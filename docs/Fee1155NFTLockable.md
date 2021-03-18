@@ -40,7 +40,7 @@ Allow the item owner to forever lock this contract to further item minting.
 
 
 
-### `createNFT(address recipient, uint256[] ids, uint256[] amounts, bytes data) → uint256` (external)
+### `createNFT(address recipient, uint256[] ids, uint256[] amounts, bytes data)` (external)
 
 Create a new NFT item group of a specific size. NFTs within a group share a
     group ID in the upper 128-bits of their full item ID. Within a group NFTs
