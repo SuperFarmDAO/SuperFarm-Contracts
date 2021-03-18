@@ -1,0 +1,28 @@
+# Ignore our imported libraries.
+/node_modules/
+node_modules
+
+# Ditch package-lock.json.
+package-lock.json
+
+# Ignore files created by Hardhat.
+/build/
+cache
+artifacts
+
+# Ignore sensitive files.
+.env
+credentials.json
+
+# Ignore built interface files.
+dist
+**/dist/
+/dist/
+dist/
+
+# Ignore archive files.
+*.zip
+
+# Ignore test coverage files.
+coverage/
+coverage.json

@@ -35,7 +35,10 @@ contract Fee1155NFTLockable is ERC1155, Ownable {
   using SafeMath for uint256;
 
   /// A version number for this fee-bearing 1155 item contract's interface.
-  uint256 public version = 1;
+  uint256 public version = 2;
+
+  /// @dev A mask for isolating an item's group ID.
+  uint256 constant GROUP_MASK = uint256(uint128(~0)) << 128;
 
   /// The ERC-1155 URI for looking up item metadata using {id} substitution.
   string public metadataUri;
@@ -45,12 +48,6 @@ contract Fee1155NFTLockable is ERC1155, Ownable {
 
   /// Specifically whitelist an OpenSea proxy registry address.
   address public proxyRegistryAddress;
-
-  /// A counter to enforce unique IDs for each item group minted.
-  uint256 public nextItemGroupId;
-
-  /// This mapping tracks the number of unique items within each item group.
-  mapping (uint256 => uint256) public itemGroupSizes;
 
   /// Whether or not the item collection has been locked to further minting.
   bool public locked;
@@ -70,7 +67,6 @@ contract Fee1155NFTLockable is ERC1155, Ownable {
     metadataUri = _uri;
     feeOwner = _feeOwner;
     proxyRegistryAddress = _proxyRegistryAddress;
-    nextItemGroupId = 0;
     locked = false;
   }
 
@@ -116,7 +112,7 @@ contract Fee1155NFTLockable is ERC1155, Ownable {
     @param amounts The amount of each corresponding item ID to create.
     @param data Any associated data to use on items minted in this transaction.
   */
-  function createNFT(address recipient, uint256[] calldata ids, uint256[] calldata amounts, bytes calldata data) external onlyOwner returns (uint256) {
+  function createNFT(address recipient, uint256[] calldata ids, uint256[] calldata amounts, bytes calldata data) external onlyOwner {
     require(!locked,
       "You cannot create more NFTs on a locked collection.");
     require(ids.length > 0,
@@ -124,16 +120,10 @@ contract Fee1155NFTLockable is ERC1155, Ownable {
     require(ids.length == amounts.length,
       "IDs length cannot be mismatched with amounts length.");
 
-    // Create an item group of requested size using the next available ID.
-    uint256 shiftedGroupId = nextItemGroupId << 128;
-    itemGroupSizes[shiftedGroupId] = ids.length;
-
     // Mint the entire batch of items.
     _mintBatch(recipient, ids, amounts, data);
 
     // Increment our next item group ID and return our created item group ID.
-    nextItemGroupId = nextItemGroupId.add(1);
-    emit ItemGroupCreated(shiftedGroupId, ids.length, msg.sender);
-    return shiftedGroupId;
+    emit ItemGroupCreated(ids[0] & GROUP_MASK, ids.length, msg.sender);
   }
 }
