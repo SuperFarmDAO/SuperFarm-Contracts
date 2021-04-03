@@ -6,22 +6,23 @@ import { expect } from 'chai';
 import 'chai/register-should';
 
 // Test the Shop Launchpad contract's ability to list and sell NFTs.
-describe('ShopLaunchpad1155', function () {
+describe('ShopPlatformLaunchpad1155', function () {
 	const startingUri = 'starting-uri';
-	let alice, bob, minter;
-	let Token, Staker, FeeOwner, ShopLaunchpad1155, MockProxyRegistry, Fee1155NFTLockable;
+	let alice, bob, carol, minter;
+	let Token, Staker, FeeOwner, ShopPlatformLaunchpad1155, MockProxyRegistry, Fee1155NFTLockable;
 	before(async () => {
 		const signers = await ethers.getSigners();
 		const addresses = await Promise.all(signers.map(async signer => signer.getAddress()));
 		alice = { provider: signers[0].provider, signer: signers[0], address: addresses[0] };
 		bob = { provider: signers[1].provider, signer: signers[1], address: addresses[1] };
+		carol = { provider: signers[2].provider, signer: signers[2], address: addresses[2] };
 		minter = { provider: signers[4].provider, signer: signers[4], address: addresses[4] };
 
 		// Create factories for deploying all required contracts using specified signers.
 		Token = await ethers.getContractFactory('Token');
 		Staker = await ethers.getContractFactory('Staker');
 		FeeOwner = await ethers.getContractFactory('FeeOwner');
-		ShopLaunchpad1155 = await ethers.getContractFactory('ShopLaunchpad1155');
+		ShopPlatformLaunchpad1155 = await ethers.getContractFactory('ShopPlatformLaunchpad1155');
 		MockProxyRegistry = await ethers.getContractFactory('MockProxyRegistry');
 		Fee1155NFTLockable = await ethers.getContractFactory('Fee1155NFTLockable');
 	});
@@ -41,7 +42,7 @@ describe('ShopLaunchpad1155', function () {
 		await proxyRegistry.deployed();
 		itemOne = await Fee1155NFTLockable.connect(alice.signer).deploy(startingUri, itemFeeOwner.address, proxyRegistry.address);
 		await itemOne.deployed();
-		shop = await ShopLaunchpad1155.connect(alice.signer).deploy(itemOne.address, platformFeeOwner.address, [ staker.address ], 1);
+		shop = await ShopPlatformLaunchpad1155.connect(alice.signer).deploy(itemOne.address, platformFeeOwner.address, [ staker.address ], 1);
 		await shop.deployed();
 
 		// Alice as owner of the Staker must approve the shop to spend user points.
@@ -76,10 +77,12 @@ describe('ShopLaunchpad1155', function () {
 			name: 'Test Pool',
 			startBlock: currentBlockNumber,
 			endBlock: currentBlockNumber + 100,
+			purchaseLimit: 1,
 			requirement: {
 				requiredType: 0,
 				requiredAsset: ethers.constants.AddressZero,
-				requiredAmount: 0
+				requiredAmount: 0,
+				whitelistId: 0
 			}
 		}, [ 0 ], [ 10 ], [ [ {
 			assetType: 1,
@@ -95,10 +98,12 @@ describe('ShopLaunchpad1155', function () {
 			name: 'Test Pool',
 			startBlock: currentBlockNumber,
 			endBlock: currentBlockNumber + 100,
+			purchaseLimit: 1,
 			requirement: {
 				requiredType: 0,
 				requiredAsset: ethers.constants.AddressZero,
-				requiredAmount: 0
+				requiredAmount: 0,
+				whitelistId: 0
 			}
 		}, [ 0 ], [ 10 ], [ [ {
 			assetType: 1,
@@ -121,10 +126,12 @@ describe('ShopLaunchpad1155', function () {
 			name: 'Test Pool',
 			startBlock: currentBlockNumber,
 			endBlock: currentBlockNumber + 100,
+			purchaseLimit: 1,
 			requirement: {
 				requiredType: 0,
 				requiredAsset: ethers.constants.AddressZero,
-				requiredAmount: 0
+				requiredAmount: 0,
+				whitelistId: 0
 			}
 		}, [ 0 ], [ 10 ], [ [ {
 			assetType: 2,
@@ -157,10 +164,12 @@ describe('ShopLaunchpad1155', function () {
 			name: 'Test Pool',
 			startBlock: currentBlockNumber,
 			endBlock: currentBlockNumber + 100,
+			purchaseLimit: 1,
 			requirement: {
 				requiredType: 0,
 				requiredAsset: ethers.constants.AddressZero,
-				requiredAmount: 0
+				requiredAmount: 0,
+				whitelistId: 0
 			}
 		}, [ 0 ], [ 10 ], [ [ {
 			assetType: 0,
@@ -183,10 +192,12 @@ describe('ShopLaunchpad1155', function () {
 			name: 'Test Pool',
 			startBlock: currentBlockNumber,
 			endBlock: currentBlockNumber + 100,
+			purchaseLimit: 1,
 			requirement: {
 				requiredType: 0,
 				requiredAsset: ethers.constants.AddressZero,
-				requiredAmount: 0
+				requiredAmount: 0,
+				whitelistId: 0
 			}
 		}, [ 0 ], [ 10 ], [ [ {
 			assetType: 1,
@@ -214,10 +225,12 @@ describe('ShopLaunchpad1155', function () {
 			name: 'Test Pool',
 			startBlock: currentBlockNumber,
 			endBlock: currentBlockNumber + 100,
+			purchaseLimit: 1,
 			requirement: {
 				requiredType: 0,
 				requiredAsset: ethers.constants.AddressZero,
-				requiredAmount: 0
+				requiredAmount: 0,
+				whitelistId: 0
 			}
 		}, [ 0 ], [ 10 ], [ [ {
 			assetType: 1,
@@ -238,10 +251,12 @@ describe('ShopLaunchpad1155', function () {
 			name: 'Test Pool',
 			startBlock: currentBlockNumber,
 			endBlock: currentBlockNumber + 100,
+			purchaseLimit: 1,
 			requirement: {
 				requiredType: 1,
 				requiredAsset: token.address,
-				requiredAmount: ethers.utils.parseEther('1000')
+				requiredAmount: ethers.utils.parseEther('1000'),
+				whitelistId: 0
 			}
 		}, [ 0 ], [ 10 ], [ [ {
 			assetType: 1,
@@ -281,10 +296,12 @@ describe('ShopLaunchpad1155', function () {
 				name: 'Test Pool',
 				startBlock: currentBlockNumber,
 				endBlock: currentBlockNumber - 1,
+				purchaseLimit: 1,
 				requirement: {
 					requiredType: 0,
 					requiredAsset: ethers.constants.AddressZero,
-					requiredAmount: 0
+					requiredAmount: 0,
+					whitelistId: 0
 				}
 			}, [ 0 ], [ 10 ], [ [ {
 				assetType: 1,
@@ -302,10 +319,12 @@ describe('ShopLaunchpad1155', function () {
 				name: 'Test Pool',
 				startBlock: currentBlockNumber,
 				endBlock: currentBlockNumber + 100,
+				purchaseLimit: 1,
 				requirement: {
 					requiredType: 0,
 					requiredAsset: ethers.constants.AddressZero,
-					requiredAmount: 0
+					requiredAmount: 0,
+					whitelistId: 0
 				}
 			}, [ ], [ 10 ], [ [ {
 				assetType: 1,
@@ -323,10 +342,12 @@ describe('ShopLaunchpad1155', function () {
 				name: 'Test Pool',
 				startBlock: currentBlockNumber,
 				endBlock: currentBlockNumber + 100,
+				purchaseLimit: 1,
 				requirement: {
 					requiredType: 0,
 					requiredAsset: ethers.constants.AddressZero,
-					requiredAmount: 0
+					requiredAmount: 0,
+					whitelistId: 0
 				}
 			}, [ 0, 1 ], [ 10 ], [ [ {
 				assetType: 1,
@@ -344,10 +365,12 @@ describe('ShopLaunchpad1155', function () {
 				name: 'Test Pool',
 				startBlock: currentBlockNumber,
 				endBlock: currentBlockNumber + 100,
+				purchaseLimit: 1,
 				requirement: {
 					requiredType: 0,
 					requiredAsset: ethers.constants.AddressZero,
-					requiredAmount: 0
+					requiredAmount: 0,
+					whitelistId: 0
 				}
 			}, [ 0 ], [ 0 ], [ [ {
 				assetType: 1,
@@ -364,10 +387,12 @@ describe('ShopLaunchpad1155', function () {
 			name: 'Test Pool',
 			startBlock: currentBlockNumber,
 			endBlock: currentBlockNumber + 100,
+			purchaseLimit: 1,
 			requirement: {
 				requiredType: 0,
 				requiredAsset: ethers.constants.AddressZero,
-				requiredAmount: 0
+				requiredAmount: 0,
+				whitelistId: 0
 			}
 		}, [ 0 ], [ 10 ], [ [ {
 			assetType: 1,
@@ -388,10 +413,12 @@ describe('ShopLaunchpad1155', function () {
 			name: 'Test Pool',
 			startBlock: currentBlockNumber,
 			endBlock: currentBlockNumber + 100,
+			purchaseLimit: 1,
 			requirement: {
 				requiredType: 0,
 				requiredAsset: ethers.constants.AddressZero,
-				requiredAmount: 0
+				requiredAmount: 0,
+				whitelistId: 0
 			}
 		}, [ 0 ], [ 10 ], [ [ {
 			assetType: 1,
@@ -412,10 +439,12 @@ describe('ShopLaunchpad1155', function () {
 			name: 'Test Pool',
 			startBlock: currentBlockNumber,
 			endBlock: currentBlockNumber + 100,
+			purchaseLimit: 1,
 			requirement: {
 				requiredType: 0,
 				requiredAsset: ethers.constants.AddressZero,
-				requiredAmount: 0
+				requiredAmount: 0,
+				whitelistId: 0
 			}
 		}, [ 0 ], [ 10 ], [ [ {
 			assetType: 1,
@@ -436,10 +465,12 @@ describe('ShopLaunchpad1155', function () {
 			name: 'Test Pool',
 			startBlock: currentBlockNumber,
 			endBlock: currentBlockNumber + 100,
+			purchaseLimit: 1,
 			requirement: {
 				requiredType: 0,
 				requiredAsset: ethers.constants.AddressZero,
-				requiredAmount: 0
+				requiredAmount: 0,
+				whitelistId: 0
 			}
 		}, [ 0 ], [ 10 ], [ [ {
 			assetType: 1,
@@ -460,10 +491,12 @@ describe('ShopLaunchpad1155', function () {
 			name: 'Test Pool',
 			startBlock: currentBlockNumber + 100,
 			endBlock: currentBlockNumber + 100,
+			purchaseLimit: 1,
 			requirement: {
 				requiredType: 0,
 				requiredAsset: ethers.constants.AddressZero,
-				requiredAmount: 0
+				requiredAmount: 0,
+				whitelistId: 0
 			}
 		}, [ 0 ], [ 10 ], [ [ {
 			assetType: 1,
@@ -484,10 +517,12 @@ describe('ShopLaunchpad1155', function () {
 			name: 'Test Pool',
 			startBlock: currentBlockNumber - 1,
 			endBlock: currentBlockNumber - 1,
+			purchaseLimit: 1,
 			requirement: {
 				requiredType: 0,
 				requiredAsset: ethers.constants.AddressZero,
-				requiredAmount: 0
+				requiredAmount: 0,
+				whitelistId: 0
 			}
 		}, [ 0 ], [ 10 ], [ [ {
 			assetType: 1,
@@ -508,10 +543,12 @@ describe('ShopLaunchpad1155', function () {
 			name: 'Test Pool',
 			startBlock: currentBlockNumber,
 			endBlock: currentBlockNumber + 100,
+			purchaseLimit: 1,
 			requirement: {
 				requiredType: 0,
 				requiredAsset: ethers.constants.AddressZero,
-				requiredAmount: 0
+				requiredAmount: 0,
+				whitelistId: 0
 			}
 		}, [ 0 ], [ 1 ], [ [ {
 			assetType: 1,
@@ -535,10 +572,12 @@ describe('ShopLaunchpad1155', function () {
 			name: 'Test Pool',
 			startBlock: currentBlockNumber,
 			endBlock: currentBlockNumber + 100,
+			purchaseLimit: 1,
 			requirement: {
 				requiredType: 0,
 				requiredAsset: ethers.constants.AddressZero,
-				requiredAmount: 0
+				requiredAmount: 0,
+				whitelistId: 0
 			}
 		}, [ 0 ], [ 1 ], [ [ {
 			assetType: 1,
@@ -559,10 +598,12 @@ describe('ShopLaunchpad1155', function () {
 			name: 'Test Pool',
 			startBlock: currentBlockNumber,
 			endBlock: currentBlockNumber + 100,
+			purchaseLimit: 1,
 			requirement: {
 				requiredType: 0,
 				requiredAsset: ethers.constants.AddressZero,
-				requiredAmount: 0
+				requiredAmount: 0,
+				whitelistId: 0
 			}
 		}, [ 0 ], [ 1 ], [ [ {
 			assetType: 2,
@@ -579,7 +620,7 @@ describe('ShopLaunchpad1155', function () {
 	// Verify that multiple assets with multiple purchase assets work.
 	it('should support multiple items per pool with multiple prices', async () => {
 		await shop.connect(alice.signer).ownershipClawback();
-		shop = await ShopLaunchpad1155.connect(alice.signer).deploy(itemOne.address, platformFeeOwner.address, [ staker.address ], 4);
+		shop = await ShopPlatformLaunchpad1155.connect(alice.signer).deploy(itemOne.address, platformFeeOwner.address, [ staker.address ], 4);
 		await shop.deployed();
 		await itemOne.connect(alice.signer).transferOwnership(shop.address);
 
@@ -589,10 +630,12 @@ describe('ShopLaunchpad1155', function () {
 			name: 'Test Pool',
 			startBlock: currentBlockNumber,
 			endBlock: currentBlockNumber + 100,
+			purchaseLimit: 1,
 			requirement: {
 				requiredType: 0,
 				requiredAsset: ethers.constants.AddressZero,
-				requiredAmount: 0
+				requiredAmount: 0,
+				whitelistId: 0
 			}
 		}, [ 0, 1 ], [ 10, 5 ], [
 			[ {
@@ -667,5 +710,216 @@ describe('ShopLaunchpad1155', function () {
 		aliceNewTokenBalance.sub(aliceOldTokenBalance).should.be.equal(ethers.utils.parseEther('10'));
 		bobTokenBalance = await token.balanceOf(bob.address);
 		bobTokenBalance.should.be.equal(ethers.utils.parseEther('0'));
+	});
+
+	// Verify correctness of the pool view function.
+	it('should generate the correct pool view output', async () => {
+		await shop.connect(alice.signer).ownershipClawback();
+		shop = await ShopPlatformLaunchpad1155.connect(alice.signer).deploy(itemOne.address, platformFeeOwner.address, [ staker.address ], 4);
+		await shop.deployed();
+		await itemOne.connect(alice.signer).transferOwnership(shop.address);
+
+		// Add the testing pools to the new Shop.
+		const currentBlockNumber = await alice.provider.getBlockNumber();
+		await shop.connect(alice.signer).addPool({
+			name: 'Test Pool',
+			startBlock: currentBlockNumber,
+			endBlock: currentBlockNumber + 100,
+			purchaseLimit: 1,
+			requirement: {
+				requiredType: 0,
+				requiredAsset: ethers.constants.AddressZero,
+				requiredAmount: 0,
+				whitelistId: 0
+			}
+		}, [ 0, 1 ], [ 10, 5 ], [
+			[ {
+				assetType: 1,
+				asset: '0x0000000000000000000000000000000000000000',
+				price: ethers.utils.parseEther('0.1')
+			},
+			{
+				assetType: 2,
+				asset: token.address,
+				price: ethers.utils.parseEther('1')
+			} ],
+			[ {
+				assetType: 1,
+				asset: '0x0000000000000000000000000000000000000000',
+				price: ethers.utils.parseEther('1')
+			},
+			{
+				assetType: 2,
+				asset: token.address,
+				price: ethers.utils.parseEther('10')
+			} ]
+		]);
+
+		// Get the first pool.
+		let poolOne = (await shop.getPools([ 0 ]))[0];
+		poolOne.name.should.be.equal('Test Pool');
+		poolOne.startBlock.should.be.equal(currentBlockNumber);
+		poolOne.endBlock.should.be.equal(currentBlockNumber + 100);
+		poolOne.requirement.requiredType.should.be.equal(0);
+		poolOne.requirement.requiredAsset.should.be.equal(ethers.constants.AddressZero);
+		poolOne.requirement.requiredAmount.should.be.equal(0);
+		poolOne.items[0].groupId.should.be.equal(0);
+		poolOne.items[0].cap.should.be.equal(10);
+		poolOne.items[0].minted.should.be.equal(0);
+		poolOne.items[0].prices.length.should.be.equal(2);
+		poolOne.items[0].prices[0].assetType.should.be.equal(1);
+		poolOne.items[0].prices[0].asset.should.be.equal(ethers.constants.AddressZero);
+		poolOne.items[0].prices[0].price.should.be.equal(ethers.utils.parseEther('0.1'));
+		poolOne.items[0].prices[1].assetType.should.be.equal(2);
+		poolOne.items[0].prices[1].asset.should.be.equal(token.address);
+		poolOne.items[0].prices[1].price.should.be.equal(ethers.utils.parseEther('1'));
+		poolOne.items[1].groupId.should.be.equal(1);
+		poolOne.items[1].cap.should.be.equal(5);
+		poolOne.items[1].minted.should.be.equal(0);
+		poolOne.items[1].prices.length.should.be.equal(2);
+		poolOne.items[1].prices[0].assetType.should.be.equal(1);
+		poolOne.items[1].prices[0].asset.should.be.equal(ethers.constants.AddressZero);
+		poolOne.items[1].prices[0].price.should.be.equal(ethers.utils.parseEther('1'));
+		poolOne.items[1].prices[1].assetType.should.be.equal(2);
+		poolOne.items[1].prices[1].asset.should.be.equal(token.address);
+		poolOne.items[1].prices[1].price.should.be.equal(ethers.utils.parseEther('10'));
+	});
+
+	// Verify that the owner can specify whitelists which are respected.
+	it('should respect whitelist requirements', async () => {
+		const currentBlockNumber = await alice.provider.getBlockNumber();
+		await shop.connect(alice.signer).addPool({
+			name: 'Test Pool',
+			startBlock: currentBlockNumber,
+			endBlock: currentBlockNumber + 100,
+			purchaseLimit: 1,
+			requirement: {
+				requiredType: 0,
+				requiredAsset: ethers.constants.AddressZero,
+				requiredAmount: 0,
+				whitelistId: 1
+			}
+		}, [ 0 ], [ 10 ], [ [ {
+			assetType: 2,
+			asset: token.address,
+			price: ethers.utils.parseEther('1')
+		} ] ]);
+
+		// The owner can specify a whitelist.
+		await shop.connect(alice.signer).addWhitelist({
+			addresses: [ carol.address ],
+			expiryBlock: currentBlockNumber + 100,
+			isActive: true
+		});
+
+		// Give Bob tokens.
+		await token.connect(minter.signer).transfer(bob.address, ethers.utils.parseEther('1'));
+		let bobTokenBalance = await token.balanceOf(bob.address);
+		bobTokenBalance.should.be.equal(ethers.utils.parseEther('1'));
+
+		// Give Carol tokens.
+		await token.connect(minter.signer).transfer(carol.address, ethers.utils.parseEther('1'));
+		let carolTokenBalance = await token.balanceOf(carol.address);
+		carolTokenBalance.should.be.equal(ethers.utils.parseEther('1'));
+
+		// Bob and Carol must approve the shop to spend their tokens.
+		await token.connect(bob.signer).approve(shop.address, ethers.utils.parseEther('1'));
+		await token.connect(carol.signer).approve(shop.address, ethers.utils.parseEther('1'));
+
+		// Conduct a purchase with Carol.
+		let carolBalance = await itemOne.balanceOf(carol.address, 1);
+		carolBalance.should.be.equal(0);
+		await shop.connect(carol.signer).mintFromPool(0, 0, 0, 1);
+		carolBalance = await itemOne.balanceOf(carol.address, 1);
+		carolBalance.should.be.equal(1);
+		carolTokenBalance = await token.balanceOf(carol.address);
+		carolTokenBalance.should.be.equal(0);
+
+		// Bob should not be able to purchase an item without being whitelisted.
+		await expect(
+			shop.connect(bob.signer).mintFromPool(0, 0, 0, 1)
+		).to.be.revertedWith(`You are not whitelisted on this pool.`);
+
+		// The owner can add Bob to a whitelist.
+		await shop.connect(alice.signer).addToWhitelist(1, [ bob.address ]);
+
+		// Bob should now be able to purchase an item.
+		let bobBalance = await itemOne.balanceOf(bob.address, 2);
+		bobBalance.should.be.equal(0);
+		await shop.connect(bob.signer).mintFromPool(0, 0, 0, 1);
+		bobBalance = await itemOne.balanceOf(bob.address, 2);
+		bobBalance.should.be.equal(1);
+		bobTokenBalance = await token.balanceOf(bob.address);
+		bobTokenBalance.should.be.equal(0);
+	});
+
+	// Verify that the owner can specify whitelists which properly expire.
+	it('should respect whitelist expiration', async () => {
+		const currentBlockNumber = await alice.provider.getBlockNumber();
+		await shop.connect(alice.signer).addPool({
+			name: 'Test Pool',
+			startBlock: currentBlockNumber,
+			endBlock: currentBlockNumber + 1000,
+			purchaseLimit: 1,
+			requirement: {
+				requiredType: 0,
+				requiredAsset: ethers.constants.AddressZero,
+				requiredAmount: 0,
+				whitelistId: 1
+			}
+		}, [ 0 ], [ 10 ], [ [ {
+			assetType: 2,
+			asset: token.address,
+			price: ethers.utils.parseEther('1')
+		} ] ]);
+
+		// The owner can specify a whitelist.
+		await shop.connect(alice.signer).addWhitelist({
+			addresses: [ carol.address ],
+			expiryBlock: currentBlockNumber + 100,
+			isActive: true
+		});
+
+		// Give Bob tokens.
+		await token.connect(minter.signer).transfer(bob.address, ethers.utils.parseEther('1'));
+		let bobTokenBalance = await token.balanceOf(bob.address);
+		bobTokenBalance.should.be.equal(ethers.utils.parseEther('1'));
+
+		// Give Carol tokens.
+		await token.connect(minter.signer).transfer(carol.address, ethers.utils.parseEther('1'));
+		let carolTokenBalance = await token.balanceOf(carol.address);
+		carolTokenBalance.should.be.equal(ethers.utils.parseEther('1'));
+
+		// Bob and Carol must approve the shop to spend their tokens.
+		await token.connect(bob.signer).approve(shop.address, ethers.utils.parseEther('1'));
+		await token.connect(carol.signer).approve(shop.address, ethers.utils.parseEther('1'));
+
+		// Conduct a purchase with Carol.
+		let carolBalance = await itemOne.balanceOf(carol.address, 1);
+		carolBalance.should.be.equal(0);
+		await shop.connect(carol.signer).mintFromPool(0, 0, 0, 1);
+		carolBalance = await itemOne.balanceOf(carol.address, 1);
+		carolBalance.should.be.equal(1);
+		carolTokenBalance = await token.balanceOf(carol.address);
+		carolTokenBalance.should.be.equal(0);
+
+		// Bob should not be able to purchase an item without being whitelisted.
+		await expect(
+			shop.connect(bob.signer).mintFromPool(0, 0, 0, 1)
+		).to.be.revertedWith(`You are not whitelisted on this pool.`);
+
+		// Mine until the whitelist limitation expires.
+		for (let i = 0; i < 100; i++) {
+			ethers.provider.send('evm_mine');
+		}
+
+		// Bob should now be able to purchase an item.
+		let bobBalance = await itemOne.balanceOf(bob.address, 2);
+		bobBalance.should.be.equal(0);
+		await shop.connect(bob.signer).mintFromPool(0, 0, 0, 1);
+		bobBalance = await itemOne.balanceOf(bob.address, 2);
+		bobBalance.should.be.equal(1);
+		bobTokenBalance = await token.balanceOf(bob.address);
+		bobTokenBalance.should.be.equal(0);
 	});
 });

@@ -51,6 +51,7 @@
     "@openzeppelin/contracts": "^3.4.0",
     "axios": "^0.21.1",
     "chai": "^4.2.0",
+    "csv-writer": "^1.6.0",
     "eslint": "^7.10.0",
     "eslint-plugin-html": "^6.1.0",
     "eslint-plugin-import": "^2.22.1",

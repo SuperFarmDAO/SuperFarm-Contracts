@@ -17,8 +17,10 @@ import "./Staker.sol";
   @title A Shop contract for selling NFTs via direct minting through particular
          pools with specific participation requirements.
   @author Tim Clancy
+
+  This launchpad contract is specifically optimized for SuperFarm direct use.
 */
-contract ShopLaunchpad1155 is ERC1155Holder, Ownable, ReentrancyGuard {
+contract ShopPlatformLaunchpad1155 is ERC1155Holder, Ownable, ReentrancyGuard {
   using SafeMath for uint256;
   using SafeERC20 for IERC20;
 
@@ -79,9 +81,14 @@ contract ShopLaunchpad1155 is ERC1155Holder, Ownable, ReentrancyGuard {
     @param name A name for the pool.
     @param startBlock The first block where this pool begins allowing purchases.
     @param endBlock The final block where this pool allows purchases.
+    @param itemGroupsLength The of the `itemGroups` array.
+    @param itemGroups An array of all item groups currently present in this pool.
+    @param currentPoolVersion A version number hashed with item group IDs before
+           being used as keys to other mappings. This supports efficient
+           invalidation of stale mappings.
     @param itemCaps A mapping of item group IDs to the maximum number this pool is allowed to mint.
     @param itemMinted A mapping of item group IDs to the number this pool has currently minted.
-    @param pricesLength A mapping of item group IDs to the number of price assets available to purchase with.
+    @param itemPricesLength A mapping of item group IDs to the number of price assets available to purchase with.
     @param itemPrices A mapping of item group IDs to a mapping of available PricePair assets available to purchase with.
     @param requirement A PoolRequirement requisite for users who want to participate in this pool.
   */
@@ -89,11 +96,13 @@ contract ShopLaunchpad1155 is ERC1155Holder, Ownable, ReentrancyGuard {
     string name;
     uint256 startBlock;
     uint256 endBlock;
-    mapping (uint256 => uint256) itemCaps;
-    mapping (uint256 => uint256) itemMinted;
-    mapping (uint256 => uint256) pricesLength;
-    mapping (uint256 => mapping (uint256 => PricePair)) itemPrices;
     PoolRequirement requirement;
+    uint256[] itemGroups;
+    uint256 currentPoolVersion;
+    mapping (bytes32 => uint256) itemCaps;
+    mapping (bytes32 => uint256) itemMinted;
+    mapping (bytes32 => uint256) itemPricesLength;
+    mapping (bytes32 => mapping (uint256 => PricePair)) itemPrices;
   }
 
   /**
@@ -141,6 +150,24 @@ contract ShopLaunchpad1155 is ERC1155Holder, Ownable, ReentrancyGuard {
     uint256 requiredAmount;
   }
 
+  // TODO.
+  struct PoolItem {
+    uint256 groupId;
+    uint256 cap;
+    uint256 minted;
+    PricePair[] prices;
+  }
+
+  // TODO.
+  struct PoolOutput {
+    string name;
+    uint256 startBlock;
+    uint256 endBlock;
+    string itemMetadataUri;
+    PoolItem[] items;
+    PoolRequirement requirement;
+  }
+
   /// @dev a modifier which allows only `originalOwner` to call a function.
   modifier onlyOriginalOwner() {
     require(originalOwner == _msgSender(),
@@ -164,6 +191,33 @@ contract ShopLaunchpad1155 is ERC1155Holder, Ownable, ReentrancyGuard {
 
     originalOwner = item.owner();
     ownershipLocked = false;
+  }
+
+  // TODO.
+  function getPool(uint256 poolId) external view returns (PoolOutput memory) {
+    PoolItem[] memory poolItems = new PoolItem[](pools[poolId].itemGroups.length);
+    for (uint256 i = 0; i < pools[poolId].itemGroups.length; i++) {
+      uint256 itemGroupId = pools[poolId].itemGroups[i];
+      bytes32 itemKey = keccak256(abi.encodePacked(pools[poolId].currentPoolVersion, itemGroupId));
+      PricePair[] memory itemPrices = new PricePair[](pools[poolId].itemPricesLength[itemKey]);
+      for (uint256 j = 0; j < pools[poolId].itemPricesLength[itemKey]; j++) {
+        itemPrices[j] = pools[poolId].itemPrices[itemKey][j];
+      }
+      poolItems[i] = PoolItem({
+        groupId: itemGroupId,
+        cap: pools[poolId].itemCaps[itemKey],
+        minted: pools[poolId].itemMinted[itemKey],
+        prices: itemPrices
+      });
+    }
+    return PoolOutput({
+      name: pools[poolId].name,
+      startBlock: pools[poolId].startBlock,
+      endBlock: pools[poolId].endBlock,
+      itemMetadataUri: item.metadataUri(),
+      items: poolItems,
+      requirement: pools[poolId].requirement
+    });
   }
 
   /**
@@ -221,10 +275,13 @@ contract ShopLaunchpad1155 is ERC1155Holder, Ownable, ReentrancyGuard {
       "Item groups length cannot be mismatched with mintable amounts length.");
 
     // Immediately store some given information about this pool.
+    uint256 newPoolVersion = pools[poolId].currentPoolVersion.add(1);
     pools[poolId] = Pool({
       name: pool.name,
       startBlock: pool.startBlock,
       endBlock: pool.endBlock,
+      itemGroups: _groupIds,
+      currentPoolVersion: newPoolVersion,
       requirement: pool.requirement
     });
 
@@ -232,13 +289,14 @@ contract ShopLaunchpad1155 is ERC1155Holder, Ownable, ReentrancyGuard {
     for (uint256 i = 0; i < _groupIds.length; i++) {
       require(_amounts[i] > 0,
         "You cannot add an item with no mintable amount.");
-      pools[poolId].itemCaps[ _groupIds[i]] = _amounts[i];
+      bytes32 itemKey = keccak256(abi.encode(newPoolVersion, _groupIds[i]));
+      pools[poolId].itemCaps[itemKey] = _amounts[i];
 
       // Store future purchase information for the item group.
-      for (uint256 j = 0; j < _pricePairs.length; j++) {
-        pools[poolId].itemPrices[ _groupIds[i]][j] = _pricePairs[i][j];
+      for (uint256 j = 0; j < _pricePairs[i].length; j++) {
+        pools[poolId].itemPrices[itemKey][j] = _pricePairs[i][j];
       }
-      pools[poolId].pricesLength[ _groupIds[i]] = _pricePairs[i].length;
+      pools[poolId].itemPricesLength[itemKey] = _pricePairs[i].length;
     }
   }
 
@@ -255,7 +313,9 @@ contract ShopLaunchpad1155 is ERC1155Holder, Ownable, ReentrancyGuard {
       "You must purchase at least one item.");
     require(poolId < nextPoolId,
       "You can only purchase items from an active pool.");
-    require(assetId < pools[poolId].pricesLength[groupId],
+
+    bytes32 itemKey = keccak256(abi.encode(pools[poolId].currentPoolVersion, groupId));
+    require(assetId < pools[poolId].itemPricesLength[itemKey],
       "Your specified asset ID is not valid.");
 
     // Verify that the pool is still running its sale.
@@ -268,8 +328,8 @@ contract ShopLaunchpad1155 is ERC1155Holder, Ownable, ReentrancyGuard {
       "You may not purchase any more items from this sale.");
 
     // Verify that the pool is not depleted by the user's purchase.
-    uint256 newCirculatingTotal = pools[poolId].itemMinted[groupId].add(amount);
-    require(newCirculatingTotal <= pools[poolId].itemCaps[groupId],
+    uint256 newCirculatingTotal = pools[poolId].itemMinted[itemKey].add(amount);
+    require(newCirculatingTotal <= pools[poolId].itemCaps[itemKey],
       "There are not enough items available for you to purchase.");
 
     // Verify that the user meets any requirements gating participation in this pool.
@@ -290,7 +350,7 @@ contract ShopLaunchpad1155 is ERC1155Holder, Ownable, ReentrancyGuard {
     // Process payment for the user.
     // If the sentinel value for the point asset type is found, sell for points.
     // This involves converting the asset from an address to a Staker index.
-    PricePair memory sellingPair = pools[poolId].itemPrices[groupId][assetId];
+    PricePair memory sellingPair = pools[poolId].itemPrices[itemKey][assetId];
     if (sellingPair.assetType == 0) {
       uint256 stakerIndex = uint256(sellingPair.asset);
       stakers[stakerIndex].spendPoints(msg.sender, sellingPair.price.mul(amount));
@@ -330,7 +390,7 @@ contract ShopLaunchpad1155 is ERC1155Holder, Ownable, ReentrancyGuard {
     nextItemIssues[groupId] = nextIssueNumber.add(amount);
 
     // Update the count of circulating items from this pool.
-    pools[poolId].itemMinted[groupId] = newCirculatingTotal;
+    pools[poolId].itemMinted[itemKey] = newCirculatingTotal;
 
     // Update the count of items that a user has purchased.
     purchaseCounts[msg.sender] = userPurchaseAmount;
