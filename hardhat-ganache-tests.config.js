@@ -1,3 +1,5 @@
+'use strict';
+
 // Configure environment variables.
 require('dotenv').config();
 
