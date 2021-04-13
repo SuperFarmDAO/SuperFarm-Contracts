@@ -630,7 +630,7 @@ describe('ShopPlatformLaunchpad1155', function () {
 			name: 'Test Pool',
 			startBlock: currentBlockNumber,
 			endBlock: currentBlockNumber + 100,
-			purchaseLimit: 1,
+			purchaseLimit: 4,
 			requirement: {
 				requiredType: 0,
 				requiredAsset: ethers.constants.AddressZero,
