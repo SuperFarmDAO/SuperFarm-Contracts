@@ -1,3 +1,5 @@
+'use strict';
+
 // Configure environment variables.
 require('dotenv').config();
 
@@ -28,6 +30,14 @@ module.exports = {
 			},
 			{
 				version: '0.6.12',
+				settings: {
+					optimizer: {
+						enabled: true
+					}
+				}
+			},
+			{
+				version: '0.7.3',
 				settings: {
 					optimizer: {
 						enabled: true
