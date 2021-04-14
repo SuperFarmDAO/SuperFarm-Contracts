@@ -16,7 +16,7 @@
   },
   "homepage": "https://github.com/SuperFarmDAO/SuperFarm-Contracts#readme",
   "scripts": {
-    "test": "npx hardhat test; echo 'Executing test cases which require Ganache ...'; npx hardhat --config hardhat-ganache-tests.config.js --network ganache test;",
+    "test": "npx hardhat test; echo 'Executing test cases which require Ganache ...';",
     "lint": "npx eslint ./",
     "validate": "npm-run-all --parallel test lint",
     "contract-size": "npx hardhat size-contracts"
