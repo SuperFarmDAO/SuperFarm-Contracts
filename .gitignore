@@ -26,3 +26,9 @@ dist/
 # Ignore test coverage files.
 coverage/
 coverage.json
+
+# Ignore script output.
+output/
+
+# Ignore deployment scripts.
+scripts/
