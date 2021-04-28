@@ -61,6 +61,8 @@ contract VestStream {
   */
   constructor(IERC20 _token) public {
     token = _token;
+    uint256 MAX_INT = 2**256 - 1;
+    token.approve(address(this), MAX_INT);
   }
 
   /**
