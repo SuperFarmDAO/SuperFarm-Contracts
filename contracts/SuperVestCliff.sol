@@ -141,7 +141,7 @@ contract SuperVestCliff {
         require(
             ERC20(tokenAddress).allowance(msg.sender, address(this)) >=
                 _totalAmount,
-            "Provide token allowance to SuperStreamClaim contract"
+            "Provide token allowance to SuperVestCliff contract"
         );
         // Transfer Tokens to SuperStreamClaim
         ERC20(tokenAddress).transferFrom(

@@ -35,6 +35,16 @@ contract SuperVestStream {
     }
     Claim[] private claims;
 
+    struct StreamInfo {
+        uint256 startTime;
+        bool notOverflow;
+        uint256 startDiff;
+        uint256 diff;
+        uint256 amountPerBlock;
+        uint256[] _timePeriods;
+        uint256[] _tokenAmounts;
+    }
+
     mapping(address => uint256[]) private _ownerClaims;
     mapping(address => uint256[]) private _beneficiaryClaims;
 
@@ -143,30 +153,36 @@ contract SuperVestStream {
             "Provide token allowance to SuperVestStream contract"
         );
         // Calculate estimated epoch for _startBlock
-        uint256 startTime;
-        // ==================================
-        // Commented code can be used if we want
-        // startTime to be now in the event of
-        // _startBlock being behind current block
-        // ==================================
-        //
-        // if ((_startBlock - block.number) <= 0) {
-        //     startTime = block.timestamp;
-        // } else {
-        startTime =
-            block.timestamp +
-            (_blockTime * (_startBlock - block.number));
-        // }
+        StreamInfo memory streamInfo =
+            StreamInfo(0, false, 0, 0, 0, new uint256[](0), new uint256[](0));
+        (streamInfo.notOverflow, streamInfo.startDiff) = _startBlock.trySub(
+            block.number
+        );
+        if (streamInfo.notOverflow) {
+            // If Not Overflow
+            streamInfo.startTime = block.timestamp.add(
+                _blockTime.mul(streamInfo.startDiff)
+            );
+        } else {
+            // If Overflow
+            streamInfo.startDiff = block.number.sub(_startBlock);
+            streamInfo.startTime = block.timestamp.sub(
+                _blockTime.mul(streamInfo.startDiff)
+            );
+        }
         // Calculate _timePeriods & _tokenAmounts
-        uint256 diff = _stopBlock - _startBlock;
-        uint256 amountPerBlock = _totalAmount / diff;
-        uint256[] memory _timePeriods = new uint256[](diff);
-        uint256[] memory _tokenAmounts = new uint256[](diff);
-        _timePeriods[0] = startTime;
-        _tokenAmounts[0] = amountPerBlock;
-        for (uint256 i = 1; i < diff; i++) {
-            _timePeriods[i] = _timePeriods[i - 1] + _blockTime;
-            _tokenAmounts[i] = amountPerBlock;
+        streamInfo.diff = _stopBlock.sub(_startBlock);
+        streamInfo.amountPerBlock = _totalAmount.div(streamInfo.diff);
+        streamInfo._timePeriods = new uint256[](streamInfo.diff);
+        streamInfo._tokenAmounts = new uint256[](streamInfo.diff);
+
+        streamInfo._timePeriods[0] = streamInfo.startTime;
+        streamInfo._tokenAmounts[0] = streamInfo.amountPerBlock;
+        for (uint256 i = 1; i < streamInfo.diff; i++) {
+            streamInfo._timePeriods[i] = streamInfo._timePeriods[i - 1].add(
+                _blockTime
+            );
+            streamInfo._tokenAmounts[i] = streamInfo.amountPerBlock;
         }
         // Transfer Tokens to SuperVestStream
         ERC20(tokenAddress).transferFrom(
@@ -179,14 +195,14 @@ contract SuperVestStream {
             Claim({
                 owner: msg.sender,
                 beneficiary: _beneficiary,
-                timePeriods: _timePeriods,
-                tokenAmounts: _tokenAmounts,
+                timePeriods: streamInfo._timePeriods,
+                tokenAmounts: streamInfo._tokenAmounts,
                 totalAmount: _totalAmount,
                 amountClaimed: 0,
                 periodsClaimed: 0
             });
         claims.push(claim);
-        uint256 index = claims.length - 1;
+        uint256 index = claims.length.sub(1);
         // Map Claim Index to Owner & Beneficiary
         _ownerClaims[msg.sender].push(index);
         _beneficiaryClaims[_beneficiary].push(index);

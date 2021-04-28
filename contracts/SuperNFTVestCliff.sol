@@ -174,7 +174,7 @@ contract SuperNFTVestCliff {
                 periodsClaimed: 0
             });
         claims.push(claim);
-        uint256 index = claims.length - 1;
+        uint256 index = claims.length.sub(1);
         // Map Claim Index to Owner & Beneficiary
         _ownerClaims[msg.sender].push(index);
         _nftClaims[_nftId].push(index);
