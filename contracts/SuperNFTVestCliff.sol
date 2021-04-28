@@ -1,10 +1,6 @@
-pragma solidity ^0.6.2;
-
-// REMIX
-// import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/release-v3.4/contracts/token/ERC20/ERC20.sol";
-// import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/release-v3.4/contracts/token/ERC721/ERC721.sol";
-// import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/release-v3.4/contracts/math/SafeMath.sol";
-// import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/release-v3.4/contracts/utils/Address.sol";
+// SPDX-License-Identifier: GPL-3.0
+pragma solidity 0.6.12;
+pragma experimental ABIEncoderV2;
 
 // TRUFFLE
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
