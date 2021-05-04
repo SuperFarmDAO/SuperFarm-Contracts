@@ -77,7 +77,7 @@ contract VestStream is Ownable, ReentrancyGuard {
     Claim memory claim = claims[beneficiary];
 
     // Early-out if the claim has not started yet.
-    if (block.timestamp < claim.startTime) {
+    if (claim.startTime == 0 || block.timestamp < claim.startTime) {
       return 0;
     }
 
