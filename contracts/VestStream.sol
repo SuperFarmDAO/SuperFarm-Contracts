@@ -104,7 +104,7 @@ contract VestStream is Ownable, ReentrancyGuard {
     require(_beneficiaries.length > 0, "You must specify at least one beneficiary for a claim.");
     require(_beneficiaries.length == _totalAmounts.length, "Beneficiaries and their amounts may not be mismatched.");
     require(_endTime >= _startTime, "You may not create a claim which ends before it starts.");
-    require(_startTime >= block.number, "Claim start time must be in the future.");
+    require(_startTime >= block.timestamp, "Claim start time must be in the future.");
 
     // After validating the details for this token claim, initialize a claim for
     // each specified beneficiary.
@@ -146,9 +146,6 @@ contract VestStream is Ownable, ReentrancyGuard {
 
     // Reduce the unclaimed amount by the amount already claimed.
     uint256 unclaimedAmount = claimAmount.sub(_claim.amountClaimed);
-
-    // Verify that there is an unclaimed balance.
-    require(unclaimedAmount > 0, "There is no unclaimed balance.");
 
     // Transfer the unclaimed tokens to the beneficiary.
     token.safeTransferFrom(address(this), beneficiary, unclaimedAmount);
