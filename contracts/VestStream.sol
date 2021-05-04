@@ -2,7 +2,6 @@
 pragma solidity 0.6.12;
 pragma experimental ABIEncoderV2;
 
-import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
@@ -19,7 +18,6 @@ contract VestStream is Ownable, ReentrancyGuard {
   using SafeMath for uint256;
   using SafeMath for uint64;
   using SafeERC20 for IERC20;
-  using Address for address;
 
   /// The token to disburse in vesting.
   IERC20 public token;
@@ -106,6 +104,7 @@ contract VestStream is Ownable, ReentrancyGuard {
     require(_beneficiaries.length > 0, "You must specify at least one beneficiary for a claim.");
     require(_beneficiaries.length == _totalAmounts.length, "Beneficiaries and their amounts may not be mismatched.");
     require(_endTime >= _startTime, "You may not create a claim which ends before it starts.");
+    require(_startTime >= block.number, "Claim start time must be in the future.");
 
     // After validating the details for this token claim, initialize a claim for
     // each specified beneficiary.
