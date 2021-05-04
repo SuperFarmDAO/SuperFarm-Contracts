@@ -4,6 +4,8 @@ pragma experimental ABIEncoderV2;
 
 import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
 
@@ -13,8 +15,9 @@ import "@openzeppelin/contracts/math/SafeMath.sol";
 
   This vesting contract allows users to claim vested tokens with every block.
 */
-contract VestStream {
+contract VestStream is Ownable, ReentrancyGuard {
   using SafeMath for uint256;
+  using SafeMath for uint64;
   using SafeERC20 for IERC20;
   using Address for address;
 
@@ -22,37 +25,27 @@ contract VestStream {
   IERC20 public token;
 
   // Information for a particular token claim.
-  // - creator: the address which created the particular claim.
-  // - beneficiary: the address to whom claimed tokens are sent.
   // - totalAmount: the total size of the token claim.
   // - startTime: the timestamp in seconds when the vest begins.
   // - endTime: the timestamp in seconds when the vest completely matures.
   // - lastCLaimTime: the timestamp in seconds of the last time the claim was utilized.
   // - amountClaimed: the total amount claimed from the entire claim.
   struct Claim {
-    address creator;
-    address beneficiary;
     uint256 totalAmount;
-    uint256 startTime;
-    uint256 endTime;
-    uint256 lastClaimTime;
+    uint64 startTime;
+    uint64 endTime;
+    uint64 lastClaimTime;
     uint256 amountClaimed;
   }
 
-  /// An array of claims processed by this smart contract.
-  Claim[] private claims;
-
-  /// A mapping of addresses to the array of indices for claims they created.
-  mapping(address => uint256[]) private _creatorClaims;
-
-  /// A mapping of addresses to the array of indices for claims they receive.
-  mapping(address => uint256[]) private _beneficiaryClaims;
+  // A mapping of addresses to the claim received.
+  mapping(address => Claim) private claims;
 
   /// An event for tracking the creation of a token vest claim.
-  event ClaimCreated(address creator, address beneficiary, uint256 index);
+  event ClaimCreated(address creator, address beneficiary);
 
   /// An event for tracking a user claiming some of their vested tokens.
-  event Claimed(address creator, address beneficiary, uint256 amount, uint256 index);
+  event Claimed(address beneficiary, uint256 amount);
 
   /**
     Construct a new VestStream by providing it a token to disburse.
@@ -67,47 +60,31 @@ contract VestStream {
 
   /**
     A function which allows the caller to retrieve information about a specific
-    creator via the claim indices they created.
-
-    @param creator the creator to query claims for.
-  */
-  function creatorClaims(address creator) external view returns (uint256[] memory) {
-    require(creator != address(0), "The zero address may not be a claim creator.");
-    return _creatorClaims[creator];
-  }
-
-  /**
-    A function which allows the caller to retrieve information about a specific
-    beneficiary via the claim indices they will receive vests for.
+    claim via its beneficiary.
 
     @param beneficiary the beneficiary to query claims for.
   */
-  function beneficiaryClaims(address beneficiary) external view returns (uint256[] memory) {
+  function getClaim(address beneficiary) external view returns (Claim memory) {
     require(beneficiary != address(0), "The zero address may not be a claim beneficiary.");
-    return _beneficiaryClaims[beneficiary];
-  }
-
-  /**
-    A function which allows the caller to retrieve information about a specific
-    claim via its index.
-
-    @param index the index of a particular claim.
-  */
-  function getClaim(uint256 index) external view returns (Claim memory) {
-    return claims[index];
+    return claims[beneficiary];
   }
 
   /**
     A function which allows the caller to retrieve information about a specific
     claim's remaining claimable amount.
 
-    @param index the index of a particular claim.
+    @param beneficiary the beneficiary to query claims for.
   */
-  function claimableAmount(uint256 index) public view returns (uint256) {
-    Claim storage claim = claims[index];
+  function claimableAmount(address beneficiary) public view returns (uint256) {
+    Claim memory claim = claims[beneficiary];
+
+    // Early-out if the claim has not started yet.
+    if (block.timestamp < claim.startTime) {
+      return 0;
+    }
 
     // Calculate the current releasable token amount.
-    uint256 currentTimestamp = block.timestamp > claim.endTime ? claim.endTime : block.timestamp;
+    uint64 currentTimestamp = uint64(block.timestamp) > claim.endTime ? claim.endTime : uint64(block.timestamp);
     uint256 claimPercent = currentTimestamp.sub(claim.startTime).mul(1e18).div(claim.endTime.sub(claim.startTime));
     uint256 claimAmount = claim.totalAmount.mul(claimPercent).div(1e18);
 
@@ -121,41 +98,33 @@ contract VestStream {
     beneficiaries. The disbursement token will be taken from the claim creator.
 
     @param _beneficiaries an array of addresses to construct token claims for.
+    @param _totalAmounts the total amount of tokens to be disbursed to each beneficiary.
     @param _startTime a timestamp when this claim is to begin vesting.
     @param _endTime a timestamp when this claim is to reach full maturity.
-    @param _totalAmount the total amount of tokens to be disbursed in this claim.
   */
-  function createClaim(address[] memory _beneficiaries, uint256 _startTime, uint256 _endTime, uint256 _totalAmount) external {
+  function createClaim(address[] memory _beneficiaries, uint256[] memory _totalAmounts, uint64 _startTime, uint64 _endTime) external onlyOwner {
     require(_beneficiaries.length > 0, "You must specify at least one beneficiary for a claim.");
+    require(_beneficiaries.length == _totalAmounts.length, "Beneficiaries and their amounts may not be mismatched.");
     require(_endTime >= _startTime, "You may not create a claim which ends before it starts.");
-    require(_totalAmount > 0, "You may not create a zero-token claim.");
-
-    // Transfer all of the tokens needed to fulfill this claim from the creator.
-    token.safeTransferFrom(msg.sender, address(this), _totalAmount.mul(_beneficiaries.length));
 
     // After validating the details for this token claim, initialize a claim for
     // each specified beneficiary.
-    for (uint256 i = 0; i < _beneficiaries.length; i++) {
+    for (uint i = 0; i < _beneficiaries.length; i++) {
       address _beneficiary = _beneficiaries[i];
+      uint256 _totalAmount = _totalAmounts[i];
       require(_beneficiary != address(0), "The zero address may not be a beneficiary.");
+      require(_totalAmount > 0, "You may not create a zero-token claim.");
 
       // Establish a claim for this particular beneficiary.
       Claim memory claim = Claim({
-        creator: msg.sender,
-        beneficiary: _beneficiary,
         totalAmount: _totalAmount,
         startTime: _startTime,
         endTime: _endTime,
         lastClaimTime: _startTime,
         amountClaimed: 0
       });
-      claims.push(claim);
-      uint256 index = claims.length.sub(1);
-
-      // Map the claim index to its creator and beneficiary.
-      _creatorClaims[msg.sender].push(index);
-      _beneficiaryClaims[_beneficiary].push(index);
-      emit ClaimCreated(msg.sender, _beneficiary, index);
+      claims[_beneficiary] = claim;
+      emit ClaimCreated(msg.sender, _beneficiary);
     }
   }
 
@@ -163,35 +132,38 @@ contract VestStream {
     A function which allows the caller to send a claim's unclaimed amount to the
     beneficiary of the claim.
 
-    @param index the index of a particular claim.
+    @param beneficiary the beneficiary to claim for.
   */
-  function claim(uint256 index) external {
-    Claim storage claim = claims[index];
+  function claim(address beneficiary) external nonReentrant {
+    Claim memory _claim = claims[beneficiary];
 
     // Verify that the claim is still active.
-    require(claim.lastClaimTime < claim.endTime, "This claim has already been completely claimed.");
+    require(_claim.lastClaimTime < _claim.endTime, "This claim has already been completely claimed.");
 
     // Calculate the current releasable token amount.
-    uint256 currentTimestamp = block.timestamp > claim.endTime ? claim.endTime : block.timestamp;
-    uint256 claimPercent = currentTimestamp.sub(claim.startTime).mul(1e18).div(claim.endTime.sub(claim.startTime));
-    uint256 claimAmount = claim.totalAmount.mul(claimPercent).div(1e18);
+    uint64 currentTimestamp = uint64(block.timestamp) > _claim.endTime ? _claim.endTime : uint64(block.timestamp);
+    uint256 claimPercent = currentTimestamp.sub(_claim.startTime).mul(1e18).div(_claim.endTime.sub(_claim.startTime));
+    uint256 claimAmount = _claim.totalAmount.mul(claimPercent).div(1e18);
 
     // Reduce the unclaimed amount by the amount already claimed.
-    uint256 unclaimedAmount = claimAmount.sub(claim.amountClaimed);
-
-    // Update the amount currently claimed by the user.
-    claim.amountClaimed = claimAmount;
+    uint256 unclaimedAmount = claimAmount.sub(_claim.amountClaimed);
 
     // Verify that there is an unclaimed balance.
     require(unclaimedAmount > 0, "There is no unclaimed balance.");
 
     // Transfer the unclaimed tokens to the beneficiary.
-    token.safeTransferFrom(address(this), claim.beneficiary, unclaimedAmount);
+    token.safeTransferFrom(address(this), beneficiary, unclaimedAmount);
+
+    // Update the amount currently claimed by the user.
+    _claim.amountClaimed = claimAmount;
 
     // Update the last time the claim was utilized.
-    claim.lastClaimTime = currentTimestamp;
+    _claim.lastClaimTime = currentTimestamp;
+
+    // Update the claim structure being tracked.
+    claims[beneficiary] = _claim;
 
     // Emit an event for this token claim.
-    emit Claimed(claim.creator, claim.beneficiary, unclaimedAmount, index);
+    emit Claimed(beneficiary, unclaimedAmount);
   }
 }
