@@ -92,6 +92,16 @@ contract VestStream is Ownable, ReentrancyGuard {
   }
 
   /**
+    Sweep all of a particular ERC-20 token from the contract.
+
+    @param _token The token to sweep the balance from.
+  */
+  function sweep(IERC20 _token) external onlyOwner {
+    uint256 balance = _token.balanceOf(address(this));
+    _token.safeTransferFrom(address(this), msg.sender, balance);
+  }
+
+  /**
     A function which allows the caller to create toke vesting claims for some
     beneficiaries. The disbursement token will be taken from the claim creator.
 
@@ -104,7 +114,6 @@ contract VestStream is Ownable, ReentrancyGuard {
     require(_beneficiaries.length > 0, "You must specify at least one beneficiary for a claim.");
     require(_beneficiaries.length == _totalAmounts.length, "Beneficiaries and their amounts may not be mismatched.");
     require(_endTime >= _startTime, "You may not create a claim which ends before it starts.");
-    require(_startTime >= block.timestamp, "Claim start time must be in the future.");
 
     // After validating the details for this token claim, initialize a claim for
     // each specified beneficiary.

@@ -35,6 +35,24 @@ describe('VestStream', function () {
 		await token.connect(minter.signer).mint(vestStream.address, ethers.utils.parseEther('1000000000'));
 	});
 
+	// Verify that the vesting owner can sweep tokens from the contract.
+	it('should allow the vesting owner to sweep', async () => {
+		let contractBalance = await token.balanceOf(vestStream.address);
+		contractBalance.should.be.equal(ethers.utils.parseEther('1000000000'));
+		await vestStream.connect(minter.signer).sweep(token.address);
+		contractBalance = await token.balanceOf(vestStream.address);
+		contractBalance.should.be.equal(ethers.utils.parseEther('0'));
+		let minterBalance = await token.balanceOf(minter.address);
+		minterBalance.should.be.equal(ethers.utils.parseEther('1000000000'));
+	});
+
+	// Verify that non-owners can not sweep tokens from the contract.
+	it('should not allow non-owners to sweep', async () => {
+		await expect(
+			vestStream.connect(alice.signer).sweep(token.address)
+		).to.be.revertedWith('Ownable: caller is not the owner');
+	});
+
 	// Verify that the vesting owner can create a claim.
 	it('should allow the vesting owner to create a claim', async () => {
 		await vestStream.connect(minter.signer).createClaim([ alice.address ], [ ethers.utils.parseEther('10000') ], currentTime + 60, currentTime + 120);
@@ -75,13 +93,6 @@ describe('VestStream', function () {
 		await expect(
 			vestStream.connect(minter.signer).createClaim([ alice.address ], [ ethers.utils.parseEther('10000') ], currentTime - 120, currentTime - 240)
 		).to.be.revertedWith('You may not create a claim which ends before it starts.');
-	});
-
-	// Verify that claims must start in the future.
-	it('should revert with claims that have already started', async () => {
-		await expect(
-			vestStream.connect(minter.signer).createClaim([ alice.address ], [ ethers.utils.parseEther('10000') ], currentTime - 240, currentTime + 120)
-		).to.be.revertedWith('Claim start time must be in the future.');
 	});
 
 	// Verify that no claims are for the zero address.
