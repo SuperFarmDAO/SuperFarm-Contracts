@@ -21,12 +21,6 @@
     "validate": "npm-run-all --parallel test lint",
     "contract-size": "npx hardhat size-contracts"
   },
-  "husky": {
-    "hooks": {
-      "pre-commit": "npm run validate",
-      "pre-push": "npm run validate"
-    }
-  },
   "eslintConfig": {
     "globals": {
       "usePlugin": true

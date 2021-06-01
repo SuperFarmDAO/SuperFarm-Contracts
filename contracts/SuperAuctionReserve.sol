@@ -8,13 +8,13 @@ import "@openzeppelin/contracts/math/SafeMath.sol";
 import "./Fee1155NFTLockable.sol";
 
 /**
-  @title A simple NFT auction contract.
+  @title A simple NFT auction contract which sells a single item on reserve.
   @author SuperFarm
 
   This auction contract accepts on-chain bids before minting an NFT to the
   winner.
 */
-contract SimpleAuction is Ownable, ReentrancyGuard {
+contract SuperAuctionReserve is Ownable, ReentrancyGuard {
   using SafeMath for uint256;
 
   /// The beneficiary of the auction sale.
