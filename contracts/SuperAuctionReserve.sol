@@ -122,7 +122,8 @@ contract SuperAuctionReserve is Ownable, ReentrancyGuard {
     uint256 amount = pendingReturns[msg.sender];
     if (amount > 0) {
       pendingReturns[msg.sender] = 0;
-      if (!payable(msg.sender).send(amount)) {
+			(bool withdrawSuccess, ) = payable(msg.sender).call{ value: amount }("");
+				if (!withdrawSuccess) {
         pendingReturns[msg.sender] = amount;
         return false;
       }
@@ -141,14 +142,15 @@ contract SuperAuctionReserve is Ownable, ReentrancyGuard {
 
     // If the reserve price is not met, return the highest bid.
     if (reservePrice >= highestBid) {
-      payable(highestBidder).transfer(highestBid);
+			(bool bidderReturnSuccess, ) = payable(highestBidder).call{ value: highestBid }("");
+
 
       // The auction ended in failure.
       emit AuctionEnded(highestBidder, highestBid, block.timestamp, false);
 
     // Otherwise, take the highest bid and mint the item.
     } else {
-      beneficiary.transfer(highestBid);
+			(bool beneficiarySendSuccess, ) = payable(highestBidder).call{ value: highestBid }("");
 
       // Mint the items.
       uint256[] memory itemIds = new uint256[](1);
