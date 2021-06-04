@@ -1,15 +1,16 @@
 // SPDX-License-Identifier: GPL-3.0-only
 pragma solidity 0.7.6;
 
-import "hardhat/console.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ContextUpgradeable.sol";
+import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 
 contract SuperPad is Initializable, ContextUpgradeable, OwnableUpgradeable {
     using SafeMath for uint256;
+    using SafeERC20 for IERC20;
 
     struct Pool {
         uint256 cap;
@@ -137,7 +138,7 @@ contract SuperPad is Initializable, ContextUpgradeable, OwnableUpgradeable {
         require(amount != 0, "Amount should not be zero");
         require(pools[id].enabled, "Pool must be enabled");
         if (pools[id].onlyHolder) {
-            require(IERC20(superToken).balanceOf(msg.sender) >= minSuper, "Miniumum EXP for the pool");
+            require(IERC20(superToken).balanceOf(msg.sender) >= minSuper, "Miniumum for the pool");
         }
         if (pools[id].isWhiteList) {
             require(whiteList[id][msg.sender] > 0, "Should be white listed for the pool");
@@ -208,5 +209,15 @@ contract SuperPad is Initializable, ContextUpgradeable, OwnableUpgradeable {
         lockedTokens[id][msg.sender] = 0;
         IERC20(pools[id].token).transfer(msg.sender, amount);
         emit Claim(id, msg.sender, amount);
+    }
+
+    /**
+      Sweep all of a particular ERC-20 token from the contract.
+
+      @param _token The token to sweep the balance from.
+    */
+    function sweep(IERC20 _token) external onlyOwner {
+      uint256 balance = _token.balanceOf(address(this));
+      _token.safeTransferFrom(address(this), msg.sender, balance);
     }
 }
