@@ -70,6 +70,33 @@ describe('ShopPlatformLaunchpad1155', function () {
 		await staker.connect(bob.signer).deposit(token.address, ethers.utils.parseEther('1'));
 	});
 
+	// Verify that the scenario being used in farm launch works correctly.
+	it('should support the farm launch scenario', async () => {
+		await shop.connect(alice.signer).addPool({
+			name: 'Test Pool',
+			startBlock: 0,
+			endBlock: ethers.constants.MaxUint256,
+			purchaseLimit: 1000000,
+			requirement: {
+				requiredType: 0,
+				requiredAsset: ethers.constants.AddressZero,
+				requiredAmount: 0,
+				whitelistId: 0
+			}
+		}, [ 0, 1, 2, 3, 4 ], [ 100, 100, 100, 100, 100 ], [ [ {
+			assetType: 0,
+			asset: ethers.constants.AddressZero,
+			price: 100
+		} ] ]);
+
+		// Conduct a purchase with Bob.
+		let bobBalance = await itemOne.balanceOf(bob.address, 1);
+		bobBalance.should.be.equal(0);
+		await shop.connect(bob.signer).mintFromPool(0, 0, 0, 1);
+		bobBalance = await itemOne.balanceOf(bob.address, 1);
+		bobBalance.should.be.equal(1);
+	});
+
 	// Verify that the Shop owner can add an item pool.
 	it('should allow shop owner to create an item pool', async () => {
 		const currentBlockNumber = await alice.provider.getBlockNumber();

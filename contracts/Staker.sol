@@ -565,4 +565,14 @@ contract Staker is Ownable, ReentrancyGuard {
     userSpentPoints[_user] = userSpentPoints[_user].add(_amount);
     emit SpentPoints(msg.sender, _user, _amount);
   }
+
+  /**
+    Sweep all of a particular ERC-20 token from the contract.
+
+    @param _token The token to sweep the balance from.
+  */
+  function sweep(IERC20 _token) external onlyOwner {
+    uint256 balance = _token.balanceOf(address(this));
+    _token.safeTransferFrom(address(this), msg.sender, balance);
+  }
 }

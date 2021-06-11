@@ -499,6 +499,8 @@ contract ShopPlatformLaunchpad1155 is ERC1155Holder, Ownable, ReentrancyGuard {
       "You must list at least one item group.");
     require(_groupIds.length == _amounts.length,
       "Item groups length cannot be mismatched with mintable amounts length.");
+    require(_groupIds.length == _pricePairs.length,
+      "Item groups length cannot be mismatched with price pair inputlength.");
 
     // Immediately store some given information about this pool.
     uint256 newPoolVersion = pools[poolId].currentPoolVersion.add(1);
@@ -753,5 +755,15 @@ contract ShopPlatformLaunchpad1155 is ERC1155Holder, Ownable, ReentrancyGuard {
 
     // Emit an event indicating a successful purchase.
     emit ItemPurchased(poolId, itemIds, assetId, amounts, msg.sender);
+  }
+
+  /**
+    Sweep all of a particular ERC-20 token from the contract.
+
+    @param _token The token to sweep the balance from.
+  */
+  function sweep(IERC20 _token) external onlyOwner {
+    uint256 balance = _token.balanceOf(address(this));
+    _token.safeTransferFrom(address(this), msg.sender, balance);
   }
 }
