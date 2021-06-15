@@ -103,7 +103,7 @@ contract SuperAuctionAcceptV2 is Ownable, ReentrancyGuard {
     originalOwner = _item.owner();
     item = _item;
     groupId = _groupId;
-    auctionEndTime = block.timestamp + _duration;
+    auctionEndTime = block.timestamp.add(_duration);
     bidBuffer = _bidBuffer;
     receiptBuffer = _receiptBuffer;
     minimumBid = _minimumBid;
@@ -166,7 +166,7 @@ contract SuperAuctionAcceptV2 is Ownable, ReentrancyGuard {
     the winner an NFT item.
   */
   function accept() public nonReentrant onlyOwner returns (bool) {
-    require(block.timestamp >= auctionEndTime, "Auction not yet ended.");
+    require(block.timestamp > auctionEndTime, "Auction not yet ended.");
     require(!ended, "The auction has already ended.");
     ended = true;
 
@@ -192,7 +192,7 @@ contract SuperAuctionAcceptV2 is Ownable, ReentrancyGuard {
     Decline the auction results and return the highest bid.
   */
   function decline() public nonReentrant onlyOwner returns (bool) {
-    require(block.timestamp >= auctionEndTime, "Auction not yet ended.");
+    require(block.timestamp > auctionEndTime, "Auction not yet ended.");
     require(!ended, "The auction has already ended.");
     ended = true;
 
