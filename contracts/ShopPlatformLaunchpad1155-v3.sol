@@ -25,7 +25,7 @@ contract ShopPlatformLaunchpad1155 is ERC1155Holder, Ownable, ReentrancyGuard {
   using SafeERC20 for IERC20;
 
   /// A version number for this Shop contract's interface.
-  uint256 public version = 2;
+  uint256 public version = 3;
 
   /// @dev A mask for isolating an item's group ID.
   uint256 constant GROUP_MASK = uint256(uint128(~0)) << 128;
@@ -337,7 +337,7 @@ contract ShopPlatformLaunchpad1155 is ERC1155Holder, Ownable, ReentrancyGuard {
         // Parse each price the item is sold at.
         PricePair[] memory itemPrices = new PricePair[](pools[poolId].itemPricesLength[itemKey]);
         for (uint256 k = 0; k < pools[poolId].itemPricesLength[itemKey]; k++) {
-          itemPrices[k] = pools[poolId].itemPrices[itemKey][k];
+          itemPrices[k] = pools[poolId].itemPrices[itemKey][k]; // TODO: add staker addresses to getter.
         }
 
         // Track the item.
@@ -469,12 +469,15 @@ contract ShopPlatformLaunchpad1155 is ERC1155Holder, Ownable, ReentrancyGuard {
 
     @param pool The PoolInput full of data defining the pool's operation.
     @param _groupIds The specific Fee1155 item group IDs to sell in this pool, keyed to `_amounts`.
+    @param _issueNumberOffsets The offset for the next issue number minted for a
+      particular item group in `_groupIds`. This is *important* to prevent
+      double-minting items.
     @param _amounts The maximum amount of each particular groupId that can be sold by this pool.
     @param _pricePairs The asset address to price pairings to use for selling
                        each item.
   */
-  function addPool(PoolInput calldata pool, uint256[] calldata _groupIds, uint256[] calldata _amounts, PricePair[][] memory _pricePairs) external onlyOwner {
-    updatePool(nextPoolId, pool, _groupIds, _amounts, _pricePairs);
+  function addPool(PoolInput calldata pool, uint256[] calldata _groupIds, uint256[] calldata _issueNumberOffsets, uint256[] calldata _amounts, PricePair[][] memory _pricePairs) external onlyOwner {
+    updatePool(nextPoolId, pool, _groupIds, _issueNumberOffsets, _amounts, _pricePairs);
 
     // Increment the ID which will be used by the next pool added.
     nextPoolId = nextPoolId.add(1);
@@ -486,17 +489,22 @@ contract ShopPlatformLaunchpad1155 is ERC1155Holder, Ownable, ReentrancyGuard {
     @param poolId The ID of the pool to update.
     @param pool The PoolInput full of data defining the pool's operation.
     @param _groupIds The specific Fee1155 item group IDs to sell in this pool, keyed to `_amounts`.
+    @param _issueNumberOffsets The offset for the next issue number minted for a
+      particular item group in `_groupIds`. This is *important* to prevent
+      double-minting items.
     @param _amounts The maximum amount of each particular groupId that can be sold by this pool.
     @param _pricePairs The asset address to price pairings to use for selling
                        each item.
   */
-  function updatePool(uint256 poolId, PoolInput calldata pool, uint256[] calldata _groupIds, uint256[] calldata _amounts, PricePair[][] memory _pricePairs) public onlyOwner {
+  function updatePool(uint256 poolId, PoolInput calldata pool, uint256[] calldata _groupIds, uint256[] calldata _issueNumberOffsets, uint256[] calldata _amounts, PricePair[][] memory _pricePairs) public onlyOwner {
     require(poolId <= nextPoolId,
       "You cannot update a non-existent pool.");
     require(pool.endBlock >= pool.startBlock,
       "You cannot create a pool which ends before it starts.");
     require(_groupIds.length > 0,
       "You must list at least one item group.");
+    require(_groupIds.length == _issueNumberOffsets.length,
+      "Item groups length cannot be mismatched with issue number offsets length.");
     require(_groupIds.length == _amounts.length,
       "Item groups length cannot be mismatched with mintable amounts length.");
     require(_groupIds.length == _pricePairs.length,
@@ -520,6 +528,9 @@ contract ShopPlatformLaunchpad1155 is ERC1155Holder, Ownable, ReentrancyGuard {
         "You cannot add an item with no mintable amount.");
       bytes32 itemKey = keccak256(abi.encode(newPoolVersion, _groupIds[i]));
       pools[poolId].itemCaps[itemKey] = _amounts[i];
+
+      // Pre-seed the next item issue IDs given the pool offsets.
+      nextItemIssues[_groupIds[i]] = _issueNumberOffsets[i];
 
       // Store future purchase information for the item group.
       for (uint256 j = 0; j < _pricePairs[i].length; j++) {
