@@ -116,6 +116,52 @@ describe('ShopPlatformLaunchpad1155', function () {
 		carolBalance.should.be.equal(1);
 	});
 
+	// This test case is used to verify that launchpads can support pre-seeding of
+	// issue numbers in order to prevent double-minting items.
+	it('should correctly quantify bad pre-seeded issue number offsets', async () => {
+		let testingItem = await Fee1155NFTLockable.connect(alice.signer).deploy(startingUri, itemFeeOwner.address, proxyRegistry.address);
+		await testingItem.deployed();
+		await testingItem.connect(alice.signer).createNFT(bob.address, [ 1 ], [ 1 ], []);
+
+		// Create the testing shop.
+		let testingShop = await ShopPlatformLaunchpad1155.connect(alice.signer).deploy(testingItem.address, platformFeeOwner.address, [ staker.address ], 1);
+		await testingShop.deployed();
+		await staker.connect(alice.signer).approvePointSpender(testingShop.address, true);
+		await testingItem.connect(alice.signer).transferOwnership(testingShop.address);
+
+		await testingShop.connect(alice.signer).addPool({
+			name: 'Test Pool',
+			startBlock: 0,
+			endBlock: ethers.constants.MaxUint256,
+			purchaseLimit: 1000000,
+			requirement: {
+				requiredType: 0,
+				requiredAsset: ethers.constants.AddressZero,
+				requiredAmount: 0,
+				whitelistId: 0
+			}
+		}, [ 0 ], [ 0 ], [ 1 ], [
+			[ {
+				assetType: 1,
+				asset: '0x0000000000000000000000000000000000000000',
+				price: ethers.utils.parseEther('0.1')
+			} ]
+		]);
+
+		// Conduct a purchase with Carol.
+		let bobBalance = await testingItem.balanceOf(bob.address, 1);
+		bobBalance.should.be.equal(1);
+		let carolBalance = await testingItem.balanceOf(carol.address, 1);
+		carolBalance.should.be.equal(0);
+		await testingShop.connect(carol.signer).mintFromPool(0, 0, 0, 1, { value: ethers.utils.parseEther('0.1') });
+		bobBalance = await testingItem.balanceOf(bob.address, 1);
+		bobBalance.should.be.equal(1);
+		carolBalance = await testingItem.balanceOf(carol.address, 1);
+		carolBalance.should.be.equal(1);
+		carolBalance = await testingItem.balanceOf(carol.address, 2);
+		carolBalance.should.be.equal(0);
+	});
+
 	// Verify that the scenario being used in farm launch works correctly.
 	it('should support the farm launch scenario', async () => {
 		await shop.connect(alice.signer).addPool({
