@@ -30,7 +30,7 @@ abstract contract PermitControl is Context, Ownable {
 
   /*
     A special constant specifying the unique manager right. This right allows an
-    address to freely-manipulate the `managedRights` mapping.
+    address to freely-manipulate the `managedRight` mapping.
   **/
   bytes32 public constant MANAGER = hex"FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF";
 
@@ -56,7 +56,7 @@ abstract contract PermitControl is Context, Ownable {
     manager right's managed rights. Each right may be managed by only one other
     right.
   */
-  mapping (bytes32 => bytes32) public managedRights;
+  mapping (bytes32 => bytes32) public managerRight;
 
   /**
     An event emitted when an address has a permit updated. This event captures,
@@ -66,11 +66,21 @@ abstract contract PermitControl is Context, Ownable {
   event PermitUpdated(address indexed updator, address indexed updatee, bytes32 circumstance, bytes32 indexed role, uint256 expirationTime);
 
   /**
-    An event emitted when a management relationship in `managedRights` is
+    An event emitted when a management relationship in `managerRight` is
     updated. This event captures adding and revoking management permissions via
-    observing the update history of the `managedRights` array.
+    observing the update history of the `managerRight` value.
   */
   event ManagementUpdated(address indexed manager, bytes32 indexed managedRight, bytes32 indexed managerRight);
+
+  /**
+    A modifier which allows only the super-administrative owner or addresses
+    with a specified valid right to perform a call.
+  */
+  modifier hasValidPermit(bytes32 _circumstance, bytes32 _right) {
+    require(_msgSender() == owner() || hasRightUntil(_msgSender(), _circumstance, _right) > 0,
+      "PermitControl: sender does not have a valid permit");
+    _;
+  }
 
   /**
     Determine whether or not an address has some rights under the given
@@ -85,11 +95,9 @@ abstract contract PermitControl is Context, Ownable {
     only be set by the super-administrative contract owner or an address holding
     some delegated management permit.
   */
-  function setPermit(address _address, bytes32 _circumstance, bytes32 _right, uint256 _expirationTime) external virtual {
+  function setPermit(address _address, bytes32 _circumstance, bytes32 _right, uint256 _expirationTime) external virtual hasValidPermit(UNIVERSAL, managerRight[_right]) {
     require(_right != ZERO_RIGHT,
       "PermitControl: you may not grant the zero right");
-    require(_msgSender() == owner() || hasRightUntil(_msgSender(), UNIVERSAL, managedRights[_right]) > 0,
-      "PermitControl: sender does not have the right to set");
     permissions[_address][_circumstance][_right] = _expirationTime;
     emit PermitUpdated(_msgSender(), _address, _circumstance, _right, _expirationTime);
   }
@@ -98,12 +106,10 @@ abstract contract PermitControl is Context, Ownable {
     Set the `_managerRight` whose `UNIVERSAL` holders may freely manage the
     specified `_managedRight`.
   */
-  function setManagerRight(bytes32 _managedRight, bytes32 _managerRight) external virtual {
+  function setManagerRight(bytes32 _managedRight, bytes32 _managerRight) external virtual hasValidPermit(UNIVERSAL, MANAGER) {
     require(_managedRight != ZERO_RIGHT,
       "PermitControl: you may not specify a manager for the zero right");
-    require(_msgSender() == owner() || hasRightUntil(_msgSender(), UNIVERSAL, MANAGER) > 0,
-      "PermitControl: sender is not a manager");
-    managedRights[_managedRight] = _managerRight;
+    managerRight[_managedRight] = _managerRight;
     emit ManagementUpdated(_msgSender(), _managedRight, _managerRight);
   }
 }
