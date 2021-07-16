@@ -47,7 +47,8 @@ abstract contract PermitControl is Context, Ownable {
     max-integer circumstance. Perpetual rights may be given an expiry time of
     max-integer.
   */
-  mapping (address => mapping (bytes32 => mapping (bytes32 => uint256))) public permissions;
+  mapping (address => mapping (bytes32 => mapping (bytes32 => uint256))) public
+    permissions;
 
   /**
     An additional mapping of managed rights to manager rights. This mapping
@@ -63,14 +64,16 @@ abstract contract PermitControl is Context, Ownable {
     through its various parameter combinations, the cases of granting a permit,
     updating the expiration time of a permit, or revoking a permit.
   */
-  event PermitUpdated(address indexed updator, address indexed updatee, bytes32 circumstance, bytes32 indexed role, uint256 expirationTime);
+  event PermitUpdated(address indexed updator, address indexed updatee,
+    bytes32 circumstance, bytes32 indexed role, uint256 expirationTime);
 
   /**
     An event emitted when a management relationship in `managerRight` is
     updated. This event captures adding and revoking management permissions via
     observing the update history of the `managerRight` value.
   */
-  event ManagementUpdated(address indexed manager, bytes32 indexed managedRight, bytes32 indexed managerRight);
+  event ManagementUpdated(address indexed manager, bytes32 indexed managedRight,
+    bytes32 indexed managerRight);
 
   /**
     A modifier which allows only the super-administrative owner or addresses
@@ -82,7 +85,8 @@ abstract contract PermitControl is Context, Ownable {
       non-expired and exist within the specified `_circumstance`.
   */
   modifier hasValidPermit(bytes32 _circumstance, bytes32 _right) {
-    require(_msgSender() == owner() || hasRightUntil(_msgSender(), _circumstance, _right) > block.timestamp,
+    require(_msgSender() == owner()
+      || hasRightUntil(_msgSender(), _circumstance, _right) > block.timestamp,
       "PermitControl: sender does not have a valid permit");
     _;
   }
@@ -94,10 +98,11 @@ abstract contract PermitControl is Context, Ownable {
     @param _address The address to check for the specified `_right`.
     @param _circumstance The circumstance to check the specified `_right` for.
     @param _right The right to check for validity.
-    @return The timestamp in seconds when the `_right` expires. If the timestamp is
-      zero, we can assume that the user never had the right.
+    @return The timestamp in seconds when the `_right` expires. If the timestamp
+      is zero, we can assume that the user never had the right.
   */
-  function hasRightUntil(address _address, bytes32 _circumstance, bytes32 _right) public view returns (uint256) {
+  function hasRightUntil(address _address, bytes32 _circumstance,
+    bytes32 _right) public view returns (uint256) {
     return permissions[_address][_circumstance][_right];
   }
 
@@ -112,11 +117,14 @@ abstract contract PermitControl is Context, Ownable {
     @param _expirationTime The time when the `_right` expires for the provided
       `_circumstance`.
   */
-  function setPermit(address _address, bytes32 _circumstance, bytes32 _right, uint256 _expirationTime) external virtual hasValidPermit(UNIVERSAL, managerRight[_right]) {
+  function setPermit(address _address, bytes32 _circumstance, bytes32 _right,
+    uint256 _expirationTime) external virtual hasValidPermit(UNIVERSAL,
+    managerRight[_right]) {
     require(_right != ZERO_RIGHT,
       "PermitControl: you may not grant the zero right");
     permissions[_address][_circumstance][_right] = _expirationTime;
-    emit PermitUpdated(_msgSender(), _address, _circumstance, _right, _expirationTime);
+    emit PermitUpdated(_msgSender(), _address, _circumstance, _right,
+      _expirationTime);
   }
 
   /**
@@ -128,7 +136,8 @@ abstract contract PermitControl is Context, Ownable {
     @param _managerRight The right whose `UNIVERSAL` holders may manage
       `_managedRight`.
   */
-  function setManagerRight(bytes32 _managedRight, bytes32 _managerRight) external virtual hasValidPermit(UNIVERSAL, MANAGER) {
+  function setManagerRight(bytes32 _managedRight, bytes32 _managerRight)
+    external virtual hasValidPermit(UNIVERSAL, MANAGER) {
     require(_managedRight != ZERO_RIGHT,
       "PermitControl: you may not specify a manager for the zero right");
     managerRight[_managedRight] = _managerRight;
