@@ -18,7 +18,7 @@ import "@openzeppelin/contracts/utils/Address.sol";
 
   The owner of this contract is always a fully-permissioned super-administrator.
 */
-abstract contract PermitControl is Context, Ownable {
+abstract contract PermitControl is Ownable {
   using SafeMath for uint256;
   using Address for address;
 
