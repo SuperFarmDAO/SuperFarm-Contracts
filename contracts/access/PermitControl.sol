@@ -63,6 +63,12 @@ abstract contract PermitControl is Context, Ownable {
     An event emitted when an address has a permit updated. This event captures,
     through its various parameter combinations, the cases of granting a permit,
     updating the expiration time of a permit, or revoking a permit.
+
+    @param updator The address which has updated the permit.
+    @param updatee The address whose permit was updated.
+    @param circumstance The circumstance wherein the permit was updated.
+    @param role The role which was updated.
+    @param expirationTime The time when the permit expires.
   */
   event PermitUpdated(address indexed updator, address indexed updatee,
     bytes32 circumstance, bytes32 indexed role, uint256 expirationTime);
@@ -71,6 +77,10 @@ abstract contract PermitControl is Context, Ownable {
     An event emitted when a management relationship in `managerRight` is
     updated. This event captures adding and revoking management permissions via
     observing the update history of the `managerRight` value.
+
+    @param manager The address of the manager performing this update.
+    @param managedRight The right which had its manager updated.
+    @param managerRight The new manager right which was updated to.
   */
   event ManagementUpdated(address indexed manager, bytes32 indexed managedRight,
     bytes32 indexed managerRight);
