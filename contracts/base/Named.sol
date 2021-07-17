@@ -12,7 +12,7 @@ import "../access/PermitControl.sol";
 
   This basic contract has a name which can be edited by those with permission.
 */
-contract Named is Context, PermitControl {
+contract Named is PermitControl {
 
   /// The public name of this contract.
   string public name;
