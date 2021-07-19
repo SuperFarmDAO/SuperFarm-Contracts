@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity 0.6.12;
+pragma solidity 0.7.6;
 pragma experimental ABIEncoderV2;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
+
+import "./OwnableMutableDelegateProxy.sol";
 
 /**
   @title A proxy registry contract.
@@ -28,7 +30,7 @@ contract ProxyRegistry is Ownable {
     which allow it to proxy functionality to the various callers contained in
     `authorizedCallers`.
   */
-  mapping(address => OwnableDelegateProxy) public proxies;
+  mapping(address => OwnableMutableDelegateProxy) public proxies;
 
   /**
     This mapping relates addresses which are pending access to the registry to
@@ -73,7 +75,8 @@ contract ProxyRegistry is Ownable {
 
     @param _unauthenticated The new address to grant access to the registry.
   */
-  function startGrantAuthentication(address _unauthenticated) public onlyOwner {
+  function startGrantAuthentication(address _unauthenticated) external
+    onlyOwner {
     require(!authorizedCallers[_unauthenticated],
       "ProxyRegistry: this address is already an authorized caller");
     require(pendingCallers[_unauthenticated] == 0,
@@ -89,7 +92,7 @@ contract ProxyRegistry is Ownable {
 
     @param _unauthenticated The new address to grant access to the registry.
   */
-  function endGrantAuthentication(address _unauthenticated) public onlyOwner {
+  function endGrantAuthentication(address _unauthenticated) external onlyOwner {
     require(!authorizedCallers[_unauthenticated],
       "ProxyRegistry: this address is already an authorized caller");
     require(pendingCallers[_unauthenticated] != 0,
@@ -106,26 +109,26 @@ contract ProxyRegistry is Ownable {
 
     @param _caller The address to revoke authentication from.
   */
-  function revokeAuthentication(address _caller) public onlyOwner {
+  function revokeAuthentication(address _caller) external onlyOwner {
     authorizedCallers[_caller] = false;
   }
 
   /**
-    Enables an address to register its proxy contract with this registry.
+    Enables an address to register its own proxy contract with this registry.
 
-    @return The new `OwnableDelegateProxy` contract with its
+    @return The new `OwnableMutableDelegateProxy` contract with its
       `delegateProxyImplementation` implementation.
   */
-  function registerProxy() public returns (OwnableDelegateProxy) {
-    require(proxies[_msgSender()] == address(0),
+  function registerProxy() external returns (OwnableMutableDelegateProxy) {
+    require(address(proxies[_msgSender()]) == address(0),
       "ProxyRegistry: you have already registered a proxy");
 
     // Construct the new `OwnableDelegateProxy` with this registry's initial
-    // implementation.
-    OwnableDelegateProxy proxy = new OwnableDelegateProxy(_msgSender(),
-      delegateProxyImplementation,
+    // implementation and call said implementation's "initialize" function.
+    OwnableMutableDelegateProxy proxy = new OwnableMutableDelegateProxy(
+      _msgSender(), delegateProxyImplementation,
       abi.encodeWithSignature("initialize(address,address)", _msgSender(),
-      address(this)));
+        address(this)));
     proxies[_msgSender()] = proxy;
     return proxy;
   }

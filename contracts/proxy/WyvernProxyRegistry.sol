@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity 0.6.12;
+pragma solidity 0.7.6;
 pragma experimental ABIEncoderV2;
 
 import "./ProxyRegistry.sol";
+import "./AuthenticatedProxy.sol";
 
 /**
   @title A fully-implemented proxy registry contract.
@@ -30,21 +31,21 @@ contract WyvernProxyRegistry is ProxyRegistry {
     will use `AuthenticatedProxy` as its initial implementation.
   */
   constructor() public {
-    delegateProxyImplementation = new AuthenticatedProxy();
+    delegateProxyImplementation = address(new AuthenticatedProxy());
   }
 
   /**
-    Allow the owner of this registry to grant immediate authorization to a single
-    address for calling proxies in this registry. This is to avoid waiting for the
-    `DELAY_PERIOD` otherwise specified for further caller additions.
+    Allow the owner of this registry to grant immediate authorization to a
+    single address for calling proxies in this registry. This is to avoid
+    waiting for the `DELAY_PERIOD` otherwise specified for further caller
+    additions.
 
-    @param _initialCaller The initial caller authorized to operate against this
-      registry.
+    @param _initial The initial caller authorized to operate in this registry.
   */
-  function grantInitialAuthentication(address _initialCaller) external onlyOwner {
+  function grantInitialAuthentication(address _initial) external onlyOwner {
     require(!initialCallerSet,
       "WyvernProxyRegistry: the initial caller has already been specified");
     initialCallerSet = true;
-    authorizedCallers[_initialCaller] = true;
+    authorizedCallers[_initial] = true;
   }
 }

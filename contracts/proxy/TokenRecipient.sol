@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity 0.6.12;
+pragma solidity 0.7.6;
 pragma experimental ABIEncoderV2;
 
+import "@openzeppelin/contracts/utils/Context.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 /**
@@ -15,7 +16,7 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
   more modern version of Solidity with associated best practices. The
   documentation has also been improved to provide more clarity.
 */
-contract TokenRecipient {
+contract TokenRecipient is Context {
 
   /**
     An event emitted when this contract receives Ether.
@@ -23,7 +24,7 @@ contract TokenRecipient {
     @param sender The sender of the received Ether.
     @param amount The amount of Ether received.
   */
-  event ReceivedEther(address indexed sender, uint amount);
+  event ReceivedEther(address indexed sender, uint256 amount);
 
   /**
     An event emitted when this contract receives ERC-20 tokens.
@@ -45,7 +46,7 @@ contract TokenRecipient {
     @param _extraData Any additional data with this token receipt to emit.
   */
   function receiveApproval(address _from, uint256 _value, address _token,
-    bytes _extraData) external {
+    bytes calldata _extraData) external {
     bool transferSuccess = IERC20(_token).transferFrom(_from, address(this),
       _value);
     require(transferSuccess,
@@ -56,7 +57,7 @@ contract TokenRecipient {
   /**
     Receive Ether and emit an event.
   */
-  receive() external payable {
-    emit ReceivedEther(msg.sender, msg.value);
+  receive() external virtual payable {
+    emit ReceivedEther(_msgSender(), msg.value);
   }
 }
