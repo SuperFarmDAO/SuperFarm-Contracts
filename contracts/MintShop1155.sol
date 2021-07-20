@@ -123,6 +123,8 @@ contract MintShop1155 is PermitControl, ReentrancyGuard {
     @param endTime The timestamp after which this pool disallows purchases.
     @param purchaseLimit The maximum number of items a single address may
       purchase from this pool.
+    @param singlePurchaseLimit The maximum number of items a single address may
+      purchase from this pool in a single transaction.
     @param requirement A PoolRequirement requisite for users who want to
       participate in this pool.
   */
@@ -131,6 +133,7 @@ contract MintShop1155 is PermitControl, ReentrancyGuard {
     uint256 startTime;
     uint256 endTime;
     uint256 purchaseLimit;
+    uint256 singlePurchaseLimit;
     PoolRequirement requirement;
   }
 
@@ -142,6 +145,8 @@ contract MintShop1155 is PermitControl, ReentrancyGuard {
     @param endTime The timestamp after which this pool disallows purchases.
     @param purchaseLimit The maximum number of items a single address may
       purchase from this pool.
+    @param singlePurchaseLimit The maximum number of items a single address may
+      purchase from this pool in a single transaction.
     @param purchaseCounts A mapping of addresses to the number of items each has
       purchased from this pool.
     @param requirement A PoolRequirement requisite for users who want to
@@ -165,6 +170,7 @@ contract MintShop1155 is PermitControl, ReentrancyGuard {
     uint256 startTime;
     uint256 endTime;
     uint256 purchaseLimit;
+    uint256 singlePurchaseLimit;
     mapping (address => uint256) purchaseCounts;
     PoolRequirement requirement;
     uint256[] itemGroups;
@@ -329,6 +335,8 @@ contract MintShop1155 is PermitControl, ReentrancyGuard {
     @param endTime The timestamp after which this pool disallows purchases.
     @param purchaseLimit The maximum number of items a single address may
       purchase from this pool.
+    @param singlePurchaseLimit The maximum number of items a single address may
+      purchase from this pool in a single transaction.
     @param requirement A PoolRequirement requisite for users who want to
       participate in this pool.
     @param itemMetadataUri The metadata URI of the item collection being sold
@@ -341,6 +349,7 @@ contract MintShop1155 is PermitControl, ReentrancyGuard {
     uint256 startTime;
     uint256 endTime;
     uint256 purchaseLimit;
+    uint256 singlePurchaseLimit;
     PoolRequirement requirement;
     string itemMetadataUri;
     PoolItem[] items;
@@ -356,6 +365,8 @@ contract MintShop1155 is PermitControl, ReentrancyGuard {
     @param endTime The timestamp after which this pool disallows purchases.
     @param purchaseLimit The maximum number of items a single address may
       purchase from this pool.
+    @param singlePurchaseLimit The maximum number of items a single address may
+      purchase from this pool in a single transaction.
     @param requirement A PoolRequirement requisite for users who want to
       participate in this pool.
     @param itemMetadataUri The metadata URI of the item collection being sold by
@@ -372,6 +383,7 @@ contract MintShop1155 is PermitControl, ReentrancyGuard {
     uint256 startTime;
     uint256 endTime;
     uint256 purchaseLimit;
+    uint256 singlePurchaseLimit;
     PoolRequirement requirement;
     string itemMetadataUri;
     PoolItem[] items;
@@ -771,6 +783,7 @@ contract MintShop1155 is PermitControl, ReentrancyGuard {
         startTime: pools[id].startTime,
         endTime: pools[id].endTime,
         purchaseLimit: pools[id].purchaseLimit,
+        singlePurchaseLimit: pools[id].singlePurchaseLimit,
         requirement: pools[id].requirement,
         itemMetadataUri: item.metadataUri(),
         items: poolItems
@@ -851,6 +864,7 @@ contract MintShop1155 is PermitControl, ReentrancyGuard {
         startTime: pools[id].startTime,
         endTime: pools[id].endTime,
         purchaseLimit: pools[id].purchaseLimit,
+        singlePurchaseLimit: pools[id].singlePurchaseLimit,
         requirement: pools[id].requirement,
         itemMetadataUri: item.metadataUri(),
         items: poolItems,
@@ -964,6 +978,7 @@ contract MintShop1155 is PermitControl, ReentrancyGuard {
     pool.startTime = _pool.startTime;
     pool.endTime = _pool.endTime;
     pool.purchaseLimit = _pool.purchaseLimit;
+    pool.singlePurchaseLimit = _pool.singlePurchaseLimit;
     pool.itemGroups = _groupIds;
     pool.currentPoolVersion = pools[_id].currentPoolVersion.add(1);
     pool.requirement = _pool.requirement;
@@ -991,6 +1006,8 @@ contract MintShop1155 is PermitControl, ReentrancyGuard {
       "MintShop1155: must purchase at least one item");
     require(_id < nextPoolId,
       "MintShop1155: can only purchase items from an active pool");
+    require(pools[_id].singlePurchaseLimit >= _amount,
+      "MintShop1155: cannot exceed the per-transaction maximum");
 
     // Verify that the asset being used in the purchase is valid.
     bytes32 itemKey = keccak256(abi.encode(pools[_id].currentPoolVersion,
