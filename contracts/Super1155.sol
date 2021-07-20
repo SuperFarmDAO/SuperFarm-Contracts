@@ -329,15 +329,13 @@ contract Super1155 is PermitControl, ERC165, IERC1155, IERC1155MetadataURI {
   /**
     Construct a new ERC-1155 item collection.
 
+    @param _owner The address of the administrator governing this collection.
     @param _name The name to assign to this item collection contract.
     @param _uri The metadata URI to perform later token ID substitution with.
-    @param _owner The address of the administrator governing this collection.
     @param _proxyRegistryAddress The address of a proxy registry contract.
   */
-  constructor(string memory _name, string memory _uri, address _owner,
+  constructor(address _owner, string memory _name, string memory _uri,
     address _proxyRegistryAddress) public {
-    name = _name;
-    metadataUri = _uri;
 
     // Register the ERC-165 interfaces.
     _registerInterface(INTERFACE_ERC1155);
@@ -350,8 +348,9 @@ contract Super1155 is PermitControl, ERC165, IERC1155, IERC1155MetadataURI {
     }
 
     // Continue initialization.
+    name = _name;
+    metadataUri = _uri;
     proxyRegistryAddress = _proxyRegistryAddress;
-    locked = false;
   }
 
   /**
@@ -872,7 +871,7 @@ contract Super1155 is PermitControl, ERC165, IERC1155, IERC1155MetadataURI {
   */
   function mintBatch(address _recipient, uint256[] calldata _ids,
     uint256[] calldata _amounts, bytes calldata _data)
-    external virtual onlyOwner {
+    external virtual {
     require(_recipient != address(0),
       "ERC1155: mint to the zero address");
     require(_ids.length == _amounts.length,
@@ -997,7 +996,7 @@ contract Super1155 is PermitControl, ERC165, IERC1155, IERC1155MetadataURI {
     @param _amounts The amounts of the corresponding item IDs to burn.
   */
   function burnBatch(address _burner, uint256[] memory _ids,
-    uint256[] memory _amounts) external virtual onlyOwner {
+    uint256[] memory _amounts) external virtual {
     require(_burner != address(0),
       "ERC1155: burn from the zero address");
     require(_ids.length == _amounts.length,

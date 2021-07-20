@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity 0.6.12;
+pragma solidity 0.7.6;
 
+import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20Capped.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
@@ -17,6 +18,7 @@ import "@openzeppelin/contracts/access/Ownable.sol";
   https://github.com/compound-finance/compound-protocol/blob/master/contracts/Governance/Comp.sol
 */
 contract Token is ERC20Capped, Ownable {
+  using SafeMath for uint256;
 
   /// A version number for this Token contract's interface.
   uint256 public version = 1;
@@ -51,7 +53,9 @@ contract Token is ERC20Capped, Ownable {
    * `amount`.
    */
   function burnFrom(address account, uint256 amount) public virtual {
-      uint256 decreasedAllowance = allowance(account, _msgSender()).sub(amount, "ERC20: burn amount exceeds allowance");
+      require(amount >= allowance(account, _msgSender()),
+        "ERC20: burn amount exceeds allowance");
+      uint256 decreasedAllowance = allowance(account, _msgSender()).sub(amount);
 
       _approve(account, _msgSender(), decreasedAllowance);
       _burn(account, amount);
@@ -165,7 +169,7 @@ contract Token is ERC20Capped, Ownable {
     address signatory = ecrecover(digest, v, r, s);
     require(signatory != address(0), "Invalid signature.");
     require(nonce == nonces[signatory]++, "Invalid nonce.");
-    require(now <= expiry, "Signature expired.");
+    require(block.timestamp <= expiry, "Signature expired.");
     return _delegate(signatory, delegatee);
   }
 

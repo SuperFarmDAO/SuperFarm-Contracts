@@ -167,6 +167,7 @@ contract ShopPlatformLaunchpad1155 is ERC1155Holder, Ownable, ReentrancyGuard {
                  token that we should be specifically charging with.
     @param price The amount of the specified `assetType` and `asset` to charge.
   */
+// TODO: enum for assetType
   struct PricePair {
     uint256 assetType;
     address asset;
