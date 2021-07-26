@@ -101,6 +101,13 @@ abstract contract PermitControl is Ownable {
   }
 
   /**
+    Return a version number for this contract's interface.
+  */
+  function version() external virtual pure returns (uint256) {
+    return 1;
+  }
+
+  /**
     Determine whether or not an address has some rights under the given
     circumstance, and if they do have the right, until when.
 

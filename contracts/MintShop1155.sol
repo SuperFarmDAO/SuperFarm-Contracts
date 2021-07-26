@@ -7,7 +7,7 @@ import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
 
-import "./access/PermitControl.sol";
+import "./base/Sweepable.sol";
 import "./Super1155.sol";
 import "./Staker.sol";
 
@@ -19,12 +19,9 @@ import "./Staker.sol";
   This launchpad contract sells new items by minting them into existence. It
   cannot be used to sell items that already exist.
 */
-contract MintShop1155 is PermitControl, ReentrancyGuard {
-  using SafeMath for uint256;
+contract MintShop1155 is Sweepable, ReentrancyGuard {
   using SafeERC20 for IERC20;
-
-  /// A version number for this Shop contract's interface.
-  uint256 public version = 1;
+  using SafeMath for uint256;
 
   /// The public identifier for the right to set the payment receiver.
   bytes32 public constant SET_PAYMENT_RECEIVER
@@ -40,12 +37,6 @@ contract MintShop1155 is PermitControl, ReentrancyGuard {
 
   /// The public identifier for the right to lock the global purchase limit.
   bytes32 public constant LOCK_GLOBAL_LIMIT = keccak256("LOCK_GLOBAL_LIMIT");
-
-  /// The public identifier for the right to sweep tokens.
-  bytes32 public constant SWEEP = keccak256("SWEEP");
-
-  /// The public identifier for the right to lock token sweeps.
-  bytes32 public constant LOCK_SWEEP = keccak256("LOCK_SWEEP");
 
   /// The public identifier for the right to manage whitelists.
   bytes32 public constant WHITELIST = keccak256("WHITELIST");
@@ -86,9 +77,6 @@ contract MintShop1155 is PermitControl, ReentrancyGuard {
 
   /// A mapping of addresses to the number of items each has purchased globally.
   mapping (address => uint256) public globalPurchaseCounts;
-
-  /// A flag determining whether or not the `sweep` function may be used.
-  bool public sweepLocked;
 
   /**
     The ID which should be taken by the next whitelist added. This value begins
@@ -426,24 +414,6 @@ contract MintShop1155 is PermitControl, ReentrancyGuard {
   event GlobalPurchaseLimitLocked(address indexed locker);
 
   /**
-    An event to track a token sweep event.
-
-    @param sweeper The calling address which triggered the sweeep.
-    @param token The specific ERC-20 token being swept.
-    @param amount The amount of the ERC-20 token being swept.
-    @param recipient The recipient of the swept tokens.
-  */
-  event TokenSweep(address indexed sweeper, IERC20 indexed token,
-    uint256 amount, address indexed recipient);
-
-  /**
-    An event to track future use of the `sweep` function being locked.
-
-    @param locker The calling address which locked down sweeping.
-  */
-  event SweepLocked(address indexed locker);
-
-  /**
     An event to track a specific whitelist being updated. When emitted this
     event indicates that a specific whitelist has had its settings completely
     replaced.
@@ -544,6 +514,13 @@ contract MintShop1155 is PermitControl, ReentrancyGuard {
   }
 
   /**
+    Return a version number for this contract's interface.
+  */
+  function version() external virtual override pure returns (uint256) {
+    return 1;
+  }
+
+  /**
     Allow the shop owner or an approved manager to update the payment receiver
     address if it has not been locked.
 
@@ -593,34 +570,6 @@ contract MintShop1155 is PermitControl, ReentrancyGuard {
     hasValidPermit(UNIVERSAL, LOCK_GLOBAL_LIMIT) {
     globalPurchaseLimitLocked = true;
     emit GlobalPurchaseLimitLocked(_msgSender());
-  }
-
-  /**
-    Allow the owner or an approved manager to sweep all of a particular ERC-20
-    token from the contract and send it to another address. This function exists
-    to allow the shop owner to recover tokens that are otherwise sent directly
-    to this contract and get stuck. Provided that sweeping is not locked, this
-    is a useful tool to help buyers recover otherwise-lost funds.
-
-    @param _token The token to sweep the balance from.
-    @param _amount The amount of token to sweep.
-    @param _address The address to send the swept tokens to.
-  */
-  function sweep(IERC20 _token, uint256 _amount, address _address) external
-    hasValidPermit(UNIVERSAL, SWEEP) {
-    require(!sweepLocked,
-      "MintShop1155: the sweep function is locked");
-    _token.safeTransferFrom(address(this), _address, _amount);
-    emit TokenSweep(_msgSender(), _token, _amount, _address);
-  }
-
-  /**
-    Allow the shop owner or an approved manager to lock the contract against any
-    future token sweeps.
-  */
-  function lockSweep() external hasValidPermit(UNIVERSAL, LOCK_SWEEP) {
-    sweepLocked = true;
-    emit SweepLocked(_msgSender());
   }
 
   /**

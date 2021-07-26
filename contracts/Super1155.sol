@@ -27,11 +27,8 @@ import "./proxy/StubProxyRegistry.sol";
   July 19th, 2021.
 */
 contract Super1155 is PermitControl, ERC165, IERC1155, IERC1155MetadataURI {
-  using SafeMath for uint256;
   using Address for address;
-
-  /// A version number for this item contract.
-  uint256 public version = 1;
+  using SafeMath for uint256;
 
   /// The public identifier for the right to set this contract's metadata URI.
   bytes32 public constant SET_URI = keccak256("SET_URI");
@@ -351,6 +348,13 @@ contract Super1155 is PermitControl, ERC165, IERC1155, IERC1155MetadataURI {
     name = _name;
     metadataUri = _uri;
     proxyRegistryAddress = _proxyRegistryAddress;
+  }
+
+  /**
+    Return a version number for this contract's interface.
+  */
+  function version() external virtual override pure returns (uint256) {
+    return 1;
   }
 
   /**
