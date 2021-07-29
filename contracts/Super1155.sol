@@ -983,7 +983,7 @@ contract Super1155 is PermitControl, ERC165, IERC1155, IERC1155MetadataURI {
     burnCount[burntItemId] = burnCount[burntItemId].add(_amount);
     circulatingSupply[burntItemId] = circulatingSupply[burntItemId]
       .sub(_amount);
-    itemGroups[groupId].burnCount = itemGroups[groupId].burnCount.sub(_amount);
+    itemGroups[groupId].burnCount = itemGroups[groupId].burnCount.add(_amount);
     itemGroups[groupId].circulatingSupply =
       itemGroups[groupId].circulatingSupply.sub(_amount);
 
