@@ -693,7 +693,7 @@ contract Super1155 is PermitControl, ERC165, IERC1155, IERC1155MetadataURI {
       }
 
       // Item supply data may not be reduced below the circulating supply.
-      require(itemGroups[_groupId].circulatingSupply >= _data.supplyData,
+      require(_data.supplyData >= itemGroups[_groupId].circulatingSupply,
         "Super1155: you may not decrease supply below the circulating amount");
       itemGroups[_groupId].supplyData = _data.supplyData;
 
@@ -1032,7 +1032,7 @@ contract Super1155 is PermitControl, ERC165, IERC1155, IERC1155MetadataURI {
       circulatingSupply[burntItemId] = circulatingSupply[burntItemId]
         .sub(_amounts[i]);
       itemGroups[groupId].burnCount = itemGroups[groupId].burnCount
-        .sub(_amounts[i]);
+        .add(_amounts[i]);
       itemGroups[groupId].circulatingSupply =
         itemGroups[groupId].circulatingSupply.sub(_amounts[i]);
     }
