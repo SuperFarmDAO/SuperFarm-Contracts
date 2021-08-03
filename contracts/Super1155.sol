@@ -14,7 +14,7 @@ import "./proxy/StubProxyRegistry.sol";
 
 /**
   @title An ERC-1155 item creation contract.
-  @author Tim Clancy
+  @author Tim Clancy & punk2513
 
   This contract represents the NFTs within a single collection. It allows for a
   designated collection owner address to manage the creation of NFTs within this
@@ -189,8 +189,8 @@ contract Super1155 is PermitControl, ERC165, IERC1155, IERC1155MetadataURI {
     @param burnData An optional integer used by some `burnType` values.
     @param circulatingSupply The number of individual items within this group in
       circulation.
-    @param mintCount The number of times items in this group have been minted.
-    @param burnCount The number of times items in this group have been burnt.
+    @param mintCount The number of times items in this group that have been minted.
+    @param burnCount The number of times items in this group that have been burnt.
   */
   struct ItemGroup {
     bool initialized;
@@ -220,7 +220,7 @@ contract Super1155 is PermitControl, ERC165, IERC1155, IERC1155MetadataURI {
 
   /**
     A mapping of token ID to a boolean representing whether the item's metadata
-    has been explicitly frozen via a call to `lockURI(string calldata _uri,
+    has been explicitly frozen via a call to `lockItemGroupURI(string calldata _uri,
     uint256 _id)`. Do note that it is possible for an item's mapping here to be
     false while still having frozen metadata if the item collection as a whole
     has had its `uriLocked` value set to true.
@@ -320,6 +320,8 @@ contract Super1155 is PermitControl, ERC165, IERC1155, IERC1155MetadataURI {
     } else if (hasRightUntil(_msgSender(), bytes32(_id), _right)
       > block.timestamp) {
       _;
+    } else {
+      revert("Super1155: _msgSender does not have the right to perform that action");
     }
   }
 
@@ -418,7 +420,7 @@ contract Super1155 is PermitControl, ERC165, IERC1155, IERC1155MetadataURI {
   }
 
   /**
-    Retrieve in a single call the balances of some mulitple particular token
+    Retrieve in a single call the balances of multiple particular token
     `_ids` held by corresponding `_owners`.
 
     @param _owners The owners to check for token balances.
@@ -557,10 +559,16 @@ contract Super1155 is PermitControl, ERC165, IERC1155, IERC1155MetadataURI {
     uint256 shiftedGroupId = (_id & GROUP_MASK);
     uint256 groupId = shiftedGroupId >> 128;
 
+    // Fungible items are coerced into the single group ID + index one slot.
+    uint256 transferredItemId = _id;
+    if (itemGroups[groupId].itemType == ItemType.Fungible) {
+      transferredItemId = shiftedGroupId.add(1);
+    }
+
     // Update all specially-tracked group-specific balances.
-    balances[_id][_from] = balances[_id][_from].sub(_amount,
+    balances[transferredItemId][_from] = balances[transferredItemId][_from].sub(_amount,
       "ERC1155: insufficient balance for transfer");
-    balances[_id][_to] = balances[_id][_to].add(_amount);
+    balances[transferredItemId][_to] = balances[transferredItemId][_to].add(_amount);
     groupBalances[groupId][_from] = groupBalances[groupId][_from].sub(_amount);
     groupBalances[groupId][_to] = groupBalances[groupId][_to].add(_amount);
     totalBalances[_from] = totalBalances[_from].sub(_amount);
@@ -623,17 +631,25 @@ contract Super1155 is PermitControl, ERC165, IERC1155, IERC1155MetadataURI {
     for (uint256 i = 0; i < _ids.length; ++i) {
 
       // Retrieve the item's group ID.
-      uint256 groupId = (_ids[i] & GROUP_MASK) >> 128;
+      uint256 shiftedGroupId = (_ids[i] & GROUP_MASK);
+      uint256 groupId = shiftedGroupId >> 128;
+
+      // Fungible items are coerced into the single group ID + index one slot.
+      uint256 transferredItemId = _ids[i];
+      if (itemGroups[groupId].itemType == ItemType.Fungible) {
+        transferredItemId = shiftedGroupId.add(1);
+      }
 
       // Update all specially-tracked group-specific balances.
-      balances[_ids[i]][_from] = balances[_ids[i]][_from].sub(_amounts[i],
+      balances[transferredItemId][_from] = balances[transferredItemId][_from].sub(_amounts[i],
         "ERC1155: insufficient balance for transfer");
-      balances[_ids[i]][_to] = balances[_ids[i]][_to].add(_amounts[i]);
+      balances[transferredItemId][_to] = balances[transferredItemId][_to].add(_amounts[i]);
       groupBalances[groupId][_from] = groupBalances[groupId][_from]
-        .sub(_amounts[i]);
+        .sub(_amounts[i], "ERC1155: insufficient balance for transfer");
       groupBalances[groupId][_to] = groupBalances[groupId][_to]
         .add(_amounts[i]);
-      totalBalances[_from] = totalBalances[_from].sub(_amounts[i]);
+      totalBalances[_from] = totalBalances[_from].sub(_amounts[i],
+        "ERC1155: insufficient balance for transfer");
       totalBalances[_to] = totalBalances[_to].add(_amounts[i]);
     }
 
@@ -705,7 +721,7 @@ contract Super1155 is PermitControl, ERC165, IERC1155, IERC1155MetadataURI {
       // A semifungible item may not change type.
       } else if (itemGroups[_groupId].itemType == ItemType.Semifungible) {
         require(_data.itemType == ItemType.Semifungible,
-          "Super1155: you may not alter nonfungible items");
+          "Super1155: you may not alter semifungible item types");
 
       // A fungible item may change type if it is unique enough.
       } else if (itemGroups[_groupId].itemType == ItemType.Fungible) {
@@ -1062,7 +1078,7 @@ contract Super1155 is PermitControl, ERC165, IERC1155, IERC1155MetadataURI {
     Allow the item collection owner or an associated manager to forever lock the
     metadata URI on the entire collection to future changes.
 
-    @param _uri The value of the URI to lock for `_id`.
+    @param _uri The value of the URI to lock for the entire collection.
   */
   function lockURI(string calldata _uri) external
     hasValidPermit(UNIVERSAL, LOCK_URI) {
@@ -1080,7 +1096,7 @@ contract Super1155 is PermitControl, ERC165, IERC1155, IERC1155MetadataURI {
     @param _uri The value of the URI to lock for `_id`.
     @param _id The token ID to lock a metadata URI value into.
   */
-  function lockURI(string calldata _uri, uint256 _id) external
+  function lockItemGroupURI(string calldata _uri, uint256 _id) external
     hasItemRight(_id, LOCK_ITEM_URI) {
     metadataFrozen[_id] = true;
     emit PermanentURI(_uri, _id);
