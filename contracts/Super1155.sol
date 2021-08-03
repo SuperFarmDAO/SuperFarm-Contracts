@@ -14,7 +14,7 @@ import "./proxy/StubProxyRegistry.sol";
 
 /**
   @title An ERC-1155 item creation contract.
-  @author Tim Clancy & punk2513
+  @author Tim Clancy, 0xthrpw, & punk2513
 
   This contract represents the NFTs within a single collection. It allows for a
   designated collection owner address to manage the creation of NFTs within this
