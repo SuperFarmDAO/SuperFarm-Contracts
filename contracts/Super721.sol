@@ -2,18 +2,21 @@
 pragma solidity 0.7.6;
 pragma experimental ABIEncoderV2;
 
+import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
+import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@openzeppelin/contracts/introspection/ERC165.sol";
-// TODO: ERC-721 imports.
+import "@openzeppelin/contracts/utils/EnumerableSet.sol";
+import "@openzeppelin/contracts/utils/EnumerableMap.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
-
+import "./utils/LocalStrings.sol";
 import "./access/PermitControl.sol";
 import "./proxy/StubProxyRegistry.sol";
 
 /**
   @title An ERC-721 item creation contract.
   @author Tim Clancy
-  @author your-name-here
+  @author 0xthrpw
 
   This contract represents the NFTs within a single collection. It allows for a
   designated collection owner address to manage the creation of NFTs within this
@@ -25,9 +28,11 @@ import "./proxy/StubProxyRegistry.sol";
 
   August 4th, 2021.
 */
-contract Super721 is PermitControl, ERC165, // TODO: ERC-721 import {
+contract Super721 is PermitControl, ERC165, IERC721 {
   using Address for address;
   using SafeMath for uint256;
+  using EnumerableSet for EnumerableSet.UintSet;
+  using EnumerableMap for EnumerableMap.UintToAddressMap;
 
   /// The public identifier for the right to set this contract's metadata URI.
   bytes32 public constant SET_URI = keccak256("SET_URI");
@@ -56,10 +61,40 @@ contract Super721 is PermitControl, ERC165, // TODO: ERC-721 import {
   /// The public identifier for the right to disable item creation.
   bytes32 public constant LOCK_CREATION = keccak256("LOCK_CREATION");
 
-  /// @dev Supply the magic number for the required ERC-721 interface.
-  bytes4 private constant INTERFACE_ERC721 = ; // TODO
+  /*
+   *     bytes4(keccak256('balanceOf(address)')) == 0x70a08231
+   *     bytes4(keccak256('ownerOf(uint256)')) == 0x6352211e
+   *     bytes4(keccak256('approve(address,uint256)')) == 0x095ea7b3
+   *     bytes4(keccak256('getApproved(uint256)')) == 0x081812fc
+   *     bytes4(keccak256('setApprovalForAll(address,bool)')) == 0xa22cb465
+   *     bytes4(keccak256('isApprovedForAll(address,address)')) == 0xe985e9c5
+   *     bytes4(keccak256('transferFrom(address,address,uint256)')) == 0x23b872dd
+   *     bytes4(keccak256('safeTransferFrom(address,address,uint256)')) == 0x42842e0e
+   *     bytes4(keccak256('safeTransferFrom(address,address,uint256,bytes)')) == 0xb88d4fde
+   *
+   *     => 0x70a08231 ^ 0x6352211e ^ 0x095ea7b3 ^ 0x081812fc ^
+   *        0xa22cb465 ^ 0xe985e9c ^ 0x23b872dd ^ 0x42842e0e ^ 0xb88d4fde == 0x80ac58cd
+   */
+  bytes4 private constant _INTERFACE_ID_ERC721 = 0x80ac58cd;
 
-  // TODO: does 721 have a metadata ERC165?
+  /*
+   *     bytes4(keccak256('name()')) == 0x06fdde03
+   *     bytes4(keccak256('symbol()')) == 0x95d89b41
+   *     bytes4(keccak256('tokenURI(uint256)')) == 0xc87b56dd
+   *
+   *     => 0x06fdde03 ^ 0x95d89b41 ^ 0xc87b56dd == 0x5b5e139f
+   */
+  bytes4 private constant _INTERFACE_ID_ERC721_METADATA = 0x5b5e139f;
+
+  /*
+   *     bytes4(keccak256('totalSupply()')) == 0x18160ddd
+   *     bytes4(keccak256('tokenOfOwnerByIndex(address,uint256)')) == 0x2f745c59
+   *     bytes4(keccak256('tokenByIndex(uint256)')) == 0x4f6ccce7
+   *
+   *     => 0x18160ddd ^ 0x2f745c59 ^ 0x4f6ccce7 == 0x780e9d63
+   */
+  bytes4 private constant _INTERFACE_ID_ERC721_ENUMERABLE = 0x780e9d63;
+  /// @dev Supply the magic number for the required ERC-721 interface.
 
   /// @dev A mask for isolating an item's group ID.
   uint256 private constant GROUP_MASK = uint256(uint128(~0)) << 128;
@@ -67,8 +102,8 @@ contract Super721 is PermitControl, ERC165, // TODO: ERC-721 import {
   /// The public name of this contract.
   string public name;
 
-  // TODO: is there an invariant for 721 ID substitution?
-  // if not, then let's use our 1155 invariant
+  string public symbol;
+
   /**
     The ERC-721 URI for tracking item metadata, supporting {id} substitution.
     For example: https://token-cdn-domain/{id}.json. See the ERC-1155 spec for
@@ -79,9 +114,8 @@ contract Super721 is PermitControl, ERC165, // TODO: ERC-721 import {
   /// A proxy registry address for supporting automatic delegated approval.
   address public proxyRegistryAddress;
 
-  // TODO: take from the OZ 721 implementation.
   /// @dev A mapping from each token ID to per-address balances.
-  mapping (uint256 => mapping(address => uint256)) private balances;
+  mapping (uint256 => mapping(address => uint256)) public balances;
 
   /// A mapping from each group ID to per-address balances.
   mapping (uint256 => mapping(address => uint256)) public groupBalances;
@@ -89,6 +123,11 @@ contract Super721 is PermitControl, ERC165, // TODO: ERC-721 import {
   /// A mapping from each address to a collection-wide balance.
   mapping(address => uint256) public totalBalances;
 
+  // Mapping from holder address to their (enumerable) set of owned tokens
+  mapping (address => EnumerableSet.UintSet) private _holderTokens;
+
+  // Enumerable mapping from token ids to their owners
+  EnumerableMap.UintToAddressMap private _tokenOwners;
   /**
     @dev This is a mapping from each address to per-address operator approvals.
     Operators are those addresses that have been approved to transfer tokens on
@@ -96,6 +135,9 @@ contract Super721 is PermitControl, ERC165, // TODO: ERC-721 import {
     tokens.
   */
   mapping (address => mapping(address => bool)) private operatorApprovals;
+
+  // Mapping from token ID to approved address
+  mapping (uint256 => address) private _tokenApprovals;
 
   /**
     This enumeration lists the various supply types that each item group may
@@ -118,8 +160,6 @@ contract Super721 is PermitControl, ERC165, // TODO: ERC-721 import {
     Uncapped,
     Flexible
   }
-
-  // TODO: ItemType is gone; nonfungible is implicit.
 
   /**
     This enumeration lists the various burn types that each item group may use.
@@ -308,13 +348,8 @@ contract Super721 is PermitControl, ERC165, // TODO: ERC-721 import {
     @param _uri The metadata URI to perform later token ID substitution with.
     @param _proxyRegistryAddress The address of a proxy registry contract.
   */
-  constructor(address _owner, string memory _name, string memory _uri,
-    address _proxyRegistryAddress) public {
-
-    // Register the ERC-165 interfaces.
-    // TODO: register correct interface
-    /* _registerInterface(INTERFACE_ERC1155); */
-    /* _registerInterface(INTERFACE_ERC1155_METADATA_URI); */
+  constructor(address _owner, string memory _name, string memory _symbol, string memory _uri,
+    address _proxyRegistryAddress) {
 
     // Do not perform a redundant ownership transfer if the deployer should
     // remain as the owner of the collection.
@@ -322,17 +357,37 @@ contract Super721 is PermitControl, ERC165, // TODO: ERC-721 import {
       transferOwnership(_owner);
     }
 
+    // Register 721 interfaces
+    _registerInterface(_INTERFACE_ID_ERC721);
+    _registerInterface(_INTERFACE_ID_ERC721_METADATA);
+    _registerInterface(_INTERFACE_ID_ERC721_ENUMERABLE);
+
     // Continue initialization.
     name = _name;
+    symbol = _symbol;
     metadataUri = _uri;
     proxyRegistryAddress = _proxyRegistryAddress;
   }
+  /**
+
+  */
+  function ownerOf(uint256 tokenId) public view override returns (address) {
+      return _tokenOwners.get(tokenId, "Super721::ownerOf: owner query for nonexistent token");
+  }
 
   /**
-    Return a version number for this contract's interface.
-  */
-  function version() external virtual override pure returns (uint256) {
-    return 1;
+   * @dev See {IERC721-approve}.
+   */
+  function approve(address to, uint256 tokenId) public virtual override {
+      address owner = ownerOf(tokenId);
+      require(to != owner, "Super721::approve: approval to current owner");
+
+      require(_msgSender() == owner || isApprovedForAll(owner, _msgSender()),
+          "Super721::approve: approve caller is not owner nor approved for all"
+      );
+
+      _tokenApprovals[tokenId] = to;
+      emit Approval(ownerOf(tokenId), to, tokenId);
   }
 
   /**
@@ -345,7 +400,7 @@ contract Super721 is PermitControl, ERC165, // TODO: ERC-721 import {
 
     @return The metadata URI string of the item with ID `_itemId`.
   */
-  function uri(uint256) external override view returns (string memory) {
+  function uri(uint256) external view returns (string memory) {
     return metadataUri;
   }
 
@@ -360,7 +415,7 @@ contract Super721 is PermitControl, ERC165, // TODO: ERC-721 import {
   function setURI(string calldata _uri) external virtual
     hasValidPermit(UNIVERSAL, SET_URI) {
     require(!uriLocked,
-      "Super721: the collection URI has been permanently locked");
+      "Super721::setURI: the collection URI has been permanently locked");
     string memory oldURI = metadataUri;
     metadataUri = _uri;
     emit ChangeURI(oldURI, _uri);
@@ -381,8 +436,6 @@ contract Super721 is PermitControl, ERC165, // TODO: ERC-721 import {
     emit ChangeProxyRegistry(oldRegistry, _proxyRegistryAddress);
   }
 
-  // TODO: 721 `balanceOf` is equivalent to our Super1155 totalBalances.
-
   /**
     Retrieve the balance of a particular token `_id` for a particular address
     `_owner`.
@@ -391,11 +444,19 @@ contract Super721 is PermitControl, ERC165, // TODO: ERC-721 import {
     @param _id The ID of the token to check for a balance.
     @return The amount of token `_id` owned by `_owner`.
   */
-  function balanceOf(address _owner, uint256 _id) public override view virtual
+
+  function balanceOf(address _owner, uint256 _id) public view virtual
   returns (uint256) {
     require(_owner != address(0),
-      "ERC1155: balance query for the zero address");
+      "Super721::balanceOf: balance query for the zero address");
     return balances[_id][_owner];
+  }
+
+  function balanceOf(address _owner) public override view virtual
+  returns (uint256) {
+    require(_owner != address(0),
+      "Super721::balanceOf: balance query for the zero address");
+    return totalBalances[_owner];
   }
 
   /**
@@ -407,9 +468,9 @@ contract Super721 is PermitControl, ERC165, // TODO: ERC-721 import {
     @return the amount of each token owned by each owner.
   */
   function balanceOfBatch(address[] calldata _owners, uint256[] calldata _ids)
-    external override view virtual returns (uint256[] memory) {
+    external view virtual returns (uint256[] memory) {
     require(_owners.length == _ids.length,
-      "ERC1155: accounts and ids length mismatch");
+      "Super721::balanceOfBatch: accounts and ids length mismatch");
 
     // Populate and return an array of balances.
     uint256[] memory batchBalances = new uint256[](_owners.length);
@@ -450,7 +511,7 @@ contract Super721 is PermitControl, ERC165, // TODO: ERC-721 import {
   function setApprovalForAll(address _operator, bool _approved) external
     override virtual {
     require(_msgSender() != _operator,
-      "ERC1155: setting approval status for self");
+      "Super721::balanceOf: setting approval status for self");
     operatorApprovals[_msgSender()][_operator] = _approved;
     emit ApprovalForAll(_msgSender(), _operator, _approved);
   }
@@ -484,9 +545,8 @@ contract Super721 is PermitControl, ERC165, // TODO: ERC-721 import {
     internal virtual {
   }
 
-  // TODO: is there a 721 equivalent to the ERC1155 receiver?
   /**
-    ERC-1155 dictates that any contract which wishes to receive ERC-1155 tokens
+    ERC-721 dictates that any contract which wishes to receive ERC-721 tokens
     must explicitly designate itself as such. This function checks for such
     designation to prevent undesirable token transfers.
 
@@ -494,21 +554,20 @@ contract Super721 is PermitControl, ERC165, // TODO: ERC-721 import {
     @param _from The address to transfer tokens from.
     @param _to The address to transfer tokens to.
     @param _id The specific token ID to transfer.
-    @param _amount The amount of the specific `_id` to transfer.
     @param _data Additional call data to send with this transfer.
   */
   function _doSafeTransferAcceptanceCheck(address _operator, address _from,
-    address _to, uint256 _id, uint256 _amount, bytes calldata _data) private {
+    address _to, uint256 _id, bytes memory _data) private {
     if (_to.isContract()) {
-      try IERC1155Receiver(_to).onERC1155Received(_operator, _from, _id,
-        _amount, _data) returns (bytes4 response) {
-        if (response != IERC1155Receiver(_to).onERC1155Received.selector) {
-          revert("ERC1155: ERC1155Receiver rejected tokens");
+      try IERC721Receiver(_to).onERC721Received(_operator, _from, _id,
+        _data) returns (bytes4 response) {
+        if (response != IERC721Receiver(_to).onERC721Received.selector) {
+          revert("SUPER721::_doSafeTransferAcceptanceCheck: ERC721Receiver rejected tokens");
         }
       } catch Error(string memory reason) {
         revert(reason);
       } catch {
-        revert("ERC1155: transfer to non ERC1155Receiver implementer");
+        revert("SUPER721::_doSafeTransferAcceptanceCheck: transfer to non ERC721Receiver implementer");
       }
     }
   }
@@ -520,64 +579,54 @@ contract Super721 is PermitControl, ERC165, // TODO: ERC-721 import {
     @param _from The address to transfer tokens from.
     @param _to The address to transfer tokens to.
     @param _id The specific token ID to transfer.
-    @param _amount The amount of the specific `_id` to transfer.
     @param _data Additional call data to send with this transfer.
   */
-  function safeTransferFrom(address _from, address _to, uint256 _id,
-    uint256 _amount, bytes calldata _data) external override virtual {
+
+  /**
+   * @dev See {IERC721-safeTransferFrom}.
+   */
+  function safeTransferFrom(address from, address to, uint256 tokenId) public virtual override {
+      _safeTransferFrom(from, to, tokenId, bytes(""));
+  }
+
+  function safeTransferFrom(address from, address to, uint256 tokenId, bytes calldata data)
+  public virtual override {
+      _safeTransferFrom(from, to, tokenId, data);
+  }
+
+  function _safeTransferFrom(address _from, address _to, uint256 _id,
+    bytes memory _data) internal  virtual {
     require(_to != address(0),
-      "ERC1155: transfer to the zero address");
+      "SUPER721::_safeTransferFrom : transfer to the zero address");
     require(_from == _msgSender() || isApprovedForAll(_from, _msgSender()),
-      "ERC1155: caller is not owner nor approved");
+      "SUPER721::_safeTransferFrom : caller is not owner nor approved");
 
     // Validate transfer safety and send tokens away.
     address operator = _msgSender();
     _beforeTokenTransfer(operator, _from, _to, _asSingletonArray(_id),
-    _asSingletonArray(_amount), _data);
+    _asSingletonArray(1), _data);
 
     // Retrieve the item's group ID.
     uint256 shiftedGroupId = (_id & GROUP_MASK);
     uint256 groupId = shiftedGroupId >> 128;
 
     // Update all specially-tracked group-specific balances.
-    balances[_id][_from] = balances[_id][_from].sub(_amount,
-      "ERC1155: insufficient balance for transfer");
-    balances[_id][_to] = balances[_id][_to].add(_amount);
-    groupBalances[groupId][_from] = groupBalances[groupId][_from].sub(_amount);
-    groupBalances[groupId][_to] = groupBalances[groupId][_to].add(_amount);
-    totalBalances[_from] = totalBalances[_from].sub(_amount);
-    totalBalances[_to] = totalBalances[_to].add(_amount);
+    balances[_id][_from] = balances[_id][_from].sub(1,
+      "SUPER721::_safeTransferFrom: insufficient balance for transfer");
+    balances[_id][_to] = balances[_id][_to].add(1);
+    groupBalances[groupId][_from] = groupBalances[groupId][_from].sub(1);
+    groupBalances[groupId][_to] = groupBalances[groupId][_to].add(1);
+    totalBalances[_from] = totalBalances[_from].sub(1);
+    totalBalances[_to] = totalBalances[_to].add(1);
+
+    _holderTokens[_from].remove(_id);
+    _holderTokens[_to].add(_id);
+
+    _tokenOwners.set(_id, _to);
 
     // Emit the transfer event and perform the safety check.
-    emit TransferSingle(operator, _from, _to, _id, _amount);
-    _doSafeTransferAcceptanceCheck(operator, _from, _to, _id, _amount, _data);
-  }
-
-  /**
-    The batch equivalent of `_doSafeTransferAcceptanceCheck()`.
-
-    @param _operator The caller who triggers the token transfer.
-    @param _from The address to transfer tokens from.
-    @param _to The address to transfer tokens to.
-    @param _ids The specific token IDs to transfer.
-    @param _amounts The amounts of the specific `_ids` to transfer.
-    @param _data Additional call data to send with this transfer.
-  */
-  function _doSafeBatchTransferAcceptanceCheck(address _operator, address _from,
-    address _to, uint256[] memory _ids, uint256[] memory _amounts, bytes memory
-    _data) private {
-    if (_to.isContract()) {
-      try IERC1155Receiver(_to).onERC1155BatchReceived(_operator, _from, _ids,
-        _amounts, _data) returns (bytes4 response) {
-        if (response != IERC1155Receiver(_to).onERC1155BatchReceived.selector) {
-          revert("ERC1155: ERC1155Receiver rejected tokens");
-        }
-      } catch Error(string memory reason) {
-        revert(reason);
-      } catch {
-        revert("ERC1155: transfer to non ERC1155Receiver implementer");
-      }
-    }
+    emit Transfer(_from, _to, _id);
+    _doSafeTransferAcceptanceCheck(operator, _from, _to, _id, _data);
   }
 
   /**
@@ -592,13 +641,13 @@ contract Super721 is PermitControl, ERC165, // TODO: ERC-721 import {
   */
   function safeBatchTransferFrom(address _from, address _to,
     uint256[] memory _ids, uint256[] memory _amounts, bytes memory _data)
-    external override virtual {
+    external virtual {
     require(_ids.length == _amounts.length,
-      "ERC1155: ids and amounts length mismatch");
+      "SUPER721::safeBatchTransferFrom: ids and amounts length mismatch");
     require(_to != address(0),
-      "ERC1155: transfer to the zero address");
+      "SUPER721::safeBatchTransferFrom: transfer to the zero address");
     require(_from == _msgSender() || isApprovedForAll(_from, _msgSender()),
-      "ERC1155: caller is not owner nor approved");
+      "SUPER721::safeBatchTransferFrom: caller is not owner nor approved");
 
     // Validate transfer and perform all batch token sends.
     _beforeTokenTransfer(_msgSender(), _from, _to, _ids, _amounts, _data);
@@ -609,7 +658,7 @@ contract Super721 is PermitControl, ERC165, // TODO: ERC-721 import {
 
       // Update all specially-tracked group-specific balances.
       balances[_ids[i]][_from] = balances[_ids[i]][_from].sub(_amounts[i],
-        "ERC1155: insufficient balance for transfer");
+        "SUPER721::safeBatchTransferFrom: insufficient balance for transfer");
       balances[_ids[i]][_to] = balances[_ids[i]][_to].add(_amounts[i]);
       groupBalances[groupId][_from] = groupBalances[groupId][_from]
         .sub(_amounts[i]);
@@ -617,12 +666,11 @@ contract Super721 is PermitControl, ERC165, // TODO: ERC-721 import {
         .add(_amounts[i]);
       totalBalances[_from] = totalBalances[_from].sub(_amounts[i]);
       totalBalances[_to] = totalBalances[_to].add(_amounts[i]);
-    }
 
-    // Emit the transfer event and perform the safety check.
-    emit TransferBatch(_msgSender(), _from, _to, _ids, _amounts);
-    _doSafeBatchTransferAcceptanceCheck(_msgSender(), _from, _to, _ids,
-      _amounts, _data);
+      // Emit the transfer event and perform the safety check.
+      emit Transfer(_from, _to, _ids[i]);
+      _doSafeTransferAcceptanceCheck(_msgSender(), _from, _to, _ids[i], _data);
+    }
   }
 
   /**
@@ -634,22 +682,20 @@ contract Super721 is PermitControl, ERC165, // TODO: ERC-721 import {
     @param _groupId The ID of the item group to create or configure.
     @param _data The `ItemGroup` data input.
   */
-  function configureGroup(uint256 _groupId, ItemGroupInput calldata _data)
+  function configureGroup(uint256 _groupId, ItemGroupInput memory _data)
     external virtual hasItemRight(_groupId, CONFIGURE_GROUP) {
     require(_groupId != 0,
-      "Super1155: group ID 0 is invalid");
+      "SUPER721::configureGroup: group ID 0 is invalid");
 
     // If the collection is not locked, we may add a new item group.
     if (!itemGroups[_groupId].initialized) {
       require(!locked,
-        "Super1155: the collection is locked so groups cannot be created");
+        "SUPER721::configureGroup: the collection is locked so groups cannot be created");
       itemGroups[_groupId] = ItemGroup({
         initialized: true,
         name: _data.name,
         supplyType: _data.supplyType,
         supplyData: _data.supplyData,
-        itemType: _data.itemType,
-        itemData: _data.itemData,
         burnType: _data.burnType,
         burnData: _data.burnData,
         circulatingSupply: 0,
@@ -665,9 +711,9 @@ contract Super721 is PermitControl, ERC165, // TODO: ERC-721 import {
       // It may also not have its cap increased.
       if (itemGroups[_groupId].supplyType == SupplyType.Capped) {
         require(_data.supplyType == SupplyType.Capped,
-          "Super1155: you may not uncap a capped supply type");
+          "SUPER721::configureGroup: you may not uncap a capped supply type");
         require(_data.supplyData <= itemGroups[_groupId].supplyData,
-          "Super1155: you may not increase the supply of a capped type");
+          "SUPER721::configureGroup: you may not increase the supply of a capped type");
 
       // The flexible and uncapped types may freely change.
       } else {
@@ -676,34 +722,8 @@ contract Super721 is PermitControl, ERC165, // TODO: ERC-721 import {
 
       // Item supply data may not be reduced below the circulating supply.
       require(_data.supplyData >= itemGroups[_groupId].circulatingSupply,
-        "Super1155: you may not decrease supply below the circulating amount");
+        "Super1155::configureGroup: you may not decrease supply below the circulating amount");
       itemGroups[_groupId].supplyData = _data.supplyData;
-
-      // A nonfungible item may not change type.
-      if (itemGroups[_groupId].itemType == ItemType.Nonfungible) {
-        require(_data.itemType == ItemType.Nonfungible,
-          "Super1155: you may not alter nonfungible items");
-
-      // A semifungible item may not change type.
-      } else if (itemGroups[_groupId].itemType == ItemType.Semifungible) {
-        require(_data.itemType == ItemType.Semifungible,
-          "Super1155: you may not alter nonfungible items");
-
-      // A fungible item may change type if it is unique enough.
-      } else if (itemGroups[_groupId].itemType == ItemType.Fungible) {
-        if (_data.itemType == ItemType.Nonfungible) {
-          require(itemGroups[_groupId].circulatingSupply <= 1,
-            "Super1155: the fungible item is not unique enough to change");
-          itemGroups[_groupId].itemType = ItemType.Nonfungible;
-
-        // We may also try for semifungible items with a high-enough cap.
-        } else if (_data.itemType == ItemType.Semifungible) {
-          require(itemGroups[_groupId].circulatingSupply <= _data.itemData,
-            "Super1155: the fungible item is not unique enough to change");
-          itemGroups[_groupId].itemType = ItemType.Semifungible;
-          itemGroups[_groupId].itemData = _data.itemData;
-        }
-      }
     }
 
     // Emit the configuration event.
@@ -740,21 +760,22 @@ contract Super721 is PermitControl, ERC165, // TODO: ERC-721 import {
 
   /**
     This is a private helper function to verify, according to all of our various
-    minting and burning rules, whether it would be valid to mint some `_amount`
-    of a particular item `_id`.
+    minting and burning rules, whether it would be valid to mint a particular
+    item `_id`.
 
     @param _id The ID of the item to check for minting validity.
-    @param _amount The amount of the item to try checking mintability for.
-    @return The ID of the item that should have `_amount` minted for it.
+    @return The ID of the item that should be minted.
   */
-  function _mintChecker(uint256 _id, uint256 _amount) private view
-    returns (uint256) {
+  function _mintChecker(uint256 _id) private view returns (uint256) {
 
     // Retrieve the item's group ID.
     uint256 shiftedGroupId = (_id & GROUP_MASK);
     uint256 groupId = shiftedGroupId >> 128;
     require(itemGroups[groupId].initialized,
-      "Super1155: you cannot mint a non-existent item group");
+      "Super1155::_mintChecker: you cannot mint a non-existent item group");
+
+    require(!_tokenOwners.contains(_id),
+      "Super721::getApproved: token already exists");
 
     // If we can replenish burnt items, then only our currently-circulating
     // supply matters. Otherwise, historic mints are what determine the cap.
@@ -767,81 +788,12 @@ contract Super721 is PermitControl, ERC165, // TODO: ERC-721 import {
 
     // If we are subject to a cap on group size, ensure we don't exceed it.
     if (itemGroups[groupId].supplyType != SupplyType.Uncapped) {
-      require(currentGroupSupply.add(_amount) <= itemGroups[groupId].supplyData,
-        "Super1155: you cannot mint a group beyond its cap");
+      require(currentGroupSupply.add(1) <= itemGroups[groupId].supplyData,
+        "Super1155::_mintChecker: you cannot mint a group beyond its cap");
     }
-
-    // Do not violate nonfungibility rules.
-    if (itemGroups[groupId].itemType == ItemType.Nonfungible) {
-      require(currentItemSupply.add(_amount) <= 1,
-        "Super1155: you cannot mint more than a single nonfungible item");
-
-    // Do not violate semifungibility rules.
-    } else if (itemGroups[groupId].itemType == ItemType.Semifungible) {
-      require(currentItemSupply.add(_amount) <= itemGroups[groupId].itemData,
-        "Super1155: you cannot mint more than the alloted semifungible items");
-    }
-
-    // Fungible items are coerced into the single group ID + index one slot.
-    uint256 mintedItemId = _id;
-    if (itemGroups[groupId].itemType == ItemType.Fungible) {
-      mintedItemId = shiftedGroupId.add(1);
-    }
-    return mintedItemId;
+    //return shiftedGroupId.add(currentGroupSupply).add(1);
+    return _id;
   }
-
-  /**
-    Mint a single token into existence and send it to the `_recipient` address.
-    In order to mint an item, its item group must first have been created using
-    the `configureGroup` function. Minting an item must obey both the
-    fungibility and size cap of its group.
-
-    @param _recipient The address to receive all NFTs within the newly-minted
-      group.
-    @param _id The item ID to mint.
-    @param _amount The amount of the corresponding item ID to mint.
-    @param _data Any associated data to use on items minted in this transaction.
-  */
-  /*
-    This single-mint function is retained here for posterity but unfortunately
-    had to be disabled in order to let this contract slip in under the limit
-    imposed by Spurious Dragon.
-
-   function mint(address _recipient, uint256 _id, uint256 _amount,
-    bytes calldata _data) external virtual hasItemRight(_id, MINT) {
-    require(_recipient != address(0),
-      "ERC1155: mint to the zero address");
-
-    // Retrieve the group ID from the given item `_id` and check mint validity.
-    uint256 shiftedGroupId = (_id & GROUP_MASK);
-    uint256 groupId = shiftedGroupId >> 128;
-    uint256 mintedItemId = _mintChecker(_id, _amount);
-
-    // Validate and perform the mint.
-    address operator = _msgSender();
-    _beforeTokenTransfer(operator, address(0), _recipient,
-      _asSingletonArray(mintedItemId), _asSingletonArray(_amount), _data);
-
-    // Update storage of special balances and circulating values.
-    balances[mintedItemId][_recipient] = balances[mintedItemId][_recipient]
-      .add(_amount);
-    groupBalances[groupId][_recipient] = groupBalances[groupId][_recipient]
-      .add(_amount);
-    totalBalances[_recipient] = totalBalances[_recipient].add(_amount);
-    mintCount[mintedItemId] = mintCount[mintedItemId].add(_amount);
-    circulatingSupply[mintedItemId] = circulatingSupply[mintedItemId]
-      .add(_amount);
-    itemGroups[groupId].mintCount = itemGroups[groupId].mintCount.add(_amount);
-    itemGroups[groupId].circulatingSupply =
-      itemGroups[groupId].circulatingSupply.add(_amount);
-
-    // Emit event and handle the safety check.
-    emit TransferSingle(operator, address(0), _recipient, mintedItemId,
-      _amount);
-    _doSafeTransferAcceptanceCheck(operator, address(0), _recipient,
-      mintedItemId, _amount, _data);
-  }
-  */
 
   /**
     Mint a batch of tokens into existence and send them to the `_recipient`
@@ -856,12 +808,12 @@ contract Super721 is PermitControl, ERC165, // TODO: ERC-721 import {
     @param _data Any associated data to use on items minted in this transaction.
   */
   function mintBatch(address _recipient, uint256[] calldata _ids,
-    uint256[] calldata _amounts, bytes calldata _data)
+    uint256[] calldata _amounts, bytes memory _data)
     external virtual {
     require(_recipient != address(0),
-      "ERC1155: mint to the zero address");
+      "Super1155::mintBatch: mint to the zero address");
     require(_ids.length == _amounts.length,
-      "ERC1155: ids and amounts length mismatch");
+      "Super1155::mintBatch: ids and amounts length mismatch");
 
     // Validate and perform the mint.
     address operator = _msgSender();
@@ -872,12 +824,12 @@ contract Super721 is PermitControl, ERC165, // TODO: ERC-721 import {
     // balances and circulation balances.
     for (uint256 i = 0; i < _ids.length; i++) {
       require(_hasItemRight(_ids[i], MINT),
-        "Super1155: you do not have the right to mint that item");
+        "Super1155::mintBatch: you do not have the right to mint that item");
 
       // Retrieve the group ID from the given item `_id` and check mint.
       uint256 shiftedGroupId = (_ids[i] & GROUP_MASK);
       uint256 groupId = shiftedGroupId >> 128;
-      uint256 mintedItemId = _mintChecker(_ids[i], _amounts[i]);
+      uint256 mintedItemId = _mintChecker(_ids[i]);
 
       // Update storage of special balances and circulating values.
       balances[mintedItemId][_recipient] = balances[mintedItemId][_recipient]
@@ -892,12 +844,16 @@ contract Super721 is PermitControl, ERC165, // TODO: ERC-721 import {
         .add(_amounts[i]);
       itemGroups[groupId].circulatingSupply =
         itemGroups[groupId].circulatingSupply.add(_amounts[i]);
+
+      //_holderTokens[address(0)].remove(_ids[i]);
+      _holderTokens[_recipient].add(_ids[i]);
+
+      _tokenOwners.set(_ids[i], _recipient);
+      // Emit event and handle the safety check.
+      emit Transfer(address(0), _recipient, _ids[i]);
+      _doSafeTransferAcceptanceCheck(operator, address(0), _recipient, _ids[i], _data);
     }
 
-    // Emit event and handle the safety check.
-    emit TransferBatch(operator, address(0), _recipient, _ids, _amounts);
-    _doSafeBatchTransferAcceptanceCheck(operator, address(0), _recipient, _ids,
-      _amounts, _data);
   }
 
   /**
@@ -916,20 +872,20 @@ contract Super721 is PermitControl, ERC165, // TODO: ERC-721 import {
     uint256 shiftedGroupId = (_id & GROUP_MASK);
     uint256 groupId = shiftedGroupId >> 128;
     require(itemGroups[groupId].initialized,
-      "Super1155: you cannot burn a non-existent item group");
+      "Super1155::_burnChecker: you cannot burn a non-existent item group");
 
     // If we can burn items, then we must verify that we do not exceed the cap.
     if (itemGroups[groupId].burnType == BurnType.Burnable) {
       require(itemGroups[groupId].burnCount.add(_amount)
         <= itemGroups[groupId].burnData,
-        "Super1155: you may not exceed the burn limit on this item group");
+        "Super1155::_burnChecker you may not exceed the burn limit on this item group");
     }
 
     // Fungible items are coerced into the single group ID + index one slot.
     uint256 burntItemId = _id;
-    if (itemGroups[groupId].itemType == ItemType.Fungible) {
-      burntItemId = shiftedGroupId.add(1);
-    }
+    // if (itemGroups[groupId].itemType == ItemType.Fungible) {
+    //   burntItemId = shiftedGroupId.add(1);
+    // }
     return burntItemId;
   }
 
@@ -940,38 +896,38 @@ contract Super721 is PermitControl, ERC165, // TODO: ERC-721 import {
     @param _id The item ID to burn.
     @param _amount The amount of the corresponding item ID to burn.
   */
-  function burn(address _burner, uint256 _id, uint256 _amount)
-    external virtual hasItemRight(_id, BURN) {
-    require(_burner != address(0),
-      "ERC1155: burn from the zero address");
-
-    // Retrieve the group ID from the given item `_id` and check burn validity.
-    uint256 shiftedGroupId = (_id & GROUP_MASK);
-    uint256 groupId = shiftedGroupId >> 128;
-    uint256 burntItemId = _burnChecker(_id, _amount);
-
-    // Validate and perform the burn.
-    address operator = _msgSender();
-    _beforeTokenTransfer(operator, _burner, address(0),
-      _asSingletonArray(burntItemId), _asSingletonArray(_amount), "");
-
-    // Update storage of special balances and circulating values.
-    balances[burntItemId][_burner] = balances[burntItemId][_burner]
-      .sub(_amount,
-      "ERC1155: burn amount exceeds balance");
-    groupBalances[groupId][_burner] = groupBalances[groupId][_burner]
-      .sub(_amount);
-    totalBalances[_burner] = totalBalances[_burner].sub(_amount);
-    burnCount[burntItemId] = burnCount[burntItemId].add(_amount);
-    circulatingSupply[burntItemId] = circulatingSupply[burntItemId]
-      .sub(_amount);
-    itemGroups[groupId].burnCount = itemGroups[groupId].burnCount.add(_amount);
-    itemGroups[groupId].circulatingSupply =
-      itemGroups[groupId].circulatingSupply.sub(_amount);
-
-    // Emit the burn event.
-    emit TransferSingle(operator, _burner, address(0), _id, _amount);
-  }
+  // function burn(address _burner, uint256 _id, uint256 _amount)
+  //   external virtual hasItemRight(_id, BURN) {
+  //   require(_burner != address(0),
+  //     "Super721::burn: burn from the zero address");
+  //
+  //   // Retrieve the group ID from the given item `_id` and check burn validity.
+  //   uint256 shiftedGroupId = (_id & GROUP_MASK);
+  //   uint256 groupId = shiftedGroupId >> 128;
+  //   uint256 burntItemId = _burnChecker(_id, _amount);
+  //
+  //   // Validate and perform the burn.
+  //   address operator = _msgSender();
+  //   _beforeTokenTransfer(operator, _burner, address(0),
+  //     _asSingletonArray(burntItemId), _asSingletonArray(_amount), "");
+  //
+  //   // Update storage of special balances and circulating values.
+  //   balances[burntItemId][_burner] = balances[burntItemId][_burner]
+  //     .sub(_amount,
+  //     "Super721::burn: burn amount exceeds balance");
+  //   groupBalances[groupId][_burner] = groupBalances[groupId][_burner]
+  //     .sub(_amount);
+  //   totalBalances[_burner] = totalBalances[_burner].sub(_amount);
+  //   burnCount[burntItemId] = burnCount[burntItemId].add(_amount);
+  //   circulatingSupply[burntItemId] = circulatingSupply[burntItemId]
+  //     .sub(_amount);
+  //   itemGroups[groupId].burnCount = itemGroups[groupId].burnCount.add(_amount);
+  //   itemGroups[groupId].circulatingSupply =
+  //     itemGroups[groupId].circulatingSupply.sub(_amount);
+  //
+  //   // Emit the burn event.
+  //   emit Transfer(operator, address(0), _id);
+  // }
 
   /**
     This function allows an address to destroy multiple different items in a
@@ -984,9 +940,9 @@ contract Super721 is PermitControl, ERC165, // TODO: ERC-721 import {
   function burnBatch(address _burner, uint256[] memory _ids,
     uint256[] memory _amounts) external virtual {
     require(_burner != address(0),
-      "ERC1155: burn from the zero address");
+      "Super721::burnBatch: burn from the zero address");
     require(_ids.length == _amounts.length,
-      "ERC1155: ids and amounts length mismatch");
+      "Super721::burnBatch: ids and amounts length mismatch");
 
     // Validate and perform the burn.
     address operator = _msgSender();
@@ -996,7 +952,7 @@ contract Super721 is PermitControl, ERC165, // TODO: ERC-721 import {
     // balances and circulation balances.
     for (uint i = 0; i < _ids.length; i++) {
       require(_hasItemRight(_ids[i], BURN),
-        "Super1155: you do not have the right to burn that item");
+        "Super721::burnBatch: you do not have the right to burn that item");
 
       // Retrieve the group ID from the given item `_id` and check burn.
       uint256 shiftedGroupId = (_ids[i] & GROUP_MASK);
@@ -1006,7 +962,7 @@ contract Super721 is PermitControl, ERC165, // TODO: ERC-721 import {
       // Update storage of special balances and circulating values.
       balances[burntItemId][_burner] = balances[burntItemId][_burner]
         .sub(_amounts[i],
-        "ERC1155: burn amount exceeds balance");
+        "Super721::burn: burn amount exceeds balance");
       groupBalances[groupId][_burner] = groupBalances[groupId][_burner]
         .sub(_amounts[i]);
       totalBalances[_burner] = totalBalances[_burner].sub(_amounts[i]);
@@ -1017,10 +973,14 @@ contract Super721 is PermitControl, ERC165, // TODO: ERC-721 import {
         .add(_amounts[i]);
       itemGroups[groupId].circulatingSupply =
         itemGroups[groupId].circulatingSupply.sub(_amounts[i]);
-    }
 
-    // Emit the burn event.
-    emit TransferBatch(operator, _burner, address(0), _ids, _amounts);
+      _holderTokens[_burner].remove(_ids[i]);
+      _holderTokens[address(0)].add(_ids[i]);
+
+      _tokenOwners.set(_ids[i], address(0));
+      // Emit the burn event.
+      emit Transfer(operator, address(0), _ids[i]);
+    }
   }
 
   /**
@@ -1034,7 +994,7 @@ contract Super721 is PermitControl, ERC165, // TODO: ERC-721 import {
   function setMetadata(uint256 _id, string memory _metadata)
     external hasItemRight(_id, SET_METADATA) {
     require(!uriLocked && !metadataFrozen[_id],
-      "Super1155: you cannot edit this metadata because it is frozen");
+      "Super721::setMetadata: you cannot edit this metadata because it is frozen");
     string memory oldMetadata = metadata[_id];
     metadata[_id] = _metadata;
     emit MetadataChanged(_msgSender(), _id, oldMetadata, _metadata);
@@ -1075,5 +1035,72 @@ contract Super721 is PermitControl, ERC165, // TODO: ERC-721 import {
   function lock() external virtual hasValidPermit(UNIVERSAL, LOCK_CREATION) {
     locked = true;
     emit CollectionLocked(_msgSender());
+  }
+
+  function getApproved(uint256 tokenId) public view override returns (address) {
+      require(_tokenOwners.contains(tokenId), "Super721::getApproved: approved query for nonexistent token");
+
+      return _tokenApprovals[tokenId];
+  }
+
+  function _isApprovedOrOwner(address spender, uint256 tokenId) internal view returns (bool) {
+      require(_tokenOwners.contains(tokenId), "Super721::getApproved: operator query for nonexistent token");
+      address owner = ownerOf(tokenId);
+      return (spender == owner || _tokenApprovals[tokenId] == spender || isApprovedForAll(owner, spender));
+  }
+  /**
+   * @dev See {IERC721-transferFrom}.
+   */
+  function transferFrom(address from, address to, uint256 tokenId) public virtual override {
+      // //solhint-disable-next-line max-line-length
+      // require(_isApprovedOrOwner(_msgSender(), tokenId), "Super721::transferForm: transfer caller is not owner nor approved");
+      //
+      // require(ownerOf(tokenId) == from, "Super721::transferForm: transfer of token that is not own");
+      // require(to != address(0), "Super721::transferForm: transfer to the zero address");
+      //
+      // _beforeTokenTransfer(_msgSender(), from, to, _asSingletonArray(tokenId), _asSingletonArray(1), "");
+      //
+      // // Clear approvals from the previous owner
+      // //_approve(address(0), tokenId);
+      // _tokenApprovals[tokenId] = address(0);
+      // emit Approval(ownerOf(tokenId), address(0), tokenId);
+      //
+      // _holderTokens[from].remove(tokenId);
+      // _holderTokens[to].add(tokenId);
+      //
+      // _tokenOwners.set(tokenId, to);
+      //
+      // emit Transfer(from, to, tokenId);
+  }
+
+  /**
+   * @dev See {IERC721Enumerable-tokenOfOwnerByIndex}.
+   */
+  function tokenOfOwnerByIndex(address owner, uint256 index) public view returns (uint256) {
+      return _holderTokens[owner].at(index);
+  }
+
+  /**
+   * @dev See {IERC721Enumerable-totalSupply}.
+   */
+  function totalSupply() public view returns (uint256) {
+      // _tokenOwners are indexed by tokenIds, so .length() returns the number of tokenIds
+      return _tokenOwners.length();
+  }
+
+  /**
+   * @dev See {IERC721Enumerable-tokenByIndex}.
+   */
+  function tokenByIndex(uint256 index) public view returns (uint256) {
+      (uint256 tokenId, ) = _tokenOwners.at(index);
+      return tokenId;
+  }
+
+  function tokenURI(uint256 _tokenId) public view returns (string memory) {
+    return Strings.strConcat(
+        metadataUri,
+        Strings.uint2str(_tokenId),
+        ".json"
+    );
   }
 }
