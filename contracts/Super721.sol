@@ -24,7 +24,7 @@ import "./proxy/StubProxyRegistry.sol";
   other addresses governing their ability to mint NFTs from this collection.
 
   This contract is forked from the inherited OpenZeppelin dependency, and uses
-  ideas inherited from the Super1155 reference implementation.
+  ideas inherited from the Super721 reference implementation.
 
   August 4th, 2021.
 */
@@ -106,8 +106,8 @@ contract Super721 is PermitControl, ERC165, IERC721 {
 
   /**
     The ERC-721 URI for tracking item metadata, supporting {id} substitution.
-    For example: https://token-cdn-domain/{id}.json. See the ERC-1155 spec for
-    more details: https://eips.ethereum.org/EIPS/eip-1155#metadata.
+    For example: https://token-cdn-domain/{id}.json. See the ERC-721 spec for
+    more details: https://eips.ethereum.org/EIPS/eip-721#metadata.
   */
   string public metadataUri;
 
@@ -337,6 +337,8 @@ contract Super721 is PermitControl, ERC165, IERC721 {
     } else if (hasRightUntil(_msgSender(), bytes32(_id), _right)
       > block.timestamp) {
       _;
+    } else {
+      revert("Super721::hasItemRight: _msgSender does not have the right to perform that action");
     }
   }
 
@@ -389,11 +391,17 @@ contract Super721 is PermitControl, ERC165, IERC721 {
       _tokenApprovals[tokenId] = to;
       emit Approval(ownerOf(tokenId), to, tokenId);
   }
+  /**
+    Return a version number for this contract's interface.
+  */
+  function version() external virtual pure override returns (uint256) {
+    return 1;
+  }
 
   /**
     Return the item collection's metadata URI. This implementation returns the
     same URI for all tokens within the collection and relies on client-side
-    ID substitution per https://eips.ethereum.org/EIPS/eip-1155#metadata. Per
+    ID substitution per https://eips.ethereum.org/EIPS/eip-721#metadata. Per
     said specification, clients calling this function must replace the {id}
     substring with the actual token ID in hex, not prefixed by 0x, and padded
     to 64 characters in length.
@@ -445,7 +453,7 @@ contract Super721 is PermitControl, ERC165, IERC721 {
     @return The amount of token `_id` owned by `_owner`.
   */
 
-  function balanceOf(address _owner, uint256 _id) public view virtual
+  function balanceOfGroup(address _owner, uint256 _id) public view virtual
   returns (uint256) {
     require(_owner != address(0),
       "Super721::balanceOf: balance query for the zero address");
@@ -475,7 +483,7 @@ contract Super721 is PermitControl, ERC165, IERC721 {
     // Populate and return an array of balances.
     uint256[] memory batchBalances = new uint256[](_owners.length);
     for (uint256 i = 0; i < _owners.length; ++i) {
-      batchBalances[i] = balanceOf(_owners[i], _ids[i]);
+      batchBalances[i] = balanceOfGroup(_owners[i], _ids[i]);
     }
     return batchBalances;
   }
@@ -562,12 +570,12 @@ contract Super721 is PermitControl, ERC165, IERC721 {
       try IERC721Receiver(_to).onERC721Received(_operator, _from, _id,
         _data) returns (bytes4 response) {
         if (response != IERC721Receiver(_to).onERC721Received.selector) {
-          revert("SUPER721::_doSafeTransferAcceptanceCheck: ERC721Receiver rejected tokens");
+          revert("Super721::_doSafeTransferAcceptanceCheck: ERC721Receiver rejected tokens");
         }
       } catch Error(string memory reason) {
         revert(reason);
       } catch {
-        revert("SUPER721::_doSafeTransferAcceptanceCheck: transfer to non ERC721Receiver implementer");
+        revert("Super721::_doSafeTransferAcceptanceCheck: transfer to non ERC721Receiver implementer");
       }
     }
   }
@@ -597,9 +605,9 @@ contract Super721 is PermitControl, ERC165, IERC721 {
   function _safeTransferFrom(address _from, address _to, uint256 _id,
     bytes memory _data) internal  virtual {
     require(_to != address(0),
-      "SUPER721::_safeTransferFrom : transfer to the zero address");
+      "Super721::_safeTransferFrom : transfer to the zero address");
     require(_from == _msgSender() || isApprovedForAll(_from, _msgSender()),
-      "SUPER721::_safeTransferFrom : caller is not owner nor approved");
+      "Super721::_safeTransferFrom : caller is not owner nor approved");
 
     // Validate transfer safety and send tokens away.
     address operator = _msgSender();
@@ -612,7 +620,7 @@ contract Super721 is PermitControl, ERC165, IERC721 {
 
     // Update all specially-tracked group-specific balances.
     balances[_id][_from] = balances[_id][_from].sub(1,
-      "SUPER721::_safeTransferFrom: insufficient balance for transfer");
+      "Super721::_safeTransferFrom: insufficient balance for transfer");
     balances[_id][_to] = balances[_id][_to].add(1);
     groupBalances[groupId][_from] = groupBalances[groupId][_from].sub(1);
     groupBalances[groupId][_to] = groupBalances[groupId][_to].add(1);
@@ -639,15 +647,16 @@ contract Super721 is PermitControl, ERC165, IERC721 {
     @param _amounts The amounts of the specific `_ids` to transfer.
     @param _data Additional call data to send with this transfer.
   */
+
   function safeBatchTransferFrom(address _from, address _to,
     uint256[] memory _ids, uint256[] memory _amounts, bytes memory _data)
     external virtual {
     require(_ids.length == _amounts.length,
-      "SUPER721::safeBatchTransferFrom: ids and amounts length mismatch");
+      "Super721::safeBatchTransferFrom: ids and amounts length mismatch");
     require(_to != address(0),
-      "SUPER721::safeBatchTransferFrom: transfer to the zero address");
+      "Super721::safeBatchTransferFrom: transfer to the zero address");
     require(_from == _msgSender() || isApprovedForAll(_from, _msgSender()),
-      "SUPER721::safeBatchTransferFrom: caller is not owner nor approved");
+      "Super721::safeBatchTransferFrom: caller is not owner nor approved");
 
     // Validate transfer and perform all batch token sends.
     _beforeTokenTransfer(_msgSender(), _from, _to, _ids, _amounts, _data);
@@ -658,7 +667,7 @@ contract Super721 is PermitControl, ERC165, IERC721 {
 
       // Update all specially-tracked group-specific balances.
       balances[_ids[i]][_from] = balances[_ids[i]][_from].sub(_amounts[i],
-        "SUPER721::safeBatchTransferFrom: insufficient balance for transfer");
+        "Super721::safeBatchTransferFrom: insufficient balance for transfer");
       balances[_ids[i]][_to] = balances[_ids[i]][_to].add(_amounts[i]);
       groupBalances[groupId][_from] = groupBalances[groupId][_from]
         .sub(_amounts[i]);
@@ -685,12 +694,12 @@ contract Super721 is PermitControl, ERC165, IERC721 {
   function configureGroup(uint256 _groupId, ItemGroupInput memory _data)
     external virtual hasItemRight(_groupId, CONFIGURE_GROUP) {
     require(_groupId != 0,
-      "SUPER721::configureGroup: group ID 0 is invalid");
+      "Super721::configureGroup: group ID 0 is invalid");
 
     // If the collection is not locked, we may add a new item group.
     if (!itemGroups[_groupId].initialized) {
       require(!locked,
-        "SUPER721::configureGroup: the collection is locked so groups cannot be created");
+        "Super721::configureGroup: the collection is locked so groups cannot be created");
       itemGroups[_groupId] = ItemGroup({
         initialized: true,
         name: _data.name,
@@ -711,9 +720,9 @@ contract Super721 is PermitControl, ERC165, IERC721 {
       // It may also not have its cap increased.
       if (itemGroups[_groupId].supplyType == SupplyType.Capped) {
         require(_data.supplyType == SupplyType.Capped,
-          "SUPER721::configureGroup: you may not uncap a capped supply type");
+          "Super721::configureGroup: you may not uncap a capped supply type");
         require(_data.supplyData <= itemGroups[_groupId].supplyData,
-          "SUPER721::configureGroup: you may not increase the supply of a capped type");
+          "Super721::configureGroup: you may not increase the supply of a capped type");
 
       // The flexible and uncapped types may freely change.
       } else {
@@ -722,8 +731,9 @@ contract Super721 is PermitControl, ERC165, IERC721 {
 
       // Item supply data may not be reduced below the circulating supply.
       require(_data.supplyData >= itemGroups[_groupId].circulatingSupply,
-        "Super1155::configureGroup: you may not decrease supply below the circulating amount");
+        "Super721::configureGroup: you may not decrease supply below the circulating amount");
       itemGroups[_groupId].supplyData = _data.supplyData;
+      // do we want burnType to be updateable?
     }
 
     // Emit the configuration event.
@@ -772,7 +782,10 @@ contract Super721 is PermitControl, ERC165, IERC721 {
     uint256 shiftedGroupId = (_id & GROUP_MASK);
     uint256 groupId = shiftedGroupId >> 128;
     require(itemGroups[groupId].initialized,
-      "Super1155::_mintChecker: you cannot mint a non-existent item group");
+      "Super721::_mintChecker: you cannot mint a non-existent item group");
+
+    require(!_tokenOwners.contains(_id),
+      "Super721::_mintChecker: token already exists");
 
     require(!_tokenOwners.contains(_id),
       "Super721::getApproved: token already exists");
@@ -789,9 +802,9 @@ contract Super721 is PermitControl, ERC165, IERC721 {
     // If we are subject to a cap on group size, ensure we don't exceed it.
     if (itemGroups[groupId].supplyType != SupplyType.Uncapped) {
       require(currentGroupSupply.add(1) <= itemGroups[groupId].supplyData,
-        "Super1155::_mintChecker: you cannot mint a group beyond its cap");
+        "Super721::_mintChecker: you cannot mint a group beyond its cap");
     }
-    //return shiftedGroupId.add(currentGroupSupply).add(1);
+
     return _id;
   }
 
@@ -807,13 +820,14 @@ contract Super721 is PermitControl, ERC165, IERC721 {
     @param _amounts The amount of each corresponding item ID to create.
     @param _data Any associated data to use on items minted in this transaction.
   */
+
   function mintBatch(address _recipient, uint256[] calldata _ids,
     uint256[] calldata _amounts, bytes memory _data)
     external virtual {
     require(_recipient != address(0),
-      "Super1155::mintBatch: mint to the zero address");
+      "Super721::mintBatch: mint to the zero address");
     require(_ids.length == _amounts.length,
-      "Super1155::mintBatch: ids and amounts length mismatch");
+      "Super721::mintBatch: ids and amounts length mismatch");
 
     // Validate and perform the mint.
     address operator = _msgSender();
@@ -824,7 +838,7 @@ contract Super721 is PermitControl, ERC165, IERC721 {
     // balances and circulation balances.
     for (uint256 i = 0; i < _ids.length; i++) {
       require(_hasItemRight(_ids[i], MINT),
-        "Super1155::mintBatch: you do not have the right to mint that item");
+        "Super721::mintBatch: you do not have the right to mint that item");
 
       // Retrieve the group ID from the given item `_id` and check mint.
       uint256 shiftedGroupId = (_ids[i] & GROUP_MASK);
@@ -872,13 +886,13 @@ contract Super721 is PermitControl, ERC165, IERC721 {
     uint256 shiftedGroupId = (_id & GROUP_MASK);
     uint256 groupId = shiftedGroupId >> 128;
     require(itemGroups[groupId].initialized,
-      "Super1155::_burnChecker: you cannot burn a non-existent item group");
+      "Super721::_burnChecker: you cannot burn a non-existent item group");
 
     // If we can burn items, then we must verify that we do not exceed the cap.
     if (itemGroups[groupId].burnType == BurnType.Burnable) {
       require(itemGroups[groupId].burnCount.add(_amount)
         <= itemGroups[groupId].burnData,
-        "Super1155::_burnChecker you may not exceed the burn limit on this item group");
+        "Super721::_burnChecker you may not exceed the burn limit on this item group");
     }
 
     // Fungible items are coerced into the single group ID + index one slot.
@@ -1022,7 +1036,7 @@ contract Super721 is PermitControl, ERC165, IERC721 {
     @param _uri The value of the URI to lock for `_id`.
     @param _id The token ID to lock a metadata URI value into.
   */
-  function lockURI(string calldata _uri, uint256 _id) external
+  function lockItemGroupURI(string calldata _uri, uint256 _id) external
     hasItemRight(_id, LOCK_ITEM_URI) {
     metadataFrozen[_id] = true;
     emit PermanentURI(_uri, _id);
