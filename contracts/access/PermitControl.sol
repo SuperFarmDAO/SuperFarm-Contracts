@@ -103,7 +103,10 @@ abstract contract PermitControl is Ownable {
     @param _right The right to validate for the calling address. It must be
       non-expired and exist within the specified `_circumstance`.
   */
-  modifier hasValidPermit(bytes32 _circumstance, bytes32 _right) {
+  modifier hasValidPermit(
+    bytes32 _circumstance,
+    bytes32 _right
+  ) {
     require(_msgSender() == owner()
       || hasRightUntil(_msgSender(), _circumstance, _right) > block.timestamp,
       "PermitControl: sender does not have a valid permit");
