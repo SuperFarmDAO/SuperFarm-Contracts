@@ -16,6 +16,8 @@ import "@openzeppelin/contracts/utils/Address.sol";
   more finely-grained access control in contracts.
 
   The owner of this contract is always a fully-permissioned super-administrator.
+
+  August 23rd, 2021.
 */
 abstract contract PermitControl is Ownable {
   using SafeMath for uint256;
@@ -46,8 +48,8 @@ abstract contract PermitControl is Ownable {
     max-integer circumstance. Perpetual rights may be given an expiry time of
     max-integer.
   */
-  mapping (address => mapping (bytes32 => mapping (bytes32 => uint256))) public
-    permissions;
+  mapping( address => mapping( bytes32 => mapping( bytes32 => uint256 )))
+    public permissions;
 
   /**
     An additional mapping of managed rights to manager rights. This mapping
@@ -56,7 +58,7 @@ abstract contract PermitControl is Ownable {
     manager right's managed rights. Each right may be managed by only one other
     right.
   */
-  mapping (bytes32 => bytes32) public managerRight;
+  mapping( bytes32 => bytes32 ) public managerRight;
 
   /**
     An event emitted when an address has a permit updated. This event captures,
@@ -69,8 +71,13 @@ abstract contract PermitControl is Ownable {
     @param role The role which was updated.
     @param expirationTime The time when the permit expires.
   */
-  event PermitUpdated(address indexed updator, address indexed updatee,
-    bytes32 circumstance, bytes32 indexed role, uint256 expirationTime);
+  event PermitUpdated(
+    address indexed updator,
+    address indexed updatee,
+    bytes32 circumstance,
+    bytes32 indexed role,
+    uint256 expirationTime
+  );
 
   /**
     An event emitted when a management relationship in `managerRight` is
@@ -81,8 +88,11 @@ abstract contract PermitControl is Ownable {
     @param managedRight The right which had its manager updated.
     @param managerRight The new manager right which was updated to.
   */
-  event ManagementUpdated(address indexed manager, bytes32 indexed managedRight,
-    bytes32 indexed managerRight);
+  event ManagementUpdated(
+    address indexed manager,
+    bytes32 indexed managedRight,
+    bytes32 indexed managerRight
+  );
 
   /**
     A modifier which allows only the super-administrative owner or addresses
@@ -117,8 +127,11 @@ abstract contract PermitControl is Ownable {
     @return The timestamp in seconds when the `_right` expires. If the timestamp
       is zero, we can assume that the user never had the right.
   */
-  function hasRightUntil(address _address, bytes32 _circumstance,
-    bytes32 _right) public view returns (uint256) {
+  function hasRightUntil(
+    address _address,
+    bytes32 _circumstance,
+    bytes32 _right
+  ) public view returns (uint256) {
     return permissions[_address][_circumstance][_right];
   }
 
@@ -133,9 +146,12 @@ abstract contract PermitControl is Ownable {
     @param _expirationTime The time when the `_right` expires for the provided
       `_circumstance`.
   */
-  function setPermit(address _address, bytes32 _circumstance, bytes32 _right,
-    uint256 _expirationTime) external virtual hasValidPermit(UNIVERSAL,
-    managerRight[_right]) {
+  function setPermit(
+    address _address,
+    bytes32 _circumstance,
+    bytes32 _right,
+    uint256 _expirationTime
+  ) external virtual hasValidPermit(UNIVERSAL, managerRight[_right]) {
     require(_right != ZERO_RIGHT,
       "PermitControl: you may not grant the zero right");
     permissions[_address][_circumstance][_right] = _expirationTime;
@@ -152,8 +168,10 @@ abstract contract PermitControl is Ownable {
     @param _managerRight The right whose `UNIVERSAL` holders may manage
       `_managedRight`.
   */
-  function setManagerRight(bytes32 _managedRight, bytes32 _managerRight)
-    external virtual hasValidPermit(UNIVERSAL, MANAGER) {
+  function setManagerRight(
+    bytes32 _managedRight,
+    bytes32 _managerRight
+  ) external virtual hasValidPermit(UNIVERSAL, MANAGER) {
     require(_managedRight != ZERO_RIGHT,
       "PermitControl: you may not specify a manager for the zero right");
     managerRight[_managedRight] = _managerRight;
