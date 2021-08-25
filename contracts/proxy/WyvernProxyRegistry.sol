@@ -21,8 +21,10 @@ contract WyvernProxyRegistry is ProxyRegistry {
   /// The public name of this registry.
   string public constant name = "Project Wyvern Proxy Registry";
 
-  /// A flag to debounce whether or not the initial authorized caller has been
-  /// set.
+  /**
+    A flag to debounce whether or not the initial authorized caller has been
+    set.
+  */
   bool public initialCallerSet = false;
 
   /**
@@ -30,7 +32,7 @@ contract WyvernProxyRegistry is ProxyRegistry {
     `OwnableDelegateProxy` contracts that are registered by users. This registry
     will use `AuthenticatedProxy` as its initial implementation.
   */
-  constructor() public {
+  constructor () {
     delegateProxyImplementation = address(new AuthenticatedProxy());
   }
 

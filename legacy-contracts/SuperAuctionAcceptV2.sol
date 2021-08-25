@@ -11,7 +11,8 @@ import "./Fee1155NFTLockable.sol";
 /**
   @title A simple NFT auction contract which sells a single item for an owner to
     accept or decline via highest bid offer.
-  @author SuperFarm
+  @author thrpw;
+  @author Tim Clancy
 
   This auction contract accepts on-chain bids before minting an NFT to the
   winner.
@@ -98,7 +99,7 @@ contract SuperAuctionAcceptV2 is Ownable, ReentrancyGuard {
     @param _receiptBuffer The buffer time which the auction owner has to accept.
     @param _minimumBid The lowest starting bid for the auctioned item.
   */
-  constructor(address payable _beneficiary, Fee1155NFTLockable _item, uint256 _groupId, uint256 _duration, uint256 _bidBuffer, uint256 _receiptBuffer, uint256 _minimumBid) public {
+  constructor (address payable _beneficiary, Fee1155NFTLockable _item, uint256 _groupId, uint256 _duration, uint256 _bidBuffer, uint256 _receiptBuffer, uint256 _minimumBid) {
     beneficiary = _beneficiary;
     originalOwner = _item.owner();
     item = _item;

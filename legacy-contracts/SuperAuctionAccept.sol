@@ -10,7 +10,8 @@ import "./Fee1155NFTLockable.sol";
 /**
   @title A simple NFT auction contract which sells a single item for an owner to
     accept or decline via highest bid offer.
-  @author SuperFarm
+  @author thrpw;
+  @author Tim Clancy
 
   This auction contract accepts on-chain bids before minting an NFT to the
   winner.

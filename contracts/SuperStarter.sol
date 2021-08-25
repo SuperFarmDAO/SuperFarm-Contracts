@@ -8,7 +8,7 @@ import "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ContextUpgradeable.sol";
 import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 
-contract SuperPad is Initializable, ContextUpgradeable, OwnableUpgradeable {
+contract SuperStarter is Initializable, ContextUpgradeable, OwnableUpgradeable {
     using SafeMath for uint256;
     using SafeERC20 for IERC20;
 

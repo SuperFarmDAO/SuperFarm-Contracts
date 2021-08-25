@@ -95,7 +95,7 @@ contract TokenVault is Ownable, ReentrancyGuard {
     @param _panicDestination The destination to withdraw to in emergency.
     @param _panicLimit A limit for the number of times `panic` can be called before tokens burn.
   */
-  constructor(string memory _name, Token _token, address _panicOwner, address _panicDestination, uint256 _panicLimit) public {
+  constructor (string memory _name, Token _token, address _panicOwner, address _panicDestination, uint256 _panicLimit) {
     name = _name;
     token = _token;
     panicOwner = _panicOwner;

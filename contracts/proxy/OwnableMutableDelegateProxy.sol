@@ -39,7 +39,7 @@ contract OwnableMutableDelegateProxy is OwnableDelegateProxy {
     @param _target The initial target of this proxy.
     @param _data The initial call to delegate to `_target`.
   */
-  constructor(address _owner, address _target, bytes memory _data) public
+  constructor (address _owner, address _target, bytes memory _data)
     OwnableDelegateProxy(_owner, _target, _data) { }
 
   /**

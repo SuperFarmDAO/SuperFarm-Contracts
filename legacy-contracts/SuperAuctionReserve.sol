@@ -82,7 +82,7 @@ contract SuperAuctionReserve is Ownable, ReentrancyGuard {
     @param _bidBuffer The buffer time at which a bid will extend the auction.
     @param _reservePrice The reserve price for the bid.
   */
-  constructor(address payable _beneficiary, Fee1155NFTLockable _item, uint256 _groupId, uint256 _duration, uint256 _bidBuffer, uint256 _reservePrice) public {
+  constructor (address payable _beneficiary, Fee1155NFTLockable _item, uint256 _groupId, uint256 _duration, uint256 _bidBuffer, uint256 _reservePrice) {
     beneficiary = _beneficiary;
     originalOwner = _item.owner();
     item = _item;
