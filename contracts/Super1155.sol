@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity 0.7.6;
-pragma experimental ABIEncoderV2;
+pragma solidity 0.8.7;
 
 import "@openzeppelin/contracts/utils/introspection/ERC165Storage.sol";
 import "@openzeppelin/contracts/token/ERC1155/IERC1155.sol";
@@ -26,7 +25,7 @@ import "./proxy/StubProxyRegistry.sol";
 
   July 19th, 2021.
 */
-contract Super1155 is PermitControl, ERC165, IERC1155, IERC1155MetadataURI {
+contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataURI {
   using Address for address;
   using SafeMath for uint256;
 
@@ -64,7 +63,7 @@ contract Super1155 is PermitControl, ERC165, IERC1155, IERC1155MetadataURI {
   bytes4 private constant INTERFACE_ERC1155_METADATA_URI = 0x0e89341c;
 
   /// @dev A mask for isolating an item's group ID.
-  uint256 private constant GROUP_MASK = uint256(uint128(~0)) << 128;
+  uint256 private constant GROUP_MASK = uint256(type(uint128).max) << 128;
 
   /// The public name of this contract.
   string public name;
@@ -332,7 +331,7 @@ contract Super1155 is PermitControl, ERC165, IERC1155, IERC1155MetadataURI {
     @param _proxyRegistryAddress The address of a proxy registry contract.
   */
   constructor(address _owner, string memory _name, string memory _uri,
-    address _proxyRegistryAddress) public {
+    address _proxyRegistryAddress) {
 
     // Register the ERC-165 interfaces.
     _registerInterface(INTERFACE_ERC1155);

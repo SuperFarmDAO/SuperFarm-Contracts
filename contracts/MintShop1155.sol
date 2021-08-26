@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity 0.7.6;
-pragma experimental ABIEncoderV2;
+pragma solidity 0.8.7;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
@@ -45,7 +44,7 @@ contract MintShop1155 is Sweepable, ReentrancyGuard {
   bytes32 public constant POOL = keccak256("POOL");
 
   /// @dev A mask for isolating an item's group ID.
-  uint256 constant GROUP_MASK = uint256(uint128(~0)) << 128;
+  uint256 constant GROUP_MASK = uint256(type(uint128).max) << 128;
 
   /// The item collection contract that minted items are sold from.
   Super1155 public item;

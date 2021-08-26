@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity 0.7.6;
-pragma experimental ABIEncoderV2;
+pragma solidity 0.8.7;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
@@ -126,7 +125,7 @@ contract Staker is Ownable, ReentrancyGuard {
     @param _name The name of the Staker contract.
     @param _token The token to reward stakers in this contract with.
   */
-  constructor(string memory _name, IERC20 _token) public {
+  constructor(string memory _name, IERC20 _token) {
     name = _name;
     token = _token;
     token.approve(address(this), MAX_INT);

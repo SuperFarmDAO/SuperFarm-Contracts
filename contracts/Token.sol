@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity 0.7.6;
+pragma solidity 0.8.7;
 
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Capped.sol";
@@ -30,7 +30,7 @@ contract Token is ERC20Capped, Ownable {
     @param _ticker The ticker symbol of the new Token.
     @param _cap The supply cap of the new Token.
   */
-  constructor (string memory _name, string memory _ticker, uint256 _cap) public ERC20(_name, _ticker) ERC20Capped(_cap) { }
+  constructor (string memory _name, string memory _ticker, uint256 _cap) ERC20(_name, _ticker) ERC20Capped(_cap) { }
 
   /**
    * @dev Destroys `amount` tokens from the caller.
@@ -309,7 +309,7 @@ contract Token is ERC20Capped, Ownable {
 
     @return The ID of the contract's network or chain.
   */
-  function getChainId() internal pure returns (uint) {
+  function getChainId() internal view returns (uint) {
     uint256 chainId;
     assembly { chainId := chainid() }
     return chainId;

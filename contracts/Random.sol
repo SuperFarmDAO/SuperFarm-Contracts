@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity 0.7.6;
-pragma experimental ABIEncoderV2;
+pragma solidity 0.8.7;
 
-import "@chainlink/contracts/src/v0.7/VRFConsumerBase.sol";
+import "@chainlink/contracts/src/v0.8/VRFConsumerBase.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
@@ -121,7 +120,7 @@ contract Random is Named, Sweepable, VRFConsumerBase {
       coordinator.
   */
   constructor(address _owner, string memory _name,
-    Chainlink memory _chainlink) public Named(_name)
+    Chainlink memory _chainlink) Named(_name)
     VRFConsumerBase(_chainlink.coordinator, _chainlink.link) {
 
     // Do not perform a redundant ownership transfer if the deployer should

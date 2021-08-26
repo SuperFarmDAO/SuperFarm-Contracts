@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity 0.7.6;
-pragma experimental ABIEncoderV2;
+pragma solidity 0.8.7;
 
 import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
@@ -28,7 +27,7 @@ import "./proxy/StubProxyRegistry.sol";
 
   August 4th, 2021.
 */
-contract Super721IMX is PermitControl, ERC165, IERC721 {
+contract Super721IMX is PermitControl, ERC165Storage, IERC721 {
   using Address for address;
   using SafeMath for uint256;
   using EnumerableSet for EnumerableSet.UintSet;
@@ -97,7 +96,7 @@ contract Super721IMX is PermitControl, ERC165, IERC721 {
   /// @dev Supply the magic number for the required ERC-721 interface.
 
   /// @dev A mask for isolating an item's group ID.
-  uint256 private constant GROUP_MASK = uint256(uint128(~0)) << 128;
+  uint256 private constant GROUP_MASK = uint256(type(uint128).max) << 128;
 
   /// The public name of this contract.
   string public name;

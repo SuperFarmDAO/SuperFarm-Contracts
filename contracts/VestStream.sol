@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity 0.6.12;
-pragma experimental ABIEncoderV2;
+pragma solidity 0.8.7;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
@@ -50,7 +49,7 @@ contract VestStream is Ownable, ReentrancyGuard {
 
     @param _token The token to vest to claimants in this contract.
   */
-  constructor(IERC20 _token) public {
+  constructor(IERC20 _token) {
     token = _token;
     uint256 MAX_INT = 2**256 - 1;
     token.approve(address(this), MAX_INT);
