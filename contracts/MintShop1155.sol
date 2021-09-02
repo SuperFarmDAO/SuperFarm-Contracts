@@ -970,10 +970,15 @@ contract MintShop1155 is Sweepable, ReentrancyGuard {
       purchase from.
     @param _itemKey The bytes32 key for accessing a particular item in a pool
       mapping.
+    @param _amount The amount of items being purchased.
   */
-  function _mintHelper(uint256 _id, bytes32 _itemKey) private {
+  function _mintHelper(
+    uint256 _id,
+    bytes32 _itemKey,
+    uint256 _amount
+  ) private {
     if (pools[_id].tokenMints[_itemKey] > 0) {
-      token.mint(_msgSender(), pools[_id].tokenMints[_itemKey]);
+      token.mint(_msgSender(), pools[_id].tokenMints[_itemKey].mul(_amount));
     }
   }
 
@@ -1121,7 +1126,7 @@ contract MintShop1155 is Sweepable, ReentrancyGuard {
     globalPurchaseCounts[_msgSender()] = userGlobalPurchaseAmount;
 
     // Use the mint helper to avoid a stack-too-deep issue.
-    _mintHelper(_id, itemKey);
+    _mintHelper(_id, itemKey, _amount);
 
     // Emit an event indicating a successful purchase.
     emit ItemPurchased(_msgSender(), _id, itemIds, amounts);
