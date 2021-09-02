@@ -128,6 +128,7 @@ contract Super721 is PermitControl, ERC165, IERC721 {
 
   // Enumerable mapping from token ids to their owners
   EnumerableMap.UintToAddressMap private _tokenOwners;
+
   /**
     @dev This is a mapping from each address to per-address operator approvals.
     Operators are those addresses that have been approved to transfer tokens on

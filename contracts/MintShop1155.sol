@@ -3,6 +3,7 @@ pragma solidity 0.7.6;
 pragma experimental ABIEncoderV2;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
@@ -182,12 +183,15 @@ contract MintShop1155 is Sweepable, ReentrancyGuard {
       some amount of an ERC-1155 item to buy from.
     @param PointRequired This specifies a pool which requires the buyer to hold
       some amount of points in a Staker to buy from.
+    @param ItemRequired721 This specifies a pool which requires the buyer to
+      hold some amount of an ERC-721 item to buy from.
   */
   enum AccessType {
     Public,
     TokenRequired,
     ItemRequired,
-    PointRequired
+    PointRequired,
+    ItemRequired721
   }
 
   /**
@@ -200,11 +204,12 @@ contract MintShop1155 is Sweepable, ReentrancyGuard {
     @param requiredAsset Some more specific information about the asset to
       require. If the `requiredType` is `TokenRequired`, we use this address to
       find the ERC-20 token that we should be specifically requiring holdings
-      of. If the `requiredType` is `ItemRequired`, we use this address to find
-      the item contract that we should be specifically requiring holdings of. If
-      the `requiredType` is `PointRequired`, we treat this address as the
-      address of a Staker contract. Do note that in order for this to work, the
-      Staker must have approved this shop as a point spender.
+      of. If the `requiredType` is `ItemRequired` or `ItemRequired721`, we use
+      this address to find the item contract that we should be specifically
+      requiring holdings of. If the `requiredType` is `PointRequired`, we treat
+      this address as the address of a Staker contract. Do note that in order
+      for this to work, the Staker must have approved this shop as a point
+      spender.
     @param requiredAmount The amount of the specified `requiredAsset` required
       for the buyer to purchase from this pool.
     @param whitelistId The ID of an address whitelist to restrict participants
@@ -1015,6 +1020,13 @@ contract MintShop1155 is Sweepable, ReentrancyGuard {
     } else if (poolRequirement.requiredType == AccessType.ItemRequired) {
       Super1155 requiredItem = Super1155(poolRequirement.requiredAsset);
       require(requiredItem.totalBalances(_msgSender())
+        >= poolRequirement.requiredAmount,
+        "MintShop1155: you do not have enough required item for this pool");
+
+    // Verify that any possible ERC-721 ownership requirements are met.
+    } else if (poolRequirement.requiredType == AccessType.ItemRequired721) {
+      IERC721 requiredItem = IERC721(poolRequirement.requiredAsset);
+      require(requiredItem.balanceOf(_msgSender())
         >= poolRequirement.requiredAmount,
         "MintShop1155: you do not have enough required item for this pool");
 
