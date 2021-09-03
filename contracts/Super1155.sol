@@ -320,7 +320,7 @@ contract Super1155 is PermitControl, ERC165, IERC1155, IERC1155MetadataURI {
     } else if (hasRightUntil(_msgSender(), bytes32(_id), _right)
       > block.timestamp) {
       _;
-    }
+    } 
   }
 
   /**

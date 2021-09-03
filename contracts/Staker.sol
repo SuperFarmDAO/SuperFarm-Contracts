@@ -11,6 +11,7 @@ import "@openzeppelin/contracts/math/SafeMath.sol";
 /**
   @title An asset staking contract.
   @author Tim Clancy
+  @author Qazawat Zirak
 
   This staking contract disburses tokens from its internal reservoir according
   to a fixed emission schedule. Assets can be assigned varied staking weights.
@@ -183,7 +184,7 @@ contract Staker is Ownable, ReentrancyGuard {
     Set new emission details to the Staker or overwrite existing ones.
     This operation requires that emission schedule alteration is not locked.
 
-    @param _tokenSchedule An array of EmissionPoints defining the token schedule.
+    @param _tokenSchedule An array of EmissionTokens defining the token schedule.
     @param _pointSchedule An array of EmissionPoints defining the point schedule.
   */
   function setEmissions(EmissionPoint[] memory _tokenSchedule, EmissionPoint[] memory _pointSchedule) external onlyOwner {
@@ -212,7 +213,7 @@ contract Staker is Ownable, ReentrancyGuard {
         }
       }
     }
-    require(tokenEmissionBlockCount > 0,
+    require(pointEmissionBlockCount > 0,
       "You must set the point emission schedule.");
   }
 
