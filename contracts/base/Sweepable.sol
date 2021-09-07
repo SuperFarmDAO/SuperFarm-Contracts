@@ -11,6 +11,7 @@ import "../access/PermitControl.sol";
   @title A base contract which supports an administrative sweep function wherein
     authorized callers may transfer ERC-20 tokens out of this contract.
   @author Tim Clancy
+  @author Qazawat Zirak
 
   This is a base contract designed with the intent to support rescuing ERC-20
   tokens which users might have wrongly sent to a contract.
@@ -67,7 +68,7 @@ contract Sweepable is PermitControl {
     hasValidPermit(UNIVERSAL, SWEEP) {
     require(!sweepLocked,
       "MintShop1155: the sweep function is locked");
-    _token.safeTransferFrom(address(this), _address, _amount);
+    _token.safeTransfer(_address, _amount);
     emit TokenSweep(_msgSender(), _token, _amount, _address);
   }
 

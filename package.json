@@ -57,7 +57,7 @@
     "eslint-plugin-standard": "^4.0.1",
     "ethereum-waffle": "^3.1.1",
     "ethers": "^5.0.25",
-    "hardhat": "^2.0.10",
+    "hardhat": "^2.6.2",
     "hardhat-contract-sizer": "^2.0.2",
     "hardhat-gas-reporter": "^1.0.4",
     "husky": "^4.3.0",

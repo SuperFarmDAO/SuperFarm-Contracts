@@ -15,6 +15,7 @@ import "./Staker.sol";
   @title A Shop contract for selling NFTs via direct minting through particular
     pools with specific participation requirements.
   @author Tim Clancy
+  @author Qazawat Zirak
 
   This launchpad contract sells new items by minting them into existence. It
   cannot be used to sell items that already exist.
@@ -678,14 +679,14 @@ contract MintShop1155 is Sweepable, ReentrancyGuard {
   */
   function getWhitelistStatus(uint256[] calldata _ids,
     address[] calldata _addresses) external view returns (bool[][] memory) {
-    bool[][] memory whitelistStatus;
-    for (uint256 i = 0; i < _ids.length; i++) {
-      uint256 id = _ids[i];
-      uint256 whitelistVersion = whitelists[id].currentWhitelistVersion;
-      for (uint256 j = 0; j < _addresses.length; j++) {
-        bytes32 addressKey = keccak256(abi.encode(whitelistVersion,
-          _addresses[j]));
-        whitelistStatus[j][i] = whitelists[id].addresses[addressKey];
+    bool[][] memory whitelistStatus = new bool[][](_addresses.length);
+    for (uint256 i = 0; i < _addresses.length; i++) {
+      whitelistStatus[i] = new bool[](_ids.length);
+      for (uint256 j = 0; j < _ids.length; j++) {
+        uint256 id = _ids[j];
+        uint256 whitelistVersion = whitelists[id].currentWhitelistVersion;
+        bytes32 addressKey = keccak256(abi.encode(whitelistVersion, _addresses[i]));
+        whitelistStatus[i][j] = whitelists[id].addresses[addressKey];
       }
     }
     return whitelistStatus;
@@ -752,12 +753,13 @@ contract MintShop1155 is Sweepable, ReentrancyGuard {
   */
   function getPurchaseCounts(uint256[] calldata _ids,
     address[] calldata _purchasers) external view returns (uint256[][] memory) {
-    uint256[][] memory purchaseCounts;
-    for (uint256 i = 0; i < _ids.length; i++) {
-      uint256 id = _ids[i];
-      for (uint256 j = 0; j < _purchasers.length; j++) {
-        address purchaser = _purchasers[j];
-        purchaseCounts[j][i] = pools[id].purchaseCounts[purchaser];
+    uint256[][] memory purchaseCounts = new uint256[][](_purchasers.length);
+    for (uint256 i = 0; i < _purchasers.length; i++) {
+      purchaseCounts[i] = new uint256[](_ids.length);
+      for (uint256 j = 0; j < _ids.length; j++) {
+        uint256 id = _ids[j];
+        address purchaser = _purchasers[i];
+        purchaseCounts[i][j] = pools[id].purchaseCounts[purchaser];
       }
     }
     return purchaseCounts;
