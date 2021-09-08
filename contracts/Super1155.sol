@@ -15,6 +15,7 @@ import "./proxy/StubProxyRegistry.sol";
 /**
   @title An ERC-1155 item creation contract.
   @author Tim Clancy
+  @author Qazawat Zirak
 
   This contract represents the NFTs within a single collection. It allows for a
   designated collection owner address to manage the creation of NFTs within this
@@ -935,6 +936,11 @@ contract Super1155 is PermitControl, ERC165, IERC1155, IERC1155MetadataURI {
     uint256 groupId = shiftedGroupId >> 128;
     require(itemGroups[groupId].initialized,
       "Super1155: you cannot burn a non-existent item group");
+
+    // If the item group is non-burnable, then revert.
+    if (itemGroups[groupId].burnType == BurnType.None) {
+      revert("Super1155: you cannot burn a non-burnable item group");
+    }
 
     // If we can burn items, then we must verify that we do not exceed the cap.
     if (itemGroups[groupId].burnType == BurnType.Burnable) {
