@@ -240,7 +240,7 @@ describe('Token', function () {
 		// Verify that vote counting reverts on unfinalized blocks.
 		it('should revert for unfinalized blocks', async () => {
 			await expect(
-				token.connect(alice.signer).getPriorVotes(alice.address, 1e6)
+				token.connect(alice.signer).getPriorVotes(alice.address, 1e9)
 			).to.be.revertedWith('The specified block is not yet finalized.');
 		});
 
@@ -305,6 +305,43 @@ describe('Token', function () {
 			priorVotes.should.be.equal(ethers.utils.parseEther('100'));
 			priorVotes = await token.connect(alice.signer).getPriorVotes(bob.address, transferTransactionThree.blockNumber + 1);
 			priorVotes.should.be.equal(ethers.utils.parseEther('100'));
+			
+		});
+	});
+
+	describe('Basic functions', function () {
+		it('Shoud burn tokens', async function() {
+			
+			await token.connect(alice.signer).mint(alice.address, ethers.utils.parseEther('100'));
+			let balanceBefore = await token.connect(alice.signer).balanceOf(alice.address);
+
+			await token.connect(alice.signer).burn(ethers.utils.parseEther('100'));
+			let balanceAfter = await token.connect(alice.signer).balanceOf(alice.address);
+			expect(balanceAfter.toString()).equal(String((balanceBefore.toString() - ethers.utils.parseEther('100'))));
+
+		});
+
+		it('Shoud burnFrom tokens', async function() {
+			await token.connect(alice.signer).mint(bob.address, ethers.utils.parseEther('100'));
+			await token.connect(bob.signer).approve(alice.address, ethers.utils.parseEther('100'));
+			let balanceBefore = await token.connect(bob.signer).balanceOf(bob.address);
+			await token.connect(alice.signer).burnFrom(bob.address, ethers.utils.parseEther('100'));
+			let balanceAfter = await token.connect(bob.signer).balanceOf(bob.address);
+			expect(balanceAfter.toString()).equal((String(balanceBefore.toString() - ethers.utils.parseEther('100'))));
+		});
+
+		it("Get current votes", async function() {
+			let balanceBeforeAlice = await token.connect(bob.signer).getCurrentVotes(alice.address);
+
+			expect(balanceBeforeAlice.toString()).equal('0');
+			await token.connect(alice.signer).mint(bob.address, ethers.utils.parseEther('100'));
+			await token.connect(bob.signer).delegate(alice.address);
+
+			let balanceAfterAlice = await token.connect(bob.signer).getCurrentVotes(alice.address);
+			expect(balanceAfterAlice.toString()).equal(ethers.utils.parseEther('100'));
+
+
+
 		});
 	});
 });
