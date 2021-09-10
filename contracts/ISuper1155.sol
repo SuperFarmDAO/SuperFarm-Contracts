@@ -169,7 +169,6 @@ interface ISuper1155 {
 
   /// A mapping of data for each item group.
   function itemGroups (uint256) external view returns (ItemGroup memory);
-  /* function itemGroups (uint256) external view returns (bool initialized, string memory _name, uint8 supplyType, uint256 supplyData, uint8 itemType, uint256 itemData, uint8 burnType, uint256 burnData, uint256 _circulatingSupply, uint256 _mintCount, uint256 _burnCount); */
 
   /// A mapping of circulating supplies for each individual token.
   function circulatingSupply (uint256) external view returns (uint256);

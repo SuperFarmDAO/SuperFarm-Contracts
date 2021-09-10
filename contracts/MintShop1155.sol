@@ -8,16 +8,20 @@ import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
 
 import "./base/Sweepable.sol";
-import "./Super1155.sol";
+import "./ISuper1155.sol";
+import "./IToken.sol";
 import "./Staker.sol";
 
 /**
-  @title A Shop contract for selling NFTs via direct minting through particular
-    pools with specific participation requirements.
+  @title A Shop contract for selling items and tokens via direct minting through
+    particular pools with specific participation requirements.
   @author Tim Clancy
+  @author Liam Clancy
 
-  This launchpad contract sells new items by minting them into existence. It
-  cannot be used to sell items that already exist.
+  This launchpad contract sells new items and tokens by minting them into
+  existence. It cannot be used to sell items that already exist.
+
+  September 2nd, 2021.
 */
 contract MintShop1155 is Sweepable, ReentrancyGuard {
   using SafeERC20 for IERC20;
@@ -48,7 +52,10 @@ contract MintShop1155 is Sweepable, ReentrancyGuard {
   uint256 constant GROUP_MASK = uint256(uint128(~0)) << 128;
 
   /// The item collection contract that minted items are sold from.
-  Super1155 public item;
+  ISuper1155 public item;
+
+  /// The token that may be minted as accompaniment to sold items.
+  IToken public token;
 
   /**
     The address where the payment from each item buyer is sent. Care must be
@@ -142,8 +149,8 @@ contract MintShop1155 is Sweepable, ReentrancyGuard {
     @param itemGroups An array of all item groups currently present in this
       pool.
     @param currentPoolVersion A version number hashed with item group IDs before
-           being used as keys to other mappings. This supports efficient
-           invalidation of stale mappings.
+      being used as keys to other mappings. This supports efficient invalidation
+      of stale mappings.
     @param itemCaps A mapping of item group IDs to the maximum number this pool
       is allowed to mint.
     @param itemMinted A mapping of item group IDs to the number this pool has
@@ -164,6 +171,7 @@ contract MintShop1155 is Sweepable, ReentrancyGuard {
     uint256[] itemGroups;
     uint256 currentPoolVersion;
     mapping (bytes32 => uint256) itemCaps;
+    mapping (bytes32 => uint256) tokenMints;
     mapping (bytes32 => uint256) itemMinted;
     mapping (bytes32 => uint256) itemPricesLength;
     mapping (bytes32 => mapping (uint256 => Price)) itemPrices;
@@ -467,15 +475,14 @@ contract MintShop1155 is Sweepable, ReentrancyGuard {
     @param updater The calling address which updated this pool.
     @param poolId The ID of the pool being updated.
     @param pool The input data used to update the pool.
-    @param groupIds The groupIds that are now on sale in the item pool.
-    @param caps The caps, keyed to `groupIds`, of the maximum that each groupId
-      may mint up to.
-    @param prices The prices, keyed to `groupIds`, of the arrays for `Price`
-      objects that each item group may be able be bought with.
+    @param poolItems The updated state of the items being sold in this pool.
   */
-  event PoolUpdated(address indexed updater, uint256 poolId,
-    PoolInput indexed pool, uint256[] groupIds, uint256[] caps,
-    Price[][] indexed prices);
+  event PoolUpdated(
+    address indexed updater,
+    uint256 poolId,
+    PoolInput indexed pool,
+    PoolItemInput[] poolItems
+  );
 
   /**
     An event to track the purchase of items from an item pool.
@@ -494,12 +501,19 @@ contract MintShop1155 is Sweepable, ReentrancyGuard {
     @param _owner The address of the administrator governing this collection.
     @param _item The address of the Super1155 item collection contract that will
       be minting new items in sales.
+    @param _token The address of a Token ERC-20 token that can optionally be
+      given with each purchase.
     @param _paymentReceiver The address where shop earnings are sent.
     @param _globalPurchaseLimit A global limit on the number of items that a
       single address may purchase across all item pools in the shop.
   */
-  constructor(address _owner, Super1155 _item, address _paymentReceiver,
-    uint256 _globalPurchaseLimit) public {
+  constructor(
+    address _owner,
+    ISuper1155 _item,
+    IToken _token,
+    address _paymentReceiver,
+    uint256 _globalPurchaseLimit
+  ) {
 
     // Do not perform a redundant ownership transfer if the deployer should
     // remain as the owner of the collection.
@@ -509,6 +523,7 @@ contract MintShop1155 is Sweepable, ReentrancyGuard {
 
     // Continue initialization.
     item = _item;
+    token = _token;
     paymentReceiver = _paymentReceiver;
     globalPurchaseLimit = _globalPurchaseLimit;
   }
@@ -827,25 +842,39 @@ contract MintShop1155 is Sweepable, ReentrancyGuard {
   }
 
   /**
+    A struct to track the addition of a single item sale in a pool.
+
+    @param groupId The specific item group ID that makes up this item sale.
+    @param tokenMint The amount of accompanying token to mint for this item when
+      it is sold by its pool.
+    @param issueNumberOffset The offset for the next issue number minted for
+      this item group. This is *important* to handle a pre-minted or
+      partially-minted item group.
+    @param cap The maximum amount of this particular groupId that can be sold
+      by its pool.
+    @param prices The price pairings to use for selling this item.
+  */
+  struct PoolItemInput {
+    uint256 groupId;
+    uint256 tokenMint;
+    uint256 issueNumberOffset;
+    uint256 cap;
+    Price[] prices;
+  }
+
+  /**
     Allow the owner of the shop or an approved manager to add a new pool of
     items that users may purchase.
 
     @param _pool The PoolInput full of data defining the pool's operation.
-    @param _groupIds The specific item group IDs to sell in this pool,
-      keyed to the `_amounts` array.
-    @param _issueNumberOffsets The offset for the next issue number minted for a
-      particular item group in `_groupIds`. This is *important* to handle
-      pre-minted or partially-minted item groups.
-    @param _caps The maximum amount of each particular groupId that can be sold
-      by this pool.
-    @param _prices The asset address to price pairings to use for selling each
-      item.
+    @param _poolItems The items to add to this pool with their associated
+      details.
   */
-  function addPool(PoolInput calldata _pool, uint256[] calldata _groupIds,
-    uint256[] calldata _issueNumberOffsets, uint256[] calldata _caps,
-    Price[][] memory _prices) external hasValidPermit(UNIVERSAL, POOL) {
-    updatePool(nextPoolId, _pool, _groupIds, _issueNumberOffsets, _caps,
-      _prices);
+  function addPool(
+    PoolInput calldata _pool,
+    PoolItemInput[] calldata _poolItems
+  ) external hasValidPermit(UNIVERSAL, POOL) {
+    updatePool(nextPoolId, _pool, _poolItems);
 
     // Increment the ID which will be used by the next pool added.
     nextPoolId = nextPoolId.add(1);
@@ -853,39 +882,45 @@ contract MintShop1155 is Sweepable, ReentrancyGuard {
 
   /**
     A private helper function for `updatePool` to prevent it from running too
-    deep into the stack. This function will store the amount of each item group
-    that this pool may mint.
+    deeply into the stack. This function will store the amount of each item
+    group that this pool may mint.
 
     @param _id The ID of the pool to update.
-    @param _groupIds The specific item group IDs to sell in this pool,
-      keyed to the `_amounts` array.
-    @param _issueNumberOffsets The offset for the next issue number minted for a
-      particular item group in `_groupIds`. This is *important* to handle
-      pre-minted or partially-minted item groups.
-    @param _caps The maximum amount of each particular groupId that can be sold
-      by this pool.
-    @param _prices The asset address to price pairings to use for selling each
-      item.
+    @param _poolItems The items to add to this pool with their associated
+      details.
   */
-  function _updatePoolHelper(uint256 _id,
-    uint256[] calldata _groupIds, uint256[] calldata _issueNumberOffsets,
-    uint256[] calldata _caps, Price[][] memory _prices) private {
-    for (uint256 i = 0; i < _groupIds.length; i++) {
-      require(_caps[i] > 0,
+  function _updatePoolHelper(
+    uint256 _id,
+    PoolItemInput[] calldata _poolItems
+  ) private {
+    uint256[] memory groupIds = new uint256[](_poolItems.length);
+    for (uint256 i = 0; i < _poolItems.length; i++) {
+      PoolItemInput memory poolItem = _poolItems[i];
+      require(poolItem.cap > 0,
         "MintShop1155: cannot add an item group with no mintable amount");
       bytes32 itemKey = keccak256(abi.encode(
-        pools[_id].currentPoolVersion, _groupIds[i]));
-      pools[_id].itemCaps[itemKey] = _caps[i];
+        pools[_id].currentPoolVersion, poolItem.groupId));
+      pools[_id].itemCaps[itemKey] = poolItem.cap;
 
       // Pre-seed the next item issue IDs given the pool offsets.
-      nextItemIssues[_groupIds[i]] = _issueNumberOffsets[i];
+      nextItemIssues[poolItem.groupId] = poolItem.issueNumberOffset;
 
       // Store future purchase information for the item group.
-      for (uint256 j = 0; j < _prices[i].length; j++) {
-        pools[_id].itemPrices[itemKey][j] = _prices[i][j];
+      for (uint256 j = 0; j < poolItem.prices.length; j++) {
+        pools[_id].itemPrices[itemKey][j] = poolItem.prices[j];
       }
-      pools[_id].itemPricesLength[itemKey] = _prices[i].length;
+      pools[_id].itemPricesLength[itemKey] = poolItem.prices.length;
+
+      // Store token mint amounts for the item group.
+      pools[_id].tokenMints[itemKey] = poolItem.tokenMint;
+
+      // Track the group IDs.
+      groupIds[i] = poolItem.groupId;
     }
+
+    // Store the item groups that appear in this pool.
+    Pool storage pool = pools[_id];
+    pool.itemGroups = groupIds;
   }
 
   /**
@@ -894,32 +929,20 @@ contract MintShop1155 is Sweepable, ReentrancyGuard {
 
     @param _id The ID of the pool to update.
     @param _pool The PoolInput full of data defining the pool's operation.
-    @param _groupIds The specific item group IDs to sell in this pool,
-      keyed to the `_amounts` array.
-    @param _issueNumberOffsets The offset for the next issue number minted for a
-      particular item group in `_groupIds`. This is *important* to handle
-      pre-minted or partially-minted item groups.
-    @param _caps The maximum amount of each particular groupId that can be sold
-      by this pool.
-    @param _prices The asset address to price pairings to use for selling each
-      item.
+    @param _poolItems The items to add to this pool with their associated
+      details.
   */
-  function updatePool(uint256 _id, PoolInput calldata _pool,
-    uint256[] calldata _groupIds, uint256[] calldata _issueNumberOffsets,
-    uint256[] calldata _caps, Price[][] memory _prices) public
-    hasValidPermit(UNIVERSAL, POOL) {
+  function updatePool(
+    uint256 _id,
+    PoolInput calldata _pool,
+    PoolItemInput[] calldata _poolItems
+  ) public hasValidPermit(UNIVERSAL, POOL) {
     require(_id <= nextPoolId,
       "MintShop1155: cannot update a non-existent pool");
     require(_pool.endTime >= _pool.startTime,
       "MintShop1155: cannot create a pool which ends before it starts");
-    require(_groupIds.length > 0,
+    require(_poolItems.length > 0,
       "MintShop1155: must list at least one item group");
-    require(_groupIds.length == _issueNumberOffsets.length,
-      "MintShop1155: item groups length must equal issue offsets length");
-    require(_groupIds.length == _caps.length,
-      "MintShop1155: item groups length must equal caps length");
-    require(_groupIds.length == _prices.length,
-      "MintShop1155: item groups length must equal prices input length");
 
     // Immediately store some given information about this pool.
     Pool storage pool = pools[_id];
@@ -928,15 +951,35 @@ contract MintShop1155 is Sweepable, ReentrancyGuard {
     pool.endTime = _pool.endTime;
     pool.purchaseLimit = _pool.purchaseLimit;
     pool.singlePurchaseLimit = _pool.singlePurchaseLimit;
-    pool.itemGroups = _groupIds;
     pool.currentPoolVersion = pools[_id].currentPoolVersion.add(1);
     pool.requirement = _pool.requirement;
 
     // Delegate work to a helper function to avoid stack-too-deep errors.
-    _updatePoolHelper(_id, _groupIds, _issueNumberOffsets, _caps, _prices);
+    _updatePoolHelper(_id, _poolItems);
 
     // Emit an event indicating that a pool has been updated.
-    emit PoolUpdated(_msgSender(), _id, _pool, _groupIds, _caps, _prices);
+    emit PoolUpdated(_msgSender(), _id, _pool, _poolItems);
+  }
+
+  /**
+    This private helper function for `mintFromPool` will help it from running
+    too deeply into the stack. This function will mint any tokens that might be
+    associated with an item purchase.
+
+    @param _id The ID of the particular item pool that the user would like to
+      purchase from.
+    @param _itemKey The bytes32 key for accessing a particular item in a pool
+      mapping.
+    @param _amount The amount of items being purchased.
+  */
+  function _mintHelper(
+    uint256 _id,
+    bytes32 _itemKey,
+    uint256 _amount
+  ) private {
+    if (pools[_id].tokenMints[_itemKey] > 0) {
+      token.mint(_msgSender(), pools[_id].tokenMints[_itemKey].mul(_amount));
+    }
   }
 
   /**
@@ -1013,7 +1056,7 @@ contract MintShop1155 is Sweepable, ReentrancyGuard {
 
     // Verify that any possible ERC-1155 ownership requirements are met.
     } else if (poolRequirement.requiredType == AccessType.ItemRequired) {
-      Super1155 requiredItem = Super1155(poolRequirement.requiredAsset);
+      ISuper1155 requiredItem = ISuper1155(poolRequirement.requiredAsset);
       require(requiredItem.totalBalances(_msgSender())
         >= poolRequirement.requiredAmount,
         "MintShop1155: you do not have enough required item for this pool");
@@ -1081,6 +1124,9 @@ contract MintShop1155 is Sweepable, ReentrancyGuard {
 
     // Update the global count of items that a user has purchased.
     globalPurchaseCounts[_msgSender()] = userGlobalPurchaseAmount;
+
+    // Use the mint helper to avoid a stack-too-deep issue.
+    _mintHelper(_id, itemKey, _amount);
 
     // Emit an event indicating a successful purchase.
     emit ItemPurchased(_msgSender(), _id, itemIds, amounts);
