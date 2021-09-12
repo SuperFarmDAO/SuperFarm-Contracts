@@ -1,83 +1,464 @@
-'use strict';
+const { expect } = require('chai');
+const { BigNumber } = require('ethers');
+const { mnemonicToSeed } = require('ethers/lib/utils');
+const { ethers } = require('hardhat');
+const Web3 = require('web3');
 
-// Imports.
-import { ethers } from 'hardhat';
-import { expect } from 'chai';
-import 'chai/register-should';
+const NULL_ADDRESS = '0x0000000000000000000000000000000000000000';
 
-// Test the Staker contract's ability to function with generic assets.
-describe('Staker', function () {
-	let alice, bob, carol, minter;
-	let Token, Staker;
-	before(async () => {
-		const signers = await ethers.getSigners();
-		const addresses = await Promise.all(signers.map(async signer => signer.getAddress()));
-		alice = { provider: signers[0].provider, signer: signers[0], address: addresses[0] };
-		bob = { provider: signers[1].provider, signer: signers[1], address: addresses[1] };
-		carol = { provider: signers[2].provider, signer: signers[2], address: addresses[2] };
-		minter = { provider: signers[4].provider, signer: signers[4], address: addresses[4] };
+const DATA = "0x02";
 
-		// Create factories for deploying all required contracts using specified signers.
-		Token = await ethers.getContractFactory('Token');
-		Staker = await ethers.getContractFactory('Staker');
-	});
+///////////////////////////////////////////////////////////
+// SEE https://hardhat.org/tutorial/testing-contracts.html
+// FOR HELP WRITING TESTS
+// USE https://github.com/gnosis/mock-contract FOR HELP
+// WITH MOCK CONTRACT
+///////////////////////////////////////////////////////////
 
-	// Deploy a fresh set of smart contracts for testing with.
-	let token, staker;
-	beforeEach(async () => {
-		token = await Token.connect(minter.signer).deploy('Token', 'TOK', ethers.utils.parseEther('1000000000'));
-		await token.deployed();
-		staker = await Staker.connect(alice.signer).deploy('Staker', token.address);
-		await staker.deployed();
+// Start test block
+describe('===Staker===', function () {
+    let deployer, owner, paymentReceiver, proxyRegistryOwner, signer1, signer2, signer3;
+    
+    let rewardToken,
+        depositToken,
+        staker;
 
-		// Mint test tokens and send them to the Staker.
-		await token.connect(minter.signer).mint(minter.address, ethers.utils.parseEther('1000000000'));
-		await token.connect(minter.signer).transfer(staker.address, ethers.utils.parseEther('1000000000'));
-	});
+    before(async function () {
+        this.MockERC20 = await ethers.getContractFactory("MockERC20");
+        this.Staker = await ethers.getContractFactory("Staker");
+    });
 
-	// Verify that the Staker starts with the correct amount of granted token.
-	it('should have the expected amount of granted token', async () => {
-		let stakerBalance = await staker.getRemainingToken();
-		stakerBalance.should.be.equal(ethers.utils.parseEther('1000000000'));
-	});
+    beforeEach(async function () {
+        [deployer, owner, paymentReceiver, proxyRegistryOwner, signer1, signer2, signer3] = await ethers.getSigners();
 
-	// Verify that pools can only be added after defining an emission schedule.
-	it('can only add a pool after defining the emission schedule', async () => {
-		await expect(
-			staker.connect(alice.signer).addPool(token.address, 100, 100)
-		).to.be.revertedWith('Staking pools cannot be addded until an emission schedule has been defined.');
-		await staker.connect(alice.signer).setEmissions([
-			{ blockNumber: 0, rate: 10 },
-			{ blockNumber: 10, rate: 5 },
-			{ blockNumber: 20, rate: 1 }
-		], [
-			{ blockNumber: 0, rate: 10 },
-			{ blockNumber: 10, rate: 5 },
-			{ blockNumber: 20, rate: 1 }
-		]);
-		await staker.connect(alice.signer).addPool(token.address, 100, 100);
-	});
+        rewardToken = await this.MockERC20.deploy();
+        await rewardToken.deployed();
 
-	// Perform operations on the Staker with an emission schedule defined and a pool added.
-	describe('-> After initialization of emission schedule ...', function () {
-		beforeEach(async () => {
-			token = await Token.connect(minter.signer).deploy('Token', 'TOK', ethers.utils.parseEther('1000000000'));
-			await token.deployed();
-			staker = await Staker.connect(alice.signer).deploy('Staker', token.address);
-			await staker.deployed();
+        depositToken = await this.MockERC20.deploy();
+        await depositToken.deployed();
 
-			// Mint test tokens and send them to the Staker, Bob, and Carol.
-			await token.connect(minter.signer).mint(minter.address, ethers.utils.parseEther('1000000000'));
-			await token.connect(minter.signer).transfer(staker.address, ethers.utils.parseEther('900000000'));
-			await token.connect(minter.signer).transfer(bob.address, ethers.utils.parseEther('50000000'));
-			await token.connect(minter.signer).transfer(carol.address, ethers.utils.parseEther('50000000'));
+        staker = await this.Staker.deploy(
+            "firstStaker",
+            rewardToken.address
+        );
+        await staker.deployed();
 
-			// Bob and Carol must approve the Staker to spend their test tokens.
-			await token.connect(bob.signer).approve(staker.address, ethers.utils.parseEther('1000000000'));
-			await token.connect(carol.signer).approve(staker.address, ethers.utils.parseEther('1000000000'));
+        await staker.transferOwnership(owner.address);
+    });
 
-			// Establish the emissions schedule and add the token pool.
-			await staker.connect(alice.signer).setEmissions([
+    // Test cases
+
+    //////////////////////////////
+    //       Constructor
+    //////////////////////////////
+    describe("Constructor", function () {
+        it('should initialize values as expected', async function () {
+            expect(await staker.name()).to.equal("firstStaker");
+            expect(await staker.owner()).to.equal(owner.address);
+            expect(await staker.canAlterDevelopers()).to.equal(true);
+            expect(await staker.canAlterTokenEmissionSchedule()).to.equal(true);
+            expect(await staker.canAlterPointEmissionSchedule()).to.equal(true);
+        });
+    });
+
+    describe("addDeveloper, lockDevelopers, updateDeveloper, getDeveloperCount", function () {
+        it('Reverts: addition of developers is locked', async function () {
+            await staker.connect(owner).lockDevelopers();
+
+            await expect(
+                staker.connect(owner).addDeveloper(deployer.address, "1000")
+            ).to.be.revertedWith("This Staker has locked the addition of developers; no more may be added.");
+        });
+
+        it('should add new developer', async function () {
+            await staker.connect(owner).addDeveloper(deployer.address, "1000");
+
+            await expect(
+                await staker.connect(owner).developerAddresses(0)
+            ).to.be.equal(deployer.address);
+        });
+
+        it('Reverts: Not a developer of the staker', async function () {
+            await staker.connect(owner).addDeveloper(deployer.address, "1000");
+
+            await expect(
+                staker.connect(signer1).updateDeveloper(signer1.address, "500")
+            ).to.be.revertedWith("You are not a developer of this Staker.");
+        });
+
+        it('Reverts: Can not increase share', async function () {
+            await staker.connect(owner).addDeveloper(deployer.address, "1000");
+
+            await expect(
+                staker.connect(deployer).updateDeveloper(deployer.address, "1500")
+            ).to.be.revertedWith("You cannot increase your developer share.");
+        });
+
+        it('should update developer', async function () {
+            await staker.connect(owner).addDeveloper(deployer.address, "1000");
+            await staker.connect(deployer).updateDeveloper(deployer.address, "900");
+
+            await expect(
+                await staker.connect(deployer).developerShares(deployer.address)
+            ).to.be.equal("900");
+        });
+
+        it('should return developers count', async function () {
+            await staker.connect(owner).addDeveloper(deployer.address, "1000");
+            await staker.connect(owner).addDeveloper(signer1.address, "900");
+       
+
+            await expect(
+                await staker.connect(deployer).getDeveloperCount()
+            ).to.be.equal("2");
+        });
+    });
+
+    describe("setEmissions, lockTokenEmissions", function () {
+        it('Reverts: alteration of token emissions is locked', async function () {
+            await staker.connect(owner).lockTokenEmissions();
+
+            await expect(
+                staker.connect(owner).setEmissions([
+                    {  blockNumber: await (await ethers.provider.getBlock()).number,  rate: 5 }
+                ],[
+                    {  blockNumber: await (await ethers.provider.getBlock()).number,  rate: 5 }
+                ])
+            ).to.be.revertedWith("This Staker has locked the alteration of token emissions.");
+        });
+
+        it('Reverts: alteration of point emissions is locked', async function () {
+            await staker.connect(owner).lockPointEmissions();
+
+            await expect(
+                staker.connect(owner).setEmissions([
+                    {  blockNumber: await (await ethers.provider.getBlock()).number,  rate: 5 }
+                ],[
+                    {  blockNumber: await (await ethers.provider.getBlock()).number,  rate: 5 }
+                ])
+            ).to.be.revertedWith("his Staker has locked the alteration of point emissions.");
+        });
+
+        it('Reverts: token emission schedule must be set', async function () {
+            await expect(
+                staker.connect(owner).setEmissions([],[])
+            ).to.be.revertedWith("You must set the token emission schedule.");
+        });
+
+        it('Reverts: point emission schedule must be set', async function () {
+            await expect(
+                staker.connect(owner).setEmissions([
+                    {  blockNumber: await (await ethers.provider.getBlock()).number, rate: 5 }
+                ],[])
+            ).to.be.revertedWith("You must set the point emission schedule.");
+        });
+
+        it('should set emissions', async function () {
+            await staker.connect(owner).setEmissions([
+                { blockNumber: await (await ethers.provider.getBlock()).number, rate: 5 }
+            ],[
+                { blockNumber: await (await ethers.provider.getBlock()).number, rate: 5 }
+            ]);
+        });
+
+        it('should set emissions of staker where earliestTokenEmission/earliestPointEmission blocks are less', async function () {
+            await staker.connect(owner).setEmissions([
+                {  blockNumber: await (await ethers.provider.getBlock()).number,  rate: 5 }
+            ],[
+                {  blockNumber: await (await ethers.provider.getBlock()).number,  rate: 5 }
+            ]);
+
+            // Mine new blocks so that the earliestTokenEmission/EarliestPointEmission blocks are less
+            await ethers.provider.send("evm_increaseTime", [70]);
+            await ethers.provider.send("evm_mine", []);
+
+            await staker.connect(owner).setEmissions([
+                {  blockNumber: await (await ethers.provider.getBlock()).number,  rate: 5 }
+            ],[
+                {  blockNumber: await (await ethers.provider.getBlock()).number,  rate: 5 }
+            ]);
+        });
+    });
+
+    describe("addPool, overwrite pool, getPoolCount", function () {
+        it('Reverts: emission schedule not defined', async function () {
+            await expect(
+                staker.connect(owner).addPool(
+                    depositToken.address,
+                    1,
+                    1
+                )
+            ).to.be.revertedWith("Staking pools cannot be addded until an emission schedule has been defined.");
+        });
+
+        it('should add a new pool, overwrite it and get pool count', async function () {
+            // Set emission
+            await staker.connect(owner).setEmissions([
+                {  blockNumber: await (await ethers.provider.getBlock()).number,  rate: 5 }
+            ],[
+                {  blockNumber: await (await ethers.provider.getBlock()).number,  rate: 5 }
+            ]);
+
+            // Create new pool
+            await staker.connect(owner).addPool(
+                    depositToken.address,
+                    1,
+                    1
+                );
+
+            await expect(
+                await (await staker.connect(owner).poolInfo(depositToken.address)).tokenStrength
+            ).to.be.equal("1");
+
+            // Update the pool with 2x the strength
+            await staker.connect(owner).addPool(
+                depositToken.address,
+                2,
+                2
+            );
+
+            await expect(
+                await (await staker.connect(owner).poolInfo(depositToken.address)).tokenStrength
+            ).to.be.equal("2");
+
+            // Get Pool count
+            await expect(
+                await staker.connect(owner).getPoolCount()
+            ).to.be.equal("1");
+        });
+    });
+
+    describe("deposit, withdraw, getRemainingToken", function () {
+        it('Reverts: Inactive pool', async function () {
+            await expect(
+                staker.connect(signer1).deposit(depositToken.address, ethers.utils.parseEther("100"))
+            ).to.be.revertedWith("You cannot deposit assets into an inactive pool.");
+        });
+
+        it('should deposit and Return at updatePool: block.number <= pool.lastRewardBlock, new block not mined', async function () {
+            // Set emission such that new block after the lastRewardBlock hasn't been mined
+            // And this makes the pool 'not update' because the blocks mining hasn't reached the emission block
+            // It can also be thought of stopping hackers to mine blocks in advance
+            await staker.connect(owner).setEmissions([
+                {  blockNumber: (await (await ethers.provider.getBlock()).number) + 100, rate: 5 } // Increasing the last reward block by 100
+            ],[
+                {  blockNumber: (await (await ethers.provider.getBlock()).number) + 100, rate: 5 }
+            ]);
+
+            // Create new pool
+            await staker.connect(owner).addPool(
+                    depositToken.address,
+                    1,
+                    1
+                );
+
+            // Give the signer some mockERC20 tokens
+            await depositToken.connect(deployer).transfer(signer1.address, ethers.utils.parseEther("1000"));
+            
+            // Signer approves staker contract
+            await depositToken.connect(signer1).approve(staker.address, ethers.utils.parseEther("100"));
+
+            // Signer deposits the tokens
+            await staker.connect(signer1).deposit(depositToken.address, ethers.utils.parseEther("100"));
+        });
+        
+        it('should deposit and Return at updatePool: poolTokenSupply <= 0', async function () {
+            // Set Emission rate to current block number
+            await staker.connect(owner).setEmissions([
+                {  blockNumber: await (await ethers.provider.getBlock()).number, rate: 5 }
+            ],[
+                {  blockNumber: await (await ethers.provider.getBlock()).number, rate: 5 }
+            ]);
+
+            // Create new pool
+            await staker.connect(owner).addPool(
+                    depositToken.address,
+                    1,
+                    1
+                );
+
+            // Give the signer some mockERC20 tokens
+            await depositToken.connect(deployer).transfer(signer1.address, ethers.utils.parseEther("1000"));
+            
+            // Signer approves staker contract
+            await depositToken.connect(signer1).approve(staker.address, ethers.utils.parseEther("100"));
+
+            // Signer deposits the tokens
+            await staker.connect(signer1).deposit(depositToken.address, ethers.utils.parseEther("100"));
+        });
+
+        it('should deposit and withdraw amount of tokens in the pool, different from the rewardToken', async function () {
+            // Set Emission rate to current block number
+            await staker.connect(owner).setEmissions([
+                {  blockNumber: await (await ethers.provider.getBlock()).number,  rate: 5 }
+            ],[
+                {  blockNumber: await (await ethers.provider.getBlock()).number,  rate: 5 }
+            ]);
+
+            // Create new pool
+            await staker.connect(owner).addPool(
+                    depositToken.address,
+                    1,
+                    1
+                );
+
+            // Let Signer2 be the developer
+            await staker.connect(owner).addDeveloper(deployer.address, "2");
+
+            // Give the signer some mockERC20 tokens
+            await depositToken.connect(deployer).transfer(signer1.address, ethers.utils.parseEther("1000"));
+            
+            // Signer approves staker contract
+            await depositToken.connect(signer1).approve(staker.address, ethers.utils.parseEther("200"));
+
+            // Signer deposits the tokens
+            await staker.connect(signer1).deposit(depositToken.address, ethers.utils.parseEther("100"));
+
+            // Signer deposits some more tokens
+            await staker.connect(signer1).deposit(depositToken.address, ethers.utils.parseEther("50"));
+
+            // Withdraw deposited tokens
+            await expect(
+                staker.connect(signer1).withdraw(depositToken.address, ethers.utils.parseEther("200"))
+            ).to.be.revertedWith("You cannot withdraw that much of the specified token; you are not owed it.");
+
+            await staker.connect(signer1).withdraw(depositToken.address, ethers.utils.parseEther("140"));
+
+            // Get remaining tokens
+            await expect((
+                await staker.connect(owner).getRemainingToken()).toString()
+            ).to.be.equal("0");
+        });
+
+        it('should deposit and withdraw amount of tokens in the pool, same as the rewardToken', async function () {
+            // Set Emission rate to current block number
+            await staker.connect(owner).setEmissions([
+                {  blockNumber: await (await ethers.provider.getBlock()).number,   rate: 5 }
+            ],[
+                {  blockNumber: await (await ethers.provider.getBlock()).number,   rate: 5 }
+            ]);
+
+            // Create new pool
+            await staker.connect(owner).addPool(
+                    rewardToken.address,
+                    1,
+                    1
+                );
+
+            // Let Signer2 be the developer
+            await staker.connect(owner).addDeveloper(deployer.address, "2");
+
+            // Give the signer some mockERC20 tokens
+            await rewardToken.connect(deployer).transfer(signer1.address, ethers.utils.parseEther("1000"));
+            
+            // Signer approves staker contract
+            await rewardToken.connect(signer1).approve(staker.address, ethers.utils.parseEther("200"));
+
+            // Signer deposits the tokens
+            await staker.connect(signer1).deposit(rewardToken.address, ethers.utils.parseEther("100"));
+
+            // Signer deposits some more tokens
+            await staker.connect(signer1).deposit(rewardToken.address, ethers.utils.parseEther("50"));
+
+            // Withdraw deposited tokens
+            await expect(
+                staker.connect(signer1).withdraw(rewardToken.address, ethers.utils.parseEther("200"))
+            ).to.be.revertedWith("You cannot withdraw that much of the specified token; you are not owed it.");
+
+            await staker.connect(signer1).withdraw(rewardToken.address, ethers.utils.parseEther("140"));
+
+             // Get remaining tokens
+             await expect((
+                await staker.connect(owner).getRemainingToken()).toString()
+            ).to.be.equal(ethers.utils.parseEther("10"));    
+        });
+    });
+
+    describe("getTotalEmittedTokens, getTotalEmittedPoints", function () {
+        it('Reverts: tokens/points emission from higher block to lower block', async function () {
+            // Set Emission rate to current block number
+            await staker.connect(owner).setEmissions([
+                {  blockNumber: await (await ethers.provider.getBlock()).number,  rate: 5 }
+            ],[
+                {  blockNumber: await (await ethers.provider.getBlock()).number,  rate: 5 }
+            ]);
+
+            await expect(
+                staker.connect(signer1).getTotalEmittedTokens(await (await ethers.provider.getBlock()).number, 
+                                                            (await (await ethers.provider.getBlock()).number) - 10)
+            ).to.be.revertedWith("Tokens cannot be emitted from a higher block to a lower block.");
+
+            await expect(
+                staker.connect(signer1).getTotalEmittedPoints(await (await ethers.provider.getBlock()).number, 
+                                                            (await (await ethers.provider.getBlock()).number) - 10)
+            ).to.be.revertedWith("Points cannot be emitted from a higher block to a lower block.");
+        });
+
+        it('should get emitted tokens/points where _toBlock < emissionBlock', async function () {
+            // Set Emission rate to current block number
+            await staker.connect(owner).setEmissions([
+				{ blockNumber: (await (await ethers.provider.getBlock()).number) +  5, rate: ethers.utils.parseEther('10')},
+				{ blockNumber: (await (await ethers.provider.getBlock()).number) + 10, rate: ethers.utils.parseEther('5') },
+				{ blockNumber: (await (await ethers.provider.getBlock()).number) + 15, rate: ethers.utils.parseEther('1') }
+			], [
+				{ blockNumber: (await (await ethers.provider.getBlock()).number) + 5,  rate: 100},
+				{ blockNumber: (await (await ethers.provider.getBlock()).number) + 10, rate: 50 },
+				{ blockNumber: (await (await ethers.provider.getBlock()).number) + 15, rate: 10 }
+			]);
+
+            for (let i = 0; i < 6; ++i) {
+				ethers.provider.send('evm_mine');
+			}
+
+            let emissionTokens = await staker.connect(signer1).getTotalEmittedTokens(await (await ethers.provider.getBlock()).number, 
+            (await (await ethers.provider.getBlock()).number) + 3);
+            let emissionPoints = await staker.connect(signer1).getTotalEmittedPoints((await (await ethers.provider.getBlock()).number), 
+            (await (await ethers.provider.getBlock()).number) + 3);
+
+            await expect(emissionTokens).to.be.equal(ethers.utils.parseEther("30"));
+            await expect(emissionPoints).to.be.equal("300");
+        });
+
+        it('should get emitted points where workingBlock < emissionBlock', async function () {
+            // Set Emission rate to current block number
+            await staker.connect(owner).setEmissions([
+				{ blockNumber: (await (await ethers.provider.getBlock()).number) +  5, rate: ethers.utils.parseEther('10')},
+				{ blockNumber: (await (await ethers.provider.getBlock()).number) + 10, rate: ethers.utils.parseEther('5') },
+				{ blockNumber: (await (await ethers.provider.getBlock()).number) + 15, rate: ethers.utils.parseEther('1') }
+			], [
+				{ blockNumber: (await (await ethers.provider.getBlock()).number) + 5,  rate: 100},
+				{ blockNumber: (await (await ethers.provider.getBlock()).number) + 10, rate: 50 },
+				{ blockNumber: (await (await ethers.provider.getBlock()).number) + 15, rate: 10 }
+			]);
+
+            let emissionTokens = await staker.connect(signer1).getTotalEmittedTokens((await (await ethers.provider.getBlock()).number), 
+            (await (await ethers.provider.getBlock()).number) + 2);
+            let emissionPoints = await staker.connect(signer1).getTotalEmittedPoints((await (await ethers.provider.getBlock()).number), 
+            (await (await ethers.provider.getBlock()).number) + 2);
+
+            await expect(emissionTokens).to.be.equal(ethers.utils.parseEther("0"));
+            await expect(emissionPoints).to.be.equal("0");
+        });
+
+        it('should get emitted tokens/points where workingBlock < _toBlock', async function () {
+             // Set Emission rate to current block number
+             await staker.connect(owner).setEmissions([
+				{ blockNumber: (await (await ethers.provider.getBlock()).number), rate: ethers.utils.parseEther('10')},
+			], [
+				{ blockNumber: (await (await ethers.provider.getBlock()).number),  rate: 100},
+			]);
+
+            let emissionTokens = await staker.connect(signer1).getTotalEmittedTokens((await (await ethers.provider.getBlock()).number), 
+            (await (await ethers.provider.getBlock()).number));    
+            let emissionPoints = await staker.connect(signer1).getTotalEmittedPoints((await (await ethers.provider.getBlock()).number), 
+            (await (await ethers.provider.getBlock()).number));                                                    
+        });
+    });
+
+    describe("getPendingTokens, getPendingPoints, getAvailablePoints, getTotalPoints, approvePointSpender, spendPoints, getSpentPoints, sweep", function () {
+        it('should get pending tokens and pending points when pool token is the disburse token', async function () {
+            // Set Emission rate to current block number
+            await staker.connect(owner).setEmissions([
 				{ blockNumber: 1000, rate: ethers.utils.parseEther('10') },
 				{ blockNumber: 1010, rate: ethers.utils.parseEther('5') },
 				{ blockNumber: 1020, rate: ethers.utils.parseEther('1') }
@@ -86,121 +467,148 @@ describe('Staker', function () {
 				{ blockNumber: 1010, rate: 50 },
 				{ blockNumber: 1020, rate: 10 }
 			]);
-			await staker.connect(alice.signer).addPool(token.address, 100, 50);
-		});
+			await staker.connect(owner).addPool(rewardToken.address, 100, 50);
 
-		// Verify that users can deposit tokens.
-		it('should allow users to deposit tokens', async () => {
-			let bobBalance = await token.balanceOf(bob.address);
-			let carolBalance = await token.balanceOf(carol.address);
-			let stakerBalance = await token.balanceOf(staker.address);
-			bobBalance.should.be.equal(ethers.utils.parseEther('50000000'));
-			carolBalance.should.be.equal(ethers.utils.parseEther('50000000'));
-			stakerBalance.should.be.equal(ethers.utils.parseEther('900000000'));
-			await staker.connect(bob.signer).deposit(token.address, ethers.utils.parseEther('50000000'));
-			await staker.connect(carol.signer).deposit(token.address, ethers.utils.parseEther('50000000'));
-			bobBalance = await token.balanceOf(bob.address);
-			carolBalance = await token.balanceOf(carol.address);
-			stakerBalance = await token.balanceOf(staker.address);
-			bobBalance.should.be.equal(ethers.utils.parseEther('0'));
-			carolBalance.should.be.equal(ethers.utils.parseEther('0'));
-			stakerBalance.should.be.equal(ethers.utils.parseEther('1000000000'));
-		});
-
-		// Verify that users can withdraw tokens.
-		it('should allow users to withdraw deposited tokens', async () => {
-			let bobBalance = await token.balanceOf(bob.address);
-			let carolBalance = await token.balanceOf(carol.address);
-			let stakerBalance = await token.balanceOf(staker.address);
-			bobBalance.should.be.equal(ethers.utils.parseEther('50000000'));
-			carolBalance.should.be.equal(ethers.utils.parseEther('50000000'));
-			stakerBalance.should.be.equal(ethers.utils.parseEther('900000000'));
-			await staker.connect(bob.signer).deposit(token.address, ethers.utils.parseEther('50000000'));
-			await staker.connect(carol.signer).deposit(token.address, ethers.utils.parseEther('50000000'));
-			bobBalance = await token.balanceOf(bob.address);
-			carolBalance = await token.balanceOf(carol.address);
-			stakerBalance = await token.balanceOf(staker.address);
-			bobBalance.should.be.equal(ethers.utils.parseEther('0'));
-			carolBalance.should.be.equal(ethers.utils.parseEther('0'));
-			stakerBalance.should.be.equal(ethers.utils.parseEther('1000000000'));
-			await staker.connect(bob.signer).withdraw(token.address, ethers.utils.parseEther('50000000'));
-			await staker.connect(carol.signer).withdraw(token.address, ethers.utils.parseEther('50000000'));
-			bobBalance = await token.balanceOf(bob.address);
-			carolBalance = await token.balanceOf(carol.address);
-			bobBalance.should.be.at.least(ethers.utils.parseEther('50000000'));
-			carolBalance.should.be.at.least(ethers.utils.parseEther('50000000'));
-		});
-
-		// Verify that users correctly earn emitted tokens and points.
-		it('should properly reward users for their stakes', async () => {
-			let bobBalance = await token.balanceOf(bob.address);
-			let carolBalance = await token.balanceOf(carol.address);
-			let stakerBalance = await token.balanceOf(staker.address);
-			bobBalance.should.be.equal(ethers.utils.parseEther('50000000'));
-			carolBalance.should.be.equal(ethers.utils.parseEther('50000000'));
-			stakerBalance.should.be.equal(ethers.utils.parseEther('900000000'));
-
-			// Mine up to a preconfigured point for deposits.
+            // Mine up to a preconfigured point for deposits.
 			let blockNumber = await ethers.provider.getBlockNumber();
 			let blocksToMine = 998 - blockNumber;
+
 			for (let i = 0; i < blocksToMine; ++i) {
 				ethers.provider.send('evm_mine');
 			}
-			await staker.connect(bob.signer).deposit(token.address, ethers.utils.parseEther('50000000'));
-			await staker.connect(carol.signer).deposit(token.address, ethers.utils.parseEther('50000000'));
-			bobBalance = await token.balanceOf(bob.address);
-			carolBalance = await token.balanceOf(carol.address);
-			stakerBalance = await token.balanceOf(staker.address);
-			bobBalance.should.be.equal(ethers.utils.parseEther('0'));
-			carolBalance.should.be.equal(ethers.utils.parseEther('0'));
-			stakerBalance.should.be.equal(ethers.utils.parseEther('1000000000'));
 
-			// Mine through the emission schedule and verify correct rewards.
-			for (let i = 0; i < 25; ++i) {
+            // Give the signer some mockERC20 tokens
+            await rewardToken.connect(deployer).transfer(signer1.address, ethers.utils.parseEther("10"));
+
+            // Give staker contract some mockERC20 tokens
+            await rewardToken.connect(deployer).transfer(staker.address, ethers.utils.parseEther("100"));
+            
+            // Signer approves staker contract
+            await rewardToken.connect(signer1).approve(staker.address, ethers.utils.parseEther("10"));
+           
+            // Signer deposits the tokens
+            await staker.connect(signer1).deposit(rewardToken.address, ethers.utils.parseEther("10"));
+
+            // Get Pending Tokens
+            await expect((
+                await staker.connect(owner).getPendingTokens(rewardToken.address, signer1.address)).toString()
+            ).to.be.equal("0");
+            await expect((
+                await staker.connect(owner).getPendingPoints(rewardToken.address, signer1.address)).toString()
+            ).to.be.equal("0");
+
+            // Jump forward and travel in time through the portal
+            for (let i = 0; i < 25; ++i) {
 				ethers.provider.send('evm_mine');
 			}
-			let totalEmittedPoints = await staker.connect(bob.signer).getTotalEmittedPoints(1000, 1025);
-			totalEmittedPoints.should.be.equal(1550);
-			let bobPendingTokens = await staker.connect(bob.signer).getPendingTokens(token.address, bob.address);
-			bobPendingTokens.should.be.equal(ethers.utils.parseEther('77.5'));
-			let carolPendingTokens = await staker.connect(carol.signer).getPendingTokens(token.address, carol.address);
-			carolPendingTokens.should.be.equal(ethers.utils.parseEther('77.5'));
-			let bobPoints = await staker.connect(bob.signer).getAvailablePoints(bob.address);
-			bobPoints.should.be.equal(775);
-			let bobTotalPoints = await staker.connect(bob.signer).getTotalPoints(bob.address);
-			bobTotalPoints.should.be.equal(775);
-			let bobSpentPoints = await staker.connect(bob.signer).getSpentPoints(bob.address);
-			bobSpentPoints.should.be.equal(0);
-			let carolPoints = await staker.connect(carol.signer).getAvailablePoints(carol.address);
-			carolPoints.should.be.equal(775);
-			let carolTotalPoints = await staker.connect(carol.signer).getTotalPoints(carol.address);
-			carolTotalPoints.should.be.equal(775);
-			let carolSpentPoints = await staker.connect(carol.signer).getSpentPoints(carol.address);
-			carolSpentPoints.should.be.equal(0);
 
-			// Check for correctness upon user withdrawal.
-			await staker.connect(bob.signer).withdraw(token.address, ethers.utils.parseEther('50000000'));
-			await staker.connect(carol.signer).withdraw(token.address, ethers.utils.parseEther('50000000'));
-			bobBalance = await token.balanceOf(bob.address);
-			carolBalance = await token.balanceOf(carol.address);
-			bobBalance.should.be.equal(ethers.utils.parseEther('50000078'));
-			carolBalance.should.be.equal(ethers.utils.parseEther('50000079'));
-			bobPoints = await staker.connect(bob.signer).getAvailablePoints(bob.address);
-			bobPoints.should.be.equal(780);
-			bobTotalPoints = await staker.connect(bob.signer).getTotalPoints(bob.address);
-			bobTotalPoints.should.be.equal(780);
-			bobSpentPoints = await staker.connect(bob.signer).getSpentPoints(bob.address);
-			bobSpentPoints.should.be.equal(0);
-			carolPoints = await staker.connect(carol.signer).getAvailablePoints(carol.address);
-			carolPoints.should.be.equal(790);
-			carolTotalPoints = await staker.connect(carol.signer).getTotalPoints(carol.address);
-			carolTotalPoints.should.be.equal(790);
-			carolSpentPoints = await staker.connect(carol.signer).getSpentPoints(carol.address);
-			carolSpentPoints.should.be.equal(0);
-			bobPendingTokens = await staker.connect(bob.signer).getPendingTokens(token.address, bob.address);
-			bobPendingTokens.should.be.equal(ethers.utils.parseEther('0'));
-			carolPendingTokens = await staker.connect(carol.signer).getPendingTokens(token.address, carol.address);
-			carolPendingTokens.should.be.equal(ethers.utils.parseEther('0'));
-		});
-	});
+            // Get Pending Tokens
+            await expect((
+                await staker.connect(owner).getPendingTokens(rewardToken.address, signer1.address)).toString()
+            ).not.to.be.equal("0");
+            await expect((
+                await staker.connect(owner).getPendingPoints(rewardToken.address, signer1.address)).toString()
+            ).not.to.be.equal("0");
+
+        });
+
+        it('should get pending tokens/points when pool token is not disburse token. Should getAvailablePoints, getTotalPoints, approvePointSpender, spendPoints, getSpentPoints, sweep', async function () {
+            // Set Emission rate to current block number
+            await staker.connect(owner).setEmissions([
+				{ blockNumber: 1000, rate: ethers.utils.parseEther('10') },
+				{ blockNumber: 1010, rate: ethers.utils.parseEther('5') },
+				{ blockNumber: 1020, rate: ethers.utils.parseEther('1') }
+			], [
+				{ blockNumber: 1000, rate: 100 },
+				{ blockNumber: 1010, rate: 50 },
+				{ blockNumber: 1020, rate: 10 }
+			]);
+			await staker.connect(owner).addPool(depositToken.address, 100, 50);
+
+            // Mine up to a preconfigured point for deposits.
+			let blockNumber = await ethers.provider.getBlockNumber();
+			let blocksToMine = 998 - blockNumber;
+
+			for (let i = 0; i < blocksToMine; ++i) {
+				ethers.provider.send('evm_mine');
+			}
+
+            // Give the signer some mockERC20 tokens
+            await depositToken.connect(deployer).transfer(signer1.address, ethers.utils.parseEther("10"));
+
+            // Give staker contract some mockERC20 tokens
+            await depositToken.connect(deployer).transfer(staker.address, ethers.utils.parseEther("100"));
+            
+            // Signer approves staker contract
+            await depositToken.connect(signer1).approve(staker.address, ethers.utils.parseEther("10"));
+           
+            // Signer deposits the tokens
+            await staker.connect(signer1).deposit(depositToken.address, ethers.utils.parseEther("10"));
+
+            // Get Pending Tokens
+            await expect((
+                await staker.connect(owner).getPendingTokens(depositToken.address, signer1.address)).toString()
+            ).to.be.equal("0");
+            await expect((
+                await staker.connect(owner).getPendingPoints(depositToken.address, signer1.address)).toString()
+            ).to.be.equal("0");
+
+            // Jump forward and travel in time through the portal
+            for (let i = 0; i < 25; ++i) {
+				ethers.provider.send('evm_mine');
+			}
+
+            // Has pending tokens
+            await expect((
+                await staker.connect(owner).getPendingTokens(depositToken.address, signer1.address)).toString()
+            ).not.to.be.equal("0");
+            await expect((
+                await staker.connect(owner).getPendingPoints(depositToken.address, signer1.address)).toString()
+            ).not.to.be.equal("0");
+
+            // Has available points
+            await expect(
+                await staker.connect(signer1).getAvailablePoints(signer1.address)
+                ).not.to.be.equal("0");
+            await expect(
+                await staker.connect(signer1).getTotalPoints(signer1.address)
+                ).not.to.be.equal("0");
+
+            // Signer2 tries to spend points without approval
+            await expect(
+                staker.connect(signer2).spendPoints(signer1.address, 5)
+                ).to.be.revertedWith("You are not permitted to spend user points.");
+
+            // Approve signer2 as point spender
+            await staker.connect(owner).approvePointSpender(signer2.address, true);
+            await expect(
+                await staker.approvedPointSpenders(signer2.address)).to.be.equal(true);
+
+            // Signer2 spends points more than available
+            await expect(
+                staker.connect(signer2).spendPoints(signer1.address, 100)
+                ).to.be.revertedWith("The user does not have enough points to spend the requested amount.");
+
+            // Signer2 spends correct amount
+            await staker.connect(signer2).spendPoints(signer1.address, 2);
+
+            // Get points spent
+            await expect(
+                await staker.getSpentPoints(signer1.address)
+            ).to.be.equal(2);
+
+            // Sweep all specific tokens back
+            await rewardToken.connect(deployer).transfer(staker.address, ethers.utils.parseEther("10"));
+
+            await expect(
+                await rewardToken.balanceOf(staker.address)
+            ).not.to.be.equal("0");
+            
+            await staker.connect(owner).sweep(rewardToken.address);
+
+            await expect(
+                await rewardToken.balanceOf(staker.address)
+            ).to.be.equal("0");
+        });
+    });
 });
