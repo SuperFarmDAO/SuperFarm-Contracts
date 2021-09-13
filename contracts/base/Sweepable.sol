@@ -16,7 +16,6 @@ import "../access/PermitControl.sol";
   tokens which users might have wrongly sent to a contract.
 */
 contract Sweepable is PermitControl {
-  using SafeERC20 for IERC20;
 
   /// The public identifier for the right to sweep tokens.
   bytes32 public constant SWEEP = keccak256("SWEEP");
@@ -67,7 +66,7 @@ contract Sweepable is PermitControl {
     hasValidPermit(UNIVERSAL, SWEEP) {
     require(!sweepLocked,
       "MintShop1155: the sweep function is locked");
-    _token.safeTransferFrom(address(this), _address, _amount);
+    _token.safeTransfer(_address, _amount);
     emit TokenSweep(_msgSender(), _token, _amount, _address);
   }
 
