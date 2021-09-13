@@ -1,12 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity 0.6.12;
-pragma experimental ABIEncoderV2;
+pragma solidity 0.8.7;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
-import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
-import "@openzeppelin/contracts/math/SafeMath.sol";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+
 
 /**
   @title A token vesting contract for streaming claims.
@@ -15,8 +14,6 @@ import "@openzeppelin/contracts/math/SafeMath.sol";
   This vesting contract allows users to claim vested tokens with every block.
 */
 contract VestStream is Ownable, ReentrancyGuard {
-  using SafeMath for uint256;
-  using SafeMath for uint64;
   using SafeERC20 for IERC20;
 
   /// The token to disburse in vesting.
@@ -50,7 +47,7 @@ contract VestStream is Ownable, ReentrancyGuard {
 
     @param _token The token to vest to claimants in this contract.
   */
-  constructor(IERC20 _token) public {
+  constructor(IERC20 _token) {
     token = _token;
     uint256 MAX_INT = 2**256 - 1;
     token.approve(address(this), MAX_INT);
@@ -83,11 +80,13 @@ contract VestStream is Ownable, ReentrancyGuard {
 
     // Calculate the current releasable token amount.
     uint64 currentTimestamp = uint64(block.timestamp) > claim.endTime ? claim.endTime : uint64(block.timestamp);
-    uint256 claimPercent = currentTimestamp.sub(claim.startTime).mul(1e18).div(claim.endTime.sub(claim.startTime));
-    uint256 claimAmount = claim.totalAmount.mul(claimPercent).div(1e18);
+    uint256 claimPercent = ((currentTimestamp - claim.startTime) * 1e18) / (claim.endTime - claim.startTime);
+    uint256 claimAmount = (claim.totalAmount * claimPercent) / 1e18;
+
 
     // Reduce the unclaimed amount by the amount already claimed.
-    uint256 unclaimedAmount = claimAmount.sub(claim.amountClaimed);
+    uint256 unclaimedAmount = claimAmount - claim.amountClaimed;
+
     return unclaimedAmount;
   }
 
@@ -150,14 +149,18 @@ contract VestStream is Ownable, ReentrancyGuard {
 
     // Calculate the current releasable token amount.
     uint64 currentTimestamp = uint64(block.timestamp) > _claim.endTime ? _claim.endTime : uint64(block.timestamp);
-    uint256 claimPercent = currentTimestamp.sub(_claim.startTime).mul(1e18).div(_claim.endTime.sub(_claim.startTime));
-    uint256 claimAmount = _claim.totalAmount.mul(claimPercent).div(1e18);
+    // uint256 claimPercent = currentTimestamp.sub(_claim.startTime).mul(1e18).div(_claim.endTime.sub(_claim.startTime));
+    uint256 claimPercent = ((currentTimestamp - _claim.startTime) * 1e18) / (_claim.endTime - _claim.startTime);
+
+    uint256 claimAmount = (_claim.totalAmount * claimPercent) / 1e18;
+
 
     // Reduce the unclaimed amount by the amount already claimed.
-    uint256 unclaimedAmount = claimAmount.sub(_claim.amountClaimed);
+    uint256 unclaimedAmount = claimAmount - _claim.amountClaimed;
+
 
     // Transfer the unclaimed tokens to the beneficiary.
-    token.safeTransferFrom(address(this), beneficiary, unclaimedAmount);
+    token.safeTransfer(beneficiary, unclaimedAmount);
 
     // Update the amount currently claimed by the user.
     _claim.amountClaimed = claimAmount;
