@@ -18,7 +18,6 @@ import "@openzeppelin/contracts/utils/Address.sol";
   August 23rd, 2021.
 */
 abstract contract PermitControl is Ownable {
-  using SafeMath for uint256;
   using Address for address;
 
   /// A special reserved constant for representing no rights.
