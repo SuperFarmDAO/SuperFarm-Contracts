@@ -1,14 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-only
-pragma solidity 0.7.6;
+pragma solidity 0.8.7;
 
 import "hardhat/console.sol";
-import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
 contract SelfStarterV2 is Ownable {
-  using SafeMath for uint256;
   using SafeERC20 for IERC20;
 
 
@@ -90,7 +88,7 @@ contract SelfStarterV2 is Ownable {
 
   function setTimespan(uint256 _id, uint256 _timespan) external onlyOwner onlyPreLaunch(_id) {
       if(_timespan > 0){
-        require(pools[_id].startTime.add(_timespan) > block.timestamp, "pool must end in the future, set start time");
+        require(pools[_id].startTime + _timespan) > block.timestamp, "pool must end in the future, set start time");
       }
       require(pools[_id].startTime > 0, "Start time must be set first");
       uint256 computedTimespan = (pools[_id].startTime > 0 && _timespan < minSpan) ? minSpan : _timespan;
