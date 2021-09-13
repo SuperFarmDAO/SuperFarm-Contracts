@@ -7,8 +7,9 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
+import "./base/Sweepable.sol";
 
-contract SuperStarter is Ownable, ReentrancyGuard {
+contract SuperStarter is Ownable, ReentrancyGuard, Sweepable {
     using SafeMath for uint256;
     using SafeERC20 for IERC20;
 
@@ -213,15 +214,5 @@ contract SuperStarter is Ownable, ReentrancyGuard {
         lockedTokens[id][msg.sender] = 0;
         IERC20(pools[id].token).safeTransfer(msg.sender, amount);
         emit Claim(id, msg.sender, amount, block.timestamp);
-    }
-
-    /**
-      Sweep all of a particular ERC-20 token from the contract.
-
-      @param _token The token to sweep the balance from.
-    */
-    function sweep(IERC20 _token, address _recepient) external onlyOwner {
-      uint256 balance = _token.balanceOf(address(this));
-      _token.safeTransfer(_recepient, balance);
     }
 }

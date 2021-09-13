@@ -66,7 +66,7 @@ contract Sweepable is PermitControl {
   function sweep(IERC20 _token, uint256 _amount, address _address) external
     hasValidPermit(UNIVERSAL, SWEEP) {
     require(!sweepLocked,
-      "MintShop1155: the sweep function is locked");
+      "Sweep: the sweep function is locked");
     _token.safeTransferFrom(address(this), _address, _amount);
     emit TokenSweep(_msgSender(), _token, _amount, _address);
   }
