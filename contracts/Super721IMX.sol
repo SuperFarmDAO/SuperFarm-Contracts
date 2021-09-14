@@ -17,6 +17,7 @@ import "./proxy/StubProxyRegistry.sol";
   @title An ERC-721 item creation contract.
   @author Tim Clancy
   @author 0xthrpw
+  @author Qazawat Zirak
 
   This contract represents the NFTs within a single collection. It allows for a
   designated collection owner address to manage the creation of NFTs within this
@@ -649,37 +650,34 @@ contract Super721IMX is PermitControl, ERC165, IERC721 {
     @param _from The address to transfer tokens from.
     @param _to The address to transfer tokens to.
     @param _ids The specific token IDs to transfer.
-    @param _amounts The amounts of the specific `_ids` to transfer.
     @param _data Additional call data to send with this transfer.
   */
 
   function safeBatchTransferFrom(address _from, address _to,
-    uint256[] memory _ids, uint256[] memory _amounts, bytes memory _data)
+    uint256[] memory _ids, bytes memory _data)
     external virtual {
-    require(_ids.length == _amounts.length,
-      "Super721::safeBatchTransferFrom: ids and amounts length mismatch");
     require(_to != address(0),
       "Super721::safeBatchTransferFrom: transfer to the zero address");
     require(_from == _msgSender() || isApprovedForAll(_from, _msgSender()),
       "Super721::safeBatchTransferFrom: caller is not owner nor approved");
 
     // Validate transfer and perform all batch token sends.
-    _beforeTokenTransfer(_msgSender(), _from, _to, _ids, _amounts, _data);
+    _beforeTokenTransfer(_msgSender(), _from, _to, _ids, _asSingletonArray(1), _data);
     for (uint256 i = 0; i < _ids.length; ++i) {
 
       // Retrieve the item's group ID.
       uint256 groupId = (_ids[i] & GROUP_MASK) >> 128;
 
       // Update all specially-tracked group-specific balances.
-      balances[_ids[i]][_from] = balances[_ids[i]][_from].sub(_amounts[i],
+      balances[_ids[i]][_from] = balances[_ids[i]][_from].sub(1,
         "Super721::safeBatchTransferFrom: insufficient balance for transfer");
-      balances[_ids[i]][_to] = balances[_ids[i]][_to].add(_amounts[i]);
+      balances[_ids[i]][_to] = balances[_ids[i]][_to].add(1);
       groupBalances[groupId][_from] = groupBalances[groupId][_from]
-        .sub(_amounts[i]);
+        .sub(1);
       groupBalances[groupId][_to] = groupBalances[groupId][_to]
-        .add(_amounts[i]);
-      totalBalances[_from] = totalBalances[_from].sub(_amounts[i]);
-      totalBalances[_to] = totalBalances[_to].add(_amounts[i]);
+        .add(1);
+      totalBalances[_from] = totalBalances[_from].sub(1);
+      totalBalances[_to] = totalBalances[_to].add(1);
 
       // Emit the transfer event and perform the safety check.
       emit Transfer(_from, _to, _ids[i]);
@@ -789,11 +787,10 @@ contract Super721IMX is PermitControl, ERC165, IERC721 {
     require(itemGroups[groupId].initialized,
       "Super721::_mintChecker: you cannot mint a non-existent item group");
 
+    // If false, owned by address (or NULL_ADDRESS i.e, was burnable)
+    // If true, never minted, (or was removed i.e, was replenishable)
     require(!_tokenOwners.contains(_id),
       "Super721::_mintChecker: token already exists");
-
-    require(!_tokenOwners.contains(_id),
-      "Super721::getApproved: token already exists");
 
     // If we can replenish burnt items, then only our currently-circulating
     // supply matters. Otherwise, historic mints are what determine the cap.
@@ -822,21 +819,18 @@ contract Super721IMX is PermitControl, ERC165, IERC721 {
     @param _recipient The address to receive all NFTs within the newly-minted
       group.
     @param _ids The item IDs for the new items to create.
-    @param _amounts The amount of each corresponding item ID to create.
     @param _data Any associated data to use on items minted in this transaction.
   */
 
   function mintBatch(address _recipient, uint256[] memory _ids,
-    uint256[] memory _amounts, bytes memory _data)
+    bytes memory _data)
     public virtual {
     require(_recipient != address(0),
       "Super721::mintBatch: mint to the zero address");
-    require(_ids.length == _amounts.length,
-      "Super721::mintBatch: ids and amounts length mismatch");
 
     // Validate and perform the mint.
     address operator = _msgSender();
-    _beforeTokenTransfer(operator, address(0), _recipient, _ids, _amounts,
+    _beforeTokenTransfer(operator, address(0), _recipient, _ids, _asSingletonArray(1),
       _data);
 
     // Loop through each of the batched IDs to update storage of special
@@ -852,23 +846,23 @@ contract Super721IMX is PermitControl, ERC165, IERC721 {
 
       // Update storage of special balances and circulating values.
       balances[mintedItemId][_recipient] = balances[mintedItemId][_recipient]
-        .add(_amounts[i]);
+        .add(1);
       groupBalances[groupId][_recipient] = groupBalances[groupId][_recipient]
-        .add(_amounts[i]);
-      totalBalances[_recipient] = totalBalances[_recipient].add(_amounts[i]);
-      mintCount[mintedItemId] = mintCount[mintedItemId].add(_amounts[i]);
+        .add(1);
+      totalBalances[_recipient] = totalBalances[_recipient].add(1);
+      mintCount[mintedItemId] = mintCount[mintedItemId].add(1);
       circulatingSupply[mintedItemId] = circulatingSupply[mintedItemId]
-        .add(_amounts[i]);
+        .add(1);
       itemGroups[groupId].mintCount = itemGroups[groupId].mintCount
-        .add(_amounts[i]);
+        .add(1);
       itemGroups[groupId].circulatingSupply =
-        itemGroups[groupId].circulatingSupply.add(_amounts[i]);
+        itemGroups[groupId].circulatingSupply.add(1);
 
       //_holderTokens[address(0)].remove(_ids[i]);
       _holderTokens[_recipient].add(_ids[i]);
 
       _tokenOwners.set(_ids[i], _recipient);
-
+      
       // Emit event and handle the safety check.
       emit Transfer(address(0), _recipient, _ids[i]);
       _doSafeTransferAcceptanceCheck(operator, address(0), _recipient, _ids[i], _data);
@@ -881,11 +875,8 @@ contract Super721IMX is PermitControl, ERC165, IERC721 {
   function mintFor(address _to, uint256 _id, bytes calldata _blueprint) external {
     require(_msgSender() == imxCoreAddress,
       "SuperIMX721::mintFor::only IMX may call this mint function");
-    uint256[] memory ids = new uint256[](1);
-    uint256[] memory amounts = new uint[](1);
-    ids[0] = _id;
-    amounts[0] = 1;
-    mintBatch(_to, ids, amounts, _blueprint);
+    uint256[] memory ids = _asSingletonArray(_id);
+    mintBatch(_to, ids, _blueprint);
   }
 
   /**
@@ -894,10 +885,9 @@ contract Super721IMX is PermitControl, ERC165, IERC721 {
     of a particular item `_id`.
 
     @param _id The ID of the item to check for burning validity.
-    @param _amount The amount of the item to try checking burning for.
     @return The ID of the item that should have `_amount` burnt for it.
   */
-  function _burnChecker(uint256 _id, uint256 _amount) private view
+  function _burnChecker(uint256 _id) private view
     returns (uint256) {
 
     // Retrieve the item's group ID.
@@ -906,18 +896,22 @@ contract Super721IMX is PermitControl, ERC165, IERC721 {
     require(itemGroups[groupId].initialized,
       "Super721::_burnChecker: you cannot burn a non-existent item group");
 
+    // If the item group is non-burnable, then revert.
+    if (itemGroups[groupId].burnType == BurnType.None) {
+      revert("Super721::_burnChecker: you cannot burn a non-burnable item group");
+    }
+
     // If we can burn items, then we must verify that we do not exceed the cap.
-    if (itemGroups[groupId].burnType == BurnType.Burnable) {
-      require(itemGroups[groupId].burnCount.add(_amount)
+    else if (itemGroups[groupId].burnType == BurnType.Burnable) {
+      require(itemGroups[groupId].burnCount.add(1)
         <= itemGroups[groupId].burnData,
         "Super721::_burnChecker you may not exceed the burn limit on this item group");
     }
 
-    // Fungible items are coerced into the single group ID + index one slot.
+    // If the item is replenishable, then ignore checks
+
     uint256 burntItemId = _id;
-    // if (itemGroups[groupId].itemType == ItemType.Fungible) {
-    //   burntItemId = shiftedGroupId.add(1);
-    // }
+
     return burntItemId;
   }
 
@@ -967,18 +961,14 @@ contract Super721IMX is PermitControl, ERC165, IERC721 {
 
     @param _burner The address whose items are burning.
     @param _ids The item IDs to burn.
-    @param _amounts The amounts of the corresponding item IDs to burn.
   */
-  function burnBatch(address _burner, uint256[] memory _ids,
-    uint256[] memory _amounts) external virtual {
+  function burnBatch(address _burner, uint256[] memory _ids) external virtual {
     require(_burner != address(0),
       "Super721::burnBatch: burn from the zero address");
-    require(_ids.length == _amounts.length,
-      "Super721::burnBatch: ids and amounts length mismatch");
 
     // Validate and perform the burn.
     address operator = _msgSender();
-    _beforeTokenTransfer(operator, _burner, address(0), _ids, _amounts, "");
+    _beforeTokenTransfer(operator, _burner, address(0), _ids, _asSingletonArray(1), "");
 
     // Loop through each of the batched IDs to update storage of special
     // balances and circulation balances.
@@ -989,27 +979,32 @@ contract Super721IMX is PermitControl, ERC165, IERC721 {
       // Retrieve the group ID from the given item `_id` and check burn.
       uint256 shiftedGroupId = (_ids[i] & GROUP_MASK);
       uint256 groupId = shiftedGroupId >> 128;
-      uint256 burntItemId = _burnChecker(_ids[i], _amounts[i]);
+      uint256 burntItemId = _burnChecker(_ids[i]);
 
       // Update storage of special balances and circulating values.
       balances[burntItemId][_burner] = balances[burntItemId][_burner]
-        .sub(_amounts[i],
+        .sub(1,
         "Super721::burn: burn amount exceeds balance");
       groupBalances[groupId][_burner] = groupBalances[groupId][_burner]
-        .sub(_amounts[i]);
-      totalBalances[_burner] = totalBalances[_burner].sub(_amounts[i]);
-      burnCount[burntItemId] = burnCount[burntItemId].add(_amounts[i]);
+        .sub(1);
+      totalBalances[_burner] = totalBalances[_burner].sub(1);
+      burnCount[burntItemId] = burnCount[burntItemId].add(1);
       circulatingSupply[burntItemId] = circulatingSupply[burntItemId]
-        .sub(_amounts[i]);
+        .sub(1);
       itemGroups[groupId].burnCount = itemGroups[groupId].burnCount
-        .add(_amounts[i]);
+        .add(1);
       itemGroups[groupId].circulatingSupply =
-        itemGroups[groupId].circulatingSupply.sub(_amounts[i]);
+        itemGroups[groupId].circulatingSupply.sub(1);
 
       _holderTokens[_burner].remove(_ids[i]);
       _holderTokens[address(0)].add(_ids[i]);
 
-      _tokenOwners.set(_ids[i], address(0));
+      // If burnType is None, burnChecker will revert that
+      if(itemGroups[groupId].burnType == BurnType.Burnable)
+        _tokenOwners.set(_ids[i], address(0));
+      else
+        _tokenOwners.remove(_ids[i]);
+
       // Emit the burn event.
       emit Transfer(operator, address(0), _ids[i]);
     }
@@ -1085,7 +1080,8 @@ contract Super721IMX is PermitControl, ERC165, IERC721 {
    */
   function transferFrom(address from, address to, uint256 tokenId) public virtual override {
       // //solhint-disable-next-line max-line-length
-      // require(_isApprovedOrOwner(_msgSender(), tokenId), "Super721::transferForm: transfer caller is not owner nor approved");
+      require(_isApprovedOrOwner(_msgSender(), tokenId), "Super721::transferForm: transfer caller is not owner nor approved");
+      safeTransferFrom(from, to, tokenId);
       //
       // require(ownerOf(tokenId) == from, "Super721::transferForm: transfer of token that is not own");
       // require(to != address(0), "Super721::transferForm: transfer to the zero address");
