@@ -3,12 +3,13 @@ pragma solidity 0.7.6;
 
 import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol";
-import "@openzeppelin/contracts-upgradeable/utils/ContextUpgradeable.sol";
-import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
-contract SuperStarter is Initializable, ContextUpgradeable, OwnableUpgradeable {
+import "./base/Sweepable.sol";
+
+contract SuperStarter is Ownable, ReentrancyGuard, Sweepable {
     using SafeMath for uint256;
     using SafeERC20 for IERC20;
 
@@ -39,7 +40,7 @@ contract SuperStarter is Initializable, ContextUpgradeable, OwnableUpgradeable {
 
     event NewPool(
         uint256 id,
-        address creator,
+        address indexed creator,
         address token,
         address swapToken,
         uint256 cap,
@@ -57,15 +58,14 @@ contract SuperStarter is Initializable, ContextUpgradeable, OwnableUpgradeable {
         uint256 amt
     );
 
-    event Claim(uint256 id, address claimer, uint256 amount);
-    event PoolFinished(uint256 id);
-    event PoolStarted(uint256 id);
-    event WhiteList(uint256 id);
+    event Claim(uint256 id, address indexed claimer, uint256 amount, uint256 timestamp);
+    event PoolFinished(uint256 id, uint256 timestamp);
+    event PoolStarted(uint256 id, uint256 timestamp);
+    event WhiteList(uint256 id, uint256 timestamp);
 
-    uint256[50] private __gap;
-
-    function initialize() public initializer {
-        __Ownable_init();
+    constructor(uint256 _minSuper, address _superToken) public {
+        minSuper = _minSuper;
+        superToken = _superToken;
     }
 
     modifier onlyCreator(uint256 id) {
@@ -73,18 +73,24 @@ contract SuperStarter is Initializable, ContextUpgradeable, OwnableUpgradeable {
         _;
     }
 
-    function addWhiteList(uint256 id, address[] calldata _whiteList, uint256[] calldata _caps) external onlyOwner {
+    function addWhiteListBatch(uint256 id, address[] calldata _whiteList, uint256[] calldata _caps) external onlyOwner {
         for (uint256 i = 0; i < _whiteList.length; ++i) {
             whiteList[id][_whiteList[i]] = _caps[i];
         }
-        emit WhiteList(id);
+        emit WhiteList(id, block.timestamp);
     }
 
-    function setMinSuper(uint256 _minSuper) external onlyOwner {
+    function addWhiteList(uint256 id, address _whiteList, uint256 _cap) external onlyOwner {
+        whiteList[id][_whiteList] = _cap;
+        emit WhiteList(id, block.timestamp);
+
+    }
+
+    function updateMinSuper(uint256 _minSuper) external onlyOwner {
         minSuper = _minSuper;
     }
 
-    function setSuperToken(address _superToken) external onlyOwner {
+    function updateSuperToken(address _superToken) external onlyOwner {
         superToken = _superToken;
     }
 
@@ -104,7 +110,6 @@ contract SuperStarter is Initializable, ContextUpgradeable, OwnableUpgradeable {
         require(cap <= IERC20(token).balanceOf(msg.sender) && cap > 0, "Cap check");
         require(token != address(0), "Pool token cannot be zero address");
         require(price > uint256(0), "Price must be greater than 0");
-        uint256 id = pools.length;
         Pool memory newPool =
             Pool(
                 cap,
@@ -119,6 +124,7 @@ contract SuperStarter is Initializable, ContextUpgradeable, OwnableUpgradeable {
                 false
             );
         pools.push(newPool);
+        uint256 id = pools.length;
         IERC20(token).transferFrom(msg.sender, address(this), cap);
         emit NewPool(
             id,
@@ -178,8 +184,7 @@ contract SuperStarter is Initializable, ContextUpgradeable, OwnableUpgradeable {
                 require(success, "Should transfer left ethers back to the user");
             }
         } else {
-            IERC20(pool.swapToken).transferFrom(
-                msg.sender,
+            IERC20(pool.swapToken).safeTranfer(
                 pool.creator,
                 amount
             );
@@ -191,7 +196,7 @@ contract SuperStarter is Initializable, ContextUpgradeable, OwnableUpgradeable {
         require(!pools[id].enabled, "Pool is already enabled");
         require(!pools[id].finished, "Pool is already completed");
         pools[id].enabled = true;
-        emit PoolStarted(id);
+        emit PoolStarted(id, block.timestamp);
     }
 
     function finishPool(uint256 id) external onlyCreator(id) {
@@ -199,25 +204,15 @@ contract SuperStarter is Initializable, ContextUpgradeable, OwnableUpgradeable {
         require(!pools[id].finished, "Pool is already completed");
         pools[id].enabled = false;
         pools[id].finished = true;
-        emit PoolFinished(id);
+        emit PoolFinished(id, block.timestamp);
     }
 
-    function claim(uint256 id) external {
+    function claim(uint256 id) external nonReentrant {
         require(pools[id].finished, "Cannot claim until pool is finished");
         require(lockedTokens[id][msg.sender] > 0, "Should have tokens to claim");
         uint256 amount = lockedTokens[id][msg.sender];
         lockedTokens[id][msg.sender] = 0;
-        IERC20(pools[id].token).transfer(msg.sender, amount);
-        emit Claim(id, msg.sender, amount);
-    }
-
-    /**
-      Sweep all of a particular ERC-20 token from the contract.
-
-      @param _token The token to sweep the balance from.
-    */
-    function sweep(IERC20 _token) external onlyOwner {
-      uint256 balance = _token.balanceOf(address(this));
-      _token.safeTransferFrom(address(this), msg.sender, balance);
+        IERC20(pools[id].token).safeTransfer(msg.sender, amount);
+        emit Claim(id, msg.sender, amount, block.timestamp);
     }
 }
