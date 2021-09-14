@@ -88,7 +88,7 @@ contract SelfStarterV2 is Ownable {
 
   function setTimespan(uint256 _id, uint256 _timespan) external onlyOwner onlyPreLaunch(_id) {
       if(_timespan > 0){
-        require(pools[_id].startTime + _timespan) > block.timestamp, "pool must end in the future, set start time");
+        require((pools[_id].startTime + _timespan) > block.timestamp, "pool must end in the future, set start time");
       }
       require(pools[_id].startTime > 0, "Start time must be set first");
       uint256 computedTimespan = (pools[_id].startTime > 0 && _timespan < minSpan) ? minSpan : _timespan;
@@ -156,7 +156,7 @@ contract SelfStarterV2 is Ownable {
       if(_isManual(id)){
         require(pools[id].enabled, "Pool must be enabled");
       }else{
-        require(pools[id].startTime < block.timestamp && block.timestamp < pools[id].startTime.add(pools[id].timespan), "TIME: Pool not open");
+        require(pools[id].startTime < block.timestamp && block.timestamp < pools[id].startTime + pools[id].timespan, "TIME: Pool not open");
       }
       if (_isOnlyHolder(id)) {
           require(IERC20(pools[id].onlyHolderToken).balanceOf(msg.sender) >= pools[id].minHolderBalance, "Miniumum balance not met");
@@ -167,20 +167,22 @@ contract SelfStarterV2 is Ownable {
       require(amount == msg.value, "Amount is not equal msg.value");
 
       Pool memory pool = pools[id];
-      uint256 left = pool.cap.sub(poolsSold[id]);
+      uint256 left = pool.cap - poolsSold[id];
+
       //console.log("left1", left);
       uint256 curLocked = lockedTokens[id][msg.sender];
-      if (left > pool.maxContribution.sub(curLocked)) {
-          left = pool.maxContribution.sub(curLocked);
+      if (left > pool.maxContribution - curLocked) {
+          left = pool.maxContribution - curLocked;
       }
       //console.log("left2", left);
-      if (pools[id].isWhiteList && left >= whiteList[id][msg.sender].sub(curLocked)) {
-          left = whiteList[id][msg.sender].sub(curLocked);
+      if (pools[id].isWhiteList && left >= whiteList[id][msg.sender] - curLocked) {
+          left = whiteList[id][msg.sender] - curLocked;
       }
       //console.log("left3", left);
       //console.log("curLocked", curLocked, "allo", whiteList[id][msg.sender]);
 
-      uint256 amt = pool.price.mul(amount).div(scaleFactor);
+      uint256 amt = (pool.price * amount) / scaleFactor;
+
       //console.log("amt", amt);
       require(left > 0, "Not enough tokens for swap");
       uint256 back = 0;
@@ -188,12 +190,12 @@ contract SelfStarterV2 is Ownable {
           //console.log("left", left);
           //console.log("amt_", amt);
           amt = left;
-          uint256 newAmount = amt.mul(scaleFactor).div(pool.price);
-          back = amount.sub(newAmount);
+          uint256 newAmount = (amt * scaleFactor) / pool.price;
+          back = amount - newAmount;
           amount = newAmount;
       }
-      lockedTokens[id][msg.sender] = curLocked.add(amt);
-      poolsSold[id] = poolsSold[id].add(amt);
+      lockedTokens[id][msg.sender] = curLocked + amt;
+      poolsSold[id] = poolsSold[id] + amt;
 
       (bool success, ) = payable(owner()).call{value: amount}("");
       require(success, "Should transfer ethers to the pool creator");
@@ -231,7 +233,7 @@ contract SelfStarterV2 is Ownable {
       if(_isManual(id)){
         require(pools[id].finished, "Cannot claim until pool is finished");
       }else{
-        require(block.timestamp > pools[id].startTime.add(pools[id].timespan));
+        require(block.timestamp > pools[id].startTime + pools[id].timespan);
       }
       require(lockedTokens[id][msg.sender] > 0, "Should have tokens to claim");
       uint256 amount = lockedTokens[id][msg.sender];
