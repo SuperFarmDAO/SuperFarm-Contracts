@@ -1,12 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity 0.7.6;
-pragma experimental ABIEncoderV2;
+pragma solidity 0.8.7;
 
-import "@chainlink/contracts/src/v0.7/VRFConsumerBase.sol";
+import "@chainlink/contracts/src/v0.8/VRFConsumerBase.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
-import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
-import "@openzeppelin/contracts/math/SafeMath.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import "./base/Named.sol";
 import "./base/Sweepable.sol";
@@ -25,7 +22,6 @@ import "./base/Sweepable.sol";
 */
 contract Random is Named, Sweepable, VRFConsumerBase {
   using SafeERC20 for IERC20;
-  using SafeMath for uint256;
 
   /// The public identifier for the right to adjust the Chainlink connection.
   bytes32 public constant SET_CHAINLINK = keccak256("SET_CHAINLINK");
@@ -237,7 +233,6 @@ contract Random is Named, Sweepable, VRFConsumerBase {
       "Random: you may only interpret the results of a fulfilled request");
 
     // Return the interpreted result.
-    return chainlinkResponses[_source].result
-      .mod(_bound.sub(_origin)).add(_origin);
+    return (chainlinkResponses[_source].result % (_bound - _origin)) + _origin;
   }
 }

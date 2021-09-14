@@ -1,9 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity 0.7.6;
+pragma solidity 0.8.7;
 pragma experimental ABIEncoderV2;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/math/SafeMath.sol";
 
 import "./IStakerData.sol";
 
@@ -16,7 +15,6 @@ interface IERC20Detailed is IERC20 {
 }
 
 contract StakerReader {
-  using SafeMath for uint256;
 
   struct stakerDevData {
     uint256 developerCount;
@@ -115,7 +113,8 @@ contract StakerReader {
   function _calcWethValue(IERC20 _weth, IERC20 _pt, IERC20 _ft) internal view returns (uint256) {
     uint256 wethBalance = _weth.balanceOf(address(_ft));
     uint256 lpSupply = _pt.totalSupply();
-    return wethBalance.mul(2).mul(1000000).div(lpSupply);
+    return (wethBalance * 2 * 1000000) / lpSupply;
+
   }
 
   function _buildRewardToken(IStakerData _stakercontract) internal view returns (RewardToken memory) {
