@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity 0.7.6;
-pragma experimental ABIEncoderV2;
+pragma solidity ^0.8.7;
 
 /**
   @title A basic call-delegating proxy contract which is compliant with the

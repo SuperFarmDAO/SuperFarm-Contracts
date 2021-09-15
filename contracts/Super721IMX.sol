@@ -1,13 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity 0.7.6;
-pragma experimental ABIEncoderV2;
+pragma solidity ^0.8.7;
 
 import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
-import "@openzeppelin/contracts/introspection/ERC165.sol";
-import "@openzeppelin/contracts/utils/EnumerableSet.sol";
-import "@openzeppelin/contracts/utils/EnumerableMap.sol";
-import "@openzeppelin/contracts/math/SafeMath.sol";
+import "@openzeppelin/contracts/utils/introspection/ERC165Storage.sol";
+import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
+import "@openzeppelin/contracts/utils/structs/EnumerableMap.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 import "./utils/LocalStrings.sol";
 import "./access/PermitControl.sol";
@@ -29,9 +27,8 @@ import "./proxy/StubProxyRegistry.sol";
 
   August 4th, 2021.
 */
-contract Super721IMX is PermitControl, ERC165, IERC721 {
+contract Super721IMX is PermitControl, ERC165Storage, IERC721 {
   using Address for address;
-  using SafeMath for uint256;
   using EnumerableSet for EnumerableSet.UintSet;
   using EnumerableMap for EnumerableMap.UintToAddressMap;
 
@@ -98,7 +95,7 @@ contract Super721IMX is PermitControl, ERC165, IERC721 {
   /// @dev Supply the magic number for the required ERC-721 interface.
 
   /// @dev A mask for isolating an item's group ID.
-  uint256 private constant GROUP_MASK = uint256(uint128(~0)) << 128;
+  uint256 private constant GROUP_MASK = uint256(type(uint128).max) << 128;
 
   /// The public name of this contract.
   string public name;
@@ -625,13 +622,13 @@ contract Super721IMX is PermitControl, ERC165, IERC721 {
     uint256 groupId = shiftedGroupId >> 128;
 
     // Update all specially-tracked group-specific balances.
-    balances[_id][_from] = balances[_id][_from].sub(1,
-      "Super721::_safeTransferFrom: insufficient balance for transfer");
-    balances[_id][_to] = balances[_id][_to].add(1);
-    groupBalances[groupId][_from] = groupBalances[groupId][_from].sub(1);
-    groupBalances[groupId][_to] = groupBalances[groupId][_to].add(1);
-    totalBalances[_from] = totalBalances[_from].sub(1);
-    totalBalances[_to] = totalBalances[_to].add(1);
+    require(balances[_id][_from] >= 1, "Super721::_safeTransferFrom: insufficient balance for transfer");
+    balances[_id][_from] = balances[_id][_from] - 1;
+    balances[_id][_to] = balances[_id][_to] + 1;
+    groupBalances[groupId][_from] = groupBalances[groupId][_from] - 1;
+    groupBalances[groupId][_to] = groupBalances[groupId][_to] + 1;
+    totalBalances[_from] = totalBalances[_from] - 1;
+    totalBalances[_to] = totalBalances[_to] + 1;
 
     _holderTokens[_from].remove(_id);
     _holderTokens[_to].add(_id);
@@ -669,15 +666,13 @@ contract Super721IMX is PermitControl, ERC165, IERC721 {
       uint256 groupId = (_ids[i] & GROUP_MASK) >> 128;
 
       // Update all specially-tracked group-specific balances.
-      balances[_ids[i]][_from] = balances[_ids[i]][_from].sub(1,
-        "Super721::safeBatchTransferFrom: insufficient balance for transfer");
-      balances[_ids[i]][_to] = balances[_ids[i]][_to].add(1);
-      groupBalances[groupId][_from] = groupBalances[groupId][_from]
-        .sub(1);
-      groupBalances[groupId][_to] = groupBalances[groupId][_to]
-        .add(1);
-      totalBalances[_from] = totalBalances[_from].sub(1);
-      totalBalances[_to] = totalBalances[_to].add(1);
+      require(balances[_ids[i]][_from] >= 1, "Super721::safeBatchTransferFrom: insufficient balance for transfer");
+      balances[_ids[i]][_from] = balances[_ids[i]][_from] - 1;
+      balances[_ids[i]][_to] = balances[_ids[i]][_to] + 1;
+      groupBalances[groupId][_from] = groupBalances[groupId][_from] - 1;
+      groupBalances[groupId][_to] = groupBalances[groupId][_to] + 1;
+      totalBalances[_from] = totalBalances[_from] - 1;
+      totalBalances[_to] = totalBalances[_to] + 1;
 
       // Emit the transfer event and perform the safety check.
       emit Transfer(_from, _to, _ids[i]);
@@ -803,7 +798,7 @@ contract Super721IMX is PermitControl, ERC165, IERC721 {
 
     // If we are subject to a cap on group size, ensure we don't exceed it.
     if (itemGroups[groupId].supplyType != SupplyType.Uncapped) {
-      require(currentGroupSupply.add(1) <= itemGroups[groupId].supplyData,
+      require(currentGroupSupply + 1 <= itemGroups[groupId].supplyData,
         "Super721::_mintChecker: you cannot mint a group beyond its cap");
     }
 
@@ -845,18 +840,14 @@ contract Super721IMX is PermitControl, ERC165, IERC721 {
       uint256 mintedItemId = _mintChecker(_ids[i]);
 
       // Update storage of special balances and circulating values.
-      balances[mintedItemId][_recipient] = balances[mintedItemId][_recipient]
-        .add(1);
-      groupBalances[groupId][_recipient] = groupBalances[groupId][_recipient]
-        .add(1);
-      totalBalances[_recipient] = totalBalances[_recipient].add(1);
-      mintCount[mintedItemId] = mintCount[mintedItemId].add(1);
-      circulatingSupply[mintedItemId] = circulatingSupply[mintedItemId]
-        .add(1);
-      itemGroups[groupId].mintCount = itemGroups[groupId].mintCount
-        .add(1);
+      balances[mintedItemId][_recipient] = balances[mintedItemId][_recipient] + 1;
+      groupBalances[groupId][_recipient] = groupBalances[groupId][_recipient] + 1;
+      totalBalances[_recipient] = totalBalances[_recipient] + 1;
+      mintCount[mintedItemId] = mintCount[mintedItemId] + 1;
+      circulatingSupply[mintedItemId] = circulatingSupply[mintedItemId] + 1;
+      itemGroups[groupId].mintCount = itemGroups[groupId].mintCount + 1;
       itemGroups[groupId].circulatingSupply =
-        itemGroups[groupId].circulatingSupply.add(1);
+        itemGroups[groupId].circulatingSupply + 1;
 
       //_holderTokens[address(0)].remove(_ids[i]);
       _holderTokens[_recipient].add(_ids[i]);
@@ -903,7 +894,7 @@ contract Super721IMX is PermitControl, ERC165, IERC721 {
 
     // If we can burn items, then we must verify that we do not exceed the cap.
     else if (itemGroups[groupId].burnType == BurnType.Burnable) {
-      require(itemGroups[groupId].burnCount.add(1)
+      require(itemGroups[groupId].burnCount + 1
         <= itemGroups[groupId].burnData,
         "Super721::_burnChecker you may not exceed the burn limit on this item group");
     }
@@ -982,19 +973,15 @@ contract Super721IMX is PermitControl, ERC165, IERC721 {
       uint256 burntItemId = _burnChecker(_ids[i]);
 
       // Update storage of special balances and circulating values.
-      balances[burntItemId][_burner] = balances[burntItemId][_burner]
-        .sub(1,
-        "Super721::burn: burn amount exceeds balance");
-      groupBalances[groupId][_burner] = groupBalances[groupId][_burner]
-        .sub(1);
-      totalBalances[_burner] = totalBalances[_burner].sub(1);
-      burnCount[burntItemId] = burnCount[burntItemId].add(1);
-      circulatingSupply[burntItemId] = circulatingSupply[burntItemId]
-        .sub(1);
-      itemGroups[groupId].burnCount = itemGroups[groupId].burnCount
-        .add(1);
+      require(balances[burntItemId][_burner] >= 1, "Super721::burn: burn amount exceeds balance");
+      balances[burntItemId][_burner] = balances[burntItemId][_burner] - 1;
+      groupBalances[groupId][_burner] = groupBalances[groupId][_burner] - 1;
+      totalBalances[_burner] = totalBalances[_burner] - 1;
+      burnCount[burntItemId] = burnCount[burntItemId] + 1;
+      circulatingSupply[burntItemId] = circulatingSupply[burntItemId] - 1;
+      itemGroups[groupId].burnCount = itemGroups[groupId].burnCount + 1;
       itemGroups[groupId].circulatingSupply =
-        itemGroups[groupId].circulatingSupply.sub(1);
+        itemGroups[groupId].circulatingSupply - 1;
 
       _holderTokens[_burner].remove(_ids[i]);
       _holderTokens[address(0)].add(_ids[i]);

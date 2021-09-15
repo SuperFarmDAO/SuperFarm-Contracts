@@ -1,10 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity 0.7.6;
-pragma experimental ABIEncoderV2;
+pragma solidity ^0.8.7;
+
 
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
-import "@openzeppelin/contracts/math/SafeMath.sol";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
 import "./Token.sol";
 
@@ -23,7 +22,6 @@ import "./Token.sol";
   token entirely.
 */
 contract TokenVault is Ownable, ReentrancyGuard {
-  using SafeMath for uint256;
 
   /// A version number for this TokenVault contract's interface.
   uint256 public version = 1;
@@ -149,7 +147,7 @@ contract TokenVault is Ownable, ReentrancyGuard {
       address recipient = _recipients[i];
       uint256 amount = _amounts[i];
       token.transfer(recipient, amount);
-      totalAmount = totalAmount.add(amount);
+      totalAmount = totalAmount + amount;
     }
     emit TokenSend(totalAmount);
   }
@@ -176,7 +174,7 @@ contract TokenVault is Ownable, ReentrancyGuard {
         token.transfer(panicDestination, totalBalance);
         emit PanicTransfer(panicCounter, totalBalance, panicDestination);
       }
-      panicCounter = panicCounter.add(1);
+      panicCounter = panicCounter + 1;
     }
   }
 }

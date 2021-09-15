@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity 0.7.6;
-pragma experimental ABIEncoderV2;
+pragma solidity ^0.8.7;
 
 import "@openzeppelin/contracts/utils/Context.sol";
 
@@ -35,7 +34,7 @@ contract Named is PermitControl {
 
     @param _name The name to assign to this contract.
   */
-  constructor(string memory _name) public {
+  constructor(string memory _name) {
     name = _name;
     emit NameUpdated(_msgSender(), "", _name);
   }

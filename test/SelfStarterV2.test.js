@@ -17,9 +17,9 @@ describe("SelfStarterV2", function () {
 
     it("Shoud deploy all contracts", async function() {
         Starter = await ethers.getContractFactory('SelfStarterV2');
-        Token = await ethers.getContractFactory('TestToken');
+        Token = await ethers.getContractFactory('Token');
         starter = await Starter.deploy('TEST TITLE');
-        token = await Token.deploy('TEST', 'TEST', ethers.utils.parseEther("1000000000"));
+        token = await Token.connect(owner).deploy('TEST', 'TEST', ethers.utils.parseEther("10000000000000"));
         token2 = await Token.connect(owner).deploy('TEST2', 'TEST2', ethers.utils.parseEther("100000000"));
         await starter.deployed();
         await token.deployed();
@@ -27,6 +27,10 @@ describe("SelfStarterV2", function () {
 
         let title = await starter.idoTitle();
         expect(title).to.equal('TEST TITLE');
+
+        await token.mint(owner.address, ethers.utils.parseEther("10000000000000"));
+        await token2.mint(owner.address, ethers.utils.parseEther("100000000"));
+
         let balance1 = await token.balanceOf(owner.address);
         let balance2 = await token2.balanceOf(owner.address);
 
@@ -56,10 +60,12 @@ describe("SelfStarterV2", function () {
 
     it ("Shoud create pool", async function() {
         token.connect(owner).approve(starter.address, ethers.utils.parseEther("100000000"));
+        let balance1 = await token.balanceOf(owner.address);
+        console.log(balance1.toString())
         await starter.connect(owner).createPool(
-            ethers.utils.parseEther("100000000"),
+            ethers.utils.parseEther("100"),
             '10000',
-            ethers.utils.parseEther("100000"),
+            ethers.utils.parseEther("10"),
             token.address,
             true,
             owner.address,
@@ -131,9 +137,9 @@ describe("SelfStarterV2", function () {
      it("Shoud create manual pool", async function() {
         token2.connect(owner).approve(starter.address, ethers.utils.parseEther("100000000"));
         await starter.connect(owner).createPool(
-            ethers.utils.parseEther("100000000"),
+            ethers.utils.parseEther("100"),
             '10000',
-            ethers.utils.parseEther("100000"),
+            ethers.utils.parseEther("100"),
             token2.address,
             true,
             owner.address,

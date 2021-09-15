@@ -1,9 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity 0.7.6;
-pragma experimental ABIEncoderV2;
+pragma solidity ^0.8.7;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 
 /**
@@ -20,7 +18,6 @@ import "@openzeppelin/contracts/utils/Address.sol";
   August 23rd, 2021.
 */
 abstract contract PermitControl is Ownable {
-  using SafeMath for uint256;
   using Address for address;
 
   /// A special reserved constant for representing no rights.

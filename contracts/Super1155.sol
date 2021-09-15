@@ -1,12 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity 0.7.6;
-pragma experimental ABIEncoderV2;
+pragma solidity ^0.8.7;
 
-import "@openzeppelin/contracts/introspection/ERC165.sol";
+import "@openzeppelin/contracts/utils/introspection/ERC165Storage.sol";
 import "@openzeppelin/contracts/token/ERC1155/IERC1155.sol";
-import "@openzeppelin/contracts/token/ERC1155/IERC1155MetadataURI.sol";
+import "@openzeppelin/contracts/token/ERC1155/extensions/IERC1155MetadataURI.sol";
 import "@openzeppelin/contracts/token/ERC1155/IERC1155Receiver.sol";
-import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 
 import "./access/PermitControl.sol";
@@ -27,9 +25,8 @@ import "./proxy/StubProxyRegistry.sol";
 
   July 19th, 2021.
 */
-contract Super1155 is PermitControl, ERC165, IERC1155, IERC1155MetadataURI {
+contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataURI {
   using Address for address;
-  using SafeMath for uint256;
 
   /// The public identifier for the right to set this contract's metadata URI.
   bytes32 public constant SET_URI = keccak256("SET_URI");
@@ -65,7 +62,7 @@ contract Super1155 is PermitControl, ERC165, IERC1155, IERC1155MetadataURI {
   bytes4 private constant INTERFACE_ERC1155_METADATA_URI = 0x0e89341c;
 
   /// @dev A mask for isolating an item's group ID.
-  uint256 private constant GROUP_MASK = uint256(uint128(~0)) << 128;
+  uint256 private constant GROUP_MASK = uint256(type(uint128).max) << 128;
 
   /// The public name of this contract.
   string public name;
@@ -333,7 +330,7 @@ contract Super1155 is PermitControl, ERC165, IERC1155, IERC1155MetadataURI {
     @param _proxyRegistryAddress The address of a proxy registry contract.
   */
   constructor(address _owner, string memory _name, string memory _uri,
-    address _proxyRegistryAddress) public {
+    address _proxyRegistryAddress) {
 
     // Register the ERC-165 interfaces.
     _registerInterface(INTERFACE_ERC1155);
@@ -559,13 +556,13 @@ contract Super1155 is PermitControl, ERC165, IERC1155, IERC1155MetadataURI {
     uint256 groupId = shiftedGroupId >> 128;
 
     // Update all specially-tracked group-specific balances.
-    balances[_id][_from] = balances[_id][_from].sub(_amount,
-      "ERC1155: insufficient balance for transfer");
-    balances[_id][_to] = balances[_id][_to].add(_amount);
-    groupBalances[groupId][_from] = groupBalances[groupId][_from].sub(_amount);
-    groupBalances[groupId][_to] = groupBalances[groupId][_to].add(_amount);
-    totalBalances[_from] = totalBalances[_from].sub(_amount);
-    totalBalances[_to] = totalBalances[_to].add(_amount);
+    require(balances[_id][_from] >= _amount, "ERC1155: insufficient balance for transfer");
+    balances[_id][_from] = balances[_id][_from] - _amount;
+    balances[_id][_to] = balances[_id][_to] + _amount;
+    groupBalances[groupId][_from] = groupBalances[groupId][_from] - _amount;
+    groupBalances[groupId][_to] = groupBalances[groupId][_to] + _amount;
+    totalBalances[_from] = totalBalances[_from] - _amount;
+    totalBalances[_to] = totalBalances[_to] + _amount;
 
     // Emit the transfer event and perform the safety check.
     emit TransferSingle(operator, _from, _to, _id, _amount);
@@ -627,15 +624,13 @@ contract Super1155 is PermitControl, ERC165, IERC1155, IERC1155MetadataURI {
       uint256 groupId = (_ids[i] & GROUP_MASK) >> 128;
 
       // Update all specially-tracked group-specific balances.
-      balances[_ids[i]][_from] = balances[_ids[i]][_from].sub(_amounts[i],
-        "ERC1155: insufficient balance for transfer");
-      balances[_ids[i]][_to] = balances[_ids[i]][_to].add(_amounts[i]);
-      groupBalances[groupId][_from] = groupBalances[groupId][_from]
-        .sub(_amounts[i]);
-      groupBalances[groupId][_to] = groupBalances[groupId][_to]
-        .add(_amounts[i]);
-      totalBalances[_from] = totalBalances[_from].sub(_amounts[i]);
-      totalBalances[_to] = totalBalances[_to].add(_amounts[i]);
+      require(balances[_ids[i]][_from] >= _amounts[i], "ERC1155: insufficient balance for transfer");
+      balances[_ids[i]][_from] = balances[_ids[i]][_from] - _amounts[i];
+      balances[_ids[i]][_to] = balances[_ids[i]][_to] + _amounts[i];
+      groupBalances[groupId][_from] = groupBalances[groupId][_from] - _amounts[i];
+      groupBalances[groupId][_to] = groupBalances[groupId][_to] + _amounts[i];
+      totalBalances[_from] = totalBalances[_from] - _amounts[i];
+      totalBalances[_to] = totalBalances[_to] + _amounts[i];
     }
 
     // Emit the transfer event and perform the safety check.
@@ -786,25 +781,25 @@ contract Super1155 is PermitControl, ERC165, IERC1155, IERC1155MetadataURI {
 
     // If we are subject to a cap on group size, ensure we don't exceed it.
     if (itemGroups[groupId].supplyType != SupplyType.Uncapped) {
-      require(currentGroupSupply.add(_amount) <= itemGroups[groupId].supplyData,
+      require((currentGroupSupply + _amount) <= itemGroups[groupId].supplyData,
         "Super1155: you cannot mint a group beyond its cap");
     }
 
     // Do not violate nonfungibility rules.
     if (itemGroups[groupId].itemType == ItemType.Nonfungible) {
-      require(currentItemSupply.add(_amount) <= 1,
+      require((currentItemSupply + _amount) <= 1,
         "Super1155: you cannot mint more than a single nonfungible item");
 
     // Do not violate semifungibility rules.
     } else if (itemGroups[groupId].itemType == ItemType.Semifungible) {
-      require(currentItemSupply.add(_amount) <= itemGroups[groupId].itemData,
+      require((currentItemSupply + _amount) <= itemGroups[groupId].itemData,
         "Super1155: you cannot mint more than the alloted semifungible items");
     }
 
     // Fungible items are coerced into the single group ID + index one slot.
     uint256 mintedItemId = _id;
     if (itemGroups[groupId].itemType == ItemType.Fungible) {
-      mintedItemId = shiftedGroupId.add(1);
+      mintedItemId = shiftedGroupId + 1;
     }
     return mintedItemId;
   }
@@ -899,18 +894,14 @@ contract Super1155 is PermitControl, ERC165, IERC1155, IERC1155MetadataURI {
       uint256 mintedItemId = _mintChecker(_ids[i], _amounts[i]);
 
       // Update storage of special balances and circulating values.
-      balances[mintedItemId][_recipient] = balances[mintedItemId][_recipient]
-        .add(_amounts[i]);
-      groupBalances[groupId][_recipient] = groupBalances[groupId][_recipient]
-        .add(_amounts[i]);
-      totalBalances[_recipient] = totalBalances[_recipient].add(_amounts[i]);
-      mintCount[mintedItemId] = mintCount[mintedItemId].add(_amounts[i]);
-      circulatingSupply[mintedItemId] = circulatingSupply[mintedItemId]
-        .add(_amounts[i]);
-      itemGroups[groupId].mintCount = itemGroups[groupId].mintCount
-        .add(_amounts[i]);
+      balances[mintedItemId][_recipient] = balances[mintedItemId][_recipient] + _amounts[i];
+      groupBalances[groupId][_recipient] = groupBalances[groupId][_recipient] + _amounts[i];
+      totalBalances[_recipient] = totalBalances[_recipient] + _amounts[i];
+      mintCount[mintedItemId] = mintCount[mintedItemId] + _amounts[i];
+      circulatingSupply[mintedItemId] = circulatingSupply[mintedItemId] + _amounts[i];
+      itemGroups[groupId].mintCount = itemGroups[groupId].mintCount + _amounts[i];
       itemGroups[groupId].circulatingSupply =
-        itemGroups[groupId].circulatingSupply.add(_amounts[i]);
+        itemGroups[groupId].circulatingSupply + _amounts[i];
     }
 
     // Emit event and handle the safety check.
@@ -944,7 +935,7 @@ contract Super1155 is PermitControl, ERC165, IERC1155, IERC1155MetadataURI {
 
     // If we can burn items, then we must verify that we do not exceed the cap.
     if (itemGroups[groupId].burnType == BurnType.Burnable) {
-      require(itemGroups[groupId].burnCount.add(_amount)
+      require((itemGroups[groupId].burnCount + _amount)
         <= itemGroups[groupId].burnData,
         "Super1155: you may not exceed the burn limit on this item group");
     }
@@ -952,7 +943,7 @@ contract Super1155 is PermitControl, ERC165, IERC1155, IERC1155MetadataURI {
     // Fungible items are coerced into the single group ID + index one slot.
     uint256 burntItemId = _id;
     if (itemGroups[groupId].itemType == ItemType.Fungible) {
-      burntItemId = shiftedGroupId.add(1);
+      burntItemId = shiftedGroupId + 1;
     }
     return burntItemId;
   }
@@ -980,18 +971,15 @@ contract Super1155 is PermitControl, ERC165, IERC1155, IERC1155MetadataURI {
       _asSingletonArray(burntItemId), _asSingletonArray(_amount), "");
 
     // Update storage of special balances and circulating values.
-    balances[burntItemId][_burner] = balances[burntItemId][_burner]
-      .sub(_amount,
-      "ERC1155: burn amount exceeds balance");
-    groupBalances[groupId][_burner] = groupBalances[groupId][_burner]
-      .sub(_amount);
-    totalBalances[_burner] = totalBalances[_burner].sub(_amount);
-    burnCount[burntItemId] = burnCount[burntItemId].add(_amount);
-    circulatingSupply[burntItemId] = circulatingSupply[burntItemId]
-      .sub(_amount);
-    itemGroups[groupId].burnCount = itemGroups[groupId].burnCount.add(_amount);
+    require(balances[burntItemId][_burner] >= _amount, "ERC1155: burn amount exceeds balance");
+    balances[burntItemId][_burner] = balances[burntItemId][_burner] - _amount;
+    groupBalances[groupId][_burner] = groupBalances[groupId][_burner] - _amount;
+    totalBalances[_burner] = totalBalances[_burner] - _amount;
+    burnCount[burntItemId] = burnCount[burntItemId] + _amount;
+    circulatingSupply[burntItemId] = circulatingSupply[burntItemId] - _amount;
+    itemGroups[groupId].burnCount = itemGroups[groupId].burnCount + _amount;
     itemGroups[groupId].circulatingSupply =
-      itemGroups[groupId].circulatingSupply.sub(_amount);
+      itemGroups[groupId].circulatingSupply - _amount;
 
     // Emit the burn event.
     emit TransferSingle(operator, _burner, address(0), _id, _amount);
@@ -1028,19 +1016,15 @@ contract Super1155 is PermitControl, ERC165, IERC1155, IERC1155MetadataURI {
       uint256 burntItemId = _burnChecker(_ids[i], _amounts[i]);
 
       // Update storage of special balances and circulating values.
-      balances[burntItemId][_burner] = balances[burntItemId][_burner]
-        .sub(_amounts[i],
-        "ERC1155: burn amount exceeds balance");
-      groupBalances[groupId][_burner] = groupBalances[groupId][_burner]
-        .sub(_amounts[i]);
-      totalBalances[_burner] = totalBalances[_burner].sub(_amounts[i]);
-      burnCount[burntItemId] = burnCount[burntItemId].add(_amounts[i]);
-      circulatingSupply[burntItemId] = circulatingSupply[burntItemId]
-        .sub(_amounts[i]);
-      itemGroups[groupId].burnCount = itemGroups[groupId].burnCount
-        .add(_amounts[i]);
+      require(balances[burntItemId][_burner] >= _amounts[i], "ERC1155: burn amount exceeds balance");
+      balances[burntItemId][_burner] = balances[burntItemId][_burner] - _amounts[i];
+      groupBalances[groupId][_burner] = groupBalances[groupId][_burner] - _amounts[i];
+      totalBalances[_burner] = totalBalances[_burner] - _amounts[i];
+      burnCount[burntItemId] = burnCount[burntItemId] + _amounts[i];
+      circulatingSupply[burntItemId] = circulatingSupply[burntItemId] - _amounts[i];
+      itemGroups[groupId].burnCount = itemGroups[groupId].burnCount + _amounts[i];
       itemGroups[groupId].circulatingSupply =
-        itemGroups[groupId].circulatingSupply.sub(_amounts[i]);
+        itemGroups[groupId].circulatingSupply - _amounts[i];
     }
 
     // Emit the burn event.

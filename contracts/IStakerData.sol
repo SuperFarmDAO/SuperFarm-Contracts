@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity 0.7.6;
-pragma abicoder v2;
+pragma solidity ^0.8.7;
 
 interface IStakerData {
   function getAvailablePoints ( address _user ) external view returns ( uint256 );
