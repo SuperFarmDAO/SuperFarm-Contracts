@@ -184,7 +184,7 @@ contract SuperStarter is Ownable, ReentrancyGuard, Sweepable {
                 require(success, "Should transfer left ethers back to the user");
             }
         } else {
-            IERC20(pool.swapToken).safeTranfer(
+            IERC20(pool.swapToken).safeTransfer(
                 pool.creator,
                 amount
             );
