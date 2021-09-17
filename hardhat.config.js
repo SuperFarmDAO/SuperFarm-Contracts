@@ -30,10 +30,10 @@ module.exports = {
 	solidity: {
 		compilers: [
 			{
-				version: '0.4.16'
+				version: '0.4.24'
 			},
 			{
-				version: '0.6.12',
+				version: '0.6.6',
 				settings: {
 					optimizer: {
 						enabled: true,
@@ -42,7 +42,7 @@ module.exports = {
 				}
 			},
 			{
-				version: '0.7.3',
+				version: '0.6.12',
 				settings: {
 					optimizer: {
 						enabled: true
@@ -59,7 +59,7 @@ module.exports = {
 				}
 			},
 			{
-				version: '0.6.6',
+				version: '0.8.7',
 				settings: {
 					optimizer: {
 						enabled: true,
@@ -67,15 +67,6 @@ module.exports = {
 					}
 				}
 			},
-			{
-				version: '0.4.24',
-				settings: {
-					optimizer: {
-						enabled: true,
-						runs: 0
-					}
-				}
-			}
 		]
 	},
 	networks: {

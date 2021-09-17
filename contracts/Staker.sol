@@ -1,12 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity 0.7.6;
-pragma experimental ABIEncoderV2;
+pragma solidity ^0.8.7;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
-import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
-import "@openzeppelin/contracts/math/SafeMath.sol";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 /**
   @title An asset staking contract.
@@ -19,7 +17,6 @@ import "@openzeppelin/contracts/math/SafeMath.sol";
   https://github.com/sushiswap/sushiswap/blob/master/contracts/MasterChef.sol
 */
 contract Staker is Ownable, ReentrancyGuard {
-  using SafeMath for uint256;
   using SafeERC20 for IERC20;
 
   // A user-specified, descriptive name for this Staker.
@@ -127,7 +124,7 @@ contract Staker is Ownable, ReentrancyGuard {
     @param _name The name of the Staker contract.
     @param _token The token to reward stakers in this contract with.
   */
-  constructor(string memory _name, IERC20 _token) public {
+  constructor(string memory _name, IERC20 _token) {
     name = _name;
     token = _token;
     token.approve(address(this), MAX_INT);
@@ -274,8 +271,8 @@ contract Staker is Ownable, ReentrancyGuard {
     uint256 lastRewardBlock = lastTokenRewardBlock > lastPointRewardBlock ? lastTokenRewardBlock : lastPointRewardBlock;
     if (address(poolInfo[_token].token) == address(0)) {
       poolTokens.push(_token);
-      totalTokenStrength = totalTokenStrength.add(_tokenStrength);
-      totalPointStrength = totalPointStrength.add(_pointStrength);
+      totalTokenStrength = totalTokenStrength + _tokenStrength;
+      totalPointStrength = totalPointStrength + _pointStrength;
       poolInfo[_token] = PoolInfo({
         token: _token,
         tokenStrength: _tokenStrength,
@@ -285,9 +282,9 @@ contract Staker is Ownable, ReentrancyGuard {
         lastRewardBlock: lastRewardBlock
       });
     } else {
-      totalTokenStrength = totalTokenStrength.sub(poolInfo[_token].tokenStrength).add(_tokenStrength);
+      totalTokenStrength = (totalTokenStrength - poolInfo[_token].tokenStrength) + _tokenStrength;
       poolInfo[_token].tokenStrength = _tokenStrength;
-      totalPointStrength = totalPointStrength.sub(poolInfo[_token].pointStrength).add(_pointStrength);
+      totalPointStrength = (totalPointStrength - poolInfo[_token].pointStrength) + _pointStrength;
       poolInfo[_token].pointStrength = _pointStrength;
     }
   }
@@ -309,16 +306,16 @@ contract Staker is Ownable, ReentrancyGuard {
       uint256 emissionBlock = tokenEmissionBlocks[i].blockNumber;
       uint256 emissionRate = tokenEmissionBlocks[i].rate;
       if (_toBlock < emissionBlock) {
-        totalEmittedTokens = totalEmittedTokens.add(_toBlock.sub(workingBlock).mul(workingRate));
+        totalEmittedTokens = totalEmittedTokens + ((_toBlock - workingBlock) * workingRate);
         return totalEmittedTokens;
       } else if (workingBlock < emissionBlock) {
-        totalEmittedTokens = totalEmittedTokens.add(emissionBlock.sub(workingBlock).mul(workingRate));
+        totalEmittedTokens = totalEmittedTokens + ((emissionBlock - workingBlock) * workingRate);
         workingBlock = emissionBlock;
       }
       workingRate = emissionRate;
     }
     if (workingBlock < _toBlock) {
-      totalEmittedTokens = totalEmittedTokens.add(_toBlock.sub(workingBlock).mul(workingRate));
+      totalEmittedTokens = totalEmittedTokens + ((_toBlock - workingBlock) * workingRate);
     }
     return totalEmittedTokens;
   }
@@ -340,16 +337,16 @@ contract Staker is Ownable, ReentrancyGuard {
       uint256 emissionBlock = pointEmissionBlocks[i].blockNumber;
       uint256 emissionRate = pointEmissionBlocks[i].rate;
       if (_toBlock < emissionBlock) {
-        totalEmittedPoints = totalEmittedPoints.add(_toBlock.sub(workingBlock).mul(workingRate));
+        totalEmittedPoints = totalEmittedPoints + ((_toBlock - workingBlock) * workingRate);
         return totalEmittedPoints;
       } else if (workingBlock < emissionBlock) {
-        totalEmittedPoints = totalEmittedPoints.add(emissionBlock.sub(workingBlock).mul(workingRate));
+        totalEmittedPoints = totalEmittedPoints + ((emissionBlock - workingBlock) * workingRate);
         workingBlock = emissionBlock;
       }
       workingRate = emissionRate;
     }
     if (workingBlock < _toBlock) {
-      totalEmittedPoints = totalEmittedPoints.add(_toBlock.sub(workingBlock).mul(workingRate));
+      totalEmittedPoints = totalEmittedPoints + ((_toBlock - workingBlock) * workingRate);
     }
     return totalEmittedPoints;
   }
@@ -374,25 +371,25 @@ contract Staker is Ownable, ReentrancyGuard {
 
     // Calculate tokens and point rewards for this pool.
     uint256 totalEmittedTokens = getTotalEmittedTokens(pool.lastRewardBlock, block.number);
-    uint256 tokensReward = totalEmittedTokens.mul(pool.tokenStrength).div(totalTokenStrength).mul(1e12);
+    uint256 tokensReward = ((totalEmittedTokens * pool.tokenStrength) / totalTokenStrength) * 1e12;
     uint256 totalEmittedPoints = getTotalEmittedPoints(pool.lastRewardBlock, block.number);
-    uint256 pointsReward = totalEmittedPoints.mul(pool.pointStrength).div(totalPointStrength).mul(1e30);
+    uint256 pointsReward = ((totalEmittedPoints * pool.pointStrength) / totalPointStrength) * 1e30;
 
     // Directly pay developers their corresponding share of tokens and points.
     for (uint256 i = 0; i < developerAddresses.length; ++i) {
       address developer = developerAddresses[i];
       uint256 share = developerShares[developer];
-      uint256 devTokens = tokensReward.mul(share).div(100000);
+      uint256 devTokens = (tokensReward * share) / 100000;
       tokensReward = tokensReward - devTokens;
-      uint256 devPoints = pointsReward.mul(share).div(100000);
+      uint256 devPoints = (pointsReward * share) / 100000;
       pointsReward = pointsReward - devPoints;
-      token.safeTransferFrom(address(this), developer, devTokens.div(1e12));
-      userPoints[developer] = userPoints[developer].add(devPoints.div(1e30));
+      token.safeTransferFrom(address(this), developer, devTokens / 1e12);
+      userPoints[developer] = userPoints[developer] + (devPoints / 1e30);
     }
 
     // Update the pool rewards per share to pay users the amount remaining.
-    pool.tokensPerShare = pool.tokensPerShare.add(tokensReward.div(poolTokenSupply));
-    pool.pointsPerShare = pool.pointsPerShare.add(pointsReward.div(poolTokenSupply));
+    pool.tokensPerShare = pool.tokensPerShare + (tokensReward / poolTokenSupply);
+    pool.pointsPerShare = pool.pointsPerShare + (pointsReward / poolTokenSupply);
     pool.lastRewardBlock = block.number;
   }
 
@@ -415,11 +412,11 @@ contract Staker is Ownable, ReentrancyGuard {
 
     if (block.number > pool.lastRewardBlock && poolTokenSupply > 0) {
       uint256 totalEmittedTokens = getTotalEmittedTokens(pool.lastRewardBlock, block.number);
-      uint256 tokensReward = totalEmittedTokens.mul(pool.tokenStrength).div(totalTokenStrength).mul(1e12);
-      tokensPerShare = tokensPerShare.add(tokensReward.div(poolTokenSupply));
+      uint256 tokensReward = ((totalEmittedTokens * pool.tokenStrength) / totalTokenStrength) * 1e12;
+      tokensPerShare = tokensPerShare + (tokensReward / poolTokenSupply);
     }
 
-    return user.amount.mul(tokensPerShare).div(1e12).sub(user.tokenPaid);
+    return ((user.amount * tokensPerShare) / 1e12) - user.tokenPaid;
   }
 
   /**
@@ -442,11 +439,11 @@ contract Staker is Ownable, ReentrancyGuard {
 
     if (block.number > pool.lastRewardBlock && poolTokenSupply > 0) {
       uint256 totalEmittedPoints = getTotalEmittedPoints(pool.lastRewardBlock, block.number);
-      uint256 pointsReward = totalEmittedPoints.mul(pool.pointStrength).div(totalPointStrength).mul(1e30);
-      pointsPerShare = pointsPerShare.add(pointsReward.div(poolTokenSupply));
+      uint256 pointsReward = ((totalEmittedPoints * pool.pointStrength) / totalPointStrength) * 1e30;
+      pointsPerShare = pointsPerShare + (pointsReward / poolTokenSupply);
     }
 
-    return user.amount.mul(pointsPerShare).div(1e30).sub(user.pointPaid);
+    return ((user.amount * pointsPerShare) / 1e30) - user.pointPaid;
   }
 
   /**
@@ -459,10 +456,10 @@ contract Staker is Ownable, ReentrancyGuard {
     for (uint256 i = 0; i < poolTokens.length; ++i) {
       IERC20 poolToken = poolTokens[i];
       uint256 _pendingPoints = getPendingPoints(poolToken, _user);
-      pendingTotal = pendingTotal.add(_pendingPoints);
+      pendingTotal = pendingTotal + _pendingPoints;
     }
     uint256 spentTotal = userSpentPoints[_user];
-    return concreteTotal.add(pendingTotal).sub(spentTotal);
+    return (concreteTotal + pendingTotal) - spentTotal;
   }
 
   /**
@@ -475,9 +472,9 @@ contract Staker is Ownable, ReentrancyGuard {
     for (uint256 i = 0; i < poolTokens.length; ++i) {
       IERC20 poolToken = poolTokens[i];
       uint256 _pendingPoints = getPendingPoints(poolToken, _user);
-      pendingTotal = pendingTotal.add(_pendingPoints);
+      pendingTotal = pendingTotal + _pendingPoints;
     }
-    return concreteTotal.add(pendingTotal);
+    return concreteTotal + pendingTotal;
   }
 
   /**
@@ -500,19 +497,19 @@ contract Staker is Ownable, ReentrancyGuard {
     UserInfo storage user = userInfo[_token][msg.sender];
     updatePool(_token);
     if (user.amount > 0) {
-      uint256 pendingTokens = user.amount.mul(pool.tokensPerShare).div(1e12).sub(user.tokenPaid);
+      uint256 pendingTokens = ((user.amount * pool.tokensPerShare) / 1e12) - user.tokenPaid;
       token.safeTransferFrom(address(this), msg.sender, pendingTokens);
-      totalTokenDisbursed = totalTokenDisbursed.add(pendingTokens);
-      uint256 pendingPoints = user.amount.mul(pool.pointsPerShare).div(1e30).sub(user.pointPaid);
-      userPoints[msg.sender] = userPoints[msg.sender].add(pendingPoints);
+      totalTokenDisbursed = totalTokenDisbursed + pendingTokens;
+      uint256 pendingPoints = ((user.amount * pool.pointsPerShare) / 1e30) - user.pointPaid;
+      userPoints[msg.sender] = userPoints[msg.sender] + pendingPoints;
     }
     pool.token.safeTransferFrom(address(msg.sender), address(this), _amount);
     if (address(_token) == address(token)) {
-      totalTokenDeposited = totalTokenDeposited.add(_amount);
+      totalTokenDeposited = totalTokenDeposited + _amount;
     }
-    user.amount = user.amount.add(_amount);
-    user.tokenPaid = user.amount.mul(pool.tokensPerShare).div(1e12);
-    user.pointPaid = user.amount.mul(pool.pointsPerShare).div(1e30);
+    user.amount = user.amount +_amount;
+    user.tokenPaid = (user.amount * pool.tokensPerShare) / 1e12;
+    user.pointPaid = (user.amount * pool.pointsPerShare) / 1e30;
     emit Deposit(msg.sender, _token, _amount);
   }
 
@@ -527,17 +524,17 @@ contract Staker is Ownable, ReentrancyGuard {
     require(user.amount >= _amount,
       "You cannot withdraw that much of the specified token; you are not owed it.");
     updatePool(_token);
-    uint256 pendingTokens = user.amount.mul(pool.tokensPerShare).div(1e12).sub(user.tokenPaid);
+    uint256 pendingTokens = ((user.amount * pool.tokensPerShare) / 1e12) - user.tokenPaid;
     token.safeTransferFrom(address(this), msg.sender, pendingTokens);
-    totalTokenDisbursed = totalTokenDisbursed.add(pendingTokens);
-    uint256 pendingPoints = user.amount.mul(pool.pointsPerShare).div(1e30).sub(user.pointPaid);
-    userPoints[msg.sender] = userPoints[msg.sender].add(pendingPoints);
+    totalTokenDisbursed = totalTokenDisbursed + pendingTokens;
+    uint256 pendingPoints = ((user.amount * pool.pointsPerShare) / 1e30) - user.pointPaid;
+    userPoints[msg.sender] = userPoints[msg.sender] + pendingPoints;
     if (address(_token) == address(token)) {
-      totalTokenDeposited = totalTokenDeposited.sub(_amount);
+      totalTokenDeposited = totalTokenDeposited - _amount;
     }
-    user.amount = user.amount.sub(_amount);
-    user.tokenPaid = user.amount.mul(pool.tokensPerShare).div(1e12);
-    user.pointPaid = user.amount.mul(pool.pointsPerShare).div(1e30);
+    user.amount = user.amount - _amount;
+    user.tokenPaid = (user.amount * pool.tokensPerShare) / 1e12;
+    user.pointPaid = (user.amount * pool.pointsPerShare) / 1e30;
     pool.token.safeTransfer(address(msg.sender), _amount);
     emit Withdraw(msg.sender, _token, _amount);
   }
@@ -563,7 +560,7 @@ contract Staker is Ownable, ReentrancyGuard {
     uint256 _userPoints = getAvailablePoints(_user);
     require(_userPoints >= _amount,
       "The user does not have enough points to spend the requested amount.");
-    userSpentPoints[_user] = userSpentPoints[_user].add(_amount);
+    userSpentPoints[_user] = userSpentPoints[_user] + _amount;
     emit SpentPoints(msg.sender, _user, _amount);
   }
 

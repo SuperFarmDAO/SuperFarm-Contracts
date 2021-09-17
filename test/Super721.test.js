@@ -1057,7 +1057,9 @@ describe('===Super721===', function () {
 
             await expect(
                 super721.tokenByIndex(2)
-            ).to.be.revertedWith("EnumerableMap: index out of bounds");
+            ).to.be.reverted;
+            //).to.be.revertedWith("EnumerableMap: index out of bounds");
+            // Solidiy 0.8.0 includes Panic codes for these situations instead of invalid opcode error
         });
     });
 

@@ -1181,7 +1181,7 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
 
             await expect(
                 mintShop1155.connect(owner).sweep(mockERC20.address, ethers.utils.parseEther("10"), signer1.address)
-            ).to.be.revertedWith("MintShop1155: the sweep function is locked");
+            ).to.be.revertedWith("Sweep: the sweep function is locked");
         });
 
         it('should sweep tokens back from mintshop1155 to the user address', async function(){

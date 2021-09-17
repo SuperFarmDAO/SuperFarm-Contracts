@@ -1,4 +1,5 @@
-pragma solidity 0.7.6;
+// SPDX-License-Identifier: GPL-3.0
+pragma solidity ^0.8.7;
 
 import "@openzeppelin/contracts/token/ERC1155/IERC1155Receiver.sol";
 

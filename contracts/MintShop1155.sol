@@ -1,11 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity 0.7.6;
-pragma experimental ABIEncoderV2;
+pragma solidity ^0.8.7;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
-import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
-import "@openzeppelin/contracts/math/SafeMath.sol";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import "./base/Sweepable.sol";
 import "./Super1155.sol";
@@ -22,7 +20,6 @@ import "./Staker.sol";
 */
 contract MintShop1155 is Sweepable, ReentrancyGuard {
   using SafeERC20 for IERC20;
-  using SafeMath for uint256;
 
   /// The public identifier for the right to set the payment receiver.
   bytes32 public constant SET_PAYMENT_RECEIVER
@@ -46,7 +43,7 @@ contract MintShop1155 is Sweepable, ReentrancyGuard {
   bytes32 public constant POOL = keccak256("POOL");
 
   /// @dev A mask for isolating an item's group ID.
-  uint256 constant GROUP_MASK = uint256(uint128(~0)) << 128;
+  uint256 constant GROUP_MASK = uint256(type(uint128).max) << 128;
 
   /// The item collection contract that minted items are sold from.
   Super1155 public item;
@@ -500,7 +497,7 @@ contract MintShop1155 is Sweepable, ReentrancyGuard {
       single address may purchase across all item pools in the shop.
   */
   constructor(address _owner, Super1155 _item, address _paymentReceiver,
-    uint256 _globalPurchaseLimit) public {
+    uint256 _globalPurchaseLimit) {
 
     // Do not perform a redundant ownership transfer if the deployer should
     // remain as the owner of the collection.
@@ -583,7 +580,7 @@ contract MintShop1155 is Sweepable, ReentrancyGuard {
     updateWhitelist(nextWhitelistId, _whitelist);
 
     // Increment the ID which will be used by the next whitelist added.
-    nextWhitelistId = nextWhitelistId.add(1);
+    nextWhitelistId += 1;
   }
 
   /**
@@ -596,7 +593,7 @@ contract MintShop1155 is Sweepable, ReentrancyGuard {
   function updateWhitelist(uint256 _id, WhitelistInput memory _whitelist)
     public hasValidPermit(UNIVERSAL, WHITELIST) {
     uint256 newWhitelistVersion =
-      whitelists[_id].currentWhitelistVersion.add(1);
+      whitelists[_id].currentWhitelistVersion + 1;
 
     // Immediately store some given information about this whitelist.
     Whitelist storage whitelist = whitelists[_id];
@@ -850,7 +847,7 @@ contract MintShop1155 is Sweepable, ReentrancyGuard {
       _prices);
 
     // Increment the ID which will be used by the next pool added.
-    nextPoolId = nextPoolId.add(1);
+    nextPoolId += 1;
   }
 
   /**
@@ -931,7 +928,7 @@ contract MintShop1155 is Sweepable, ReentrancyGuard {
     pool.purchaseLimit = _pool.purchaseLimit;
     pool.singlePurchaseLimit = _pool.singlePurchaseLimit;
     pool.itemGroups = _groupIds;
-    pool.currentPoolVersion = pools[_id].currentPoolVersion.add(1);
+    pool.currentPoolVersion = pools[_id].currentPoolVersion + 1;
     pool.requirement = _pool.requirement;
 
     // Delegate work to a helper function to avoid stack-too-deep errors.
@@ -973,13 +970,13 @@ contract MintShop1155 is Sweepable, ReentrancyGuard {
 
     // Verify that the pool is respecting per-address global purchase limits.
     uint256 userGlobalPurchaseAmount =
-      _amount.add(globalPurchaseCounts[_msgSender()]);
+      _amount + globalPurchaseCounts[_msgSender()];
     require(userGlobalPurchaseAmount <= globalPurchaseLimit,
       "MintShop1155: you may not purchase any more items from this shop");
 
     // Verify that the pool is respecting per-address pool purchase limits.
     uint256 userPoolPurchaseAmount =
-      _amount.add(pools[_id].purchaseCounts[_msgSender()]);
+      _amount + pools[_id].purchaseCounts[_msgSender()];
     require(userPoolPurchaseAmount <= pools[_id].purchaseLimit,
       "MintShop1155: you may not purchase any more items from this pool");
 
@@ -1000,7 +997,7 @@ contract MintShop1155 is Sweepable, ReentrancyGuard {
     }
 
     // Verify that the pool is not depleted by the user's purchase.
-    uint256 newCirculatingTotal = pools[_id].itemMinted[itemKey].add(_amount);
+    uint256 newCirculatingTotal = pools[_id].itemMinted[itemKey] + _amount;
     require(newCirculatingTotal <= pools[_id].itemCaps[itemKey],
       "MintShop1155: there are not enough items available for you to purchase");
 
@@ -1032,11 +1029,11 @@ contract MintShop1155 is Sweepable, ReentrancyGuard {
     Price memory sellingPair = pools[_id].itemPrices[itemKey][_assetIndex];
     if (sellingPair.assetType == AssetType.Point) {
       Staker(sellingPair.asset).spendPoints(_msgSender(),
-        sellingPair.price.mul(_amount));
+        sellingPair.price * _amount);
 
     // Process payment for the user with a check to sell for Ether.
     } else if (sellingPair.assetType == AssetType.Ether) {
-      uint256 etherPrice = sellingPair.price.mul(_amount);
+      uint256 etherPrice = sellingPair.price * _amount;
       require(msg.value >= etherPrice,
         "MintShop1155: you did not send enough Ether to complete the purchase");
       (bool success, ) = payable(paymentReceiver).call{ value: msg.value }("");
@@ -1046,7 +1043,7 @@ contract MintShop1155 is Sweepable, ReentrancyGuard {
     // Process payment for the user with a check to sell for an ERC-20 token.
     } else if (sellingPair.assetType == AssetType.Token) {
       IERC20 sellingAsset = IERC20(sellingPair.asset);
-      uint256 tokenPrice = sellingPair.price.mul(_amount);
+      uint256 tokenPrice = sellingPair.price * _amount;
       require(sellingAsset.balanceOf(_msgSender()) >= tokenPrice,
         "MintShop1155: you do not have enough token to complete the purchase");
       sellingAsset.safeTransferFrom(_msgSender(), paymentReceiver, tokenPrice);
@@ -1063,7 +1060,7 @@ contract MintShop1155 is Sweepable, ReentrancyGuard {
     {
       uint256 shiftedGroupId = _groupId << 128;
       for (uint256 i = 1; i <= _amount; i++) {
-        uint256 itemId = shiftedGroupId.add(nextIssueNumber).add(i);
+        uint256 itemId = (shiftedGroupId + nextIssueNumber) + i;
         itemIds[i - 1] = itemId;
         amounts[i - 1] = 1;
       }
@@ -1073,7 +1070,7 @@ contract MintShop1155 is Sweepable, ReentrancyGuard {
     item.mintBatch(_msgSender(), itemIds, amounts, "");
 
     // Update the tracker for available item issue numbers.
-    nextItemIssues[_groupId] = nextIssueNumber.add(_amount);
+    nextItemIssues[_groupId] = nextIssueNumber + _amount;
 
     // Update the count of circulating items from this pool.
     pools[_id].itemMinted[itemKey] = newCirculatingTotal;

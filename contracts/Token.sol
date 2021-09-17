@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity 0.7.6;
+pragma solidity ^0.8.7;
 
-import "@openzeppelin/contracts/math/SafeMath.sol";
-import "@openzeppelin/contracts/token/ERC20/ERC20Capped.sol";
+import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Capped.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
 /**
@@ -18,7 +17,6 @@ import "@openzeppelin/contracts/access/Ownable.sol";
   https://github.com/compound-finance/compound-protocol/blob/master/contracts/Governance/Comp.sol
 */
 contract Token is ERC20Capped, Ownable {
-  using SafeMath for uint256;
 
   /// A version number for this Token contract's interface.
   uint256 public version = 1;
@@ -30,7 +28,7 @@ contract Token is ERC20Capped, Ownable {
     @param _ticker The ticker symbol of the new Token.
     @param _cap The supply cap of the new Token.
   */
-  constructor (string memory _name, string memory _ticker, uint256 _cap) public ERC20(_name, _ticker) ERC20Capped(_cap) { }
+  constructor (string memory _name, string memory _ticker, uint256 _cap) ERC20(_name, _ticker) ERC20Capped(_cap) { }
 
   /**
    * @dev Destroys `amount` tokens from the caller.
@@ -55,7 +53,7 @@ contract Token is ERC20Capped, Ownable {
   function burnFrom(address account, uint256 amount) public virtual {
       require(amount >= allowance(account, _msgSender()),
         "ERC20: burn amount exceeds allowance");
-      uint256 decreasedAllowance = allowance(account, _msgSender()).sub(amount);
+      uint256 decreasedAllowance = allowance(account, _msgSender()) - amount;
 
       _approve(account, _msgSender(), decreasedAllowance);
       _burn(account, amount);
@@ -256,7 +254,7 @@ contract Token is ERC20Capped, Ownable {
       if (srcRep != address(0)) {
         uint32 srcRepNum = numCheckpoints[srcRep];
         uint256 srcRepOld = srcRepNum > 0 ? checkpoints[srcRep][srcRepNum - 1].votes : 0;
-        uint256 srcRepNew = srcRepOld.sub(amount);
+        uint256 srcRepNew = srcRepOld - amount;
         _writeCheckpoint(srcRep, srcRepNum, srcRepOld, srcRepNew);
       }
 
@@ -264,7 +262,7 @@ contract Token is ERC20Capped, Ownable {
       if (dstRep != address(0)) {
         uint32 dstRepNum = numCheckpoints[dstRep];
         uint256 dstRepOld = dstRepNum > 0 ? checkpoints[dstRep][dstRepNum - 1].votes : 0;
-        uint256 dstRepNew = dstRepOld.add(amount);
+        uint256 dstRepNew = dstRepOld + amount;
         _writeCheckpoint(dstRep, dstRepNum, dstRepOld, dstRepNew);
       }
     }
@@ -309,7 +307,7 @@ contract Token is ERC20Capped, Ownable {
 
     @return The ID of the contract's network or chain.
   */
-  function getChainId() internal pure returns (uint) {
+  function getChainId() internal view returns (uint) {
     uint256 chainId;
     assembly { chainId := chainid() }
     return chainId;

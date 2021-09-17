@@ -1,16 +1,15 @@
 // SPDX-License-Identifier: GPL-3.0-only
-pragma solidity 0.7.6;
+pragma solidity ^0.8.7;
 
-import "@openzeppelin/contracts/math/SafeMath.sol";
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+
 
 import "./base/Sweepable.sol";
 
 contract SuperStarter is Ownable, ReentrancyGuard, Sweepable {
-    using SafeMath for uint256;
     using SafeERC20 for IERC20;
 
     struct Pool {
@@ -63,7 +62,7 @@ contract SuperStarter is Ownable, ReentrancyGuard, Sweepable {
     event PoolStarted(uint256 id, uint256 timestamp);
     event WhiteList(uint256 id, uint256 timestamp);
 
-    constructor(uint256 _minSuper, address _superToken) public {
+    constructor(uint256 _minSuper, address _superToken) {
         minSuper = _minSuper;
         superToken = _superToken;
     }
@@ -157,25 +156,27 @@ contract SuperStarter is Ownable, ReentrancyGuard, Sweepable {
 
     function _simpleSwap(uint256 id, uint256 amount) internal {
         Pool memory pool = pools[id];
-        uint256 left = pool.cap.sub(poolsSold[id]);
+        uint256 left = pool.cap - poolsSold[id];
         uint256 curLocked = lockedTokens[id][msg.sender];
-        if (left > pool.maxCap.sub(curLocked)) {
-            left = pool.maxCap.sub(curLocked);
+        if (left > pool.maxCap - curLocked) {
+            left = pool.maxCap - curLocked;
         }
-        if (pool.isWhiteList && left > whiteList[id][msg.sender].sub(curLocked)) {
-            left = whiteList[id][msg.sender].sub(curLocked);
+        if (pool.isWhiteList && left > whiteList[id][msg.sender] - curLocked) {
+            left = whiteList[id][msg.sender] - curLocked;
         }
         require(left > 0, "Not enough tokens for swap");
-        uint256 amt = pool.price.mul(amount).div(scaleFactor);
+        uint256 amt = (pool.price * amount) / scaleFactor;
+
         uint256 back = 0;
         if (left < amt) {
             amt = left;
-            uint256 newAmount = amt.mul(scaleFactor).div(pool.price);
-            back = amount.sub(newAmount);
+            uint256 newAmount = (amt * scaleFactor) / pool.price;
+
+            back = amount - newAmount;
             amount = newAmount;
         }
-        lockedTokens[id][msg.sender] = curLocked.add(amt);
-        poolsSold[id] = poolsSold[id].add(amt);
+        lockedTokens[id][msg.sender] = curLocked + amt;
+        poolsSold[id] = poolsSold[id ]+ amt;
         if (pool.swapToken == address(0)) {
             (bool success, ) = payable(pool.creator).call{value: amount}("");
             require(success, "Should transfer ethers to the pool creator");

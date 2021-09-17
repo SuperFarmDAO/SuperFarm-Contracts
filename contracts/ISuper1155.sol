@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity 0.7.6;
-pragma abicoder v2;
+pragma solidity ^0.8.7;
 
 /**
   @title An interface for the `Super1155` ERC-1155 item collection contract.
