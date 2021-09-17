@@ -125,7 +125,7 @@ contract SuperStarter is Ownable, ReentrancyGuard, Sweepable {
             );
         pools.push(newPool);
         uint256 id = pools.length;
-        IERC20(token).transferFrom(msg.sender, address(this), cap);
+        IERC20(token).safeTransferFrom(msg.sender, address(this), cap);
         emit NewPool(
             id,
             msg.sender,
