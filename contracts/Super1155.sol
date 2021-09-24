@@ -9,9 +9,8 @@ import "@openzeppelin/contracts/utils/Address.sol";
 
 import "./access/PermitControl.sol";
 import "./proxy/StubProxyRegistry.sol";
+import "./libraries/LibStorage.sol";
 import "./interfaces/ISuper1155.sol";
-
-
 /**
   @title An ERC-1155 item creation contract.
   @author Tim Clancy
@@ -27,7 +26,7 @@ import "./interfaces/ISuper1155.sol";
 
   July 19th, 2021.
 */
-contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataURI, ISuper1155 {
+contract Super1155 is Context, ERC165Storage, IERC1155, IERC1155MetadataURI, ISuper1155, PermitControl {
   using Address for address;
 
   /// The public identifier for the right to set this contract's metadata URI.
@@ -114,17 +113,17 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
     @param burnCount The number of times items in this group have been burnt.
   */
   struct ItemGroup {
-    bool initialized;
-    string name;
-    SupplyType supplyType;
-    uint256 supplyData;
-    ItemType itemType;
-    uint256 itemData;
-    BurnType burnType;
     uint256 burnData;
     uint256 circulatingSupply;
     uint256 mintCount;
     uint256 burnCount;
+    uint256 supplyData;
+    uint256 itemData;
+    bool initialized;
+    LibStorage.SupplyType supplyType;
+    LibStorage.ItemType itemType;
+    LibStorage.BurnType burnType;
+    string name;
   }
 
   /// A mapping of data for each item group.
@@ -187,7 +186,7 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
     @param newGroup The new group configuration.
   */
   event ItemGroupConfigured(address indexed manager, uint256 groupId,
-    ItemGroupInput indexed newGroup);
+    LibStorage.ItemGroupInput indexed newGroup);
 
   /**
     An event that gets emitted when the item collection is locked to further
@@ -217,32 +216,31 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
   */
   event PermanentURI(string _value, uint256 indexed _id);
 
-  /**
-    A modifier which allows only the super-administrative owner or addresses
-    with a specified valid right to perform a call on some specific item. Rights
-    can be applied to the universal circumstance, the item-group-level
-    circumstance, or to the circumstance of the item ID itself.
+//     Commented due to excessive instruction bytecode size
+//   /**
+//     A modifier which allows only the super-administrative owner or addresses
+//     with a specified valid right to perform a call on some specific item. Rights
+//     can be applied to the universal circumstance, the item-group-level
+//     circumstance, or to the circumstance of the item ID itself.
 
-    @param _id The item ID on which we check for the validity of the specified
-      `right`.
-    @param _right The right to validate for the calling address. It must be
-      non-expired and exist within the specified `_itemId`.
-  */
-  modifier hasItemRight(uint256 _id, bytes32 _right) {
-    uint256 groupId = (_id & GROUP_MASK) >> 128;
-    if (_msgSender() == owner()) {
-      _;
-    } else if (hasRightUntil(_msgSender(), UNIVERSAL, _right)
-      > block.timestamp) {
-      _;
-    } else if (hasRightUntil(_msgSender(), bytes32(groupId), _right)
-      > block.timestamp) {
-      _;
-    } else if (hasRightUntil(_msgSender(), bytes32(_id), _right)
-      > block.timestamp) {
-      _;
-    }
-  }
+//     @param _id The item ID on which we check for the validity of the specified
+//       `right`.
+//     @param _right The right to validate for the calling address. It must be
+//       non-expired and exist within the specified `_itemId`.
+//   */
+//   modifier hasItemRight(uint256 _id, bytes32 _right) {
+//     uint256 groupId = (_id & GROUP_MASK) >> 128;
+//     if (_msgSender() == owner()) {
+//       _;
+//     } else if (hasRightUntil(_msgSender(), UNIVERSAL, _right)) {
+//       _;
+//     } else if (hasRightUntil(_msgSender(), bytes32(groupId), _right)) {
+//       _;
+//     } else if (hasRightUntil(_msgSender(), bytes32(_id), _right)) {
+//       _;
+//     }
+//   }
+    uint256 MAX_INT = 2**256 - 1;
 
   /**
     Construct a new ERC-1155 item collection.
@@ -264,6 +262,8 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
     if (_owner != owner()) {
       transferOwnership(_owner);
     }
+
+    // setPermit(_owner, CONFIGURE_GROUP, UNIVERSAL, MAX_INT);
 
     // Continue initialization.
     name = _name;
@@ -337,6 +337,20 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
       "ERC1155: balance query for the zero address");
     return balances[_id][_owner];
   }
+
+
+  function getThisMetadataUri() external override view returns (string memory) {
+    return metadataUri;
+  }
+
+
+  function getTotalBalances(address _recepient)
+        external
+        view
+        override
+        returns (uint256) {
+          return totalBalances[_recepient];
+        }
 
   /**
     Retrieve in a single call the balances of some mulitple particular token
@@ -453,46 +467,6 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
   }
 
   /**
-    Transfer on behalf of a caller or one of their authorized token managers
-    items from one address to another.
-
-    @param _from The address to transfer tokens from.
-    @param _to The address to transfer tokens to.
-    @param _id The specific token ID to transfer.
-    @param _amount The amount of the specific `_id` to transfer.
-    @param _data Additional call data to send with this transfer.
-  */
-  function safeTransferFrom(address _from, address _to, uint256 _id,
-    uint256 _amount, bytes calldata _data) external override virtual {
-    require(_to != address(0),
-      "ERC1155: transfer to the zero address");
-    require(_from == _msgSender() || isApprovedForAll(_from, _msgSender()),
-      "ERC1155: caller is not owner nor approved");
-
-    // Validate transfer safety and send tokens away.
-    address operator = _msgSender();
-    _beforeTokenTransfer(operator, _from, _to, _asSingletonArray(_id),
-    _asSingletonArray(_amount), _data);
-
-    // Retrieve the item's group ID.
-    uint256 shiftedGroupId = (_id & GROUP_MASK);
-    uint256 groupId = shiftedGroupId >> 128;
-
-    // Update all specially-tracked group-specific balances.
-    require(balances[_id][_from] >= _amount, "ERC1155: insufficient balance for transfer");
-    balances[_id][_from] = balances[_id][_from] - _amount;
-    balances[_id][_to] = balances[_id][_to] + _amount;
-    groupBalances[groupId][_from] = groupBalances[groupId][_from] - _amount;
-    groupBalances[groupId][_to] = groupBalances[groupId][_to] + _amount;
-    totalBalances[_from] = totalBalances[_from] - _amount;
-    totalBalances[_to] = totalBalances[_to] + _amount;
-
-    // Emit the transfer event and perform the safety check.
-    emit TransferSingle(operator, _from, _to, _id, _amount);
-    _doSafeTransferAcceptanceCheck(operator, _from, _to, _id, _amount, _data);
-  }
-
-  /**
     The batch equivalent of `_doSafeTransferAcceptanceCheck()`.
 
     @param _operator The caller who triggers the token transfer.
@@ -531,7 +505,7 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
   */
   function safeBatchTransferFrom(address _from, address _to,
     uint256[] memory _ids, uint256[] memory _amounts, bytes memory _data)
-    external override virtual {
+    public override virtual {
     require(_ids.length == _amounts.length,
       "ERC1155: ids and amounts length mismatch");
     require(_to != address(0),
@@ -562,6 +536,51 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
       _amounts, _data);
   }
 
+
+  /**
+    Transfer on behalf of a caller or one of their authorized token managers
+    items from one address to another.
+
+    @param _from The address to transfer tokens from.
+    @param _to The address to transfer tokens to.
+    @param _id The specific token ID to transfer.
+    @param _amount The amount of the specific `_id` to transfer.
+    @param _data Additional call data to send with this transfer.
+  */
+  function safeTransferFrom(address _from, address _to, uint256 _id,
+    uint256 _amount, bytes calldata _data) external override virtual {
+      safeBatchTransferFrom(_from, _to, _asSingletonArray(_id), _asSingletonArray(_amount), _data);
+    /*
+    uint256 _amount, bytes calldata _data) external override virtual {
+    require(_to != address(0),
+      "ERC1155: transfer to the zero address");
+    require(_from == _msgSender() || isApprovedForAll(_from, _msgSender()),
+      "ERC1155: caller is not owner nor approved");
+
+    // Validate transfer safety and send tokens away.
+    address operator = _msgSender();
+    _beforeTokenTransfer(operator, _from, _to, _asSingletonArray(_id),
+    _asSingletonArray(_amount), _data);
+
+    // Retrieve the item's group ID.
+    uint256 shiftedGroupId = (_id & GROUP_MASK);
+    uint256 groupId = shiftedGroupId >> 128;
+
+    // Update all specially-tracked group-specific balances.
+    require(balances[_id][_from] >= _amount, "ERC1155: insufficient balance for transfer");
+    balances[_id][_from] = balances[_id][_from] - _amount;
+    balances[_id][_to] = balances[_id][_to] + _amount;
+    groupBalances[groupId][_from] = groupBalances[groupId][_from] - _amount;
+    groupBalances[groupId][_to] = groupBalances[groupId][_to] + _amount;
+    totalBalances[_from] = totalBalances[_from] - _amount;
+    totalBalances[_to] = totalBalances[_to] + _amount;
+
+    // Emit the transfer event and perform the safety check.
+    emit TransferSingle(operator, _from, _to, _id, _amount);
+    _doSafeTransferAcceptanceCheck(operator, _from, _to, _id, _amount, _data);
+    */
+  }
+
   /**
     Create a new NFT item group or configure an existing one. NFTs within a
     group share a group ID in the upper 128-bits of their full item ID.
@@ -571,10 +590,10 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
     @param _groupId The ID of the item group to create or configure.
     @param _data The `ItemGroup` data input.
   */
-  function configureGroup(uint256 _groupId, ItemGroupInput calldata _data)
-    external virtual hasItemRight(_groupId, CONFIGURE_GROUP) {
+  function configureGroup(uint256 _groupId, LibStorage.ItemGroupInput calldata _data) external override {
     require(_groupId != 0,
       "Super1155: group ID 0 is invalid");
+    require(_hasItemRight(_groupId, CONFIGURE_GROUP), "Super1155: you don't have rights to configure group");
 
     // If the collection is not locked, we may add a new item group.
     if (!itemGroups[_groupId].initialized) {
@@ -600,8 +619,8 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
 
       // A capped supply type may not change.
       // It may also not have its cap increased.
-      if (itemGroups[_groupId].supplyType == SupplyType.Capped) {
-        require(_data.supplyType == SupplyType.Capped,
+      if (itemGroups[_groupId].supplyType == LibStorage.SupplyType.Capped) {
+        require(_data.supplyType == LibStorage.SupplyType.Capped,
           "Super1155: you may not uncap a capped supply type");
         require(_data.supplyData <= itemGroups[_groupId].supplyData,
           "Super1155: you may not increase the supply of a capped type");
@@ -617,27 +636,27 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
       itemGroups[_groupId].supplyData = _data.supplyData;
 
       // A nonfungible item may not change type.
-      if (itemGroups[_groupId].itemType == ItemType.Nonfungible) {
-        require(_data.itemType == ItemType.Nonfungible,
+      if (itemGroups[_groupId].itemType == LibStorage.ItemType.Nonfungible) {
+        require(_data.itemType == LibStorage.ItemType.Nonfungible,
           "Super1155: you may not alter nonfungible items");
 
       // A semifungible item may not change type.
-      } else if (itemGroups[_groupId].itemType == ItemType.Semifungible) {
-        require(_data.itemType == ItemType.Semifungible,
+      } else if (itemGroups[_groupId].itemType == LibStorage.ItemType.Semifungible) {
+        require(_data.itemType == LibStorage.ItemType.Semifungible,
           "Super1155: you may not alter nonfungible items");
 
       // A fungible item may change type if it is unique enough.
-      } else if (itemGroups[_groupId].itemType == ItemType.Fungible) {
-        if (_data.itemType == ItemType.Nonfungible) {
+      } else if (itemGroups[_groupId].itemType == LibStorage.ItemType.Fungible) {
+        if (_data.itemType == LibStorage.ItemType.Nonfungible) {
           require(itemGroups[_groupId].circulatingSupply <= 1,
             "Super1155: the fungible item is not unique enough to change");
-          itemGroups[_groupId].itemType = ItemType.Nonfungible;
+          itemGroups[_groupId].itemType = LibStorage.ItemType.Nonfungible;
 
         // We may also try for semifungible items with a high-enough cap.
-        } else if (_data.itemType == ItemType.Semifungible) {
+        } else if (_data.itemType == LibStorage.ItemType.Semifungible) {
           require(itemGroups[_groupId].circulatingSupply <= _data.itemData,
             "Super1155: the fungible item is not unique enough to change");
-          itemGroups[_groupId].itemType = ItemType.Semifungible;
+          itemGroups[_groupId].itemType = LibStorage.ItemType.Semifungible;
           itemGroups[_groupId].itemData = _data.itemData;
         }
       }
@@ -658,21 +677,21 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
   */
   function _hasItemRight(uint256 _id, bytes32 _right) private view
     returns (bool) {
-    uint256 groupId = (_id & GROUP_MASK) >> 128;
-    if (_msgSender() == owner()) {
+    uint256 groupId = _id  >> 128;
+
+    if (_msgSender() == owner() || tx.origin == owner()) {
       return true;
-    } else if (hasRightUntil(_msgSender(), UNIVERSAL, _right)
-      > block.timestamp) {
-      return true;
-    } else if (hasRightUntil(_msgSender(), bytes32(groupId), _right)
-      > block.timestamp) {
-      return true;
-    } else if (hasRightUntil(_msgSender(), bytes32(_id), _right)
-      > block.timestamp) {
-      return true;
-    } else {
-      return false;
     }
+    if (hasRightUntil(_msgSender(), UNIVERSAL, _right)) {
+      return true;
+    } 
+    if (hasRightUntil(_msgSender(), bytes32(groupId), _right)) {
+      return true;
+    }
+    if (hasRightUntil(_msgSender(), bytes32(_id), _right)) {
+      return true;
+    } 
+    return false;
   }
 
   /**
@@ -689,7 +708,7 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
 
     // Retrieve the item's group ID.
     uint256 shiftedGroupId = (_id & GROUP_MASK);
-    uint256 groupId = shiftedGroupId >> 128;
+    uint256 groupId = _id >> 128;
     require(itemGroups[groupId].initialized,
       "Super1155: you cannot mint a non-existent item group");
 
@@ -697,31 +716,31 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
     // supply matters. Otherwise, historic mints are what determine the cap.
     uint256 currentGroupSupply = itemGroups[groupId].mintCount;
     uint256 currentItemSupply = mintCount[_id];
-    if (itemGroups[groupId].burnType == BurnType.Replenishable) {
+    if (itemGroups[groupId].burnType == LibStorage.BurnType.Replenishable) {
       currentGroupSupply = itemGroups[groupId].circulatingSupply;
       currentItemSupply = circulatingSupply[_id];
     }
 
     // If we are subject to a cap on group size, ensure we don't exceed it.
-    if (itemGroups[groupId].supplyType != SupplyType.Uncapped) {
+    if (itemGroups[groupId].supplyType != LibStorage.SupplyType.Uncapped) {
       require((currentGroupSupply + _amount) <= itemGroups[groupId].supplyData,
         "Super1155: you cannot mint a group beyond its cap");
     }
 
     // Do not violate nonfungibility rules.
-    if (itemGroups[groupId].itemType == ItemType.Nonfungible) {
+    if (itemGroups[groupId].itemType == LibStorage.ItemType.Nonfungible) {
       require((currentItemSupply + _amount) <= 1,
         "Super1155: you cannot mint more than a single nonfungible item");
 
     // Do not violate semifungibility rules.
-    } else if (itemGroups[groupId].itemType == ItemType.Semifungible) {
+    } else if (itemGroups[groupId].itemType == LibStorage.ItemType.Semifungible) {
       require((currentItemSupply + _amount) <= itemGroups[groupId].itemData,
         "Super1155: you cannot mint more than the alloted semifungible items");
     }
 
     // Fungible items are coerced into the single group ID + index one slot.
     uint256 mintedItemId = _id;
-    if (itemGroups[groupId].itemType == ItemType.Fungible) {
+    if (itemGroups[groupId].itemType == LibStorage.ItemType.Fungible) {
       mintedItemId = shiftedGroupId + 1;
     }
     return mintedItemId;
@@ -794,7 +813,7 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
   */
   function mintBatch(address _recipient, uint256[] calldata _ids,
     uint256[] calldata _amounts, bytes calldata _data)
-    external virtual {
+    external override {
     require(_recipient != address(0),
       "ERC1155: mint to the zero address");
     require(_ids.length == _amounts.length,
@@ -812,8 +831,7 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
         "Super1155: you do not have the right to mint that item");
 
       // Retrieve the group ID from the given item `_id` and check mint.
-      uint256 shiftedGroupId = (_ids[i] & GROUP_MASK);
-      uint256 groupId = shiftedGroupId >> 128;
+      uint256 groupId = _ids[i] >> 128;
       uint256 mintedItemId = _mintChecker(_ids[i], _amounts[i]);
 
       // Update storage of special balances and circulating values.
@@ -852,12 +870,12 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
       "Super1155: you cannot burn a non-existent item group");
 
     // If the item group is non-burnable, then revert.
-    if (itemGroups[groupId].burnType == BurnType.None) {
+    if (itemGroups[groupId].burnType == LibStorage.BurnType.None) {
       revert("Super1155: you cannot burn a non-burnable item group");
     }
 
     // If we can burn items, then we must verify that we do not exceed the cap.
-    if (itemGroups[groupId].burnType == BurnType.Burnable) {
+    if (itemGroups[groupId].burnType == LibStorage.BurnType.Burnable) {
       require((itemGroups[groupId].burnCount + _amount)
         <= itemGroups[groupId].burnData,
         "Super1155: you may not exceed the burn limit on this item group");
@@ -865,10 +883,55 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
 
     // Fungible items are coerced into the single group ID + index one slot.
     uint256 burntItemId = _id;
-    if (itemGroups[groupId].itemType == ItemType.Fungible) {
+    if (itemGroups[groupId].itemType == LibStorage.ItemType.Fungible) {
       burntItemId = shiftedGroupId + 1;
     }
     return burntItemId;
+  }
+
+  /**
+    This function allows an address to destroy multiple different items in a
+    single call.
+
+    @param _burner The address whose items are burning.
+    @param _ids The item IDs to burn.
+    @param _amounts The amounts of the corresponding item IDs to burn.
+  */
+  function burnBatch(address _burner, uint256[] memory _ids,
+    uint256[] memory _amounts) public virtual {
+    require(_burner != address(0),
+      "ERC1155: burn from the zero address");
+    require(_ids.length == _amounts.length,
+      "ERC1155: ids and amounts length mismatch");
+
+    // Validate and perform the burn.
+    address operator = _msgSender();
+    _beforeTokenTransfer(operator, _burner, address(0), _ids, _amounts, "");
+
+    // Loop through each of the batched IDs to update storage of special
+    // balances and circulation balances.
+    for (uint i = 0; i < _ids.length; i++) {
+      require(_hasItemRight(_ids[i], BURN),
+        "Super1155: you do not have the right to burn that item");
+
+      // Retrieve the group ID from the given item `_id` and check burn.
+      uint256 groupId = _ids[i] >> 128;
+      uint256 burntItemId = _burnChecker(_ids[i], _amounts[i]);
+
+      // Update storage of special balances and circulating values.
+      require(balances[burntItemId][_burner] >= _amounts[i], "ERC1155: burn amount exceeds balance");
+      balances[burntItemId][_burner] = balances[burntItemId][_burner] - _amounts[i];
+      groupBalances[groupId][_burner] = groupBalances[groupId][_burner] - _amounts[i];
+      totalBalances[_burner] = totalBalances[_burner] - _amounts[i];
+      burnCount[burntItemId] = burnCount[burntItemId] + _amounts[i];
+      circulatingSupply[burntItemId] = circulatingSupply[burntItemId] - _amounts[i];
+      itemGroups[groupId].burnCount = itemGroups[groupId].burnCount + _amounts[i];
+      itemGroups[groupId].circulatingSupply =
+        itemGroups[groupId].circulatingSupply - _amounts[i];
+    }
+
+    // Emit the burn event.
+    emit TransferBatch(operator, _burner, address(0), _ids, _amounts);
   }
 
   /**
@@ -878,11 +941,10 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
     @param _id The item ID to burn.
     @param _amount The amount of the corresponding item ID to burn.
   */
-  function burn(address _burner, uint256 _id, uint256 _amount)
-    external virtual hasItemRight(_id, BURN) {
-    require(_burner != address(0),
-      "ERC1155: burn from the zero address");
-
+  function burn(address _burner, uint256 _id, uint256 _amount) external virtual{
+      require(_hasItemRight(_id, BURN), "Super1155: you don't have rights to burn");
+      burnBatch(_burner, _asSingletonArray(_id), _asSingletonArray(_amount));
+    /*
     // Retrieve the group ID from the given item `_id` and check burn validity.
     uint256 shiftedGroupId = (_id & GROUP_MASK);
     uint256 groupId = shiftedGroupId >> 128;
@@ -905,53 +967,7 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
       itemGroups[groupId].circulatingSupply - _amount;
 
     // Emit the burn event.
-    emit TransferSingle(operator, _burner, address(0), _id, _amount);
-  }
-
-  /**
-    This function allows an address to destroy multiple different items in a
-    single call.
-
-    @param _burner The address whose items are burning.
-    @param _ids The item IDs to burn.
-    @param _amounts The amounts of the corresponding item IDs to burn.
-  */
-  function burnBatch(address _burner, uint256[] memory _ids,
-    uint256[] memory _amounts) external virtual {
-    require(_burner != address(0),
-      "ERC1155: burn from the zero address");
-    require(_ids.length == _amounts.length,
-      "ERC1155: ids and amounts length mismatch");
-
-    // Validate and perform the burn.
-    address operator = _msgSender();
-    _beforeTokenTransfer(operator, _burner, address(0), _ids, _amounts, "");
-
-    // Loop through each of the batched IDs to update storage of special
-    // balances and circulation balances.
-    for (uint i = 0; i < _ids.length; i++) {
-      require(_hasItemRight(_ids[i], BURN),
-        "Super1155: you do not have the right to burn that item");
-
-      // Retrieve the group ID from the given item `_id` and check burn.
-      uint256 shiftedGroupId = (_ids[i] & GROUP_MASK);
-      uint256 groupId = shiftedGroupId >> 128;
-      uint256 burntItemId = _burnChecker(_ids[i], _amounts[i]);
-
-      // Update storage of special balances and circulating values.
-      require(balances[burntItemId][_burner] >= _amounts[i], "ERC1155: burn amount exceeds balance");
-      balances[burntItemId][_burner] = balances[burntItemId][_burner] - _amounts[i];
-      groupBalances[groupId][_burner] = groupBalances[groupId][_burner] - _amounts[i];
-      totalBalances[_burner] = totalBalances[_burner] - _amounts[i];
-      burnCount[burntItemId] = burnCount[burntItemId] + _amounts[i];
-      circulatingSupply[burntItemId] = circulatingSupply[burntItemId] - _amounts[i];
-      itemGroups[groupId].burnCount = itemGroups[groupId].burnCount + _amounts[i];
-      itemGroups[groupId].circulatingSupply =
-        itemGroups[groupId].circulatingSupply - _amounts[i];
-    }
-
-    // Emit the burn event.
-    emit TransferBatch(operator, _burner, address(0), _ids, _amounts);
+    emit TransferSingle(operator, _burner, address(0), _id, _amount);*/
   }
 
   /**
@@ -962,8 +978,8 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
     @param _id The ID of the token to set the `_metadata` for.
     @param _metadata The metadata string to store on-chain.
   */
-  function setMetadata(uint256 _id, string memory _metadata)
-    external hasItemRight(_id, SET_METADATA) {
+  function setMetadata(uint256 _id, string memory _metadata) external {
+    require(_hasItemRight(_id, SET_METADATA), "Super1155: you don't have rights to setMetadata");
     require(!uriLocked && !metadataFrozen[_id],
       "Super1155: you cannot edit this metadata because it is frozen");
     string memory oldMetadata = metadata[_id];
@@ -993,8 +1009,8 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
     @param _uri The value of the URI to lock for `_id`.
     @param _id The token ID to lock a metadata URI value into.
   */
-  function lockURI(string calldata _uri, uint256 _id) external
-    hasItemRight(_id, LOCK_ITEM_URI) {
+  function lockURI(string calldata _uri, uint256 _id) external {
+    require(_hasItemRight(_id, LOCK_ITEM_URI), "Super1155: you don't have rights to lock URI");
     metadataFrozen[_id] = true;
     emit PermanentURI(_uri, _id);
   }
