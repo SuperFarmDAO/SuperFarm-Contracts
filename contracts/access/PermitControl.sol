@@ -105,7 +105,7 @@ abstract contract PermitControl is Ownable {
     bytes32 _right
   ) {
     require(_msgSender() == owner()
-      || hasRightUntil(_msgSender(), _circumstance, _right) > block.timestamp,
+      || hasRightUntil(_msgSender(), _circumstance, _right),
       "PermitControl: sender does not have a valid permit");
     _;
   }
@@ -131,8 +131,8 @@ abstract contract PermitControl is Ownable {
     address _address,
     bytes32 _circumstance,
     bytes32 _right
-  ) public view returns (uint256) {
-    return permissions[_address][_circumstance][_right];
+  ) public view returns (bool) {
+    return permissions[_address][_circumstance][_right] > block.timestamp;
   }
 
   /**

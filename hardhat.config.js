@@ -21,6 +21,8 @@ require('solidity-coverage');
 // Include the Etherscan contract verifier.
 require('@nomiclabs/hardhat-etherscan');
 
+require('hardhat-contract-sizer');
+
 // Retrieve sensitive node and private key details from environment variables.
 const INFURA_PROJECT_ID = process.env.INFURA_PROJECT_ID;
 const DEPLOYER_PRIVATE_KEY = process.env.DEPLOYER_PRIVATE_KEY;
@@ -102,5 +104,10 @@ module.exports = {
 	},
 	mocha: {
 		grep: '^(?!.*; using Ganache).*'
-	}
+	},
+    contractSizer: {
+        alphaSort: true,
+        runOnCompile: true,
+        disambiguatePaths: false,
+    }
 };
