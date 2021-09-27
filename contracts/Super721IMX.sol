@@ -1111,11 +1111,7 @@ contract Super721IMX is PermitControl, ERC165Storage, IERC721 {
       return tokenId;
   }
 
-  function tokenURI(uint256 _tokenId) public view returns (string memory) {
-    return Strings.strConcat(
-        metadataUri,
-        Strings.uint2str(_tokenId),
-        ".json"
-    );
+function tokenURI(uint256 _tokenId) public view returns (string memory) {
+    return metadata[_tokenId];
   }
 }
