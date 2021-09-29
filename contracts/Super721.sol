@@ -326,11 +326,11 @@ contract Super721 is PermitControl, ERC165Storage, IERC721 {
     uint256 groupId = (_id & GROUP_MASK) >> 128;
     if (_msgSender() == owner()) {
       _;
-    } else if (hasRightUntil(_msgSender(), UNIVERSAL, _right)) {
+    } else if (hasRight(_msgSender(), UNIVERSAL, _right)) {
       _;
-    } else if (hasRightUntil(_msgSender(), bytes32(groupId), _right)) {
+    } else if (hasRight(_msgSender(), bytes32(groupId), _right)) {
       _;
-    } else if (hasRightUntil(_msgSender(), bytes32(_id), _right)) {
+    } else if (hasRight(_msgSender(), bytes32(_id), _right)) {
       _;
     } else {
       revert("Super721::hasItemRight: _msgSender does not have the right to perform that action");
@@ -745,13 +745,13 @@ contract Super721 is PermitControl, ERC165Storage, IERC721 {
     if (_msgSender() == owner()) {
       return true;
     }
-    if (hasRightUntil(_msgSender(), UNIVERSAL, _right)) {
+    if (hasRight(_msgSender(), UNIVERSAL, _right)) {
       return true;
     }
-    if (hasRightUntil(_msgSender(), bytes32(groupId), _right)) {
+    if (hasRight(_msgSender(), bytes32(groupId), _right)) {
       return true;
     }
-    if (hasRightUntil(_msgSender(), bytes32(_id), _right)) {
+    if (hasRight(_msgSender(), bytes32(_id), _right)) {
       return true;
     }
       return false;

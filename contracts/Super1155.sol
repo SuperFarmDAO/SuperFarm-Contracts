@@ -311,11 +311,11 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
 //     uint256 groupId = (_id & GROUP_MASK) >> 128;
 //     if (_msgSender() == owner()) {
 //       _;
-//     } else if (hasRightUntil(_msgSender(), UNIVERSAL, _right)) {
+//     } else if (hasRight(_msgSender(), UNIVERSAL, _right)) {
 //       _;
-//     } else if (hasRightUntil(_msgSender(), bytes32(groupId), _right)) {
+//     } else if (hasRight(_msgSender(), bytes32(groupId), _right)) {
 //       _;
-//     } else if (hasRightUntil(_msgSender(), bytes32(_id), _right)) {
+//     } else if (hasRight(_msgSender(), bytes32(_id), _right)) {
 //       _;
 //     }
 //   }
@@ -612,35 +612,6 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
   function safeTransferFrom(address _from, address _to, uint256 _id,
     uint256 _amount, bytes calldata _data) external override virtual {
       safeBatchTransferFrom(_from, _to, _asSingletonArray(_id), _asSingletonArray(_amount), _data);
-    /*
-    uint256 _amount, bytes calldata _data) external override virtual {
-    require(_to != address(0),
-      "ERC1155: transfer to the zero address");
-    require(_from == _msgSender() || isApprovedForAll(_from, _msgSender()),
-      "ERC1155: caller is not owner nor approved");
-
-    // Validate transfer safety and send tokens away.
-    address operator = _msgSender();
-    _beforeTokenTransfer(operator, _from, _to, _asSingletonArray(_id),
-    _asSingletonArray(_amount), _data);
-
-    // Retrieve the item's group ID.
-    uint256 shiftedGroupId = (_id & GROUP_MASK);
-    uint256 groupId = shiftedGroupId >> 128;
-
-    // Update all specially-tracked group-specific balances.
-    require(balances[_id][_from] >= _amount, "ERC1155: insufficient balance for transfer");
-    balances[_id][_from] = balances[_id][_from] - _amount;
-    balances[_id][_to] = balances[_id][_to] + _amount;
-    groupBalances[groupId][_from] = groupBalances[groupId][_from] - _amount;
-    groupBalances[groupId][_to] = groupBalances[groupId][_to] + _amount;
-    totalBalances[_from] = totalBalances[_from] - _amount;
-    totalBalances[_to] = totalBalances[_to] + _amount;
-
-    // Emit the transfer event and perform the safety check.
-    emit TransferSingle(operator, _from, _to, _id, _amount);
-    _doSafeTransferAcceptanceCheck(operator, _from, _to, _id, _amount, _data);
-    */
   }
 
   /**
@@ -743,13 +714,13 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
     if (_msgSender() == owner()) {
       return true;
     }
-    if (hasRightUntil(_msgSender(), UNIVERSAL, _right)) {
+    if (hasRight(_msgSender(), UNIVERSAL, _right)) {
       return true;
     } 
-    if (hasRightUntil(_msgSender(), bytes32(groupId), _right)) {
+    if (hasRight(_msgSender(), bytes32(groupId), _right)) {
       return true;
     }
-    if (hasRightUntil(_msgSender(), bytes32(_id), _right)) {
+    if (hasRight(_msgSender(), bytes32(_id), _right)) {
       return true;
     } 
     return false;
@@ -769,7 +740,7 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
 
     // Retrieve the item's group ID.
     uint256 shiftedGroupId = (_id & GROUP_MASK);
-    uint256 groupId = _id >> 128;
+    uint256 groupId = shiftedGroupId >> 128;
     require(itemGroups[groupId].initialized,
       "Super1155: you cannot mint a non-existent item group");
 
@@ -806,59 +777,6 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
     }
     return mintedItemId;
   }
-
-  /**
-    Mint a single token into existence and send it to the `_recipient` address.
-    In order to mint an item, its item group must first have been created using
-    the `configureGroup` function. Minting an item must obey both the
-    fungibility and size cap of its group.
-
-    @param _recipient The address to receive all NFTs within the newly-minted
-      group.
-    @param _id The item ID to mint.
-    @param _amount The amount of the corresponding item ID to mint.
-    @param _data Any associated data to use on items minted in this transaction.
-  */
-  /*
-    This single-mint function is retained here for posterity but unfortunately
-    had to be disabled in order to let this contract slip in under the limit
-    imposed by Spurious Dragon.
-
-   function mint(address _recipient, uint256 _id, uint256 _amount,
-    bytes calldata _data) external virtual hasItemRight(_id, MINT) {
-    require(_recipient != address(0),
-      "ERC1155: mint to the zero address");
-
-    // Retrieve the group ID from the given item `_id` and check mint validity.
-    uint256 shiftedGroupId = (_id & GROUP_MASK);
-    uint256 groupId = shiftedGroupId >> 128;
-    uint256 mintedItemId = _mintChecker(_id, _amount);
-
-    // Validate and perform the mint.
-    address operator = _msgSender();
-    _beforeTokenTransfer(operator, address(0), _recipient,
-      _asSingletonArray(mintedItemId), _asSingletonArray(_amount), _data);
-
-    // Update storage of special balances and circulating values.
-    balances[mintedItemId][_recipient] = balances[mintedItemId][_recipient]
-      .add(_amount);
-    groupBalances[groupId][_recipient] = groupBalances[groupId][_recipient]
-      .add(_amount);
-    totalBalances[_recipient] = totalBalances[_recipient].add(_amount);
-    mintCount[mintedItemId] = mintCount[mintedItemId].add(_amount);
-    circulatingSupply[mintedItemId] = circulatingSupply[mintedItemId]
-      .add(_amount);
-    itemGroups[groupId].mintCount = itemGroups[groupId].mintCount.add(_amount);
-    itemGroups[groupId].circulatingSupply =
-      itemGroups[groupId].circulatingSupply.add(_amount);
-
-    // Emit event and handle the safety check.
-    emit TransferSingle(operator, address(0), _recipient, mintedItemId,
-      _amount);
-    _doSafeTransferAcceptanceCheck(operator, address(0), _recipient,
-      mintedItemId, _amount, _data);
-  }
-  */
 
   /**
     Mint a batch of tokens into existence and send them to the `_recipient`
@@ -1005,30 +923,6 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
   function burn(address _burner, uint256 _id, uint256 _amount) external virtual{
       require(_hasItemRight(_id, BURN), "Super1155: you don't have rights to burn");
       burnBatch(_burner, _asSingletonArray(_id), _asSingletonArray(_amount));
-    /*
-    // Retrieve the group ID from the given item `_id` and check burn validity.
-    uint256 shiftedGroupId = (_id & GROUP_MASK);
-    uint256 groupId = shiftedGroupId >> 128;
-    uint256 burntItemId = _burnChecker(_id, _amount);
-
-    // Validate and perform the burn.
-    address operator = _msgSender();
-    _beforeTokenTransfer(operator, _burner, address(0),
-      _asSingletonArray(burntItemId), _asSingletonArray(_amount), "");
-
-    // Update storage of special balances and circulating values.
-    require(balances[burntItemId][_burner] >= _amount, "ERC1155: burn amount exceeds balance");
-    balances[burntItemId][_burner] = balances[burntItemId][_burner] - _amount;
-    groupBalances[groupId][_burner] = groupBalances[groupId][_burner] - _amount;
-    totalBalances[_burner] = totalBalances[_burner] - _amount;
-    burnCount[burntItemId] = burnCount[burntItemId] + _amount;
-    circulatingSupply[burntItemId] = circulatingSupply[burntItemId] - _amount;
-    itemGroups[groupId].burnCount = itemGroups[groupId].burnCount + _amount;
-    itemGroups[groupId].circulatingSupply =
-      itemGroups[groupId].circulatingSupply - _amount;
-
-    // Emit the burn event.
-    emit TransferSingle(operator, _burner, address(0), _id, _amount);*/
   }
 
   /**
