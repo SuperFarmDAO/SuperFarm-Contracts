@@ -218,6 +218,23 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
   /// A mapping of the number of times each individual token has been burnt.
   mapping (uint256 => uint256) public burnCount;
 
+  /**
+    A mapping of token ID to a boolean representing whether the item's metadata
+    has been explicitly frozen via a call to `lockURI(string calldata _uri,
+    uint256 _id)`. Do note that it is possible for an item's mapping here to be
+    false while still having frozen metadata if the item collection as a whole
+    has had its `uriLocked` value set to true.
+  */
+  mapping (uint256 => bool) public metadataFrozen;
+
+  /**
+    A public mapping of optional on-chain metadata for each token ID. A token's
+    on-chain metadata is unable to be changed if the item's metadata URI has
+    been permanently fixed or if the collection's metadata URI as a whole has
+    been frozen.
+  */
+  mapping (uint256 => string) public metadata;
+
   /// Whether or not the metadata URI has been locked to future changes.
   bool public uriLocked;
 
@@ -258,6 +275,18 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
     @param locker The caller who locked the collection.
   */
   event CollectionLocked(address indexed locker);
+
+  /**
+    An event that gets emitted when a token ID has its on-chain metadata
+    changed.
+
+    @param changer The caller who triggered the metadata change.
+    @param id The ID of the token which had its metadata changed.
+    @param oldMetadata The old metadata of the token.
+    @param newMetadata The new metadata of the token.
+  */
+  event MetadataChanged(address indexed changer, uint256 indexed id,
+    string oldMetadata, string indexed newMetadata);
 
   /**
     An event that indicates we have set a permanent metadata URI for a token.
@@ -338,8 +367,8 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
 
     @return The metadata URI string of the item with ID `_itemId`.
   */
-  function uri(uint256 id) public override view returns (string memory) {
-    Strings.Slice memory slice1 = metadataUri.toSlice();
+  function uri(uint256 id) external override view returns (string memory) {
+   Strings.Slice memory slice1 = metadataUri.toSlice();
     Strings.Slice memory slice2 = metadataUri.toSlice();
     string memory tokenFirst = "{";
     string memory tokenLast = "}";
@@ -1016,6 +1045,24 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
   }
 
   /**
+    Set the on-chain metadata attached to a specific token ID so long as the
+    collection as a whole or the token specifically has not had metadata
+    editing frozen.
+
+    @param _id The ID of the token to set the `_metadata` for.
+    @param _metadata The metadata string to store on-chain.
+  */
+  function setMetadata(uint256 _id, string memory _metadata)
+    external hasItemRight(_id, SET_METADATA) {
+    uint groupId = _id >> 128;
+    require(!uriLocked && !metadataFrozen[_id] &&  !metadataFrozen[groupId],
+      "Super1155: you cannot edit this metadata because it is frozen");
+    string memory oldMetadata = metadata[_id];
+    metadata[_id] = _metadata;
+    emit MetadataChanged(_msgSender(), _id, oldMetadata, _metadata);
+  }
+
+  /**
     Allow the item collection owner or an associated manager to forever lock the
     metadata URI on the entire collection to future changes.
 
@@ -1028,6 +1075,32 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
     emit ChangeURI(oldURI, _uri);
     uriLocked = true;
     emit PermanentURI(_uri, 2 ** 256 - 1);
+  }
+
+  /**
+    Allow the item collection owner or an associated manager to forever lock the
+    metadata URI on an item to future changes.
+
+    @param _uri The value of the URI to lock for `_id`.
+    @param _id The token ID to lock a metadata URI value into.
+  */
+  function lockURI(string calldata _uri, uint256 _id) external
+    hasItemRight(_id, LOCK_ITEM_URI) {
+    metadataFrozen[_id] = true;
+    emit PermanentURI(_uri, _id);
+  }
+
+  /**
+    Allow the item collection owner or an associated manager to forever lock the
+    metadata URI on a group of items to future changes.
+
+    @param _uri The value of the URI to lock for `groupId`.
+    @param groupId The group ID to lock a metadata URI value into.
+  */
+  function lockGroupURI(string calldata _uri, uint256 groupId) external
+    hasItemRight(groupId, LOCK_ITEM_URI) {
+    metadataFrozen[groupId] = true;
+    emit PermanentURI(_uri, groupId);
   }
 
   /**
