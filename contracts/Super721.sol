@@ -10,6 +10,7 @@ import "@openzeppelin/contracts/utils/Address.sol";
 import "./utils/LocalStrings.sol";
 import "./access/PermitControl.sol";
 import "./proxy/StubProxyRegistry.sol";
+import "./utils/LocalStrings.sol";
 
 /**
   @title An ERC-721 item creation contract.
@@ -29,6 +30,7 @@ import "./proxy/StubProxyRegistry.sol";
 */
 contract Super721 is PermitControl, ERC165Storage, IERC721 {
   using Address for address;
+  using Strings for string;
   using EnumerableSet for EnumerableSet.UintSet;
   using EnumerableMap for EnumerableMap.UintToAddressMap;
 
@@ -233,23 +235,6 @@ contract Super721 is PermitControl, ERC165Storage, IERC721 {
   /// A mapping of the number of times each individual token has been burnt.
   mapping (uint256 => uint256) public burnCount;
 
-  /**
-    A mapping of token ID to a boolean representing whether the item's metadata
-    has been explicitly frozen via a call to `lockURI(string calldata _uri,
-    uint256 _id)`. Do note that it is possible for an item's mapping here to be
-    false while still having frozen metadata if the item collection as a whole
-    has had its `uriLocked` value set to true.
-  */
-  mapping (uint256 => bool) public metadataFrozen;
-
-  /**
-    A public mapping of optional on-chain metadata for each token ID. A token's
-    on-chain metadata is unable to be changed if the item's metadata URI has
-    been permanently fixed or if the collection's metadata URI as a whole has
-    been frozen.
-  */
-  mapping (uint256 => string) public metadata;
-
   /// Whether or not the metadata URI has been locked to future changes.
   bool public uriLocked;
 
@@ -290,18 +275,6 @@ contract Super721 is PermitControl, ERC165Storage, IERC721 {
     @param locker The caller who locked the collection.
   */
   event CollectionLocked(address indexed locker);
-
-  /**
-    An event that gets emitted when a token ID has its on-chain metadata
-    changed.
-
-    @param changer The caller who triggered the metadata change.
-    @param id The ID of the token which had its metadata changed.
-    @param oldMetadata The old metadata of the token.
-    @param newMetadata The new metadata of the token.
-  */
-  event MetadataChanged(address indexed changer, uint256 indexed id,
-    string oldMetadata, string indexed newMetadata);
 
   /**
     An event that indicates we have set a permanent metadata URI for a token.
@@ -406,8 +379,19 @@ contract Super721 is PermitControl, ERC165Storage, IERC721 {
 
     @return The metadata URI string of the item with ID `_itemId`.
   */
-  function uri(uint256) external view returns (string memory) {
-    return metadataUri;
+ function uri(uint256 id) public view returns (string memory) {
+    Strings.Slice memory slice1 = metadataUri.toSlice();
+    Strings.Slice memory slice2 = metadataUri.toSlice();
+    string memory tokenFirst = "{";
+    string memory tokenLast = "}";
+    Strings.Slice memory firstSlice = tokenFirst.toSlice();
+    Strings.Slice memory secondSlice = tokenLast.toSlice();
+    firstSlice = Strings.beforeMatch(slice1, firstSlice);
+    secondSlice = Strings.afterMatch(slice2, secondSlice);
+    string memory first = Strings.toString(firstSlice);
+    string memory second = Strings.toString(secondSlice);
+    string memory result = string(abi.encodePacked(first, Strings.uint2str(id), second));
+    return result;
   }
 
   /**
@@ -982,22 +966,6 @@ contract Super721 is PermitControl, ERC165Storage, IERC721 {
     }
   }
 
-  /**
-    Set the on-chain metadata attached to a specific token ID so long as the
-    collection as a whole or the token specifically has not had metadata
-    editing frozen.
-
-    @param _id The ID of the token to set the `_metadata` for.
-    @param _metadata The metadata string to store on-chain.
-  */
-  function setMetadata(uint256 _id, string memory _metadata)
-    external hasItemRight(_id, SET_METADATA) {
-    require(!uriLocked && !metadataFrozen[_id],
-      "Super721::setMetadata: you cannot edit this metadata because it is frozen");
-    string memory oldMetadata = metadata[_id];
-    metadata[_id] = _metadata;
-    emit MetadataChanged(_msgSender(), _id, oldMetadata, _metadata);
-  }
 
   /**
     Allow the item collection owner or an associated manager to forever lock the
@@ -1012,19 +980,6 @@ contract Super721 is PermitControl, ERC165Storage, IERC721 {
     emit ChangeURI(oldURI, _uri);
     uriLocked = true;
     emit PermanentURI(_uri, 2 ** 256 - 1);
-  }
-
-  /**
-    Allow the item collection owner or an associated manager to forever lock the
-    metadata URI on an item to future changes.
-
-    @param _uri The value of the URI to lock for `_id`.
-    @param _id The token ID to lock a metadata URI value into.
-  */
-  function lockItemGroupURI(string calldata _uri, uint256 _id) external
-    hasItemRight(_id, LOCK_ITEM_URI) {
-    metadataFrozen[_id] = true;
-    emit PermanentURI(_uri, _id);
   }
 
   /**
@@ -1094,9 +1049,5 @@ contract Super721 is PermitControl, ERC165Storage, IERC721 {
   function tokenByIndex(uint256 index) public view returns (uint256) {
       (uint256 tokenId, ) = _tokenOwners.at(index);
       return tokenId;
-  }
-
-  function tokenURI(uint256 _tokenId) public view returns (string memory) {
-    return metadata[_tokenId];
   }
 }

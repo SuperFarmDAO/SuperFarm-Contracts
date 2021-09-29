@@ -50,4 +50,110 @@ library Strings {
         }
         return string(bstr);
     }
+
+    // this is struct for aligning function memory 
+    struct Slice { 
+        uint length;
+        uint pointer;
+    }
+
+    function copyToMemory(uint _destination, uint _source, uint _length) private pure {
+        // Copy word-length chunks while possible
+        for(_length ; _length >= 32; _length -= 32) {
+            assembly {
+                mstore(_destination, mload(_source))
+            }
+            _destination += 32;
+            _source += 32;
+        }
+
+        // Copy remaining bytes
+        uint mask = 256 ** (32 - _length) - 1;
+        assembly {
+            let source := and(mload(_source), not(mask))
+            let _destinationination := and(mload(_destination), mask)
+            mstore(_destination, or(_destinationination, source))
+        }
+    }
+
+    // make struct slice out of string
+    function toSlice(string memory input) internal pure returns (Slice memory) {
+        uint ptr;
+        assembly {
+            ptr := add(input, 0x20)
+        }
+        return Slice(bytes(input).length, ptr);
+    }
+
+    function findPointer(uint inputLength, uint inputPointer, uint toSearchLength, uint toSearchPointer) private pure returns (uint) {
+        uint pointer = inputPointer;
+
+        if (toSearchLength <= inputLength) {
+            if (toSearchLength <= 32) {
+                bytes32 mask = bytes32(~(2 ** (8 * (32 - toSearchLength)) - 1));
+
+                bytes32 toSearchdata;
+                assembly { toSearchdata := and(mload(toSearchPointer), mask) }
+
+                uint end = inputPointer + inputLength - toSearchLength;
+                bytes32 data;
+                assembly { data := and(mload(pointer), mask) }
+
+                while (data != toSearchdata) {
+                    if (pointer >= end)
+                        return inputPointer + inputLength;
+                    pointer++;
+                    assembly { data := and(mload(pointer), mask) }
+                }
+                return pointer;
+            } else {
+                // For long toSearchs, use hashing
+                bytes32 hash;
+                assembly { hash := keccak256(toSearchPointer, toSearchLength) }
+
+                for (uint i = 0; i <= inputLength - toSearchLength; i++) {
+                    bytes32 testHash;
+                    assembly { testHash := keccak256(pointer, toSearchLength) }
+                    if (hash == testHash)
+                        return pointer;
+                    pointer += 1;
+                }
+            }
+        }
+        return inputPointer + inputLength;
+    }
+
+    function afterMatch(Slice memory input, Slice memory toSearch) internal pure returns (Slice memory) {
+        uint pointer = findPointer(input.length, input.pointer, toSearch.length, toSearch.pointer);
+        input.length -= pointer - input.pointer;
+        input.pointer = pointer +1; // escape token
+        return input;
+    }
+
+    function beforeMatch(Slice memory input, Slice memory toSearch) internal pure returns (Slice memory token) {
+        beforeMatch(input, toSearch, token);
+    }
+
+    function beforeMatch(Slice memory input, Slice memory toSearch, Slice memory token) internal pure returns (Slice memory) {
+        uint pointer = findPointer(input.length, input.pointer, toSearch.length, toSearch.pointer);
+        token.pointer = input.pointer;
+        token.length = pointer - input.pointer;
+        if (pointer == input.pointer + input.length) {
+            // Not found
+            input.length = 0;
+        } else {
+            input.length -= token.length + toSearch.length;
+            input.pointer = pointer + toSearch.length;
+        }
+        return token;
+    }
+
+    function toString(Slice memory input) internal pure returns (string memory) {
+        string memory result = new string(input.length);
+        uint resultPointer;
+        assembly { resultPointer := add(result, 32) }
+
+        copyToMemory(resultPointer, input.pointer, input.length);
+        return result;
+    }
 }
