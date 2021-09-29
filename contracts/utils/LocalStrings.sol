@@ -71,8 +71,8 @@ library Strings {
         uint mask = 256 ** (32 - _length) - 1;
         assembly {
             let source := and(mload(_source), not(mask))
-            let _destinationination := and(mload(_destination), mask)
-            mstore(_destination, or(_destinationination, source))
+            let destination := and(mload(_destination), mask)
+            mstore(_destination, or(destination, source))
         }
     }
 
