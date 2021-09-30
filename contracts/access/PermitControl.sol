@@ -105,7 +105,7 @@ abstract contract PermitControl is Ownable {
     bytes32 _right
   ) {
     require(_msgSender() == owner()
-      || hasRightUntil(_msgSender(), _circumstance, _right) > block.timestamp,
+      || hasRight(_msgSender(), _circumstance, _right),
       "PermitControl: sender does not have a valid permit");
     _;
   }
@@ -133,6 +133,23 @@ abstract contract PermitControl is Ownable {
     bytes32 _right
   ) public view returns (uint256) {
     return permissions[_address][_circumstance][_right];
+  }
+
+   /**
+    Determine whether or not an address has some rights under the given
+    circumstance,
+
+    @param _address The address to check for the specified `_right`.
+    @param _circumstance The circumstance to check the specified `_right` for.
+    @param _right The right to check for validity.
+    @return true or false, whether user has rights and time is valid.
+  */
+  function hasRight(
+    address _address,
+    bytes32 _circumstance,
+    bytes32 _right
+  ) public view returns (bool) {
+    return permissions[_address][_circumstance][_right] > block.timestamp;
   }
 
   /**

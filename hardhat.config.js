@@ -102,5 +102,10 @@ module.exports = {
 	},
 	mocha: {
 		grep: '^(?!.*; using Ganache).*'
-	}
+	},
+    contractSizer: {
+        alphaSort: true,
+        runOnCompile: true,
+        disambiguatePaths: false,
+    }
 };
