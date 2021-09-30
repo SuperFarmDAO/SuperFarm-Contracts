@@ -9,6 +9,7 @@ import "@openzeppelin/contracts/utils/Address.sol";
 
 import "./access/PermitControl.sol";
 import "./proxy/StubProxyRegistry.sol";
+import "./utils/LocalStrings.sol";
 
 /**
   @title An ERC-1155 item creation contract.
@@ -27,6 +28,7 @@ import "./proxy/StubProxyRegistry.sol";
 */
 contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataURI {
   using Address for address;
+  using Strings for string;
 
   /// The public identifier for the right to set this contract's metadata URI.
   bytes32 public constant SET_URI = keccak256("SET_URI");
@@ -364,8 +366,19 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
 
     @return The metadata URI string of the item with ID `_itemId`.
   */
-  function uri(uint256) external override view returns (string memory) {
-    return metadataUri;
+  function uri(uint256 id) external override view returns (string memory) {
+    Strings.Slice memory slice1 = metadataUri.toSlice();
+    Strings.Slice memory slice2 = metadataUri.toSlice();
+    string memory tokenFirst = "{";
+    string memory tokenLast = "}";
+    Strings.Slice memory firstSlice = tokenFirst.toSlice();
+    Strings.Slice memory secondSlice = tokenLast.toSlice();
+    firstSlice = Strings.beforeMatch(slice1, firstSlice);
+    secondSlice = Strings.afterMatch(slice2, secondSlice);
+    string memory first = Strings.toString(firstSlice);
+    string memory second = Strings.toString(secondSlice);
+    string memory result = string(abi.encodePacked(first, Strings.uint2str(id), second));
+    return result;
   }
 
   /**
@@ -935,7 +948,8 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
   */
   function setMetadata(uint256 _id, string memory _metadata) external {
     require(_hasItemRight(_id, SET_METADATA), "Super1155: you don't have rights to setMetadata");
-    require(!uriLocked && !metadataFrozen[_id],
+    uint groupId = _id >> 128;
+    require(!uriLocked && !metadataFrozen[_id] &&  !metadataFrozen[groupId],
       "Super1155: you cannot edit this metadata because it is frozen");
     string memory oldMetadata = metadata[_id];
     metadata[_id] = _metadata;
@@ -968,6 +982,19 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
     require(_hasItemRight(_id, LOCK_ITEM_URI), "Super1155: you don't have rights to lock URI");
     metadataFrozen[_id] = true;
     emit PermanentURI(_uri, _id);
+  }
+
+  /**
+    Allow the item collection owner or an associated manager to forever lock the
+    metadata URI on a group of items to future changes.
+
+    @param _uri The value of the URI to lock for `groupId`.
+    @param groupId The group ID to lock a metadata URI value into.
+  */
+  function lockGroupURI(string calldata _uri, uint256 groupId) external {
+    require(_hasItemRight(groupId, LOCK_ITEM_URI), "Super1155: you don't have rights to lock group URI");
+    metadataFrozen[groupId] = true;
+    emit PermanentURI(_uri, groupId);
   }
 
   /**
