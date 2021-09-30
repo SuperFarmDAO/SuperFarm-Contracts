@@ -1052,8 +1052,8 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
     @param _id The ID of the token to set the `_metadata` for.
     @param _metadata The metadata string to store on-chain.
   */
-  function setMetadata(uint256 _id, string memory _metadata)
-    external hasItemRight(_id, SET_METADATA) {
+  function setMetadata(uint256 _id, string memory _metadata) external {
+    require(_hasItemRight(_id, SET_METADATA), "Super1155: you don't have rights to setMetadata");
     uint groupId = _id >> 128;
     require(!uriLocked && !metadataFrozen[_id] &&  !metadataFrozen[groupId],
       "Super1155: you cannot edit this metadata because it is frozen");
