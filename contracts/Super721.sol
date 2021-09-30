@@ -10,25 +10,24 @@ import "@openzeppelin/contracts/utils/Address.sol";
 import "./utils/LocalStrings.sol";
 import "./access/PermitControl.sol";
 import "./proxy/StubProxyRegistry.sol";
+import "./utils/LocalStrings.sol";
 
 /**
   @title An ERC-721 item creation contract.
   @author Tim Clancy
   @author 0xthrpw
   @author Qazawat Zirak
-
   This contract represents the NFTs within a single collection. It allows for a
   designated collection owner address to manage the creation of NFTs within this
   collection. The collection owner grants approval to or removes approval from
   other addresses governing their ability to mint NFTs from this collection.
-
   This contract is forked from the inherited OpenZeppelin dependency, and uses
   ideas inherited from the Super721 reference implementation.
-
   August 4th, 2021.
 */
 contract Super721 is PermitControl, ERC165Storage, IERC721 {
   using Address for address;
+  using Strings for string;
   using EnumerableSet for EnumerableSet.UintSet;
   using EnumerableMap for EnumerableMap.UintToAddressMap;
 
@@ -143,7 +142,6 @@ contract Super721 is PermitControl, ERC165Storage, IERC721 {
     to do so may move from a more-permissive supply type to a less-permissive.
     For example: an uncapped or flexible supply type may be converted to a
     capped supply type. A capped supply type may not be uncapped later, however.
-
     @param Capped There exists a fixed cap on the size of the item group. The
       cap is set by `supplyData`.
     @param Uncapped There is no cap on the size of the item group. The value of
@@ -162,7 +160,6 @@ contract Super721 is PermitControl, ERC165Storage, IERC721 {
   /**
     This enumeration lists the various burn types that each item group may use.
     These are static once chosen.
-
     @param None The items in this group may not be burnt. The value of
       `burnData` is ignored.
     @param Burnable The items in this group may be burnt. The value of
@@ -179,7 +176,6 @@ contract Super721 is PermitControl, ERC165Storage, IERC721 {
   /**
     This struct is a source of mapping-free input to the `configureGroup`
     function. It defines the settings for a particular item group.
-
     @param name A name for the item group.
     @param supplyType The supply type for this group of items.
     @param supplyData An optional integer used by some `supplyType` values.
@@ -197,7 +193,6 @@ contract Super721 is PermitControl, ERC165Storage, IERC721 {
   /**
     This struct defines the settings for a particular item group and is tracked
     in storage.
-
     @param initialized Whether or not this `ItemGroup` has been initialized.
     @param name A name for the item group.
     @param supplyType The supply type for this group of items.
@@ -258,7 +253,6 @@ contract Super721 is PermitControl, ERC165Storage, IERC721 {
 
   /**
     An event that gets emitted when the metadata collection URI is changed.
-
     @param oldURI The old metadata URI.
     @param newURI The new metadata URI.
   */
@@ -266,7 +260,6 @@ contract Super721 is PermitControl, ERC165Storage, IERC721 {
 
   /**
     An event that gets emitted when the proxy registry address is changed.
-
     @param oldRegistry The old proxy registry address.
     @param newRegistry The new proxy registry address.
   */
@@ -275,7 +268,6 @@ contract Super721 is PermitControl, ERC165Storage, IERC721 {
 
   /**
     An event that gets emitted when an item group is configured.
-
     @param manager The caller who configured the item group `_groupId`.
     @param groupId The groupId being configured.
     @param newGroup The new group configuration.
@@ -286,7 +278,6 @@ contract Super721 is PermitControl, ERC165Storage, IERC721 {
   /**
     An event that gets emitted when the item collection is locked to further
     creation.
-
     @param locker The caller who locked the collection.
   */
   event CollectionLocked(address indexed locker);
@@ -294,7 +285,6 @@ contract Super721 is PermitControl, ERC165Storage, IERC721 {
   /**
     An event that gets emitted when a token ID has its on-chain metadata
     changed.
-
     @param changer The caller who triggered the metadata change.
     @param id The ID of the token which had its metadata changed.
     @param oldMetadata The old metadata of the token.
@@ -305,7 +295,6 @@ contract Super721 is PermitControl, ERC165Storage, IERC721 {
 
   /**
     An event that indicates we have set a permanent metadata URI for a token.
-
     @param _value The value of the permanent metadata URI.
     @param _id The token ID associated with the permanent metadata value.
   */
@@ -316,7 +305,6 @@ contract Super721 is PermitControl, ERC165Storage, IERC721 {
     with a specified valid right to perform a call on some specific item. Rights
     can be applied to the universal circumstance, the item-group-level
     circumstance, or to the circumstance of the item ID itself.
-
     @param _id The item ID on which we check for the validity of the specified
       `right`.
     @param _right The right to validate for the calling address. It must be
@@ -326,14 +314,11 @@ contract Super721 is PermitControl, ERC165Storage, IERC721 {
     uint256 groupId = (_id & GROUP_MASK) >> 128;
     if (_msgSender() == owner()) {
       _;
-    } else if (hasRightUntil(_msgSender(), UNIVERSAL, _right)
-      > block.timestamp) {
+    } else if (hasRight(_msgSender(), UNIVERSAL, _right)) {
       _;
-    } else if (hasRightUntil(_msgSender(), bytes32(groupId), _right)
-      > block.timestamp) {
+    } else if (hasRight(_msgSender(), bytes32(groupId), _right)) {
       _;
-    } else if (hasRightUntil(_msgSender(), bytes32(_id), _right)
-      > block.timestamp) {
+    } else if (hasRight(_msgSender(), bytes32(_id), _right)) {
       _;
     } else {
       revert("Super721::hasItemRight: _msgSender does not have the right to perform that action");
@@ -342,7 +327,6 @@ contract Super721 is PermitControl, ERC165Storage, IERC721 {
 
   /**
     Construct a new ERC-721 item collection.
-
     @param _owner The address of the administrator governing this collection.
     @param _name The name to assign to this item collection contract.
     @param _uri The metadata URI to perform later token ID substitution with.
@@ -369,7 +353,6 @@ contract Super721 is PermitControl, ERC165Storage, IERC721 {
     proxyRegistryAddress = _proxyRegistryAddress;
   }
   /**
-
   */
   function ownerOf(uint256 tokenId) public view override returns (address) {
       return _tokenOwners.get(tokenId, "Super721::ownerOf: owner query for nonexistent token");
@@ -403,11 +386,21 @@ contract Super721 is PermitControl, ERC165Storage, IERC721 {
     said specification, clients calling this function must replace the {id}
     substring with the actual token ID in hex, not prefixed by 0x, and padded
     to 64 characters in length.
-
     @return The metadata URI string of the item with ID `_itemId`.
   */
-  function uri(uint256) external view returns (string memory) {
-    return metadataUri;
+  function uri(uint256 id) external view returns (string memory) {
+    Strings.Slice memory slice1 = metadataUri.toSlice();
+    Strings.Slice memory slice2 = metadataUri.toSlice();
+    string memory tokenFirst = "{";
+    string memory tokenLast = "}";
+    Strings.Slice memory firstSlice = tokenFirst.toSlice();
+    Strings.Slice memory secondSlice = tokenLast.toSlice();
+    firstSlice = Strings.beforeMatch(slice1, firstSlice);
+    secondSlice = Strings.afterMatch(slice2, secondSlice);
+    string memory first = Strings.toString(firstSlice);
+    string memory second = Strings.toString(secondSlice);
+    string memory result = string(abi.encodePacked(first, Strings.uint2str(id), second));
+    return result;
   }
 
   /**
@@ -415,7 +408,6 @@ contract Super721 is PermitControl, ERC165Storage, IERC721 {
     metadata URI of this collection. This implementation relies on a single URI
     for all items within the collection, and as such does not emit the standard
     URI event. Instead, we emit our own event to reflect changes in the URI.
-
     @param _uri The new URI to update to.
   */
   function setURI(string calldata _uri) external virtual
@@ -431,7 +423,6 @@ contract Super721 is PermitControl, ERC165Storage, IERC721 {
   /**
     Allow the item collection owner or an approved manager to update the proxy
     registry address handling delegated approval.
-
     @param _proxyRegistryAddress The address of the new proxy registry to
       update to.
   */
@@ -445,7 +436,6 @@ contract Super721 is PermitControl, ERC165Storage, IERC721 {
   /**
     Retrieve the balance of a particular token `_id` for a particular address
     `_owner`.
-
     @param _owner The owner to check for this token balance.
     @param _id The ID of the token to check for a balance.
     @return The amount of token `_id` owned by `_owner`.
@@ -468,7 +458,6 @@ contract Super721 is PermitControl, ERC165Storage, IERC721 {
   /**
     Retrieve in a single call the balances of some mulitple particular token
     `_ids` held by corresponding `_owners`.
-
     @param _owners The owners to check for token balances.
     @param _ids The IDs of tokens to check for balances.
     @return the amount of each token owned by each owner.
@@ -490,7 +479,6 @@ contract Super721 is PermitControl, ERC165Storage, IERC721 {
     This function returns true if `_operator` is approved to transfer items
     owned by `_owner`. This approval check features an override to explicitly
     whitelist any addresses delegated in the proxy registry.
-
     @param _owner The owner of items to check for transfer ability.
     @param _operator The potential transferrer of `_owner`'s items.
     @return Whether `_operator` may transfer items owned by `_owner`.
@@ -509,7 +497,6 @@ contract Super721 is PermitControl, ERC165Storage, IERC721 {
   /**
     Enable or disable approval for a third party `_operator` address to manage
     (transfer or burn) all of the caller's tokens.
-
     @param _operator The address to grant management rights over all of the
       caller's tokens.
     @param _approved The status of the `_operator`'s approval for the caller.
@@ -524,7 +511,6 @@ contract Super721 is PermitControl, ERC165Storage, IERC721 {
 
   /**
     This private helper function converts a number into a single-element array.
-
     @param _element The element to convert to an array.
     @return The array containing the single `_element`.
   */
@@ -538,7 +524,6 @@ contract Super721 is PermitControl, ERC165Storage, IERC721 {
   /**
     An inheritable and configurable pre-transfer hook that can be overridden.
     It fires before any token transfer, including mints and burns.
-
     @param _operator The caller who triggers the token transfer.
     @param _from The address to transfer tokens from.
     @param _to The address to transfer tokens to.
@@ -555,7 +540,6 @@ contract Super721 is PermitControl, ERC165Storage, IERC721 {
     ERC-721 dictates that any contract which wishes to receive ERC-721 tokens
     must explicitly designate itself as such. This function checks for such
     designation to prevent undesirable token transfers.
-
     @param _operator The caller who triggers the token transfer.
     @param _from The address to transfer tokens from.
     @param _to The address to transfer tokens to.
@@ -581,7 +565,6 @@ contract Super721 is PermitControl, ERC165Storage, IERC721 {
   /**
     Transfer on behalf of a caller or one of their authorized token managers
     items from one address to another.
-
     @param _from The address to transfer tokens from.
     @param _to The address to transfer tokens to.
     @param _id The specific token ID to transfer.
@@ -638,7 +621,6 @@ contract Super721 is PermitControl, ERC165Storage, IERC721 {
   /**
     Transfer on behalf of a caller or one of their authorized token managers
     items from one address to another.
-
     @param _from The address to transfer tokens from.
     @param _to The address to transfer tokens to.
     @param _ids The specific token IDs to transfer.
@@ -680,7 +662,6 @@ contract Super721 is PermitControl, ERC165Storage, IERC721 {
     group share a group ID in the upper 128-bits of their full item ID.
     Within a group NFTs can be distinguished for the purposes of serializing
     issue numbers.
-
     @param _groupId The ID of the item group to create or configure.
     @param _data The `ItemGroup` data input.
   */
@@ -737,7 +718,6 @@ contract Super721 is PermitControl, ERC165Storage, IERC721 {
     This is a private helper function to replace the `hasItemRight` modifier
     that we use on some functions in order to inline this check during batch
     minting and burning.
-
     @param _id The ID of the item to check for the given `_right` on.
     @param _right The right that the caller is trying to exercise on `_id`.
     @return Whether or not the caller has a valid right on this item.
@@ -747,25 +727,23 @@ contract Super721 is PermitControl, ERC165Storage, IERC721 {
     uint256 groupId = (_id & GROUP_MASK) >> 128;
     if (_msgSender() == owner()) {
       return true;
-    } else if (hasRightUntil(_msgSender(), UNIVERSAL, _right)
-      > block.timestamp) {
-      return true;
-    } else if (hasRightUntil(_msgSender(), bytes32(groupId), _right)
-      > block.timestamp) {
-      return true;
-    } else if (hasRightUntil(_msgSender(), bytes32(_id), _right)
-      > block.timestamp) {
-      return true;
-    } else {
-      return false;
     }
+    if (hasRight(_msgSender(), UNIVERSAL, _right)) {
+      return true;
+    }
+    if (hasRight(_msgSender(), bytes32(groupId), _right)) {
+      return true;
+    }
+    if (hasRight(_msgSender(), bytes32(_id), _right)) {
+      return true;
+    }
+      return false;
   }
 
   /**
     This is a private helper function to verify, according to all of our various
     minting and burning rules, whether it would be valid to mint a particular
     item `_id`.
-
     @param _id The ID of the item to check for minting validity.
     @return The ID of the item that should be minted.
   */
@@ -805,7 +783,6 @@ contract Super721 is PermitControl, ERC165Storage, IERC721 {
     address. In order to mint an item, its item group must first have been
     created. Minting an item must obey both the fungibility and size cap of its
     group.
-
     @param _recipient The address to receive all NFTs within the newly-minted
       group.
     @param _ids The item IDs for the new items to create.
@@ -859,7 +836,6 @@ contract Super721 is PermitControl, ERC165Storage, IERC721 {
     This is a private helper function to verify, according to all of our various
     minting and burning rules, whether it would be valid to burn some `_amount`
     of a particular item `_id`.
-
     @param _id The ID of the item to check for burning validity.
     @return The ID of the item that should have `_amount` burnt for it.
   */
@@ -893,7 +869,6 @@ contract Super721 is PermitControl, ERC165Storage, IERC721 {
 
   /**
     This function allows an address to destroy some of its items.
-
     @param _burner The address whose item is burning.
     @param _id The item ID to burn.
     @param _amount The amount of the corresponding item ID to burn.
@@ -934,7 +909,6 @@ contract Super721 is PermitControl, ERC165Storage, IERC721 {
   /**
     This function allows an address to destroy multiple different items in a
     single call.
-
     @param _burner The address whose items are burning.
     @param _ids The item IDs to burn.
   */
@@ -986,13 +960,13 @@ contract Super721 is PermitControl, ERC165Storage, IERC721 {
     Set the on-chain metadata attached to a specific token ID so long as the
     collection as a whole or the token specifically has not had metadata
     editing frozen.
-
     @param _id The ID of the token to set the `_metadata` for.
     @param _metadata The metadata string to store on-chain.
   */
   function setMetadata(uint256 _id, string memory _metadata)
     external hasItemRight(_id, SET_METADATA) {
-    require(!uriLocked && !metadataFrozen[_id],
+    uint groupId = _id >> 128;
+    require(!uriLocked && !metadataFrozen[_id] &&  !metadataFrozen[groupId],
       "Super721::setMetadata: you cannot edit this metadata because it is frozen");
     string memory oldMetadata = metadata[_id];
     metadata[_id] = _metadata;
@@ -1002,7 +976,6 @@ contract Super721 is PermitControl, ERC165Storage, IERC721 {
   /**
     Allow the item collection owner or an associated manager to forever lock the
     metadata URI on the entire collection to future changes.
-
     @param _uri The value of the URI to lock for `_id`.
   */
   function lockURI(string calldata _uri) external
@@ -1017,14 +990,26 @@ contract Super721 is PermitControl, ERC165Storage, IERC721 {
   /**
     Allow the item collection owner or an associated manager to forever lock the
     metadata URI on an item to future changes.
-
     @param _uri The value of the URI to lock for `_id`.
     @param _id The token ID to lock a metadata URI value into.
   */
-  function lockItemGroupURI(string calldata _uri, uint256 _id) external
+  function lockItemURI(string calldata _uri, uint256 _id) external
     hasItemRight(_id, LOCK_ITEM_URI) {
     metadataFrozen[_id] = true;
     emit PermanentURI(_uri, _id);
+  }
+
+  /**
+    Allow the item collection owner or an associated manager to forever lock the
+    metadata URI on a group of items to future changes.
+
+    @param _uri The value of the URI to lock for `groupId`.
+    @param groupId The group ID to lock a metadata URI value into.
+  */
+  function lockGroupURI(string calldata _uri, uint256 groupId) external
+    hasItemRight(groupId, LOCK_ITEM_URI) {
+    metadataFrozen[groupId] = true;
+    emit PermanentURI(_uri, groupId);
   }
 
   /**
@@ -1094,13 +1079,5 @@ contract Super721 is PermitControl, ERC165Storage, IERC721 {
   function tokenByIndex(uint256 index) public view returns (uint256) {
       (uint256 tokenId, ) = _tokenOwners.at(index);
       return tokenId;
-  }
-
-  function tokenURI(uint256 _tokenId) public view returns (string memory) {
-    return Strings.strConcat(
-        metadataUri,
-        Strings.uint2str(_tokenId),
-        ".json"
-    );
   }
 }

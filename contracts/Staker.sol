@@ -19,104 +19,112 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 contract Staker is Ownable, ReentrancyGuard {
   using SafeERC20 for IERC20;
 
-  // A user-specified, descriptive name for this Staker.
+  /// A user-specified, descriptive name for this Staker.
   string public name;
 
-  // The token to disburse.
+  /// The token to disburse.
   IERC20 public token;
 
-  // The amount of the disbursed token deposited by users. This is used for the
-  // special case where a staking pool has been created for the disbursed token.
-  // This is required to prevent the Staker itself from reducing emissions.
-  uint256 public totalTokenDeposited;
-
-  // A flag signalling whether the contract owner can add or set developers.
+  /// A flag signalling whether the contract owner can add or set developers.
   bool public canAlterDevelopers;
 
-  // An array of developer addresses for finding shares in the share mapping.
+  /// An array of developer addresses for finding shares in the share mapping.
   address[] public developerAddresses;
 
-  // A mapping of developer addresses to their percent share of emissions.
-  // Share percentages are represented as 1/1000th of a percent. That is, a 1%
-  // share of emissions should map an address to 1000.
+  /**  
+    @dev A mapping of developer addresses to their percent share of emissions.
+    Share percentages are represented as 1/1000th of a percent. That is, a 1%
+    share of emissions should map an address to 1000.
+  */
   mapping (address => uint256) public developerShares;
 
-  // A flag signalling whether or not the contract owner can alter emissions.
+  /// A flag signalling whether or not the contract owner can alter emissions.
   bool public canAlterTokenEmissionSchedule;
   bool public canAlterPointEmissionSchedule;
 
-  // The token emission schedule of the Staker. This emission schedule maps a
-  // block number to the amount of tokens or points that should be disbursed with every
-  // block beginning at said block number.
+  /**  
+    This emission schedule maps a timestamp to the amount of tokens or points 
+    that should be disbursed starting at that timestamp.
+
+    @param timeStamp If current time reaches timestamp, the rate is applied.
+    @param rate Measure of points/tokens emitted.
+  */
   struct EmissionPoint {
-    uint256 blockNumber;
+    uint256 timeStamp;
     uint256 rate;
   }
 
-  // An array of emission schedule key blocks for finding emission rate changes.
-  uint256 public tokenEmissionBlockCount;
-  mapping (uint256 => EmissionPoint) public tokenEmissionBlocks;
-  uint256 public pointEmissionBlockCount;
-  mapping (uint256 => EmissionPoint) public pointEmissionBlocks;
+  /// Array of emission schedule timestamps for finding emission rate changes.
+  uint256 public tokenEmissionEventsCount;
+  mapping (uint256 => EmissionPoint) public tokenEmissionEvents;
+  uint256 public pointEmissionEventsCount;
+  mapping (uint256 => EmissionPoint) public pointEmissionEvents;
 
-  // Store the very earliest possible emission block for quick reference.
+  /// Store the very earliest possible timestamp for quick reference.
   uint256 MAX_INT = 2**256 - 1;
-  uint256 internal earliestTokenEmissionBlock;
-  uint256 internal earliestPointEmissionBlock;
+  uint256 internal earliestTokenEmissionTime;
+  uint256 internal earliestPointEmissionTime;
 
-  // Information for each pool that can be staked in.
-  // - token: the address of the ERC20 asset that is being staked in the pool.
-  // - strength: the relative token emission strength of this pool.
-  // - lastRewardBlock: the last block number where token distribution occurred.
-  // - tokensPerShare: accumulated tokens per share times 1e12.
-  // - pointsPerShare: accumulated points per share times 1e12.
+/**  
+    A struct containing the pool info tracked in storage.
+
+    @param token address of the ERC20 asset that is being staked in the pool.
+    @param tokenStrength the relative token emission strength of this pool.
+    @param tokensPerShare accumulated tokens per share times 1e12.
+    @param pointStrength the relative point emission strength of this pool.
+    @param pointsPerShare accumulated points per share times 1e12.
+    @param lastRewardTime record of the time of the last disbursement.
+  */
   struct PoolInfo {
     IERC20 token;
     uint256 tokenStrength;
     uint256 tokensPerShare;
     uint256 pointStrength;
     uint256 pointsPerShare;
-    uint256 lastRewardBlock;
+    uint256 lastRewardTime;
   }
 
   IERC20[] public poolTokens;
 
-  // Stored information for each available pool per its token address.
+  /// Stored information for each available pool per its token address.
   mapping (IERC20 => PoolInfo) public poolInfo;
 
-  // Information for each user per staking pool:
-  // - amount: the amount of the pool asset being provided by the user.
-  // - tokenPaid: the value of the user's total earning that has been paid out.
-  // -- pending reward = (user.amount * pool.tokensPerShare) - user.rewardDebt.
-  // - pointPaid: the value of the user's total point earnings that has been paid out.
+  /**  
+    A struct containing the user info tracked in storage.
+
+    @param amount amount of the pool asset being provided by the user.
+    @param tokenPaid value of user's total token earnings paid out. 
+    pending reward = (user.amount * pool.tokensPerShare) - user.rewardDebt.
+    @param pointPaid value of user's total point earnings paid out.
+  */
   struct UserInfo {
     uint256 amount;
     uint256 tokenPaid;
     uint256 pointPaid;
   }
 
-  // Stored information for each user staking in each pool.
+  /// Stored information for each user staking in each pool.
   mapping (IERC20 => mapping (address => UserInfo)) public userInfo;
 
-  // The total sum of the strength of all pools.
+  /// The total sum of the strength of all pools.
   uint256 public totalTokenStrength;
   uint256 public totalPointStrength;
 
-  // The total amount of the disbursed token ever emitted by this Staker.
+  /// The total amount of the disbursed token ever emitted by this Staker.
   uint256 public totalTokenDisbursed;
 
-  // Users additionally accrue non-token points for participating via staking.
+  /// Users additionally accrue non-token points for participating via staking.
   mapping (address => uint256) public userPoints;
   mapping (address => uint256) public userSpentPoints;
 
-  // A map of all external addresses that are permitted to spend user points.
+  /// A map of all external addresses that are permitted to spend user points.
   mapping (address => bool) public approvedPointSpenders;
 
-  // Events for depositing assets into the Staker and later withdrawing them.
+  /// Events for depositing assets into the Staker and later withdrawing them.
   event Deposit(address indexed user, IERC20 indexed token, uint256 amount);
   event Withdraw(address indexed user, IERC20 indexed token, uint256 amount);
 
-  // An event for tracking when a user has spent points.
+  /// An event for tracking when a user has spent points.
   event SpentPoints(address indexed source, address indexed user, uint256 amount);
 
   /**
@@ -130,9 +138,9 @@ contract Staker is Ownable, ReentrancyGuard {
     token.approve(address(this), MAX_INT);
     canAlterDevelopers = true;
     canAlterTokenEmissionSchedule = true;
-    earliestTokenEmissionBlock = MAX_INT;
+    earliestTokenEmissionTime = MAX_INT;
     canAlterPointEmissionSchedule = true;
-    earliestPointEmissionBlock = MAX_INT;
+    earliestPointEmissionTime = MAX_INT;
   }
 
   /**
@@ -188,29 +196,29 @@ contract Staker is Ownable, ReentrancyGuard {
     if (_tokenSchedule.length > 0) {
       require(canAlterTokenEmissionSchedule,
         "This Staker has locked the alteration of token emissions.");
-      tokenEmissionBlockCount = _tokenSchedule.length;
-      for (uint256 i = 0; i < tokenEmissionBlockCount; i++) {
-        tokenEmissionBlocks[i] = _tokenSchedule[i];
-        if (earliestTokenEmissionBlock > _tokenSchedule[i].blockNumber) {
-          earliestTokenEmissionBlock = _tokenSchedule[i].blockNumber;
+      tokenEmissionEventsCount = _tokenSchedule.length;
+      for (uint256 i = 0; i < tokenEmissionEventsCount; i++) {
+        tokenEmissionEvents[i] = _tokenSchedule[i];
+        if (earliestTokenEmissionTime > _tokenSchedule[i].timeStamp) {
+          earliestTokenEmissionTime = _tokenSchedule[i].timeStamp;
         }
       }
     }
-    require(tokenEmissionBlockCount > 0,
+    require(tokenEmissionEventsCount > 0,
       "You must set the token emission schedule.");
 
     if (_pointSchedule.length > 0) {
       require(canAlterPointEmissionSchedule,
         "This Staker has locked the alteration of point emissions.");
-      pointEmissionBlockCount = _pointSchedule.length;
-      for (uint256 i = 0; i < pointEmissionBlockCount; i++) {
-        pointEmissionBlocks[i] = _pointSchedule[i];
-        if (earliestPointEmissionBlock > _pointSchedule[i].blockNumber) {
-          earliestPointEmissionBlock = _pointSchedule[i].blockNumber;
+      pointEmissionEventsCount = _pointSchedule.length;
+      for (uint256 i = 0; i < pointEmissionEventsCount; i++) {
+        pointEmissionEvents[i] = _pointSchedule[i];
+        if (earliestPointEmissionTime > _pointSchedule[i].timeStamp) {
+          earliestPointEmissionTime = _pointSchedule[i].timeStamp;
         }
       }
     }
-    require(pointEmissionBlockCount > 0,
+    require(pointEmissionEventsCount > 0,
       "You must set the point emission schedule.");
   }
 
@@ -264,11 +272,16 @@ contract Staker is Ownable, ReentrancyGuard {
     @param _pointStrength The relative strength of the new asset for earning points.
   */
   function addPool(IERC20 _token, uint256 _tokenStrength, uint256 _pointStrength) external onlyOwner {
-    require(tokenEmissionBlockCount > 0 && pointEmissionBlockCount > 0,
+    require(tokenEmissionEventsCount > 0 && pointEmissionEventsCount > 0,
       "Staking pools cannot be addded until an emission schedule has been defined.");
-    uint256 lastTokenRewardBlock = block.number > earliestTokenEmissionBlock ? block.number : earliestTokenEmissionBlock;
-    uint256 lastPointRewardBlock = block.number > earliestPointEmissionBlock ? block.number : earliestPointEmissionBlock;
-    uint256 lastRewardBlock = lastTokenRewardBlock > lastPointRewardBlock ? lastTokenRewardBlock : lastPointRewardBlock;
+    require(address(_token) != address(token), 
+      "Staking pool token can not be the same as reward token.");
+    require(_tokenStrength > 0 && _pointStrength > 0, 
+      "Staking pool token/point strength must be greater than 0.");
+
+    uint256 lastTokenRewardTime = block.timestamp > earliestTokenEmissionTime ? block.timestamp : earliestTokenEmissionTime;
+    uint256 lastPointRewardTime = block.timestamp > earliestPointEmissionTime ? block.timestamp : earliestPointEmissionTime;
+    uint256 lastRewardTime = lastTokenRewardTime > lastPointRewardTime ? lastTokenRewardTime : lastPointRewardTime;
     if (address(poolInfo[_token].token) == address(0)) {
       poolTokens.push(_token);
       totalTokenStrength = totalTokenStrength + _tokenStrength;
@@ -279,7 +292,7 @@ contract Staker is Ownable, ReentrancyGuard {
         tokensPerShare: 0,
         pointStrength: _pointStrength,
         pointsPerShare: 0,
-        lastRewardBlock: lastRewardBlock
+        lastRewardTime: lastRewardTime
       });
     } else {
       totalTokenStrength = (totalTokenStrength - poolInfo[_token].tokenStrength) + _tokenStrength;
@@ -291,62 +304,62 @@ contract Staker is Ownable, ReentrancyGuard {
 
   /**
     Uses the emission schedule to calculate the total amount of staking reward
-    token that was emitted between two specified block numbers.
+    token that was emitted between two specified timestamps.
 
-    @param _fromBlock The block to begin calculating emissions from.
-    @param _toBlock The block to calculate total emissions up to.
+    @param _fromTime The time to begin calculating emissions from.
+    @param _toTime The time to calculate total emissions up to.
   */
-  function getTotalEmittedTokens(uint256 _fromBlock, uint256 _toBlock) public view returns (uint256) {
-    require(_toBlock >= _fromBlock,
-      "Tokens cannot be emitted from a higher block to a lower block.");
+  function getTotalEmittedTokens(uint256 _fromTime, uint256 _toTime) public view returns (uint256) {
+    require(_toTime >= _fromTime,
+      "Tokens cannot be emitted from a higher timestsamp to a lower timestamp.");
     uint256 totalEmittedTokens = 0;
     uint256 workingRate = 0;
-    uint256 workingBlock = _fromBlock;
-    for (uint256 i = 0; i < tokenEmissionBlockCount; ++i) {
-      uint256 emissionBlock = tokenEmissionBlocks[i].blockNumber;
-      uint256 emissionRate = tokenEmissionBlocks[i].rate;
-      if (_toBlock < emissionBlock) {
-        totalEmittedTokens = totalEmittedTokens + ((_toBlock - workingBlock) * workingRate);
+    uint256 workingTime = _fromTime;
+    for (uint256 i = 0; i < tokenEmissionEventsCount; ++i) {
+      uint256 emissionTime = tokenEmissionEvents[i].timeStamp;
+      uint256 emissionRate = tokenEmissionEvents[i].rate;
+      if (_toTime < emissionTime) {
+        totalEmittedTokens = totalEmittedTokens + (((_toTime - workingTime) / 15) * workingRate);
         return totalEmittedTokens;
-      } else if (workingBlock < emissionBlock) {
-        totalEmittedTokens = totalEmittedTokens + ((emissionBlock - workingBlock) * workingRate);
-        workingBlock = emissionBlock;
+      } else if (workingTime < emissionTime) {
+        totalEmittedTokens = totalEmittedTokens + (((emissionTime - workingTime) / 15) * workingRate);
+        workingTime = emissionTime;
       }
       workingRate = emissionRate;
     }
-    if (workingBlock < _toBlock) {
-      totalEmittedTokens = totalEmittedTokens + ((_toBlock - workingBlock) * workingRate);
+    if (workingTime < _toTime) {
+      totalEmittedTokens = totalEmittedTokens + (((_toTime - workingTime) / 15) * workingRate);
     }
     return totalEmittedTokens;
   }
 
   /**
     Uses the emission schedule to calculate the total amount of points
-    emitted between two specified block numbers.
+    emitted between two specified timestamps.
 
-    @param _fromBlock The block to begin calculating emissions from.
-    @param _toBlock The block to calculate total emissions up to.
+    @param _fromTime The time to begin calculating emissions from.
+    @param _toTime The time to calculate total emissions up to.
   */
-  function getTotalEmittedPoints(uint256 _fromBlock, uint256 _toBlock) public view returns (uint256) {
-    require(_toBlock >= _fromBlock,
-      "Points cannot be emitted from a higher block to a lower block.");
+  function getTotalEmittedPoints(uint256 _fromTime, uint256 _toTime) public view returns (uint256) {
+    require(_toTime >= _fromTime,
+      "Points cannot be emitted from a higher timestsamp to a lower timestamp.");
     uint256 totalEmittedPoints = 0;
     uint256 workingRate = 0;
-    uint256 workingBlock = _fromBlock;
-    for (uint256 i = 0; i < pointEmissionBlockCount; ++i) {
-      uint256 emissionBlock = pointEmissionBlocks[i].blockNumber;
-      uint256 emissionRate = pointEmissionBlocks[i].rate;
-      if (_toBlock < emissionBlock) {
-        totalEmittedPoints = totalEmittedPoints + ((_toBlock - workingBlock) * workingRate);
+    uint256 workingTime = _fromTime;
+    for (uint256 i = 0; i < pointEmissionEventsCount; ++i) {
+      uint256 emissionTime = pointEmissionEvents[i].timeStamp;
+      uint256 emissionRate = pointEmissionEvents[i].rate;
+      if (_toTime < emissionTime) {
+        totalEmittedPoints = totalEmittedPoints + (((_toTime - workingTime) / 15) * workingRate);
         return totalEmittedPoints;
-      } else if (workingBlock < emissionBlock) {
-        totalEmittedPoints = totalEmittedPoints + ((emissionBlock - workingBlock) * workingRate);
-        workingBlock = emissionBlock;
+      } else if (workingTime < emissionTime) {
+        totalEmittedPoints = totalEmittedPoints + (((emissionTime - workingTime) / 15) * workingRate);
+        workingTime = emissionTime;
       }
       workingRate = emissionRate;
     }
-    if (workingBlock < _toBlock) {
-      totalEmittedPoints = totalEmittedPoints + ((_toBlock - workingBlock) * workingRate);
+    if (workingTime < _toTime) {
+      totalEmittedPoints = totalEmittedPoints + (((_toTime - workingTime) / 15) * workingRate);
     }
     return totalEmittedPoints;
   }
@@ -357,22 +370,19 @@ contract Staker is Ownable, ReentrancyGuard {
   */
   function updatePool(IERC20 _token) internal {
     PoolInfo storage pool = poolInfo[_token];
-    if (block.number <= pool.lastRewardBlock) {
+    if (block.timestamp <= pool.lastRewardTime) {
       return;
     }
     uint256 poolTokenSupply = pool.token.balanceOf(address(this));
-    if (address(_token) == address(token)) {
-      poolTokenSupply = totalTokenDeposited;
-    }
     if (poolTokenSupply <= 0) {
-      pool.lastRewardBlock = block.number;
+      pool.lastRewardTime = block.timestamp;
       return;
     }
 
-    // Calculate tokens and point rewards for this pool.
-    uint256 totalEmittedTokens = getTotalEmittedTokens(pool.lastRewardBlock, block.number);
+    // Calculate token and point rewards for this pool.
+    uint256 totalEmittedTokens = getTotalEmittedTokens(pool.lastRewardTime, block.timestamp);
     uint256 tokensReward = ((totalEmittedTokens * pool.tokenStrength) / totalTokenStrength) * 1e12;
-    uint256 totalEmittedPoints = getTotalEmittedPoints(pool.lastRewardBlock, block.number);
+    uint256 totalEmittedPoints = getTotalEmittedPoints(pool.lastRewardTime, block.timestamp);
     uint256 pointsReward = ((totalEmittedPoints * pool.pointStrength) / totalPointStrength) * 1e30;
 
     // Directly pay developers their corresponding share of tokens and points.
@@ -390,7 +400,7 @@ contract Staker is Ownable, ReentrancyGuard {
     // Update the pool rewards per share to pay users the amount remaining.
     pool.tokensPerShare = pool.tokensPerShare + (tokensReward / poolTokenSupply);
     pool.pointsPerShare = pool.pointsPerShare + (pointsReward / poolTokenSupply);
-    pool.lastRewardBlock = block.number;
+    pool.lastRewardTime = block.timestamp;
   }
 
   /**
@@ -406,12 +416,9 @@ contract Staker is Ownable, ReentrancyGuard {
     UserInfo storage user = userInfo[_token][_user];
     uint256 tokensPerShare = pool.tokensPerShare;
     uint256 poolTokenSupply = pool.token.balanceOf(address(this));
-    if (address(_token) == address(token)) {
-      poolTokenSupply = totalTokenDeposited;
-    }
 
-    if (block.number > pool.lastRewardBlock && poolTokenSupply > 0) {
-      uint256 totalEmittedTokens = getTotalEmittedTokens(pool.lastRewardBlock, block.number);
+    if (block.timestamp > pool.lastRewardTime && poolTokenSupply > 0) {
+      uint256 totalEmittedTokens = getTotalEmittedTokens(pool.lastRewardTime, block.timestamp);
       uint256 tokensReward = ((totalEmittedTokens * pool.tokenStrength) / totalTokenStrength) * 1e12;
       tokensPerShare = tokensPerShare + (tokensReward / poolTokenSupply);
     }
@@ -433,12 +440,9 @@ contract Staker is Ownable, ReentrancyGuard {
     UserInfo storage user = userInfo[_token][_user];
     uint256 pointsPerShare = pool.pointsPerShare;
     uint256 poolTokenSupply = pool.token.balanceOf(address(this));
-    if (address(_token) == address(token)) {
-      poolTokenSupply = totalTokenDeposited;
-    }
 
-    if (block.number > pool.lastRewardBlock && poolTokenSupply > 0) {
-      uint256 totalEmittedPoints = getTotalEmittedPoints(pool.lastRewardBlock, block.number);
+    if (block.timestamp > pool.lastRewardTime && poolTokenSupply > 0) {
+      uint256 totalEmittedPoints = getTotalEmittedPoints(pool.lastRewardTime, block.timestamp);
       uint256 pointsReward = ((totalEmittedPoints * pool.pointStrength) / totalPointStrength) * 1e30;
       pointsPerShare = pointsPerShare + (pointsReward / poolTokenSupply);
     }
@@ -504,9 +508,6 @@ contract Staker is Ownable, ReentrancyGuard {
       userPoints[msg.sender] = userPoints[msg.sender] + pendingPoints;
     }
     pool.token.safeTransferFrom(address(msg.sender), address(this), _amount);
-    if (address(_token) == address(token)) {
-      totalTokenDeposited = totalTokenDeposited + _amount;
-    }
     user.amount = user.amount +_amount;
     user.tokenPaid = (user.amount * pool.tokensPerShare) / 1e12;
     user.pointPaid = (user.amount * pool.pointsPerShare) / 1e30;
@@ -529,9 +530,6 @@ contract Staker is Ownable, ReentrancyGuard {
     totalTokenDisbursed = totalTokenDisbursed + pendingTokens;
     uint256 pendingPoints = ((user.amount * pool.pointsPerShare) / 1e30) - user.pointPaid;
     userPoints[msg.sender] = userPoints[msg.sender] + pendingPoints;
-    if (address(_token) == address(token)) {
-      totalTokenDeposited = totalTokenDeposited - _amount;
-    }
     user.amount = user.amount - _amount;
     user.tokenPaid = (user.amount * pool.tokensPerShare) / 1e12;
     user.pointPaid = (user.amount * pool.pointsPerShare) / 1e30;

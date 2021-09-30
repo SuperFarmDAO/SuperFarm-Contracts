@@ -407,17 +407,17 @@ describe('===Super1155===', function () {
         });
 
         it('Reverts: sender does not have the right', async () => {
-            super1155.connect(deployer).configureGroup(itemGroupId, {
-                name: 'KFC',
-                supplyType: 0,
-                supplyData: 20000,
-                itemType: 0,
-                itemData: 0,
-                burnType: 1,
-                burnData: 20000
-            });
-            // Since the revert string from the modifier is missing in the .sol file, we compare to ""
-            await expect((await super1155.connect(owner).itemGroups(itemGroupId)).name).to.be.equal("");
+            await expect(
+                super1155.connect(deployer).configureGroup(itemGroupId, {
+                    name: 'KFC',
+                    supplyType: 0,
+                    supplyData: 20000,
+                    itemType: 0,
+                    itemData: 0,
+                    burnType: 1,
+                    burnData: 20000
+                })
+            ).to.be.revertedWith("Super1155: you don't have rights to configure group");
         });
 
         it('Reverts: collection is locked', async function(){
@@ -1107,13 +1107,9 @@ describe('===Super1155===', function () {
         });
 
         it('Reverts: burn has no valid permit', async function () {
-            // Burn without any permit
-            // Modifier's revert string is missing. So, expectation is the balanced unchanged
-            await super1155.connect(deployer).burn(deployer.address, shiftedItemGroupId.add(1), "5");
             await expect(
-                await super1155.connect(owner).balanceOf(deployer.address, shiftedItemGroupId.add(1))
-            ).to.be.equal("5");
-  
+                super1155.connect(deployer).burn(deployer.address, shiftedItemGroupId.add(1), "5")
+            ).to.be.revertedWith("Super1155: you don't have rights to burn");
         });
 
         it('Reverts: burn from Zero address', async function () {
