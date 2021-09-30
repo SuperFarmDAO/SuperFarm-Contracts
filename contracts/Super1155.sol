@@ -367,7 +367,7 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
     @return The metadata URI string of the item with ID `_itemId`.
   */
   function uri(uint256 id) external override view returns (string memory) {
-   Strings.Slice memory slice1 = metadataUri.toSlice();
+    Strings.Slice memory slice1 = metadataUri.toSlice();
     Strings.Slice memory slice2 = metadataUri.toSlice();
     string memory tokenFirst = "{";
     string memory tokenLast = "}";
@@ -948,12 +948,8 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
   */
   function setMetadata(uint256 _id, string memory _metadata) external {
     require(_hasItemRight(_id, SET_METADATA), "Super1155: you don't have rights to setMetadata");
-<<<<<<< HEAD
     uint groupId = _id >> 128;
     require(!uriLocked && !metadataFrozen[_id] &&  !metadataFrozen[groupId],
-=======
-    require(!uriLocked && !metadataFrozen[_id],
->>>>>>> master
       "Super1155: you cannot edit this metadata because it is frozen");
     string memory oldMetadata = metadata[_id];
     metadata[_id] = _metadata;
@@ -995,8 +991,8 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
     @param _uri The value of the URI to lock for `groupId`.
     @param groupId The group ID to lock a metadata URI value into.
   */
-  function lockGroupURI(string calldata _uri, uint256 groupId) external
-    hasItemRight(groupId, LOCK_ITEM_URI) {
+  function lockGroupURI(string calldata _uri, uint256 groupId) external {
+    require(_hasItemRight(groupId, LOCK_ITEM_URI), "Super1155: you don't have rights to lock group URI");
     metadataFrozen[groupId] = true;
     emit PermanentURI(_uri, groupId);
   }
