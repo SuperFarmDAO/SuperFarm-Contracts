@@ -248,12 +248,11 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
   /**
     Construct a new ERC-1155 item collection.
 
-    @param _owner The address of the administrator governing this collection.
     @param _name The name to assign to this item collection contract.
     @param _uri The metadata URI to perform later token ID substitution with.
     @param _proxyRegistryAddress The address of a proxy registry contract.
   */
-  constructor(address _owner, string memory _name, string memory _uri,
+  constructor(string memory _name, string memory _uri,
     address _proxyRegistryAddress) {
 
     // Register the ERC-165 interfaces.
@@ -262,9 +261,9 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
 
     // Do not perform a redundant ownership transfer if the deployer should
     // remain as the owner of the collection.
-    if (_owner != owner()) {
-      transferOwnership(_owner);
-    }
+    // if (_owner != owner()) {
+    //   transferOwnership(_owner);
+    // }
 
     // Continue initialization.
     name = _name;
@@ -315,6 +314,13 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
         override
         returns (uint256) {
           return totalBalances[_recepient];
+  }
+
+
+  function _transferOwnership(address _owner) override external onlyOwner {
+    if (_owner != owner()) {
+      transferOwnership(_owner);
+    }
   }
 
 
@@ -661,7 +667,7 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
   function _hasItemRight(uint256 _id, bytes32 _right) private view
     returns (bool) {
     uint256 groupId = _id  >> 128;
-    if (_msgSender() == owner() || tx.origin == owner()) {
+    if (_msgSender() == owner()) {
       return true;
     }
     if (hasRight(_msgSender(), UNIVERSAL, _right)) {

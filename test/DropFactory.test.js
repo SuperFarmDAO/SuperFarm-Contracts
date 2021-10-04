@@ -3,6 +3,7 @@ const { expect } = require('chai');
 // Imports.
 // import { ethers } from 'hardhat';
 import 'chai/register-should';
+
 // import { ethers } from 'hardhat';
 let today = new Date() / 100;
 let owner, user_one, user_two;
@@ -29,14 +30,15 @@ describe("DropFactory test", function () {
         Factory = await ethers.getContractFactory('DropFactory');
 
         // mintShopHelper = await MintShopHelper.deploy();
-        factory = await Factory.deploy('v0.1', mintShopHelper.address, super1155Helper.address);
+        factory = await Factory.deploy(mintShopHelper.address, super1155Helper.address);
 
 
         await factory.deployed();
 
         let value = await factory.version();
         expect(value).to.equal('v0.1');
-    });
+        // done();
+    }).timeout(10000);
 
     it("Shoud try to create new drop", async function () {
         let configGroup = {
@@ -49,11 +51,6 @@ describe("DropFactory test", function () {
             burnData: 6
         };
 
-
-
-        let poolData = {
-
-        };
         let poolInput = {
             name: "firstPool",
             startTime: 1,
@@ -68,20 +65,6 @@ describe("DropFactory test", function () {
             }
         };
 
-        let poolConfigurationData = {
-            groupIds: [1, 2],
-            issueNumberOffsets: [1, 1],
-            caps: [10, 1],
-            prices: [[{
-                assetType: 1,
-                asset: NULL_ADDRESS,
-                price: 1
-            }], [{
-                assetType: 1,
-                asset: NULL_ADDRESS,
-                price: 1
-            }]]
-        }
 
         let data2 = [[1, 2], [1, 1], [10, 1], [[{
             assetType: 1,
@@ -109,16 +92,40 @@ describe("DropFactory test", function () {
                 1
             ]]
         ];
-        let salt = "0x60eb971ba5cc65e981c8b3a0fff625736ce28dc2ee9a1b10f749ac1828c4aded";
-        // console.log(2);
-        // console.log([data2]);
-        // console.log(poolInput);
-        console.log("DROPFACTORY ADDRESS: ", factory.address);
-        console.log("OWNER v TESTE: ", owner.address)
+        // let salt = "0x60eb971ba5cc65e981c8b3a0fff625736ce28dc2ee9a1b10f749ac1828c4aded";
+        // // console.log(2);
+        // // console.log([data2]);
+        // // console.log(poolInput);
+        // console.log("DROPFACTORY ADDRESS: ", factory.address);
+        // console.log("OWNER v TESTE: ", owner.address);
 
         // let address = await factory.computeAddress(salt, bytecode);
+        // let splitted = mintShopBytecode.split()
 
+        // var chuncks = [];
+
+        // for (var i = 0, charsLength = mintShopBytecode.length; i < charsLength; i += 66) {
+        //     chuncks.push(mintShopBytecode.substring(i, i + 66));
+        // }
+        // fs.writeFile('mintShopByteCode.txt', chuncks);
+        // console.log(chuncks);
+
+        // fs.writeFile('mintShopByteCode.txt', chuncks.join('\n'), function (err) {
+        //     if (err) return console.log(err);
+        //     // console.log('Hello World > helloworld.txt');
+        //   });
+
+    //     fs.writeFile(
+    //         'mintShopByteCode.txt',
+    //         chuncks.map(function(v){ return v.join(' ') }).join('\n'),
+    //         function (err) { console.log(err ? 'Error :'+err : 'ok') }
+    //    );
+        // await factory.sendData(chuncks);
+
+        // let bytecodeInContract = await factory.getData();
+        // console.log(bytecodeInContract);
         // console.log(address.toString());
+
         let addresses = await factory.createDrop(
             owner.address,
             "TEST_COLLECTION",
@@ -134,8 +141,9 @@ describe("DropFactory test", function () {
         let drops = await factory.getDrops();
 
         console.log(drops.toString());
+        // done();
         // console.log(addresses);
-    });
+    }).timeout(10000);
 
 
 });

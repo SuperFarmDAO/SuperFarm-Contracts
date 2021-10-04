@@ -22,4 +22,7 @@ interface ISuper1155 {
 
     function configureGroup(uint256 _groupId, DFStorage.ItemGroupInput calldata _data)
     external;
+
+
+    function _transferOwnership(address _owner) external;
 }

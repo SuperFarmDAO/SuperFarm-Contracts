@@ -11,4 +11,6 @@ interface IMintShop {
         uint256[] calldata _caps,
         DFStorage.Price[][] memory _prices
     ) external;
+
+    function _transferOwnership(address _owner) external;
 }
