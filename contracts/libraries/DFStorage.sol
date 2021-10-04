@@ -1,6 +1,6 @@
 pragma solidity 0.8.7;
 
-library LibStorage {
+library DFStorage {
     /**
     @notice This struct is a source of mapping-free input to the `addPool` function.
 

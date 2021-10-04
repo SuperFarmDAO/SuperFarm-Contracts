@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity 0.8.7;
 
-import "../libraries/LibStorage.sol";
+import "../libraries/DFStorage.sol";
 
 
 interface ISuper1155 {
@@ -20,6 +20,6 @@ interface ISuper1155 {
         view
         returns (uint256);
 
-    function configureGroup(uint256 _groupId, LibStorage.ItemGroupInput calldata _data)
+    function configureGroup(uint256 _groupId, DFStorage.ItemGroupInput calldata _data)
     external;
 }

@@ -5,12 +5,11 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 
 import "./interfaces/ISuper1155.sol";
 import "./interfaces/IMintShop.sol";
-import "./libraries/LibStorage.sol";
+import "./libraries/DFStorage.sol";
 import "./interfaces/IHelper.sol";
-import "hardhat/console.sol";
 
 contract DropFactory is Ownable {
-    string public version;
+    string public version = "v0.1";
     uint256 MAX_INT = 2**256 - 1;
     address mintShopHelper;
     address super1155Helper;
@@ -25,7 +24,6 @@ contract DropFactory is Ownable {
         address mintShop1155;
         address super1155;
     }
-
     /**
      * @param groupIds Array of groupId's of 1155 contract
      * @param issueNumberOffsets Array of groupId's of 1155 contract
@@ -36,17 +34,15 @@ contract DropFactory is Ownable {
         uint256[] groupIds;
         uint256[] issueNumberOffsets;
         uint256[] caps;
-        LibStorage.Price[][] prices;
+        DFStorage.Price[][] prices;
     }
 
     Drop[] public drops;
 
     constructor(
-        string memory _version,
         address _mintShopHelper,
         address _super1155Helper
     ) {
-        version = _version;
         mintShopHelper = _mintShopHelper;
         super1155Helper = _super1155Helper;
     }
@@ -74,14 +70,12 @@ contract DropFactory is Ownable {
         address _proxyRegistry,
         address _paymentReceiver,
         uint256 _globalPurchaseLimit,
-        LibStorage.ItemGroupInput[] memory _itemGroupInput,
-        LibStorage.PoolInput[] memory _poolInput,
+        DFStorage.ItemGroupInput[] memory _itemGroupInput,
+        DFStorage.PoolInput[] memory _poolInput,
         PoolConfigurationData[] memory _poolConfigurationData
     )
         external
         returns (
-            // bytes calldata _mintShopBytecode,
-            // bytes calldata _super1555Bytecode
             address super1155,
             address mintShop
         )
@@ -97,14 +91,11 @@ contract DropFactory is Ownable {
 
         bytes memory super1155Bytecode = IHelper(super1155Helper).getByteCode();
 
-        // console.logBytes(super1155Bytecode);
-
         bytes memory bytecodeSuper1155 = abi.encodePacked(
             super1155Bytecode,
             abi.encode(_owner, _collectionName, _uri, _proxyRegistry)
         );
 
-        // bytes memory bytecode = IHelper(IHelperSuper).getCreateionCode();
         bytes32 salt = keccak256(
             abi.encodePacked(block.timestamp - 2, msg.sender)
         );
@@ -120,7 +111,6 @@ contract DropFactory is Ownable {
             }
         }
 
-        console.log(super1155);
         
         for (uint256 i = 0; i < _poolInput.length; i++) {
             ISuper1155(super1155).configureGroup(i + 1, _itemGroupInput[i]);
@@ -137,7 +127,6 @@ contract DropFactory is Ownable {
             _poolConfigurationData
         );
 
-        console.log(mintShop);
 
         drops.push(
             Drop({
@@ -155,7 +144,7 @@ contract DropFactory is Ownable {
         address super1155,
         address _paymentReceiver,
         uint256 _globalPurchaseLimit,
-        LibStorage.PoolInput[] memory _poolInput,
+        DFStorage.PoolInput[] memory _poolInput,
         PoolConfigurationData[] memory _poolConfigurationData
     ) private returns (address mintShop) {
 
