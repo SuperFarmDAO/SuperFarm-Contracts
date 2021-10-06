@@ -538,9 +538,6 @@ contract MintShop1155 is Sweepable, ReentrancyGuard {
     @param _items The array of Super1155 addresses.
   */
   function addItems(Super1155[] memory _items) external onlyOwner {
-    // for (uint256 i = 0; i < _items.length; i++) {
-    //   items[i] = _items[i];
-    // }
     items = _items;
   }
 
