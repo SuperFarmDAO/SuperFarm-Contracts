@@ -58,6 +58,9 @@ contract Super721IMX is PermitControl, ERC165Storage, IERC721 {
   /// The public identifier for the right to disable item creation.
   bytes32 public constant LOCK_CREATION = keccak256("LOCK_CREATION");
 
+  /// The public identifier for the right to execute the mintFor fucntion.
+  bytes32 public constant MINT_FOR = keccak256("MINT_FOR");
+
   /*
    *     bytes4(keccak256('balanceOf(address)')) == 0x70a08231
    *     bytes4(keccak256('ownerOf(uint256)')) == 0x6352211e
@@ -253,6 +256,9 @@ contract Super721IMX is PermitControl, ERC165Storage, IERC721 {
 
   /// Whether or not the item collection has been locked to all further minting.
   bool public locked;
+
+  /// Whether or not the mintFor is disabled
+  bool public mintForLocked;
 
   /**
     An event that gets emitted when the metadata collection URI is changed.
@@ -835,10 +841,22 @@ contract Super721IMX is PermitControl, ERC165Storage, IERC721 {
     }
   }
 
+  /** 
+    Toggling control for the mintFor function ability to mint.
+  */
+  function toggleMintFor() external hasValidPermit(UNIVERSAL, MINT_FOR) {
+    if(mintForLocked)
+      mintForLocked = false;
+    else
+      mintForLocked = true;
+  }
+
   /**
     The special, IMX-privileged minting function for centralized L2 support.
   */
   function mintFor(address _to, uint256 _id, bytes calldata _blueprint) external {
+    require(!mintForLocked, 
+      "SuperIMX721::mintFor::disabled");
     require(_msgSender() == imxCoreAddress,
       "SuperIMX721::mintFor::only IMX may call this mint function");
     uint256[] memory ids = _asSingletonArray(_id);

@@ -1526,6 +1526,20 @@ describe('===Super721IMX===', function () {
             ).to.be.revertedWith("SuperIMX721::mintFor::only IMX may call this mint function");
         });
 
+        it('Reverts: mintFor function is locked', async () => {
+            await super721IMX.connect(owner).toggleMintFor(); // LOCKED
+
+            await expect(
+                super721IMX.mintFor(signer1.address, shiftedItemGroupId, ethers.utils.id('a'))
+            ).to.be.revertedWith("SuperIMX721::mintFor::disabled");
+
+            await super721IMX.connect(owner).toggleMintFor(); // UNLOCKED
+
+            await expect(
+                super721IMX.mintFor(signer1.address, shiftedItemGroupId, ethers.utils.id('a'))
+            ).to.be.revertedWith("SuperIMX721::mintFor::only IMX may call this mint function");
+        });
+
         it('IMX core should mint for an address', async () => {
             await mockIMXCore.setSuper721Address(super721IMX.address);
 
