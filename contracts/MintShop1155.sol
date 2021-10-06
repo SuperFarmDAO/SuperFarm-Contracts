@@ -538,9 +538,10 @@ contract MintShop1155 is Sweepable, ReentrancyGuard {
     @param _items The array of Super1155 addresses.
   */
   function addItems(Super1155[] memory _items) external onlyOwner {
-    for (uint256 i = 0; i < _items.length; i++) {
-      items[i] = _items[i];
-    }
+    // for (uint256 i = 0; i < _items.length; i++) {
+    //   items[i] = _items[i];
+    // }
+    items = _items;
   }
 
   /**
@@ -1062,7 +1063,19 @@ contract MintShop1155 is Sweepable, ReentrancyGuard {
       revert("MintShop1155: unrecognized asset type");
     }
 
-    // If payment is successful, mint each of the user's purchased items.
+    
+    sellingHelper(_itemId, _groupId, _id, itemKey, _amount, newCirculatingTotal, userPoolPurchaseAmount, userGlobalPurchaseAmount);
+
+    // Emit an event indicating a successful purchase.
+  }
+
+
+
+  /**
+  * Private function to avoid stach-too-deep error.
+  */
+  function sellingHelper(uint256 _itemId, uint256 _groupId, uint256 _id, bytes32 _itemKey, uint256 _amount, uint256 _newCirculatingTotal, uint256 _userPoolPurchaseAmount, uint256 _userGlobalPurchaseAmount) private {
+     // If payment is successful, mint each of the user's purchased items.
     uint256[] memory itemIds = new uint256[](_amount);
     uint256[] memory amounts = new uint256[](_amount);
     uint256 nextIssueNumber = nextItemIssues[_groupId];
@@ -1074,22 +1087,8 @@ contract MintShop1155 is Sweepable, ReentrancyGuard {
         amounts[i - 1] = 1;
       }
     }
-
-    // Mint the items.
-    items[_itemId].mintBatch(_msgSender(), itemIds, amounts, "");
-
-    sellingHelper(_groupId, _id, itemKey, nextIssueNumber, _amount, newCirculatingTotal, userPoolPurchaseAmount, userGlobalPurchaseAmount);
-
-    // Emit an event indicating a successful purchase.
-    emit ItemPurchased(_msgSender(), _id, itemIds, amounts);
-  }
-
-
-
-
-  function sellingHelper(uint256 _groupId, uint256 _id, bytes32 _itemKey, uint256 _nextIssueNumber, uint256 _amount, uint256 _newCirculatingTotal, uint256 _userPoolPurchaseAmount, uint256 _userGlobalPurchaseAmount) private {
      // Update the tracker for available item issue numbers.
-    nextItemIssues[_groupId] = _nextIssueNumber + _amount;
+    nextItemIssues[_groupId] = nextIssueNumber + _amount;
 
     // Update the count of circulating items from this pool.
     pools[_id].itemMinted[_itemKey] = _newCirculatingTotal;
@@ -1099,5 +1098,14 @@ contract MintShop1155 is Sweepable, ReentrancyGuard {
 
     // Update the global count of items that a user has purchased.
     globalPurchaseCounts[_msgSender()] = _userGlobalPurchaseAmount;
+
+   
+
+    // Mint the items.
+    items[_itemId].mintBatch(_msgSender(), itemIds, amounts, "");
+
+    emit ItemPurchased(_msgSender(), _id, itemIds, amounts);
+
+
   }
 }
