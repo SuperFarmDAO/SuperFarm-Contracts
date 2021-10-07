@@ -42,6 +42,9 @@ contract MintShop1155 is Sweepable, ReentrancyGuard {
   /// The public identifier for the right to manage item pools.
   bytes32 public constant POOL = keccak256("POOL");
 
+  /// The public identifier for the right to set new items.
+  bytes32 public constant SET_ITEMS = keccak256("SET_ITEMS");
+
   /// @dev A mask for isolating an item's group ID.
   uint256 constant GROUP_MASK = uint256(type(uint128).max) << 128;
 
@@ -533,11 +536,11 @@ contract MintShop1155 is Sweepable, ReentrancyGuard {
 
 
    /**
-    Allow the shop owner to add new items to the shop,
+    Allow the shop owner or an approved manager to set the array of items known to this shop.
 
     @param _items The array of Super1155 addresses.
   */
-  function addItems(Super1155[] memory _items) external onlyOwner {
+  function setItems(Super1155[] memory _items) external  hasValidPermit(UNIVERSAL, SET_ITEMS) {
     items = _items;
   }
 
@@ -702,7 +705,7 @@ contract MintShop1155 is Sweepable, ReentrancyGuard {
 
     @param _ids An array of pool IDs to retrieve information about.
   */
-  function getPools(uint256[] calldata _ids, uint256 _itemId) external view
+  function getPools(uint256[] calldata _ids, uint256 _itemIndex) external view
     returns (PoolOutput[] memory) {
     PoolOutput[] memory poolOutputs = new PoolOutput[](_ids.length);
     for (uint256 i = 0; i < _ids.length; i++) {
@@ -739,7 +742,7 @@ contract MintShop1155 is Sweepable, ReentrancyGuard {
         purchaseLimit: pools[id].purchaseLimit,
         singlePurchaseLimit: pools[id].singlePurchaseLimit,
         requirement: pools[id].requirement,
-        itemMetadataUri: items[_itemId].metadataUri(),
+        itemMetadataUri: items[_itemIndex].metadataUri(),
         items: poolItems
       });
     }
@@ -780,7 +783,7 @@ contract MintShop1155 is Sweepable, ReentrancyGuard {
     @param _address An address which enables this function to support additional
       relevant data lookups.
   */
-  function getPoolsWithAddress(uint256[] calldata _ids, address _address, uint256 _itemId)
+  function getPoolsWithAddress(uint256[] calldata _ids, address _address, uint256 _itemIndex)
     external view returns (PoolAddressOutput[] memory) {
     PoolAddressOutput[] memory poolOutputs =
       new PoolAddressOutput[](_ids.length);
@@ -821,7 +824,7 @@ contract MintShop1155 is Sweepable, ReentrancyGuard {
         purchaseLimit: pools[id].purchaseLimit,
         singlePurchaseLimit: pools[id].singlePurchaseLimit,
         requirement: pools[id].requirement,
-        itemMetadataUri: items[_itemId].metadataUri(),
+        itemMetadataUri: items[_itemIndex].metadataUri(),
         items: poolItems,
         purchaseCount: pools[id].purchaseCounts[_address],
         whitelistStatus: whitelists[whitelistId].addresses[addressKey]
@@ -956,7 +959,7 @@ contract MintShop1155 is Sweepable, ReentrancyGuard {
     @param _amount The amount of item that the user would like to purchase.
   */
   function mintFromPool(uint256 _id, uint256 _groupId, uint256 _assetIndex,
-    uint256 _amount, uint256 _itemId) external nonReentrant payable {
+    uint256 _amount, uint256 _itemIndex) external nonReentrant payable {
     require(_amount > 0,
       "MintShop1155: must purchase at least one item");
     require(_id < nextPoolId,
@@ -1061,7 +1064,7 @@ contract MintShop1155 is Sweepable, ReentrancyGuard {
     }
 
     
-    sellingHelper(_itemId, _groupId, _id, itemKey, _amount, newCirculatingTotal, userPoolPurchaseAmount, userGlobalPurchaseAmount);
+    sellingHelper(_itemIndex, _groupId, _id, itemKey, _amount, newCirculatingTotal, userPoolPurchaseAmount, userGlobalPurchaseAmount);
 
     // Emit an event indicating a successful purchase.
   }
@@ -1069,9 +1072,9 @@ contract MintShop1155 is Sweepable, ReentrancyGuard {
 
 
   /**
-  * Private function to avoid stach-too-deep error.
+  * Private function to avoid a stack-too-deep error.
   */
-  function sellingHelper(uint256 _itemId, uint256 _groupId, uint256 _id, bytes32 _itemKey, uint256 _amount, uint256 _newCirculatingTotal, uint256 _userPoolPurchaseAmount, uint256 _userGlobalPurchaseAmount) private {
+  function sellingHelper(uint256 _itemIndex, uint256 _groupId, uint256 _id, bytes32 _itemKey, uint256 _amount, uint256 _newCirculatingTotal, uint256 _userPoolPurchaseAmount, uint256 _userGlobalPurchaseAmount) private {
      // If payment is successful, mint each of the user's purchased items.
     uint256[] memory itemIds = new uint256[](_amount);
     uint256[] memory amounts = new uint256[](_amount);
@@ -1099,7 +1102,7 @@ contract MintShop1155 is Sweepable, ReentrancyGuard {
    
 
     // Mint the items.
-    items[_itemId].mintBatch(_msgSender(), itemIds, amounts, "");
+    items[_itemIndex].mintBatch(_msgSender(), itemIds, amounts, "");
 
     emit ItemPurchased(_msgSender(), _id, itemIds, amounts);
 
