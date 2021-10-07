@@ -31,6 +31,7 @@ describe('===Super721IMX===', function () {
     let super721IMX;
     let proxyRegistry;
     let mockIMXCore;
+    let super721IMXLock;
     const originalUri = "://ipfs/uri/";
     let itemGroupId = ethers.BigNumber.from(1);
     let shiftedItemGroupId = itemGroupId.shl(128);
@@ -41,6 +42,7 @@ describe('===Super721IMX===', function () {
         this.Super721IMX = await ethers.getContractFactory("Super721IMX");
         this.ProxyRegistry = await ethers.getContractFactory("MockProxyRegistry");
         this.MockIMXCore = await ethers.getContractFactory("MockIMXCore");
+        this.Super721IMXLock = await ethers.getContractFactory("Super721IMXLock");
     });
 
     beforeEach(async function () {
@@ -52,13 +54,17 @@ describe('===Super721IMX===', function () {
         mockIMXCore = await this.MockIMXCore.deploy();
         await mockIMXCore.deployed();
 
+        super721IMXLock = await this.Super721IMXLock.deploy(owner.address);
+        await super721IMXLock.deployed()
+
         super721IMX = await this.Super721IMX.deploy(
             owner.address,
             "Super721IMX",
             "SIMX721",
             originalUri,
             proxyRegistry.address,
-            mockIMXCore.address
+            mockIMXCore.address,
+            super721IMXLock.address
         );
         await super721IMX.deployed();
         
@@ -1527,13 +1533,13 @@ describe('===Super721IMX===', function () {
         });
 
         it('Reverts: mintFor function is locked', async () => {
-            await super721IMX.connect(owner).toggleMintFor(); // LOCKED
+            await super721IMXLock.connect(owner).toggleMintFor(); // LOCKED
 
             await expect(
                 super721IMX.mintFor(signer1.address, shiftedItemGroupId, ethers.utils.id('a'))
             ).to.be.revertedWith("SuperIMX721::mintFor::disabled");
 
-            await super721IMX.connect(owner).toggleMintFor(); // UNLOCKED
+            await super721IMXLock.connect(owner).toggleMintFor(); // UNLOCKED
 
             await expect(
                 super721IMX.mintFor(signer1.address, shiftedItemGroupId, ethers.utils.id('a'))
