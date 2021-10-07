@@ -93,7 +93,7 @@ contract DropFactory is Ownable {
 
         bytes memory bytecodeSuper1155 = abi.encodePacked(
             super1155Bytecode,
-            abi.encode(_owner, _collectionName, _uri, _proxyRegistry)
+            abi.encode(_collectionName, _uri, _proxyRegistry)
         );
 
         bytes32 salt = keccak256(
@@ -116,7 +116,7 @@ contract DropFactory is Ownable {
             ISuper1155(super1155).configureGroup(i + 1, _itemGroupInput[i]);
         }
 
-        // ISuper1155(super1155)
+        ISuper1155(super1155)._transferOwnership(_owner);
 
         mintShop = createMintShop(
             _owner,
@@ -152,7 +152,6 @@ contract DropFactory is Ownable {
         bytes memory bytecodeMintShop = abi.encodePacked(
             mintShopBytecode,
             abi.encode(
-                _owner,
                 ISuper1155(super1155),
                 _paymentReceiver,
                 _globalPurchaseLimit
@@ -180,7 +179,7 @@ contract DropFactory is Ownable {
                 _poolConfigurationData[i].prices
             );
         }
-
+        IMintShop(mintShop)._transferOwnership(_owner);
         return mintShop;
     }
 
