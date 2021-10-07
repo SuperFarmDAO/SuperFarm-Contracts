@@ -36,6 +36,7 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
 
     let mintShop1155;
     let super1155;
+    let super1155Second;
     let mockERC20;
     let staker;
     let proxyRegistry;
@@ -66,11 +67,17 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
             originalUri,
             proxyRegistry.address
         );
+
+        super1155Second = await this.Super1155.deploy(
+            owner.address,
+            "Super1155142",
+            originalUri + "uri2",
+            proxyRegistry.address
+        );
         await super1155.deployed();
 
         mintShop1155 = await this.MintShop1155.deploy(
             owner.address,
-            super1155.address,
             paymentReceiver.address,
             "4"
         );
@@ -83,6 +90,11 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
             "firstStaker",
             mockERC20.address
         );
+
+
+        /// adding items to MintShop
+        await mintShop1155.connect(owner).addItems([super1155.address, super1155Second.address]);
+
         await staker.transferOwnership(owner.address);
 
         UNIVERSAL = await mintShop1155.UNIVERSAL();
@@ -110,7 +122,7 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
     describe("Constructor", function () {
         it('should initialize values as expected', async function () {
             expect(await mintShop1155.owner()).to.equal(owner.address);
-            expect(await mintShop1155.item()).to.equal(super1155.address);
+            // expect(await mintShop1155.item()).to.equal(super1155.address);
             expect(await mintShop1155.paymentReceiver()).to.equal(paymentReceiver.address);
             expect(await mintShop1155.globalPurchaseLimit()).to.equal("4");
         });
@@ -118,14 +130,13 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
         it('should deploy a new instance where deployer is the owner', async function () {
             let mintShop1155v2 = await this.MintShop1155.deploy(
                 deployer.address,
-                super1155.address,
                 paymentReceiver.address,
                 "4"
             );
             await super1155.deployed();
 
             expect(await mintShop1155v2.owner()).to.equal(deployer.address);
-            expect(await mintShop1155v2.item()).to.equal(super1155.address);
+            // expect(await mintShop1155v2.item()).to.equal(super1155.address);
             expect(await mintShop1155v2.paymentReceiver()).to.equal(paymentReceiver.address);
             expect(await mintShop1155v2.globalPurchaseLimit()).to.equal("4");
         });
@@ -355,6 +366,26 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
                 burnType: 0,
                 burnData: 0
             });
+
+            await super1155Second.connect(owner).configureGroup(itemGroupId2, {
+                name: 'NONFUNGIBLE',
+                supplyType: 0,
+                supplyData: 1,
+                itemType: 0,
+                itemData: 0,
+                burnType: 0,
+                burnData: 0
+            });
+
+            await super1155Second.connect(owner).configureGroup(itemGroupId2, {
+                name: 'NONFUNGIBLE',
+                supplyType: 0,
+                supplyData: 1,
+                itemType: 0,
+                itemData: 0,
+                burnType: 0,
+                burnData: 0
+            });
         });
 
         it('Reverts: updatePool a non-existent pool', async function(){
@@ -561,7 +592,7 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
             }]]);
 
             //Get the pool
-            let pools = await mintShop1155.connect(owner).getPools([0]);
+            let pools = await mintShop1155.connect(owner).getPools([0], 0);
             expect(pools[0].name).to.be.equal("firstPool");
         });
     });
@@ -675,35 +706,35 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
                 ]);
 
             // Get the pool
-            let pools = await mintShop1155.connect(owner).getPools([0]);
+            let pools = await mintShop1155.connect(owner).getPools([0], 0);
             expect(pools[0].name).to.be.equal("firstPool");
         });
 
         it('Reverts: mintFromPool amount less than 0', async function(){
             // Mint from pool
             await expect(
-                mintShop1155.connect(owner).mintFromPool(0, 2, 1, 0)
+                mintShop1155.connect(owner).mintFromPool(0, 2, 1, 0, 0)
             ).to.be.revertedWith("MintShop1155: must purchase at least one item");
         });
 
         it('Reverts: mintFromPool pool not active', async function(){
             // Mint from pool
             await expect(
-                mintShop1155.connect(owner).mintFromPool(2, 2, 1, 1)
+                mintShop1155.connect(owner).mintFromPool(2, 2, 1, 1, 0)
             ).to.be.revertedWith("MintShop1155: can only purchase items from an active pool");
         });
 
         it('Reverts: mintFromPool amount greater than singlePurchaseLimit', async function(){
             // Mint from pool
             await expect(
-                mintShop1155.connect(owner).mintFromPool(0, 2, 1, 3)
+                mintShop1155.connect(owner).mintFromPool(0, 2, 1, 3, 0)
             ).to.be.revertedWith("MintShop1155: cannot exceed the per-transaction maximum");
         });
 
         it('Reverts: mintFromPool assetindex not valid', async function(){
             // Mint from pool
             await expect(
-                mintShop1155.connect(owner).mintFromPool(0, 2, 5, 1)
+                mintShop1155.connect(owner).mintFromPool(0, 2, 5, 1, 0)
             ).to.be.revertedWith("MintShop1155: specified asset index is not valid");
         });
 
@@ -714,7 +745,7 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
 
             // Mint from pool
             await expect(
-                mintShop1155.connect(owner).mintFromPool(0, 2, 0, 1)
+                mintShop1155.connect(owner).mintFromPool(0, 2, 0, 1, 0)
             ).to.be.revertedWith("MintShop1155: pool is not currently running its sale");
         });
 
@@ -728,13 +759,13 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
             );
 
             // Mint three times
-            await mintShop1155.connect(owner).mintFromPool(0, 2, 0, 1, {value: ethers.utils.parseEther("1")})
-            await mintShop1155.connect(owner).mintFromPool(0, 2, 1, 1, {value: ethers.utils.parseEther("1")})
-            await mintShop1155.connect(owner).mintFromPool(0, 2, 2, 1, {value: ethers.utils.parseEther("1")})
+            await mintShop1155.connect(owner).mintFromPool(0, 2, 0, 1, 0, {value: ethers.utils.parseEther("1")})
+            await mintShop1155.connect(owner).mintFromPool(0, 2, 1, 1, 0, {value: ethers.utils.parseEther("1")})
+            await mintShop1155.connect(owner).mintFromPool(0, 2, 2, 1, 0, {value: ethers.utils.parseEther("1")})
 
             // Mint again surpassing the purchase limit of the pool
             await expect(
-                mintShop1155.connect(owner).mintFromPool(0, 2, 0, 1, {value: ethers.utils.parseEther("1")})
+                mintShop1155.connect(owner).mintFromPool(0, 2, 0, 1, 0, {value: ethers.utils.parseEther("1")})
             ).to.be.revertedWith("MintShop1155: you may not purchase any more items from this pool");
         });
 
@@ -748,14 +779,14 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
             );
 
             // Mint four times
-            await mintShop1155.connect(owner).mintFromPool(0, 2, 0, 1, {value: ethers.utils.parseEther("1")})
-            await mintShop1155.connect(owner).mintFromPool(0, 2, 1, 1, {value: ethers.utils.parseEther("1")})
-            await mintShop1155.connect(owner).mintFromPool(0, 2, 2, 1, {value: ethers.utils.parseEther("1")})
-            await mintShop1155.connect(owner).mintFromPool(1, 3, 0, 1, {value: ethers.utils.parseEther("1")})
+            await mintShop1155.connect(owner).mintFromPool(0, 2, 0, 1, 0, {value: ethers.utils.parseEther("1")})
+            await mintShop1155.connect(owner).mintFromPool(0, 2, 1, 1, 0, {value: ethers.utils.parseEther("1")})
+            await mintShop1155.connect(owner).mintFromPool(0, 2, 2, 1, 0, {value: ethers.utils.parseEther("1")})
+            await mintShop1155.connect(owner).mintFromPool(1, 3, 0, 1, 0, {value: ethers.utils.parseEther("1")})
 
             // Mint again surpassing the global purchase limit
             await expect(
-                mintShop1155.connect(owner).mintFromPool(1, 3, 1, 1, {value: ethers.utils.parseEther("1")})
+                mintShop1155.connect(owner).mintFromPool(1, 3, 1, 1, 0, {value: ethers.utils.parseEther("1")})
             ).to.be.revertedWith("MintShop1155: you may not purchase any more items from this shop");
         });
 
@@ -809,7 +840,7 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
            
             // Mint
             await expect(
-                mintShop1155.connect(signer1).mintFromPool(1, 3, 0, 1, {value: ethers.utils.parseEther("1")})
+                mintShop1155.connect(signer1).mintFromPool(1, 3, 0, 1, 0, {value: ethers.utils.parseEther("1")})
             ).to.be.revertedWith("MintShop1155: you are not whitelisted on this pool");
         });
 
@@ -851,11 +882,11 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
                     }]
                 ]);
            
-            await mintShop1155.connect(signer1).mintFromPool(1, 3, 0, 1, {value: ethers.utils.parseEther("1")})
+            await mintShop1155.connect(signer1).mintFromPool(1, 3, 0, 1, 0, {value: ethers.utils.parseEther("1")})
 
             // Mint until cap reached
             await expect(
-                mintShop1155.connect(signer1).mintFromPool(1, 3, 0, 1, {value: ethers.utils.parseEther("1")})
+                mintShop1155.connect(signer1).mintFromPool(1, 3, 0, 1, 0, {value: ethers.utils.parseEther("1")})
             ).to.be.revertedWith("MintShop1155: there are not enough items available for you to purchase");
         });
 
@@ -898,7 +929,7 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
             );
 
             await expect(
-                mintShop1155.connect(owner).mintFromPool(1, 3, 0, 1, {value: ethers.utils.parseEther("0.5")})
+                mintShop1155.connect(owner).mintFromPool(1, 3, 0, 1, 0, {value: ethers.utils.parseEther("0.5")})
             ).to.be.revertedWith("MintShop1155: you did not send enough Ether to complete the purchase");
         });
 
@@ -945,7 +976,7 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
 
             // Mint until cap reached
             await expect(
-                mintShop1155.connect(signer1).mintFromPool(1, 3, 0, 1)
+                mintShop1155.connect(signer1).mintFromPool(1, 3, 0, 1, 0)
             ).to.be.revertedWith("MintShop1155: you do not have enough required token for this pool");
 
             // Give signer1 some more amount of ERC20 Tokens
@@ -955,13 +986,13 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
             await mockERC20.connect(signer1).approve(mintShop1155.address, ethers.utils.parseEther("15"));
 
             await expect(
-                mintShop1155.connect(signer1).mintFromPool(1, 3, 1, 3)
+                mintShop1155.connect(signer1).mintFromPool(1, 3, 1, 3, 0)
             ).to.be.revertedWith("MintShop1155: you do not have enough token to complete the purchase");
 
             // Successful purchase, Give signer1 some more amount of ERC20 Tokens
             await mockERC20.connect(deployer).transfer(signer1.address, ethers.utils.parseEther("5"));
 
-            await mintShop1155.connect(signer1).mintFromPool(1, 3, 1, 1);
+            await mintShop1155.connect(signer1).mintFromPool(1, 3, 1, 1, 0);
 
             // getPurchaseCounts
             let balances = await mintShop1155.connect(signer1).getPurchaseCounts([signer1.address, signer2.address, owner.address], [1]);
@@ -1052,18 +1083,18 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
 
                 // Mint based on ERC1155 item holdings
                 await expect(
-                    mintShop1155.connect(signer1).mintFromPool(1, 3, 1, 1)
+                    mintShop1155.connect(signer1).mintFromPool(1, 3, 1, 1, 0, )
                 ).to.be.revertedWith("MintShop1155: you do not have enough required item for this pool");
 
                 // Mint ERC1155 for signer1
                 await super1155.connect(owner).mintBatch(signer1.address, [shiftedItemGroupId], ["1"], DATA);
 
-                await mintShop1155.connect(signer1).mintFromPool(1, 3, 0, 1, {value: ethers.utils.parseEther("1")});
+                await mintShop1155.connect(signer1).mintFromPool(1, 3, 0, 1, 0, {value: ethers.utils.parseEther("1")});
         });
 
         it('should getPoolsWithAddress', async function(){
             // Get all the pools mentioned
-            let pools = await mintShop1155.connect(owner).getPoolsWithAddress([0, 1], owner.address);
+            let pools = await mintShop1155.connect(owner).getPoolsWithAddress([0, 1], owner.address, 0);
             await expect(
                 pools[0].name
             ).to.be.equal("firstPool")
@@ -1144,7 +1175,7 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
             // Signer1 hasn't claimed points
             // mintFromPool of mintshop1155 must revert
             await expect(
-                mintShop1155.connect(signer1).mintFromPool(0, 1, 0, 1)
+                mintShop1155.connect(signer1).mintFromPool(0, 1, 0, 1, 0)
             ).to.be.revertedWith("MintShop1155: you do not have enough required points for this pool");
             
             // Jump forward and travel in time through the portal, signer1 must be eligible for the pool now
@@ -1171,7 +1202,7 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
             );
             
             // Signer1 Successfully mint
-            await mintShop1155.connect(signer1).mintFromPool(0, 1, 0, 1);
+            await mintShop1155.connect(signer1).mintFromPool(0, 1, 0, 1, 0);
         });
     });
 
