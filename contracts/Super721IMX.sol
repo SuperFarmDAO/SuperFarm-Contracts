@@ -10,7 +10,7 @@ import "@openzeppelin/contracts/utils/Address.sol";
 import "./utils/LocalStrings.sol";
 import "./access/PermitControl.sol";
 import "./proxy/StubProxyRegistry.sol";
-import "./utils/LocalStrings.sol";
+import "./Super721IMXLock.sol";
 
 /**
   @title An ERC-721 item creation contract.
@@ -113,6 +113,9 @@ contract Super721IMX is PermitControl, ERC165Storage, IERC721 {
 
   /// The address of the IMX core contract for L2 minting.
   address public imxCoreAddress;
+
+  /// The address of the global lock for all 721IMX instances.
+  address public super721IMXLock;
 
   /// @dev A mapping from each token ID to per-address balances.
   mapping (uint256 => mapping(address => uint256)) public balances;
@@ -337,7 +340,7 @@ contract Super721IMX is PermitControl, ERC165Storage, IERC721 {
     @param _imxCoreAddress The address of the IMX core contract for L2 minting.
   */
   constructor(address _owner, string memory _name, string memory _symbol, string memory _uri,
-    address _proxyRegistryAddress, address _imxCoreAddress) {
+    address _proxyRegistryAddress, address _imxCoreAddress, address _super721IMXLock) {
 
     // Do not perform a redundant ownership transfer if the deployer should
     // remain as the owner of the collection.
@@ -356,6 +359,7 @@ contract Super721IMX is PermitControl, ERC165Storage, IERC721 {
     metadataUri = _uri;
     proxyRegistryAddress = _proxyRegistryAddress;
     imxCoreAddress = _imxCoreAddress;
+    super721IMXLock = _super721IMXLock;
   }
   /**
   */
@@ -839,6 +843,8 @@ contract Super721IMX is PermitControl, ERC165Storage, IERC721 {
     The special, IMX-privileged minting function for centralized L2 support.
   */
   function mintFor(address _to, uint256 _id, bytes calldata _blueprint) external {
+    require(!Super721IMXLock(super721IMXLock).mintForLocked(),
+      "SuperIMX721::mintFor::disabled");
     require(_msgSender() == imxCoreAddress,
       "SuperIMX721::mintFor::only IMX may call this mint function");
     uint256[] memory ids = _asSingletonArray(_id);
