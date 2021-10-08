@@ -22,13 +22,13 @@ contract Super721IMXLock is PermitControl {
     An event that gets emitted when the mintForLocked variable is set to true.
     @param locker The caller who locked the collection.
   */
-  event MintForLocked(address indexed locker);
+  event MintForLocked(address indexed locker, uint256 timestamp, bool oldValue, bool newValue);
 
   /**
     An event that gets emitted when the mintForLocked variable is set to false.
     @param locker The caller who locked the collection.
   */
-  event MintForUnlocked(address indexed locker);
+  event MintForUnlocked(address indexed locker, uint256 timestamp, bool oldValue, bool newValue);
 
   /**
     Construct a new ERC-721 item collections global lock.
@@ -44,14 +44,14 @@ contract Super721IMXLock is PermitControl {
     Toggling control for the mintFor function ability to mint based on
     mintForLocked variable.
   */
-  function toggleMintFor() external hasValidPermit(MANAGER, TOGGLE_MINT_FOR) {
+  function toggleMintFor() external hasValidPermit(UNIVERSAL, TOGGLE_MINT_FOR) {
+    bool oldValue = mintForLocked;
     if (mintForLocked) {
       mintForLocked = false;
-      emit MintForUnlocked(msg.sender);
-    }
-    else {
+      emit MintForUnlocked(msg.sender, block.timestamp, oldValue, mintForLocked);
+    } else {
       mintForLocked = true;
-      emit MintForUnlocked(msg.sender);
+      emit MintForLocked(msg.sender, block.timestamp, oldValue, mintForLocked);
     }
   }
 }
