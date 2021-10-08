@@ -189,4 +189,22 @@ library DFStorage {
     BurnType burnType;
     string name;
   }
+
+
+    /**
+    This struct is a source of mapping-free input to the `addWhitelist`
+    function.
+
+    @param expiryTime A block timestamp after which this whitelist is
+      automatically considered inactive, no matter the value of `isActive`.
+    @param isActive Whether or not this whitelist is actively restricting
+      purchases in blocks ocurring before `expiryTime`.
+    @param addresses An array of addresses to whitelist for participation in a
+      purchases guarded by a whitelist.
+  */
+  struct WhitelistInput {
+    uint256 expiryTime;
+    bool isActive;
+    address[] addresses;
+  }
 }

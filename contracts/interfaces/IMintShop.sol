@@ -13,4 +13,6 @@ interface IMintShop {
     ) external;
 
     function _transferOwnership(address _owner) external;
+
+    function addWhitelist(DFStorage.WhitelistInput memory _whitelist) external;
 }

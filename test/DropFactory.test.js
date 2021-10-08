@@ -27,7 +27,7 @@ describe("DropFactory test", function () {
         await super1155Helper.deployed();
 
         // MintShopHelper = await ethers.getContractFactory('HelperMintShop');
-        Factory = await ethers.getContractFactory('DropFactory');
+        Factory = await hre.ethers.getContractFactory('DropFactory');
 
         // mintShopHelper = await MintShopHelper.deploy();
         factory = await Factory.deploy(mintShopHelper.address, super1155Helper.address);
@@ -61,7 +61,7 @@ describe("DropFactory test", function () {
                 requiredType: 0,
                 requiredAsset: NULL_ADDRESS,
                 requiredAmount: 1,
-                whitelistId: 1
+                whitelistId: 0
             }
         };
 
@@ -125,6 +125,13 @@ describe("DropFactory test", function () {
         // let bytecodeInContract = await factory.getData();
         // console.log(bytecodeInContract);
         // console.log(address.toString());
+        let whitelistAddresses = [owner.address, user_one.address];
+        let whiteListData = {
+            expiryTime: ethers.constants.MaxUint256,
+            isActive: true,
+            addresses: whitelistAddresses
+        };
+
 
         let addresses = await factory.createDrop(
             owner.address,
@@ -132,17 +139,36 @@ describe("DropFactory test", function () {
             "data_uri",
             "0x0000000000000000000000000000000000000000",
             user_one.address,
-            ethers.utils.parseEther("100"),
+            100,
             [configGroup],
             [poolInput],
-            [data2]
+            [data2], 
+            [whiteListData]
         );
 
-        let drops = await factory.getDrops();
+       
+
+        // let drops = await factory.getDrops();
+
+        let drops = await factory.getExactDrop(0);
+        let mintShopAddres = drops[1];
+        // let MS =await  hre.ethers.getContractAt("MintShop1155", mintShopAddres);
+        // let setWhiteListRight = await MS.WHITELIST();
+        //
+
+        // await MS.connect(owner).addWhitelist({
+        //     expiryTime: ethers.constants.MaxUint256,
+        //     isActive: true,
+        //     addresses: whitelistAddresses
+        // });
+
+        
 
         console.log(drops.toString());
         // done();
-        // console.log(addresses);
+        console.log(addresses[0]);
+        console.log(addresses[1]);
+
     }).timeout(10000);
 
 

@@ -37,7 +37,9 @@ contract DropFactory is Ownable {
         DFStorage.Price[][] prices;
     }
 
-    Drop[] public drops;
+
+    mapping (bytes32 => Drop) drops;
+    // Drop[] public drops;
 
     constructor(
         address _mintShopHelper,
@@ -54,10 +56,10 @@ contract DropFactory is Ownable {
      * @param _uri URI of new drop
      * @param _proxyRegistry Address of proxy registy contract
      * @param _globalPurchaseLimit Maximum quantity available for purchase.
-     * @param _itemGroupInput Array of object of ItemGroupInput, description in {LibStorage}.
-     * @param _poolInput Array of object of PoolInput, description in {LibStorage}.
+     * @param _itemGroupInput Array of object of ItemGroupInput, description in {DFStorage}.
+     * @param _poolInput Array of object of PoolInput, description in {DFStorage}.
      * @param _poolConfigurationData Array of object of ItemGroupInput, description above.
-
+     * @param _whiteListInput Array of whiteListInput, description in {DFStorage}
 
      * @return super1155 Returns 2 addresses, new Super1155 and MintShop1155 contracts.
      * @return mintShop Returns 2 addresses, new Super1155 and MintShop1155 contracts.
@@ -72,7 +74,9 @@ contract DropFactory is Ownable {
         uint256 _globalPurchaseLimit,
         DFStorage.ItemGroupInput[] memory _itemGroupInput,
         DFStorage.PoolInput[] memory _poolInput,
-        PoolConfigurationData[] memory _poolConfigurationData
+        PoolConfigurationData[] memory _poolConfigurationData,
+        DFStorage.WhitelistInput[] memory _whiteListInput,
+        bytes32 salt
     )
         external
         returns (
@@ -80,16 +84,55 @@ contract DropFactory is Ownable {
             address mintShop
         )
     {
-        require(
-            _itemGroupInput.length == _poolInput.length,
-            "DropFactory: arrays of input parametres must be same length!"
-        );
-        require(
-            _itemGroupInput.length == _poolConfigurationData.length,
-            "DropFactory: arrays of input parametres must be same length!"
+        // require(
+        //     _itemGroupInput.length == _poolInput.length,
+        //     "DropFactory: arrays of input parametres must be same length!"
+        // );
+        // require(
+        //     _itemGroupInput.length == _poolConfigurationData.length,
+        //     "DropFactory: arrays of input parametres must be same length!"
+        // );
+
+        // require(_poolInput.length == _whiteListInput.length, "DropFactory: arrays of poolImput and whiteListInput must be the same length!");
+
+        super1155 = createSuper1155(_owner, _collectionName, _uri, _proxyRegistry, _itemGroupInput, _poolInput);  
+
+        mintShop = createMintShop(
+            _owner,
+            address(super1155),
+            _paymentReceiver,
+            _globalPurchaseLimit,
+            _poolInput,
+            _poolConfigurationData,
+            _whiteListInput
         );
 
-        bytes memory super1155Bytecode = IHelper(super1155Helper).getByteCode();
+        Drop storage drop = drops[salt];
+        drop.mintShop1155 = address(mintShop);
+        drop.owner = msg.sender;
+        drop.super1155 = address(super1155);
+        // drops.push(
+        //     Drop({
+        //         owner: msg.sender,
+        //         mintShop1155: address(mintShop),
+        //         super1155: address(super1155)
+        //     })
+        // );
+
+        return (address(super1155), address(mintShop));
+    }
+
+
+    function createSuper1155( 
+        address _owner,
+        string memory _collectionName,
+        string memory _uri,
+        address _proxyRegistry,
+        DFStorage.ItemGroupInput[] memory _itemGroupInput,
+        DFStorage.PoolInput[] memory _poolInput
+        ) private returns (address super1155) {
+            
+         bytes memory super1155Bytecode = IHelper(super1155Helper).getByteCode();
 
         bytes memory bytecodeSuper1155 = abi.encodePacked(
             super1155Bytecode,
@@ -111,32 +154,13 @@ contract DropFactory is Ownable {
             }
         }
 
-        
         for (uint256 i = 0; i < _poolInput.length; i++) {
             ISuper1155(super1155).configureGroup(i + 1, _itemGroupInput[i]);
         }
 
         ISuper1155(super1155)._transferOwnership(_owner);
 
-        mintShop = createMintShop(
-            _owner,
-            address(super1155),
-            _paymentReceiver,
-            _globalPurchaseLimit,
-            _poolInput,
-            _poolConfigurationData
-        );
-
-
-        drops.push(
-            Drop({
-                owner: msg.sender,
-                mintShop1155: address(mintShop),
-                super1155: address(super1155)
-            })
-        );
-
-        return (address(super1155), address(mintShop));
+        return (super1155);
     }
 
     function createMintShop(
@@ -145,7 +169,8 @@ contract DropFactory is Ownable {
         address _paymentReceiver,
         uint256 _globalPurchaseLimit,
         DFStorage.PoolInput[] memory _poolInput,
-        PoolConfigurationData[] memory _poolConfigurationData
+        PoolConfigurationData[] memory _poolConfigurationData,
+        DFStorage.WhitelistInput[] memory _whiteListInput
     ) private returns (address mintShop) {
 
         bytes memory mintShopBytecode = IHelper(mintShopHelper).getByteCode();
@@ -169,8 +194,13 @@ contract DropFactory is Ownable {
                 revert(0, 0)
             }
         }
+        
 
         for (uint256 i = 0; i < _poolInput.length; i++) {
+            DFStorage.PoolRequirement memory req = _poolInput[i].requirement;
+            if (req.whitelistId != 0) {
+                IMintShop(mintShop).addWhitelist(_whiteListInput[i]);
+            }
             IMintShop(mintShop).addPool(
                 _poolInput[i],
                 _poolConfigurationData[i].groupIds,
@@ -179,25 +209,18 @@ contract DropFactory is Ownable {
                 _poolConfigurationData[i].prices
             );
         }
+
         IMintShop(mintShop)._transferOwnership(_owner);
         return mintShop;
     }
 
     /**
-     * @notice Get all Drops from contract
-     * @return Returns array of Drop structs.
-     */
-    function getDrops() external view returns (Drop[] memory) {
-        return drops;
-    }
-
-    /**
      * @notice Get exact Drop struct.
-     * @param _index Index in Drops[] array.
+     * @param salt Bytes32 salt for getting drop object.
       
      * @return Returns Drop struct.
      */
-    function getExactDrop(uint256 _index) external view returns (Drop memory) {
-        return drops[_index];
+    function getExactDrop(bytes32 salt) external view returns (Drop memory) {
+        return drops[salt];
     }
 }

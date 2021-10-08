@@ -148,25 +148,6 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop {
     mapping (bytes32 => mapping (uint256 => DFStorage.Price)) itemPrices;
   }
 
-  
-
-  /**
-    This struct is a source of mapping-free input to the `addWhitelist`
-    function.
-
-    @param expiryTime A block timestamp after which this whitelist is
-      automatically considered inactive, no matter the value of `isActive`.
-    @param isActive Whether or not this whitelist is actively restricting
-      purchases in blocks ocurring before `expiryTime`.
-    @param addresses An array of addresses to whitelist for participation in a
-      purchases guarded by a whitelist.
-  */
-  struct WhitelistInput {
-    uint256 expiryTime;
-    bool isActive;
-    address[] addresses;
-  }
-
   /**
     This struct tracks information about a single whitelist known to this shop.
     Whitelists may be shared across multiple different item pools.
@@ -476,7 +457,7 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop {
 
     @param _whitelist The WhitelistInput full of data defining the whitelist.
   */
-  function addWhitelist(WhitelistInput memory _whitelist) external
+  function addWhitelist(DFStorage.WhitelistInput memory _whitelist) external override
     hasValidPermit(UNIVERSAL, WHITELIST) {
     updateWhitelist(nextWhitelistId, _whitelist);
 
@@ -491,7 +472,7 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop {
     @param _id The whitelist ID to replace with the new whitelist.
     @param _whitelist The WhitelistInput full of data defining the whitelist.
   */
-  function updateWhitelist(uint256 _id, WhitelistInput memory _whitelist)
+  function updateWhitelist(uint256 _id, DFStorage.WhitelistInput memory _whitelist)
     public hasValidPermit(UNIVERSAL, WHITELIST) {
     uint256 newWhitelistVersion =
       whitelists[_id].currentWhitelistVersion + 1;
