@@ -52,7 +52,7 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop {
   uint256 constant GROUP_MASK = uint256(type(uint128).max) << 128;
 
   /// The item collection contract that minted items are sold from.
-  Super1155[] public items;
+  ISuper1155[] public items;
 
   /**
     The address where the payment from each item buyer is sent. Care must be
@@ -423,7 +423,7 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop {
 
     @param _items The array of Super1155 addresses.
   */
-  function setItems(Super1155[] memory _items) external  hasValidPermit(UNIVERSAL, SET_ITEMS) {
+  function setItems(ISuper1155[] memory _items) external  hasValidPermit(UNIVERSAL, SET_ITEMS) {
     items = _items;
   }
 
@@ -625,7 +625,7 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop {
         purchaseLimit: pools[id].purchaseLimit,
         singlePurchaseLimit: pools[id].singlePurchaseLimit,
         requirement: pools[id].requirement,
-        itemMetadataUri: items[_itemIndex].metadataUri(),
+        itemMetadataUri: items[_itemIndex].getThisMetadataUri(),
         items: poolItems
       });
     }
@@ -707,7 +707,7 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop {
         purchaseLimit: pools[id].purchaseLimit,
         singlePurchaseLimit: pools[id].singlePurchaseLimit,
         requirement: pools[id].requirement,
-        itemMetadataUri: items[_itemIndex].metadataUri(),
+        itemMetadataUri: items[_itemIndex].getThisMetadataUri(),
         items: poolItems,
         purchaseCount: pools[id].purchaseCounts[_address],
         whitelistStatus: whitelists[whitelistId].addresses[addressKey]
