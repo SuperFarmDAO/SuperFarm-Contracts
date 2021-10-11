@@ -368,21 +368,14 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop {
   /**
     Construct a new shop which can mint items upon purchase from various pools.
 
-    @param _owner The address of the administrator governing this collection.
     @param _paymentReceiver The address where shop earnings are sent.
     @param _globalPurchaseLimit A global limit on the number of items that a
       single address may purchase across all item pools in the shop.
   */
-  constructor(address _owner, address _paymentReceiver,
+  constructor(address _paymentReceiver,
     uint256 _globalPurchaseLimit) {
 
-    // Do not perform a redundant ownership transfer if the deployer should
-    // remain as the owner of the collection.
-    // if (_owner != owner()) {
-    //   transferOwnership(_owner);
-    // }
-
-    // Continue initialization.
+    // Initialization.
     paymentReceiver = _paymentReceiver;
     globalPurchaseLimit = _globalPurchaseLimit;
   }
@@ -423,7 +416,7 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop {
 
     @param _items The array of Super1155 addresses.
   */
-  function setItems(ISuper1155[] memory _items) external  hasValidPermit(UNIVERSAL, SET_ITEMS) {
+  function setItems(ISuper1155[] memory _items) external override hasValidPermit(UNIVERSAL, SET_ITEMS) {
     items = _items;
   }
 

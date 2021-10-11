@@ -177,7 +177,6 @@ contract DropFactory is Ownable {
         bytes memory bytecodeMintShop = abi.encodePacked(
             mintShopBytecode,
             abi.encode(
-                ISuper1155(super1155),
                 _paymentReceiver,
                 _globalPurchaseLimit
             )
@@ -194,6 +193,11 @@ contract DropFactory is Ownable {
                 revert(0, 0)
             }
         }
+
+        ISuper1155[] memory items = new ISuper1155[](1);
+        items[0] = ISuper1155(super1155);
+
+        IMintShop(mintShop).setItems(items);
         
 
         for (uint256 i = 0; i < _poolInput.length; i++) {

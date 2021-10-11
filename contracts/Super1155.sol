@@ -259,12 +259,6 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
     _registerInterface(INTERFACE_ERC1155);
     _registerInterface(INTERFACE_ERC1155_METADATA_URI);
 
-    // Do not perform a redundant ownership transfer if the deployer should
-    // remain as the owner of the collection.
-    // if (_owner != owner()) {
-    //   transferOwnership(_owner);
-    // }
-
     // Continue initialization.
     name = _name;
     metadataUri = _uri;
