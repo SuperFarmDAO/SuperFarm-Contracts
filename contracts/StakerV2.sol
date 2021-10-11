@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8.7;
 
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 import "@openzeppelin/contracts/token/ERC1155/IERC1155Receiver.sol";
+import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
+import "./base/Sweepable.sol";
 import "./ISuperGeneric.sol";
 
 /**
@@ -16,24 +16,55 @@ import "./ISuperGeneric.sol";
   @author Qazawat Zirak
   This staking contract disburses tokens from its internal reservoir according
   to a fixed emission schedule. Assets can be assigned varied staking weights.
-  It also supports NFT staking for boosts on native ERC20 staking rewards.
+  It also supports Items staking for boosts on native ERC20 staking rewards.
+  The item staking supports Fungible, Non-Fungible and Semi-Fungible staking.
   This code is inspired by and modified from Sushi's Master Chef contract.
   https://github.com/sushiswap/sushiswap/blob/master/contracts/MasterChef.sol
 */
-contract StakerV2 is IERC721Receiver, IERC1155Receiver, Ownable, ReentrancyGuard {
+contract StakerV2 is Sweepable, ReentrancyGuard, IERC721Receiver, IERC1155Receiver {
   using SafeERC20 for IERC20;
   using EnumerableSet for EnumerableSet.UintSet;
 
-  // Descriptive name for this contract.
+  /// The public identifier for the right to add developer.
+  bytes32 public constant ADD_DEVELOPER = keccak256("ADD_DEVELOPER");
+
+  /// The public identifier for the right to lock developers.
+  bytes32 public constant LOCK_DEVELOPERS = keccak256("LOCK_DEVELOPERS");
+
+  /// The public identifier for the right to set emissions.
+  bytes32 public constant SET_EMISSIONS = keccak256("SET_EMISSIONS");
+
+  /// The public identifier for the right to lock token emissions.
+  bytes32 public constant LOCK_TOKEN_EMISSIONS = keccak256("LOCK_TOKEN_EMISSIONS");
+
+  /// The public identifier for the right to lock point emissions.
+  bytes32 public constant LOCK_POINT_EMISSIONS = keccak256("LOCK_POINT_EMISSIONS");
+
+  /// The public identifier for the right to configure boosters.
+  bytes32 public constant CONFIGURE_BOOSTERS = keccak256("CONFIGURE_BOOSTERS");
+
+  /// The public identifier for the right to add pools.
+  bytes32 public constant ADD_POOL = keccak256("ADD_POOL");
+
+  /// The public identifier for the right to approve point spender.
+  bytes32 public constant APPROVE_POINT_SPENDER = keccak256("APPROVE_POINT_SPENDER");
+
+  /// ERC721 interface ID to detect external contracts for Items staking.
+  bytes4 private constant INTERFACE_ERC721 = 0x80ac58cd;
+
+  /// ERC1155 interface ID to detect external contracts for Items staking.
+  bytes4 private constant INTERFACE_ERC1155 = 0xd9b67a26;
+
+  /// Descriptive name for this contract.
   string public name;
 
-  // Token to disburse to stakers.
-  IERC20 public token;
+  /// Token to disburse to stakers.
+  address public token;
 
-  // If contract owner can add/set developers.
+  /// Flag for allowing contract owner to add or set developers.
   bool public canAlterDevelopers;
 
-  // Developer addresses for finding shares in the 'developerShares'.
+  /// Developer addresses for finding shares in the 'developerShares'.
   address[] public developerAddresses;
 
   /**  
@@ -43,30 +74,42 @@ contract StakerV2 is IERC721Receiver, IERC1155Receiver, Ownable, ReentrancyGuard
   */
   mapping (address => uint256) public developerShares;
 
-  // If contract owner can alter emissions.
+  /// Flag for allowing contract owner to alter token emissions.
   bool public canAlterTokenEmissionSchedule;
+
+  /// Flag for allowing contract owner to alter point emissions.
   bool public canAlterPointEmissionSchedule;
 
   /**  
     This emission schedule maps a timestamp to the amount of tokens or points 
     that should be disbursed starting at that timestamp per-second onwards.
     @param timeStamp if current time reaches timestamp, the rate is applied.
-    @param rate measure of points/tokens emitted per-second.
+    @param rate measure of points or tokens emitted per-second.
   */
   struct EmissionPoint {
     uint256 timeStamp;
     uint256 rate;
   }
 
-  // Array of emission schedule timestamps for finding emission rate changes.
+  /// The total number of 'EmissionPoint' as token emission events in the schedule.
   uint256 public tokenEmissionEventsCount;
+
+  /// The total number of 'EmissionPoint' as point emission events in the schedule.
   uint256 public pointEmissionEventsCount;
+
+  /// Schedule of token 'EmissionPoint' for finding emission rate changes.
   mapping (uint256 => EmissionPoint) public tokenEmissionEvents;
+
+  /// Schedule of point 'EmissionPoint' for finding emission rate changes.
   mapping (uint256 => EmissionPoint) public pointEmissionEvents;
 
-  // Store the very earliest possible timestamp for quick reference.
-  uint256 MAX_INT = 2**256 - 1;
+  /// @dev A max uint256 value that represents earliest timestamp for quick reference.
+  uint256 private MAX_INT = 2**256 - 1;
+
+  /// Earliest possible token emission timestamp.
   uint256 internal earliestTokenEmissionEvent;
+
+  /// Earliest possible point emission timestamp.
   uint256 internal earliestPointEmissionEvent;
 
 /**  
@@ -80,7 +123,8 @@ contract StakerV2 is IERC721Receiver, IERC1155Receiver, Ownable, ReentrancyGuard
     @param pointsPerShare accumulated points per share times 1e12.
     @param lastRewardEvent record of the time of the last disbursement.
     @param boostInfo boosters applied to the pool rewards when eligible.
-    @notice tokenBoostedDeposit & pointBoostedDeposit do not change emission
+
+    'tokenBoostedDeposit' and 'pointBoostedDeposit' do not change emission
     rate, but used to calculate perShare amount when there are boosters.
   */
   struct PoolInfo {
@@ -95,19 +139,19 @@ contract StakerV2 is IERC721Receiver, IERC1155Receiver, Ownable, ReentrancyGuard
     uint256[] boostInfo;
   }
 
-  // Array for enumeration of the pools.
+  /// Array for enumeration of the pools.
   IERC20[] public poolTokens;
 
-  // Mapping of pools to 'PoolInfo' based on their deposit tokens.
+  /// Mapping of pools to 'PoolInfo' based on their deposit tokens.
   mapping (IERC20 => PoolInfo) public poolInfo;
 
   /**  
     A struct containing the Fungible Token Staker information.
     @param amount amount of the pool asset being provided by the user.
-    @param tokenBoostedAmount tokens amount after boosts.
-    @param pointBoostedAmount points amount after boosts.
+    @param tokenBoostedAmount tokens amount after boosts are applied.
+    @param pointBoostedAmount points amount after boosts are applied.
     @param tokenPaid value of user's total token earnings paid out. 
-    pending reward = (user.amount * pool.tokensPerShare) - user.rewardDebt.
+      pending reward = (user.amount * pool.tokensPerShare) - user.rewardDebt.
     @param pointPaid value of user's total point earnings paid out.
   */
   struct UserInfo {
@@ -118,21 +162,25 @@ contract StakerV2 is IERC721Receiver, IERC1155Receiver, Ownable, ReentrancyGuard
     uint256 pointPaid;
   }
 
-  // Stored information for each user staking in each pool.
+  /// Stored information for each user staking in each pool.
   mapping (IERC20 => mapping (address => UserInfo)) public userInfo;
 
-  // The total sum of the strength of all pools.
+  /// The total sum of the token strength of all pools.
   uint256 public totalTokenStrength;
+
+  /// The total sum of the point strength of all pools.
   uint256 public totalPointStrength;
 
-  // The total amount of the disbursed token ever emitted by this Staker.
+  /// The total amount of the disbursed token ever emitted by this StakerV2.
   uint256 public totalTokenDisbursed;
 
-  // Users additionally accrue non-token points for participating via staking.
+  /// Users additionally accrue non-token points for participating via staking.
   mapping (address => uint256) public userPoints;
+
+  /// The amount of points belonging to a user already spent.
   mapping (address => uint256) public userSpentPoints;
 
-  // A map of all external addresses that are permitted to spend user points.
+  /// A map of all external addresses that are permitted to spend user points.
   mapping (address => bool) public approvedPointSpenders;
 
   /**
@@ -149,11 +197,10 @@ contract StakerV2 is IERC721Receiver, IERC1155Receiver, Ownable, ReentrancyGuard
 
   /** 
     A booster struct, which stores information on the boost requirements.
-    @param set if set, then the booster is active.
     @param multiplier the rate which will act as a boost on basis points.
-    A multiplier of Zero means, the booster is not set.
-    @param amountRequired number of NFTs required from the contract.
-    @param groupRequired (optional) specifies a group from NFT contract 
+      A multiplier of Zero means, the booster is not set.
+    @param amountRequired number of Items required from the contract.
+    @param groupRequired (optional) specifies a group from Items contract 
       as requirement for the boost. If 0, then any group or item.
     @param contractRequired contract that the required assets belong to.
     @param assetType enum that specifies Tokens/Points to boost or both.
@@ -166,80 +213,92 @@ contract StakerV2 is IERC721Receiver, IERC1155Receiver, Ownable, ReentrancyGuard
     AssetType assetType;
   }
 
-  // Mapping of Booster ID to its 'BoostInfo'.
+  /// Mapping of Booster ID to its 'BoostInfo'.
   mapping (uint256 => BoostInfo) public boostInfo;
 
-  // Number of boosters that are active.
+  /// Number of boosters that are active.
   uint256 public activeBoosters;
 
   /**
-    A struct containing the NFT staker information.
-    @param boosterIds enumerable booster Ids the user has staked NFTs in.
+    A struct containing the Items staker information.
+    @param totalItems total Items staked in this contract by Items staker.
     @param tokenIds actual ids of tokens mapped to booster Id.
-    @param totalNfts total NFTs staked in this contract by NFT staker.
-    @notice contract information at the time of unstaking is retreived
-    from the boostInfo.
+    @param amounts amount of Items per tokenId.
+    @param boosterIds enumerable booster Ids the user has staked Items in.
+
+    Contract address at the time of unstaking is retreived from boostInfo.
    */
-  struct NftUserInfo {
-    EnumerableSet.UintSet boosterIds;
+  struct ItemUserInfo {
+    uint256 totalItems;
     mapping(uint256 => EnumerableSet.UintSet) tokenIds;
-    uint256 totalNfts;
+    mapping(uint256 => uint256) amounts;
+    EnumerableSet.UintSet boosterIds;
   }
 
   /**
     A struct as return parameter to get token Ids against a booster Id of
-    a staker.
-    @param boostersIds the booster Id to check the NFTs for.
+    a staker. Needed since EnumerableSets cannot have getters by default.
+    @param boostersIds the booster Id to check the Items for.
     @param tokenIds the token Ids that are staked in that booster.
-    @param totalNfts total NFTs staked in this contract by NFT staker.
+    @param amounts amount per token Id staked in a booster.
+    @param totalItems total Items staked in this contract by Items staker.
    */
-  struct GetNftUserInfo {
+  struct GetItemUserInfo {
     uint256 boosterId;
     uint256[] tokenIds;
-    uint256 totalNfts;
+    uint256[] amounts;
+    uint256 totalItems;
   }
 
-  // Collection of NFT stakers
-  mapping(address => NftUserInfo) private nftUserInfo;
+  /// Collection of Item stakers
+  mapping(address => ItemUserInfo) private itemUserInfo;
 
-  // NFTs staked in this contract.
-  uint256 public totalNftStakes;
+  /// Items staked in this contract.
+  uint256 public totalItemStakes;
 
-  // Events for depositing Fungible assets and later withdrawing them.
+  /// Event for depositing Fungible assets.
   event Deposit(address indexed user, IERC20 indexed token, uint256 amount);
+
+  /// Event for withdrawing Fungible assets.
   event Withdraw(address indexed user, IERC20 indexed token, uint256 amount);
 
-  // Events for staking and unstaking non fungible items for boosters.
-  event StakeNftBatch(address indexed user, IERC20 indexed token, uint256 boosterId);
-  event UnstakeNftBatch(address indexed user, IERC20 indexed token, uint256 boosterId);
+  /// Event for staking non fungible items for boosters.
+  event StakeItemBatch(address indexed user, IERC20 indexed token, uint256 boosterId);
+
+  /// Event for unstaking non fungible items from boosters.
+  event UnstakeItemBatch(address indexed user, IERC20 indexed token, uint256 boosterId);
 
   // An event for tracking when a user has spent points.
   event SpentPoints(address indexed source, address indexed user, uint256 amount);
 
   /**
-    Deploy a new SuperStaking contract with a name and the token to disburse.
-    @param _name the name of the Staker contract.
+    Deploy a new StakerV2 contract with a name and the token to disburse.
+    @param _name the name of the StakerV2 contract.
     @param _token the token to reward stakers in this contract with.
   */
-  constructor(string memory _name, IERC20 _token) {
+  constructor(address _owner, string memory _name, address _token) {
+
+    if (_owner != owner()) {
+      transferOwnership(_owner);
+    }
 
     name = _name;
     token = _token;
     canAlterDevelopers = true;
     canAlterTokenEmissionSchedule = true;
-    earliestTokenEmissionEvent = MAX_INT;
     canAlterPointEmissionSchedule = true;
+    earliestTokenEmissionEvent = MAX_INT;
     earliestPointEmissionEvent = MAX_INT;
   }
 
   /**
-    Add a new developer to the Staker or overwrite an existing one.
+    Add a new developer to the StakerV2 or overwrite an existing one.
     This operation requires that developer address addition is not locked.
     @param _developerAddress the additional developer's address.
     @param _share the share in 1/1000th of a percent of each token emission sent
-    to this new developer.
+      to this new developer.
   */
-  function addDeveloper(address _developerAddress, uint256 _share) external onlyOwner {
+  function addDeveloper(address _developerAddress, uint256 _share) external hasValidPermit(UNIVERSAL, ADD_DEVELOPER) {
 
     require(canAlterDevelopers,
       "Devs locked.");
@@ -248,11 +307,11 @@ contract StakerV2 is IERC721Receiver, IERC1155Receiver, Ownable, ReentrancyGuard
   }
 
   /**
-    Permanently forfeits owner ability to alter the state of Staker developers.
-    Once called, this function is intended to give peace of mind to the Staker's
+    Permanently forfeits owner ability to alter the state of StakerV2 developers.
+    Once called, this function is intended to give peace of mind to the StakerV2's
     developers and community that the fee structure is now immutable.
   */
-  function lockDevelopers() external onlyOwner {
+  function lockDevelopers() external hasValidPermit(UNIVERSAL, LOCK_DEVELOPERS) {
 
     canAlterDevelopers = false;
   }
@@ -263,7 +322,7 @@ contract StakerV2 is IERC721Receiver, IERC1155Receiver, Ownable, ReentrancyGuard
     Note that updating a developer's share to zero effectively removes them.
     @param _newDeveloperAddress an address to update this developer's address.
     @param _newShare the new share in 1/1000th of a percent of each token
-    emission sent to this developer.
+      emission sent to this developer.
   */
   function updateDeveloper(address _newDeveloperAddress, uint256 _newShare) external {
 
@@ -278,12 +337,12 @@ contract StakerV2 is IERC721Receiver, IERC1155Receiver, Ownable, ReentrancyGuard
   }
 
   /**
-    Set new emission details to the Staker or overwrite existing ones.
+    Set new emission details to the StakerV2 or overwrite existing ones.
     This operation requires that emission schedule alteration is not locked.
     @param _tokenSchedule an array of EmissionPoints defining the token schedule.
     @param _pointSchedule an array of EmissionPoints defining the point schedule.
   */
-  function setEmissions(EmissionPoint[] memory _tokenSchedule, EmissionPoint[] memory _pointSchedule) external onlyOwner {
+  function setEmissions(EmissionPoint[] memory _tokenSchedule, EmissionPoint[] memory _pointSchedule) external hasValidPermit(UNIVERSAL, SET_EMISSIONS) {
 
     if (_tokenSchedule.length > 0) {
       require(canAlterTokenEmissionSchedule,
@@ -316,20 +375,20 @@ contract StakerV2 is IERC721Receiver, IERC1155Receiver, Ownable, ReentrancyGuard
 
   /**
     Permanently forfeits owner ability to alter the emission schedule.
-    Once called, this function is intended to give peace of mind to the Staker's
+    Once called, this function is intended to give peace of mind to the StakerV2's
     developers and community that the inflation rate is now immutable.
   */
-  function lockTokenEmissions() external onlyOwner {
+  function lockTokenEmissions() external hasValidPermit(UNIVERSAL, LOCK_TOKEN_EMISSIONS) {
 
     canAlterTokenEmissionSchedule = false;
   }
 
   /**
     Permanently forfeits owner ability to alter the emission schedule.
-    Once called, this function is intended to give peace of mind to the Staker's
+    Once called, this function is intended to give peace of mind to the StakerV2's
     developers and community that the inflation rate is now immutable.
   */
-  function lockPointEmissions() external onlyOwner {
+  function lockPointEmissions() external hasValidPermit(UNIVERSAL, LOCK_POINT_EMISSIONS) {
 
     canAlterPointEmissionSchedule = false;
   }
@@ -353,37 +412,40 @@ contract StakerV2 is IERC721Receiver, IERC1155Receiver, Ownable, ReentrancyGuard
   }
 
   /**
-    Returns the amount of token that has not been disbursed by the Staker yet.
-    @return the amount of token that has not been disbursed by the Staker yet.
+    Returns the amount of token that has not been disbursed by the StakerV2 yet.
+    @return the amount of token that has not been disbursed by the StakerV2 yet.
   */
   function getRemainingToken() external view returns (uint256) {
 
-    return token.balanceOf(address(this));
+    return IERC20(token).balanceOf(address(this));
   }
 
    /** 
-    Create or edit a booster with parameters
+    Create or edit boosters in batch with boost parameters
     @param _ids array of booster IDs.
     @param _boostInfo array of boostInfo.
-    @notice should not be reconfigured if it was made public for staking NFTs.
+
+    Should not be reconfigured if it was made public for staking Items.
   */
-  function configureBoostersBatch(uint256[] memory _ids, BoostInfo[] memory _boostInfo) external onlyOwner {
+  function configureBoostersBatch(uint256[] memory _ids, BoostInfo[] memory _boostInfo) external hasValidPermit(UNIVERSAL, CONFIGURE_BOOSTERS) {
 
     require(_boostInfo.length > 0, 
       "0 BoostInfo.");
     require(_ids.length == _boostInfo.length, 
       "Length mismatch.");
 
-    for(uint256 i = 0; i < _boostInfo.length; i++){
-      if(_boostInfo[i].multiplier == 0)
+    for (uint256 i = 0; i < _boostInfo.length; i++) {
+      if (_boostInfo[i].multiplier == 0) {
         revert("0 Multiplier.");
-      else if(_boostInfo[i].amountRequired == 0)
+      } else if (_boostInfo[i].amountRequired == 0) {
         revert("0 Amount.");
-      else if(_boostInfo[i].contractRequired == address(0))
+      } else if (_boostInfo[i].contractRequired == address(0)) {
         revert("0 address.");
+      }
 
-      if(boostInfo[i].multiplier == 0 && _boostInfo[i].multiplier != 0)
+      if (boostInfo[i].multiplier == 0 && _boostInfo[i].multiplier != 0) {
         activeBoosters++;
+      }
 
       boostInfo[_ids[i]] = BoostInfo({ 
           multiplier: _boostInfo[i].multiplier,
@@ -403,7 +465,7 @@ contract StakerV2 is IERC721Receiver, IERC1155Receiver, Ownable, ReentrancyGuard
     @param _pointStrength the relative strength of the new asset for earning points.
     @param _boostInfo collection of boosters the pool supports.
   */
-  function addPool(IERC20 _token, uint256 _tokenStrength, uint256 _pointStrength, uint256[] calldata _boostInfo) external onlyOwner {
+  function addPool(IERC20 _token, uint256 _tokenStrength, uint256 _pointStrength, uint256[] calldata _boostInfo) external hasValidPermit(UNIVERSAL, ADD_POOL) {
 
     require(tokenEmissionEventsCount > 0 && pointEmissionEventsCount > 0,
       "Emissions required.");
@@ -438,10 +500,12 @@ contract StakerV2 is IERC721Receiver, IERC1155Receiver, Ownable, ReentrancyGuard
 
       // Append boosters by avoid writing to storage directly in a loop to avoid costs
       uint256[] memory boosters = new uint256[](poolInfo[_token].boostInfo.length + _boostInfo.length);
-      for(uint256 i = 0; i < poolInfo[_token].boostInfo.length; i++)
+      for (uint256 i = 0; i < poolInfo[_token].boostInfo.length; i++) {
         boosters[i] = poolInfo[_token].boostInfo[i];
-      for(uint256 i = 0; i < _boostInfo.length; i++)
+      }
+      for (uint256 i = 0; i < _boostInfo.length; i++) {
         boosters[i + poolInfo[_token].boostInfo.length] = _boostInfo[i];
+      }
       PoolInfo storage pool = poolInfo[_token];
       pool.boostInfo = boosters; // Appended boosters
     }
@@ -513,7 +577,7 @@ contract StakerV2 is IERC721Receiver, IERC1155Receiver, Ownable, ReentrancyGuard
     A function to easily see the amount of token rewards pending for a user on a
     given pool. Returns the pending reward token amount.
     @param _token The address of a particular staking pool asset to check for a
-    pending reward.
+      pending reward.
     @param _user the user address to check for a pending reward.
     @return the pending reward token amount.
   */
@@ -537,7 +601,7 @@ contract StakerV2 is IERC721Receiver, IERC1155Receiver, Ownable, ReentrancyGuard
     A function to easily see the amount of point rewards pending for a user on a
     given pool. Returns the pending reward point amount.
     @param _token The address of a particular staking pool asset to check for a
-    pending reward.
+      pending reward.
     @param _user The user address to check for a pending reward.
     @return the pending reward token amount.
   */
@@ -595,6 +659,7 @@ contract StakerV2 is IERC721Receiver, IERC1155Receiver, Ownable, ReentrancyGuard
     @return the total number of points that the user has ever spent.
   */
   function getSpentPoints(address _user) external view returns (uint256) {
+    
     return userSpentPoints[_user];
   }
 
@@ -628,7 +693,7 @@ contract StakerV2 is IERC721Receiver, IERC1155Receiver, Ownable, ReentrancyGuard
       tokensReward = tokensReward - devTokens;
       uint256 devPoints = (pointsReward * share) / 100000;
       pointsReward = pointsReward - devPoints;
-      token.safeTransfer(developer, devTokens / 1e12);
+      IERC20(token).safeTransfer(developer, devTokens / 1e12);
       userPoints[developer] = userPoints[developer] + (devPoints / 1e30);
     }
 
@@ -638,33 +703,44 @@ contract StakerV2 is IERC721Receiver, IERC1155Receiver, Ownable, ReentrancyGuard
     pool.lastRewardEvent = block.timestamp;
   }
 
-  function updateDeposits(uint256 _amount, IERC20 _token, PoolInfo storage pool, UserInfo storage user, uint8 isDeposit) private {
+  /**
+    Private helper function to update the deposits based on new shares.
+    @param _amount base amount of the new boosted amounts.
+    @param _token the deposit token of the pool.
+    @param _pool the pool, the deposit of which is to be updated.
+    @param _user the user, the amount of whom is to be updated.
+    @param _isDeposit flag that represents the caller function. 0 is for deposit,
+      1 is for withdraw, other value represents no amount update.
+   */
+  function updateDeposits(uint256 _amount, IERC20 _token, PoolInfo storage _pool, UserInfo storage _user, uint8 _isDeposit) private {
     
-    if (user.amount > 0){
-      uint256 pendingTokens = ((user.tokenBoostedAmount * pool.tokensPerShare) / 1e12) - user.tokenPaid;
-      token.safeTransfer(msg.sender, pendingTokens);
+    if (_user.amount > 0) {
+      uint256 pendingTokens = ((_user.tokenBoostedAmount * _pool.tokensPerShare) / 1e12) - _user.tokenPaid;
+      IERC20(token).safeTransfer(msg.sender, pendingTokens);
       totalTokenDisbursed = totalTokenDisbursed + pendingTokens;
-      uint256 pendingPoints = ((user.pointBoostedAmount * pool.pointsPerShare) / 1e30) - user.pointPaid;
+      uint256 pendingPoints = ((_user.pointBoostedAmount * _pool.pointsPerShare) / 1e30) - _user.pointPaid;
       userPoints[msg.sender] = userPoints[msg.sender] + pendingPoints;
-      pool.tokenBoostedDeposit -= user.tokenBoostedAmount;
-      pool.pointBoostedDeposit -= user.pointBoostedAmount;
+      _pool.tokenBoostedDeposit -= _user.tokenBoostedAmount;
+      _pool.pointBoostedDeposit -= _user.pointBoostedAmount;
     }
 
-    if(isDeposit == 0) // Flag for Deposit
-      user.amount += _amount;
-    else if(isDeposit == 1) // Flag for Withdraw
-      user.amount -= _amount;
-    user.tokenBoostedAmount = applyBoosts(user.amount, _token, true);
-    user.pointBoostedAmount = applyBoosts(user.amount, _token, false);
-    pool.tokenBoostedDeposit += user.tokenBoostedAmount;
-    pool.pointBoostedDeposit += user.pointBoostedAmount;
+    if (_isDeposit == 0) { // Flag for Deposit
+      _user.amount += _amount;
+    } else if(_isDeposit == 1) { // Flag for Withdraw
+      _user.amount -= _amount;
+    }
+    
+    _user.tokenBoostedAmount = applyBoosts(_user.amount, _token, true);
+    _user.pointBoostedAmount = applyBoosts(_user.amount, _token, false);
+    _pool.tokenBoostedDeposit += _user.tokenBoostedAmount;
+    _pool.pointBoostedDeposit += _user.pointBoostedAmount;
 
-    user.tokenPaid = (user.tokenBoostedAmount * pool.tokensPerShare) / 1e12;
-    user.pointPaid = (user.pointBoostedAmount * pool.pointsPerShare) / 1e30;
+    _user.tokenPaid = (_user.tokenBoostedAmount * _pool.tokensPerShare) / 1e12;
+    _user.pointPaid = (_user.pointBoostedAmount * _pool.pointsPerShare) / 1e30;
   }
 
   /**
-    Private helper function that applies boosts on deposits for NFT staking.
+    Private helper function that applies boosts on deposits for Item staking.
     (amount * multiplier ) / 10000, where multiplier is in basis points.
     (20 * 20000) / 10000 = 40 => 2x boost
     @param _unboosted value that needs to have boosts applied to.
@@ -674,28 +750,31 @@ contract StakerV2 is IERC721Receiver, IERC1155Receiver, Ownable, ReentrancyGuard
    */
   function applyBoosts(uint256 _unboosted, IERC20 _token, bool _isToken ) internal view returns(uint256 _boosted) {
 
-    if(_unboosted <= 0)
+    if (_unboosted <= 0) {
         return 0;
-    if(poolInfo[_token].boostInfo.length == 0)
+    } else if (poolInfo[_token].boostInfo.length == 0) {
         return _unboosted;
-    if(nftUserInfo[_msgSender()].boosterIds.length() == 0)
+    } else if (itemUserInfo[_msgSender()].boosterIds.length() == 0) {
         return _unboosted;
+    }
 
     _boosted = _unboosted;
     BoostInfo memory booster;
     PoolInfo memory pool = poolInfo[_token];
-    NftUserInfo storage staker =  nftUserInfo[_msgSender()];
+    ItemUserInfo storage staker =  itemUserInfo[_msgSender()];
 
     // Iterate through all the boosters that the pool supports
     for(uint256 i = 0; i < pool.boostInfo.length; i++) {
       booster = boostInfo[pool.boostInfo[i]];
-      if(staker.boosterIds.contains(pool.boostInfo[i])) 
-        if(booster.assetType == AssetType.Tokens && _isToken)
+      if (staker.boosterIds.contains(pool.boostInfo[i])) {
+        if (booster.assetType == AssetType.Tokens && _isToken) {
           _boosted += (_unboosted * booster.multiplier)/10000;
-        else if(booster.assetType == AssetType.Points && !_isToken)
+        } else if (booster.assetType == AssetType.Points && !_isToken) {
           _boosted += (_unboosted * booster.multiplier)/10000;
-        else if (booster.assetType == AssetType.Both)
+        } else if (booster.assetType == AssetType.Both) {
            _boosted += (_unboosted * booster.multiplier)/10000;
+        }
+      }
     }
   }
 
@@ -738,141 +817,157 @@ contract StakerV2 is IERC721Receiver, IERC1155Receiver, Ownable, ReentrancyGuard
   }
 
   /**
-    Private helper function to check if NFT staker is eligible for a booster.
-    @param _ids ids of NFTs required for a booster.
-    @param _contract external contract from which NFTs are required.
-    @param _boosterId the booster for which NFTs are being staked.
+    Private helper function to check if Item staker is eligible for a booster.
+    @param _ids ids of Items required for a booster.
+    @param _amounts amount per token Id.
+    @param _contract external contract from which Items are required.
+    @param _boosterId the booster for which Items are being staked.
     @return return true if eligible.
    */
-  function eligible(uint256[] memory _ids, address _contract, uint256 _boosterId) private view returns(bool) {
+  function eligible(uint256[] memory _ids, uint256[] memory _amounts, address _contract, uint256 _boosterId) private view returns(bool) {
 
     BoostInfo memory booster = boostInfo[_boosterId];
-    if(booster.multiplier == 0) // Inactive
+    uint256 totalAmount = 0;
+
+    for (uint256 i = 0; i < _amounts.length; i++) {
+      totalAmount += _amounts[i];
+    }
+    if (booster.multiplier == 0) { // Inactive
       return false;
-    else if(_contract != booster.contractRequired) // Different contract
+    } else if (_contract != booster.contractRequired) { // Different contract
       return false;
-    else if(_ids.length < booster.amountRequired) // Insufficient amount
+    } else if (totalAmount < booster.amountRequired) { // Insufficient amount
       return false;
-    else if(booster.groupRequired != 0)
-      for(uint256 i = 0; i < _ids.length; i++)
-        if(_ids[i] >> 128 != booster.groupRequired) // Wrong group item
+    } else if (booster.groupRequired != 0) {
+      for (uint256 i = 0; i < _ids.length; i++) {
+        if (_ids[i] >> 128 != booster.groupRequired) { // Wrong group item
           return false;
+        }
+      }
+    }
     return true;
   }
 
   /**
-    Stake a collection of NFTs from a Super721 or Super1155 contract.
-    @param _ids the ids collection of NFTs from a contract.
-    @param _contract the external contract of the NFTs.
+    Stake a collection of items for booster from a ERC721 or ERC1155 contract.
+    @param _ids the ids collection of Items from a contract.
+    @param _amounts the amount per token Id.
+    @param _contract the external contract of the Items.
     @param _token the pool that will be staked in.
-    @param _boosterId the booster that accepts these NFTs.
+    @param _boosterId the booster that accepts these Items.
   */
-  function stakeNftBatch(uint256[] calldata _ids, address _contract, IERC20 _token, uint256 _boosterId) external nonReentrant {
-    
+  function stakeItemsBatch(uint256[] calldata _ids, uint256[] calldata _amounts, address _contract, IERC20 _token, uint256 _boosterId) external nonReentrant {
+
+    require(_ids.length == _amounts.length, 
+      "Length Mismatch");
     bool exists = false;
-    for(uint256 i = 0; i < poolInfo[_token].boostInfo.length; i++)
-        if(poolInfo[_token].boostInfo[i] == _boosterId){
+    for (uint256 i = 0; i < poolInfo[_token].boostInfo.length; i++) {
+        if (poolInfo[_token].boostInfo[i] == _boosterId) {
             exists = true;
             break;
         }
-    if(!exists)
+    }
+    if (!exists) {
         revert("Invalid pool/booster.");
-    if(!eligible(_ids, _contract, _boosterId))
+    } else if (!eligible(_ids, _amounts, _contract, _boosterId)) {
         revert("Ineligible.");
+    }
         
     PoolInfo storage pool = poolInfo[_token];
     UserInfo storage user = userInfo[_token][msg.sender];
 
-    // Is Super721 with approval
-    if(ISuperGeneric(_contract).supportsInterface(0x80ac58cd))
+    if (ISuperGeneric(_contract).supportsInterface(INTERFACE_ERC721)) {
         ISuperGeneric(_contract).safeBatchTransferFrom(_msgSender(), address(this), _ids, "");
-    // Is Super1155 with approval
-    else if(ISuperGeneric(_contract).supportsInterface(0xd9b67a26)){
-        uint256[] memory amounts = new uint256[](_ids.length);
-        for(uint256 i = 0; i < _ids.length; i++)
-            amounts[i] = 1;
-        ISuperGeneric(_contract).safeBatchTransferFrom(_msgSender(), address(this), _ids, amounts, "");
-    }
-    else 
+    } else if (ISuperGeneric(_contract).supportsInterface(INTERFACE_ERC1155)) {
+        ISuperGeneric(_contract).safeBatchTransferFrom(_msgSender(), address(this), _ids, _amounts, "");
+    } else {
         revert("Unsupported Contract.");
+    }
     
-    NftUserInfo storage staker = nftUserInfo[msg.sender];
-    staker.totalNfts += _ids.length;
-    for(uint256 i = 0; i < _ids.length; i++)
+    ItemUserInfo storage staker = itemUserInfo[msg.sender];
+    staker.totalItems += _ids.length;
+    for (uint256 i = 0; i < _ids.length; i++) {
       staker.tokenIds[_boosterId].add(_ids[i]);
+      staker.amounts[_ids[i]] += _amounts[i];
+    }
     staker.boosterIds.add(_boosterId);
 
-    totalNftStakes += _ids.length;
+    totalItemStakes += _ids.length;
 
     updatePool(_token);
     updateDeposits(0, _token, pool, user, 2); // 2 = PlaceHolder
 
-    emit StakeNftBatch(msg.sender, _token, _boosterId);
+    emit StakeItemBatch(msg.sender, _token, _boosterId);
   }
 
   /**
-    Unstake collection of NFTs to ERC721 or ERC1155 contract.
+    Unstake collection of items from booster to ERC721 or ERC1155 contract.
     @param _token the pool that was previously staked in.
-    @param _boosterId the booster that accepted these NFTs.
+    @param _boosterId the booster that accepted these Items.
   */
-  function unstakeNftBatch(IERC20 _token, uint256 _boosterId) external nonReentrant {
+  function unstakeItemsBatch(IERC20 _token, uint256 _boosterId) external nonReentrant {
     
     require(address(_token) != address(0), 
         "0 address.");
-    require(nftUserInfo[msg.sender].boosterIds.contains(_boosterId),
+    require(itemUserInfo[msg.sender].boosterIds.contains(_boosterId),
         "No stakes.");
 
-    NftUserInfo storage staker = nftUserInfo[msg.sender];
+    ItemUserInfo storage staker = itemUserInfo[msg.sender];
     PoolInfo storage pool = poolInfo[_token];
     UserInfo storage user = userInfo[_token][msg.sender];
     address externalContract = boostInfo[_boosterId].contractRequired;
 
     uint256[] memory _ids = new uint256[](staker.tokenIds[_boosterId].length());
-    for(uint256 i = 0; i < _ids.length; i++)
+    uint256[] memory _amounts = new uint256[](_ids.length);
+    for (uint256 i = 0; i < _ids.length; i++) {
       _ids[i] = staker.tokenIds[_boosterId].at(i);
-
-    // Is Super721 with approval
-    if(ISuperGeneric(externalContract).supportsInterface(0x80ac58cd))
-        ISuperGeneric(externalContract).safeBatchTransferFrom(address(this), _msgSender(), _ids, "");
-    // Is Super1155 with approval
-    else if(ISuperGeneric(externalContract).supportsInterface(0xd9b67a26)){
-        uint256[] memory amounts = new uint256[](_ids.length);
-        for(uint256 i = 0; i < _ids.length; i++)
-            amounts[i] = 1;
-        ISuperGeneric(externalContract).safeBatchTransferFrom(address(this), _msgSender(), _ids, amounts, "");
+      _amounts[i] = staker.amounts[_ids[i]];
     }
-    else 
-        revert("Contract not supported.");
 
-    staker.totalNfts -= _ids.length;
-    for(uint256 i = 0; i <  _ids.length; i++)
+    if (ISuperGeneric(externalContract).supportsInterface(INTERFACE_ERC721)) {
+        ISuperGeneric(externalContract).safeBatchTransferFrom(address(this), _msgSender(), _ids, "");
+    } else if (ISuperGeneric(externalContract).supportsInterface(INTERFACE_ERC1155)) {
+        ISuperGeneric(externalContract).safeBatchTransferFrom(address(this), _msgSender(), _ids, _amounts, "");
+    } else {
+        revert("Unsupported Contract.");
+    }
+
+    staker.totalItems -= _ids.length;
+    for (uint256 i = 0; i <  _ids.length; i++) {
         staker.tokenIds[_boosterId].remove(_ids[i]);
+        staker.amounts[_ids[i]] = 0;
+    }
     staker.boosterIds.remove(_boosterId);
 
-    totalNftStakes -= _ids.length;
+    totalItemStakes -= _ids.length;
 
     updatePool(_token);
     updateDeposits(0, _token, pool, user, 2); // 2 = PlaceHolder
 
-    emit UnstakeNftBatch(msg.sender, _token, _boosterId);
+    emit UnstakeItemBatch(msg.sender, _token, _boosterId);
   }
 
   /**
-    Allows to get information about tokens staked in a booster for NFT staker address.
-    @param _nftUserAddress the user address to check.
+    Allows to get information about tokens staked in a booster for Items staker address.
+    @param _itemUserAddress the user address to check.
     @param _boosterId the booster Id to check the tokens staked for.
     @return a struct containing the information.
    */
-  function getNftUserInfo(address _nftUserAddress, uint256 _boosterId) external view returns(GetNftUserInfo memory){
-    uint256 length = nftUserInfo[_nftUserAddress].tokenIds[_boosterId].length();
+  function getItemsUserInfo(address _itemUserAddress, uint256 _boosterId) external view returns(GetItemUserInfo memory) {
+    
+    uint256 length = itemUserInfo[_itemUserAddress].tokenIds[_boosterId].length();
     uint256[] memory _tokenIds = new uint256[](length);
-    for(uint256 i = 0; i < length; i++)
-      _tokenIds[i] = nftUserInfo[_nftUserAddress].tokenIds[_boosterId].at(i);
+    uint256[] memory _amounts = new uint256[](length);
+    for (uint256 i = 0; i < length; i++) {
+      _tokenIds[i] = itemUserInfo[_itemUserAddress].tokenIds[_boosterId].at(i);
+      _amounts[i] = itemUserInfo[_itemUserAddress].amounts[_tokenIds[i]];
+    }
 
-    GetNftUserInfo memory _userInfo = GetNftUserInfo({
+    GetItemUserInfo memory _userInfo = GetItemUserInfo({
       boosterId: _boosterId,
       tokenIds: _tokenIds,
-      totalNfts: nftUserInfo[_nftUserAddress].totalNfts
+      amounts: _amounts,
+      totalItems: itemUserInfo[_itemUserAddress].totalItems
     });
     return _userInfo;
   }
@@ -883,7 +978,7 @@ contract StakerV2 is IERC721Receiver, IERC1155Receiver, Ownable, ReentrancyGuard
     @param _spender The external address allowed to spend user points.
     @param _approval The updated user approval status.
   */
-  function approvePointSpender(address _spender, bool _approval) external onlyOwner {
+  function approvePointSpender(address _spender, bool _approval) external hasValidPermit(UNIVERSAL, APPROVE_POINT_SPENDER) {
 
     approvedPointSpenders[_spender] = _approval;
   }
@@ -904,22 +999,13 @@ contract StakerV2 is IERC721Receiver, IERC1155Receiver, Ownable, ReentrancyGuard
     emit SpentPoints(msg.sender, _user, _amount);
   }
 
-  /**
-    Sweep all of a particular ERC-20 token from the contract.
-    @param _token The token to sweep the balance from.
-  */
-  function sweep(IERC20 _token) external onlyOwner {
-
-    uint256 balance = _token.balanceOf(address(this));
-    _token.safeTransfer(msg.sender, balance);
-  }
-
   function onERC721Received(
       address operator,
       address from,
       uint256 tokenId,
       bytes calldata data
-  ) external override returns (bytes4){
+  ) external override returns (bytes4) {
+
     return this.onERC721Received.selector;
   }
 
@@ -929,9 +1015,9 @@ contract StakerV2 is IERC721Receiver, IERC1155Receiver, Ownable, ReentrancyGuard
       uint256 id,
       uint256 value,
       bytes calldata data
-  ) external override returns (bytes4){
-      return this.onERC1155Received.selector;
+  ) external override returns (bytes4) {
 
+      return this.onERC1155Received.selector;
   }
 
   function onERC1155BatchReceived(
@@ -940,9 +1026,12 @@ contract StakerV2 is IERC721Receiver, IERC1155Receiver, Ownable, ReentrancyGuard
       uint256[] calldata ids,
       uint256[] calldata values,
       bytes calldata data
-  ) external override returns (bytes4){
+  ) external override returns (bytes4) {
+
       return this.onERC1155BatchReceived.selector;
   }
 
-  function supportsInterface(bytes4 interfaceId) external view override returns (bool){}
+  function supportsInterface(bytes4 interfaceId) external view override returns (bool) {
+
+  }
 }

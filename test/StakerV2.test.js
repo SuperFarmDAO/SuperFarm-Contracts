@@ -46,11 +46,11 @@ describe('===Stakerv2===', function () {
         await depositToken.deployed();
 
         stakerv2 = await this.Staker.deploy(
+            owner.address,
             "firstStaker",
             rewardToken.address
         );
         await stakerv2.deployed();
-        await stakerv2.transferOwnership(owner.address);
 
         proxyRegistry = await this.ProxyRegistry.deploy();
         await proxyRegistry.deployed();
@@ -117,7 +117,7 @@ describe('===Stakerv2===', function () {
             await depositToken.connect(signer1).approve(stakerv2.address, ethers.utils.parseEther("1000"));
             await depositToken.connect(signer2).approve(stakerv2.address, ethers.utils.parseEther("1000"));
             
-            // Mint NFTs for Signer1
+            // Mint ITEMS for Signer1
             await super721.connect(owner).configureGroup(itemGroupId2, {
                 name: 'PEPSI',
                     supplyType: 0,
@@ -128,7 +128,7 @@ describe('===Stakerv2===', function () {
             await super721.connect(owner).mintBatch(signer1.address, [shiftedItemGroupId2, shiftedItemGroupId2.add(1), shiftedItemGroupId2.add(2)], DATA);
             await super721.connect(signer1).setApprovalForAll(stakerv2.address, true);
 
-            // Mint NFTs for Signer2
+            // Mint ITEMS for Signer2
             await super1155.connect(owner).configureGroup(itemGroupId, {
                 name: 'PEPSI',
                     supplyType: 0,
@@ -145,20 +145,20 @@ describe('===Stakerv2===', function () {
             await stakerv2.connect(signer1).deposit(depositToken.address, ethers.utils.parseEther("200"));
             await network.provider.send("evm_increaseTime", [30])
 
-            //User2-StakeNFT
-            await stakerv2.connect(signer2).stakeNftBatch([shiftedItemGroupId, shiftedItemGroupId.add(1)], super1155.address, depositToken.address, 1);
+            //User2-StakeITEMS
+            await stakerv2.connect(signer2).stakeItemsBatch([shiftedItemGroupId, shiftedItemGroupId.add(1)], [1, 1], super1155.address, depositToken.address, 1);
             await network.provider.send("evm_increaseTime", [30])
 
-            //User1-StakeNFT
-            await stakerv2.connect(signer1).stakeNftBatch([shiftedItemGroupId2, shiftedItemGroupId2.add(1), shiftedItemGroupId2.add(2)], super721.address, depositToken.address, 0);
+            //User1-StakeITEMS
+            await stakerv2.connect(signer1).stakeItemsBatch([shiftedItemGroupId2, shiftedItemGroupId2.add(1), shiftedItemGroupId2.add(2)], [1, 1, 1], super721.address, depositToken.address, 0);
             await network.provider.send("evm_increaseTime", [15])
             
             //User2-Deposit
             await stakerv2.connect(signer2).deposit(depositToken.address, ethers.utils.parseEther("150"));
             await network.provider.send("evm_increaseTime", [15])
             
-            //User1-UnstakeNFT
-            await stakerv2.connect(signer1).unstakeNftBatch(depositToken.address, 0);
+            //User1-UnstakeITEMS
+            await stakerv2.connect(signer1).unstakeItemsBatch(depositToken.address, 0);
             await network.provider.send("evm_increaseTime", [15])
 
             //User2-Withdraw
@@ -174,7 +174,7 @@ describe('===Stakerv2===', function () {
             await stakerv2.connect(signer1).withdraw(depositToken.address, ethers.utils.parseEther("350"))
             console.log(await (await rewardToken.balanceOf(signer1.address)).toString());
             console.log(await (await rewardToken.balanceOf(signer2.address)).toString());
-            //console.log(await stakerv2.connect(signer3).getNftUserInfo(signer2.address, 1));
+            console.log(await stakerv2.connect(signer3).getItemsUserInfo(signer2.address, 1));
             
             // Resultant must be around 900 rewards since 
             // (30 + 30 + 15 + 15 + 15 + 15 + 15) seconds * (6.666666666) Rate = 899.99999
