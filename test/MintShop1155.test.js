@@ -611,7 +611,7 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
             console.log(pools[0].config);
             console.log("=================");
 
-            console.log(pools[0].config.name);
+            console.log(pools[0].items[0].prices[0].price);
 
 
             expect(pools[0].config.name).to.be.equal("firstPool");

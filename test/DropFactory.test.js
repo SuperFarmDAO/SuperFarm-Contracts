@@ -41,6 +41,8 @@ describe("DropFactory test", function () {
     }).timeout(10000);
 
     it("Shoud try to create new drop", async function () {
+       
+         
         let configGroup = {
             name: 'PEPSI',
             supplyType: 0,
@@ -67,7 +69,7 @@ describe("DropFactory test", function () {
         };
 
 
-        let data2 = [[1, 2], [1, 1], [10, 1], [[{
+        let data2 = [[1, 2], [1, 1], [10,10], [[{
             assetType: 1,
             asset: NULL_ADDRESS,
             price: 1
@@ -169,7 +171,7 @@ describe("DropFactory test", function () {
         console.log(drops.toString());
         // done();
         console.log(addresses[0]);
-        console.log(addresses[1]);
+        
 
     }).timeout(10000);
 

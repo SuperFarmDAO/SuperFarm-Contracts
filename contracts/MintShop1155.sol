@@ -566,6 +566,7 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop {
     return whitelistStatus;
   }
 
+
   /**
     A function which allows the caller to retrieve information about specific
     pools, the items for sale within, and the collection this shop uses.
@@ -968,4 +969,7 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop {
 
 
   }
+
+
+
 }

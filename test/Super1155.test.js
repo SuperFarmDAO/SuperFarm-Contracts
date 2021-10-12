@@ -54,13 +54,12 @@ describe('===Super1155===', function () {
         await proxyRegistry.transferOwnership(proxyRegistryOwner.address);
 
         super1155 = await this.Super1155.deploy(
-            owner.address,
             "Super1155",
             originalUri,
             proxyRegistry.address
         );
         await super1155.deployed();
-
+        await super1155.transferOwnership(owner.address);
         omdProxy = await this.OMDProxy.deploy(owner.address, super1155.address, selector);
         await omdProxy.deployed();
 
@@ -91,11 +90,11 @@ describe('===Super1155===', function () {
 
         it('should deploy a new instance where deployer is the owner', async function () {
             super1155 = await this.Super1155.deploy(
-                deployer.address,
                 "Super1155",
                 originalUri,
                 proxyRegistry.address
             );
+            
             await super1155.deployed();
 
             expect(await super1155.owner()).to.equal(deployer.address);
@@ -1968,6 +1967,11 @@ describe('===Super1155===', function () {
                 [1],
                 ethers.utils.id('a'))
             ).to.be.revertedWith("Super1155: you cannot mint more than the alloted semifungible items");
+
+
+            let types = await super1155.getGroupTypes(shiftedItemGroupId.add(1));
+            console.log(types);
         });
     });
+    
 });

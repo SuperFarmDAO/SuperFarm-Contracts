@@ -39,7 +39,6 @@ contract DropFactory is Ownable {
 
 
     mapping (bytes => Drop) drops;
-    // Drop[] public drops;
 
     constructor(
         address _mintShopHelper,
@@ -84,16 +83,14 @@ contract DropFactory is Ownable {
             address mintShop
         )
     {
-        // require(
-        //     _itemGroupInput.length == _poolInput.length,
-        //     "DropFactory: arrays of input parametres must be same length!"
-        // );
-        // require(
-        //     _itemGroupInput.length == _poolConfigurationData.length,
-        //     "DropFactory: arrays of input parametres must be same length!"
-        // );
-
-        // require(_poolInput.length == _whiteListInput.length, "DropFactory: arrays of poolImput and whiteListInput must be the same length!");
+        require(
+            _itemGroupInput.length == _poolInput.length,
+            "DropFactory: arrays of input parametres must be same length!"
+        );
+        require(
+            _itemGroupInput.length == _poolConfigurationData.length,
+            "DropFactory: arrays of input parametres must be same length!"
+        );
 
         super1155 = createSuper1155(_owner, _collectionName, _uri, _proxyRegistry, _itemGroupInput, _poolInput);  
 
@@ -210,6 +207,17 @@ contract DropFactory is Ownable {
 
         IMintShop(mintShop)._transferOwnership(_owner);
         return mintShop;
+    }
+
+    /**
+     * @notice Update helpers addresses for contract.
+     * @param _mintShopHelper Address of mintShopHelper
+     * @param _super1155Helper Address of super1155Helper
+
+     */
+    function updateHelpersAddress(address _mintShopHelper, address _super1155Helper) external onlyOwner {
+        mintShopHelper = _mintShopHelper;
+        super1155Helper = _super1155Helper;
     }
 
     /**

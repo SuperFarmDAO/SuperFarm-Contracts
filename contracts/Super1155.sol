@@ -72,6 +72,13 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
   /// The public name of this contract.
   string public name;
 
+
+  /// Struct for 
+  struct TypesOutput {
+    DFStorage.SupplyType supplyType;
+    DFStorage.ItemType itemType;
+    DFStorage.BurnType burnType;
+  }
   /**
     The ERC-1155 URI for tracking item metadata, supporting {id} substitution.
     For example: https://token-cdn-domain/{id}.json. See the ERC-1155 spec for
@@ -939,5 +946,25 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
   function lock() external virtual hasValidPermit(UNIVERSAL, LOCK_CREATION) {
     locked = true;
     emit CollectionLocked(_msgSender());
+  }
+
+
+  function getSupplyType(uint256 _groupId) public view returns (DFStorage.SupplyType) {
+    return itemGroups[_groupId].supplyType;
+  }
+  
+
+  function getItemType(uint256 _groupId) public view returns (DFStorage.ItemType) {
+    return itemGroups[_groupId].itemType;
+  }
+
+  function getBurnType(uint256 _groupId) public view returns (DFStorage.BurnType) {
+    return itemGroups[_groupId].burnType;
+  }
+
+  function getGroupTypes(uint256 _groupId) public view returns (TypesOutput memory types) {
+    types.itemType = itemGroups[_groupId].itemType;
+    types.supplyType = itemGroups[_groupId].supplyType;
+    types.burnType = itemGroups[_groupId].burnType;
   }
 }
