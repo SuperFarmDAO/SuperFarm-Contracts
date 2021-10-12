@@ -21,6 +21,7 @@ library DFStorage {
         uint256 purchaseLimit;
         uint256 singlePurchaseLimit;
         PoolRequirement requirement;
+        address collection;
     }
 
     /**
