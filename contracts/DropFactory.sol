@@ -38,7 +38,7 @@ contract DropFactory is Ownable {
     }
 
 
-    mapping (bytes32 => Drop) drops;
+    mapping (bytes => Drop) drops;
     // Drop[] public drops;
 
     constructor(
@@ -76,7 +76,7 @@ contract DropFactory is Ownable {
         DFStorage.PoolInput[] memory _poolInput,
         PoolConfigurationData[] memory _poolConfigurationData,
         DFStorage.WhitelistInput[] memory _whiteListInput,
-        bytes32 salt
+        bytes memory salt
     )
         external
         returns (
@@ -187,7 +187,6 @@ contract DropFactory is Ownable {
                 revert(0, 0)
             }
         }
-
         ISuper1155[] memory items = new ISuper1155[](1);
         items[0] = ISuper1155(super1155);
 
@@ -195,6 +194,7 @@ contract DropFactory is Ownable {
         
 
         for (uint256 i = 0; i < _poolInput.length; i++) {
+            _poolInput[i].collection = super1155;
             DFStorage.PoolRequirement memory req = _poolInput[i].requirement;
             if (req.whitelistId != 0) {
                 IMintShop(mintShop).addWhitelist(_whiteListInput[i]);
@@ -218,7 +218,7 @@ contract DropFactory is Ownable {
       
      * @return Returns Drop struct.
      */
-    function getExactDrop(bytes32 salt) external view returns (Drop memory) {
+    function getExactDrop(bytes calldata salt) external view returns (Drop memory) {
         return drops[salt];
     }
 }

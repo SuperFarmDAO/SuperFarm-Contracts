@@ -62,7 +62,8 @@ describe("DropFactory test", function () {
                 requiredAsset: NULL_ADDRESS,
                 requiredAmount: 1,
                 whitelistId: 0
-            }
+            },
+            collection: NULL_ADDRESS
         };
 
 
@@ -131,7 +132,7 @@ describe("DropFactory test", function () {
             isActive: true,
             addresses: whitelistAddresses
         };
-
+        let salt = ethers.utils.formatBytes32String("HelloWorld");
 
         let addresses = await factory.createDrop(
             owner.address,
@@ -143,15 +144,16 @@ describe("DropFactory test", function () {
             [configGroup],
             [poolInput],
             [data2], 
-            [whiteListData]
+            [whiteListData],
+            salt
         );
 
        
 
         // let drops = await factory.getDrops();
 
-        let drops = await factory.getExactDrop(0);
-        let mintShopAddres = drops[1];
+        let drops = await factory.getExactDrop(salt);
+        
         // let MS =await  hre.ethers.getContractAt("MintShop1155", mintShopAddres);
         // let setWhiteListRight = await MS.WHITELIST();
         //
