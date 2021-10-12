@@ -268,7 +268,7 @@ contract StakerV2 is Sweepable, ReentrancyGuard, IERC721Receiver, IERC1155Receiv
   /// Event for unstaking non fungible items from boosters.
   event UnstakeItemBatch(address indexed user, IERC20 indexed token, uint256 boosterId);
 
-  // An event for tracking when a user has spent points.
+  /// An event for tracking when a user has spent points.
   event SpentPoints(address indexed source, address indexed user, uint256 amount);
 
   /**
