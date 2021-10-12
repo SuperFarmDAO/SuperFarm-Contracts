@@ -111,13 +111,7 @@ contract DropFactory is Ownable {
         drop.mintShop1155 = address(mintShop);
         drop.owner = msg.sender;
         drop.super1155 = address(super1155);
-        // drops.push(
-        //     Drop({
-        //         owner: msg.sender,
-        //         mintShop1155: address(mintShop),
-        //         super1155: address(super1155)
-        //     })
-        // );
+
 
         return (address(super1155), address(mintShop));
     }

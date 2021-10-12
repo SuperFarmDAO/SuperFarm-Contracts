@@ -312,9 +312,7 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
 
 
   function _transferOwnership(address _owner) override external onlyOwner {
-    if (_owner != owner()) {
       transferOwnership(_owner);
-    }
   }
 
 

@@ -389,9 +389,7 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop {
 
 
   function _transferOwnership(address _owner) override external onlyOwner {
-    if (_owner != owner()) {
-      transferOwnership(_owner);
-    }
+    transferOwnership(_owner);
   }
 
   /**
