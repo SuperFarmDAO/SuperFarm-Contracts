@@ -393,7 +393,7 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop {
   */
   function updatePaymentReceiver(address _newPaymentReceiver) external
     hasValidPermit(UNIVERSAL, SET_PAYMENT_RECEIVER) {
-    require(!paymentReceiverLocked
+    require(!paymentReceiverLocked, "XXX"
       );
     address oldPaymentReceiver = paymentReceiver;
     paymentReceiver = _newPaymentReceiver;
@@ -430,7 +430,7 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop {
   function updateGlobalPurchaseLimit(uint256 _newGlobalPurchaseLimit) external
     hasValidPermit(UNIVERSAL, UPDATE_GLOBAL_LIMIT) {
     require(!globalPurchaseLimitLocked,
-      "MintShop1155: the global purchase limit is locked");
+      "0x0A");
     uint256 oldGlobalPurchaseLimit = globalPurchaseLimit;
     globalPurchaseLimit = _newGlobalPurchaseLimit;
     emit GlobalPurchaseLimitUpdated(_msgSender(), oldGlobalPurchaseLimit,
@@ -582,7 +582,7 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop {
       PoolItem[] memory poolItems = new PoolItem[](pools[id].itemGroups.length);
       for (uint256 j = 0; j < pools[id].itemGroups.length; j++) {
         uint256 itemGroupId = pools[id].itemGroups[j];
-        bytes32 itemKey = keccak256(abi.encodePacked(
+        bytes32 itemKey = keccak256(abi.encodePacked(pools[id].config.collection,
           pools[id].currentPoolVersion, itemGroupId));
 
         // Parse each price the item is sold at.
@@ -656,7 +656,7 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop {
       PoolItem[] memory poolItems = new PoolItem[](pools[id].itemGroups.length);
       for (uint256 j = 0; j < pools[id].itemGroups.length; j++) {
         uint256 itemGroupId = pools[id].itemGroups[j];
-        bytes32 itemKey = keccak256(abi.encodePacked(
+        bytes32 itemKey = keccak256(abi.encodePacked(pools[id].config.collection,
           pools[id].currentPoolVersion, itemGroupId));
 
         // Parse each price the item is sold at.
@@ -738,13 +738,13 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop {
     uint256[] calldata _caps, DFStorage.Price[][] memory _prices) public
     hasValidPermit(UNIVERSAL, POOL) {
     require(_id <= nextPoolId,
-      "MintShop1155: cannot update a non-existent pool");
+      "0x1A");
     require(_config.endTime >= _config.startTime,
-      "MintShop1155: cannot create a pool which ends before it starts");
+      "0x2A");
     require(_groupIds.length > 0,
-      "MintShop1155: must list at least one item group");
+      "0x3A");
     require(_groupIds.length == _caps.length && _caps.length == _prices.length && _issueNumberOffsets.length == _prices.length,
-      "MintShop1155: item groups length must equal caps, issue offsets and prices input length");
+      "0x4A");
 
     // Immediately store some given information about this pool.
     Pool storage pool = pools[_id];
@@ -780,7 +780,7 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop {
     uint256[] calldata _caps, DFStorage.Price[][] memory _prices) private {
     for (uint256 i = 0; i < _groupIds.length; i++) {
       require(_caps[i] > 0,
-        "MintShop1155: cannot add an item group with no mintable amount");
+        "0x5A");
       bytes32 itemKey = keccak256(abi.encodePacked(pools[_id].config.collection, pools[_id].currentPoolVersion, _groupIds[i]));
       pools[_id].itemCaps[itemKey] = _caps[i];
       
@@ -799,9 +799,9 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop {
 
   function updatePoolConfig(uint256 _id, DFStorage.PoolInput calldata _config) external hasValidPermit(UNIVERSAL, POOL){
     require(_id <= nextPoolId,
-      "MintShop1155: cannot update a non-existent pool");
+      "0x1A");
     require(_config.endTime >= _config.startTime,
-      "MintShop1155: cannot create a pool which ends before it starts");
+      "0x6A");
     pools[_id].config = _config;
   }
 
@@ -818,34 +818,36 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop {
   function mintFromPool(uint256 _id, uint256 _groupId, uint256 _assetIndex,
     uint256 _amount, uint256 _itemIndex) external nonReentrant payable {
     require(_amount > 0,
-      "MintShop1155: must purchase at least one item");
+      "0x0B");
     require(_id < nextPoolId,
-      "MintShop1155: can only purchase items from an active pool");
+      "0x1B");
     require(pools[_id].config.singlePurchaseLimit >= _amount,
-      "MintShop1155: cannot exceed the per-transaction maximum");
+      "0x2B");
 
     // Verify that the asset being used in the purchase is valid.
-    bytes32 itemKey = keccak256(abi.encode(pools[_id].currentPoolVersion,
-      _groupId));
+    // bytes32 itemKey = keccak256(abi.encode(pools[_id].currentPoolVersion,
+    //   _groupId));
+    bytes32 itemKey = keccak256(abi.encodePacked(pools[_id].config.collection, 
+       pools[_id].currentPoolVersion, _groupId));
     require(_assetIndex < pools[_id].itemPricesLength[itemKey],
-      "MintShop1155: specified asset index is not valid");
+      "0x3B");
 
     // Verify that the pool is running its sale.
     require(block.timestamp >= pools[_id].config.startTime
       && block.timestamp <= pools[_id].config.endTime,
-      "MintShop1155: pool is not currently running its sale");
+      "0x4B");
 
     // Verify that the pool is respecting per-address global purchase limits.
     uint256 userGlobalPurchaseAmount =
       _amount + globalPurchaseCounts[_msgSender()];
     require(userGlobalPurchaseAmount <= globalPurchaseLimit,
-      "MintShop1155: you may not purchase any more items from this shop");
+      "0x5B");
 
     // Verify that the pool is respecting per-address pool purchase limits.
     uint256 userPoolPurchaseAmount =
       _amount + pools[_id].purchaseCounts[_msgSender()];
     require(userPoolPurchaseAmount <= pools[_id].config.purchaseLimit,
-      "MintShop1155: you may not purchase any more items from this pool");
+      "0x5B");
 
     // Verify that the pool is either public, inactive, time-expired,
     // or the caller's address is whitelisted.
@@ -860,13 +862,13 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop {
         || !whitelists[whitelistId].isActive
         || block.timestamp > whitelists[whitelistId].expiryTime
         || addressWhitelisted,
-        "MintShop1155: you are not whitelisted on this pool");
+        "0x6B");
     }
 
     // Verify that the pool is not depleted by the user's purchase.
     uint256 newCirculatingTotal = pools[_id].itemMinted[itemKey] + _amount;
     require(newCirculatingTotal <= pools[_id].itemCaps[itemKey],
-      "MintShop1155: there are not enough items available for you to purchase");
+      "0x7B");
 
     // Verify that the user meets any requirements gating participation in this
     // pool. Verify that any possible ERC-20 requirements are met.
@@ -875,21 +877,21 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop {
       IERC20 requiredToken = IERC20(poolRequirement.requiredAsset);
       require(requiredToken.balanceOf(_msgSender())
         >= poolRequirement.requiredAmount,
-        "MintShop1155: you do not have enough required token for this pool");
+        "0x8B");
 
     // Verify that any possible ERC-1155 ownership requirements are met.
     } else if (poolRequirement.requiredType == DFStorage.AccessType.ItemRequired) {
       ISuper1155 requiredItem = ISuper1155(poolRequirement.requiredAsset);
       require(requiredItem.getTotalBalances(_msgSender())
         >= poolRequirement.requiredAmount,
-        "MintShop1155: you do not have enough required item for this pool");
+        "0x8B");
 
     // Verify that any possible Staker point threshold requirements are met.
     } else if (poolRequirement.requiredType == DFStorage.AccessType.PointRequired) {
       IStaker requiredStaker = IStaker(poolRequirement.requiredAsset);
       require(requiredStaker.getAvailablePoints(_msgSender())
         >= poolRequirement.requiredAmount,
-        "MintShop1155: you do not have enough required points for this pool");
+        "0x8B");
     }
 
     // Process payment for the user, checking to sell for Staker points.
@@ -902,22 +904,22 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop {
     } else if (sellingPair.assetType == DFStorage.AssetType.Ether) {
       uint256 etherPrice = sellingPair.price * _amount;
       require(msg.value >= etherPrice,
-        "MintShop1155: you did not send enough Ether to complete the purchase");
+        "0x9B");
       (bool success, ) = payable(paymentReceiver).call{ value: msg.value }("");
       require(success,
-        "MintShop1155: payment receiver transfer failed");
+        "0x0C");
 
     // Process payment for the user with a check to sell for an ERC-20 token.
     } else if (sellingPair.assetType == DFStorage.AssetType.Token) {
       IERC20 sellingAsset = IERC20(sellingPair.asset);
       uint256 tokenPrice = sellingPair.price * _amount;
       require(sellingAsset.balanceOf(_msgSender()) >= tokenPrice,
-        "MintShop1155: you do not have enough token to complete the purchase");
+        "0x1C");
       sellingAsset.safeTransferFrom(_msgSender(), paymentReceiver, tokenPrice);
 
     // Otherwise, error out because the payment type is unrecognized.
     } else {
-      revert("MintShop1155: unrecognized asset type");
+      revert("0x0");
     }
 
     

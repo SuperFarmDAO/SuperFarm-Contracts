@@ -154,7 +154,7 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
             await mintShop1155.connect(owner).lockPaymentReceiver();
             await expect(
                 mintShop1155.connect(owner).updatePaymentReceiver(owner.address)
-            ).to.be.revertedWith("MintShop1155: the payment receiver address is locked");
+            ).to.be.revertedWith("XXX");
         });
 
         it('Reverts: no valid permit', async function(){
@@ -216,7 +216,7 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
 
             await expect(
                 mintShop1155.connect(owner).updateGlobalPurchaseLimit("6")
-            ).to.be.revertedWith("MintShop1155: the global purchase limit is locked");
+            ).to.be.revertedWith("0x0A");
         });
 
         it('should update global purchase limit', async function(){
@@ -403,12 +403,13 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
                     requiredAsset: NULL_ADDRESS,
                     requiredAmount: 1,
                     whitelistId: 1
-                }
+                },
+                collection: super1155.address
             }, [1], [1], [1], [[{
                 assetType: 1,
                 asset: NULL_ADDRESS,
                 price: 1
-            }]])).to.be.revertedWith("MintShop1155: cannot update a non-existent pool");
+            }]])).to.be.revertedWith("0x1A");
         });
 
         it('Reverts: updatePool end time preceeds start time', async function(){
@@ -425,12 +426,13 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
                     requiredAsset: NULL_ADDRESS,
                     requiredAmount: 1,
                     whitelistId: 1
-                }
+                },
+                collection: super1155.address
             }, [1], [1], [1], [[{
                 assetType: 1,
                 asset: NULL_ADDRESS,
                 price: 1
-            }]])).to.be.revertedWith("MintShop1155: cannot create a pool which ends before it starts");
+            }]])).to.be.revertedWith("0x2A");
         });
 
         it('Reverts: updatePool no item groups included', async function(){
@@ -447,12 +449,13 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
                     requiredAsset: NULL_ADDRESS,
                     requiredAmount: 1,
                     whitelistId: 1
-                }
+                },
+                collection: super1155.address
             }, [], [1], [1], [[{
                 assetType: 1,
                 asset: NULL_ADDRESS,
                 price: 1
-            }]])).to.be.revertedWith("MintShop1155: must list at least one item group");
+            }]])).to.be.revertedWith("0x3A");
         });
 
         it('Reverts: updatePool groups and offsets length mismatch', async function(){
@@ -469,12 +472,13 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
                     requiredAsset: NULL_ADDRESS,
                     requiredAmount: 1,
                     whitelistId: 1
-                }
+                },
+                collection: super1155.address
             }, [1], [1, 2], [1], [[{
                 assetType: 1,
                 asset: NULL_ADDRESS,
                 price: 1
-            }]])).to.be.revertedWith("MintShop1155: item groups length must equal issue offsets length");
+            }]])).to.be.revertedWith("0x4A");
         });
 
         it('Reverts: updatePool groups and caps length mismatch', async function(){
@@ -491,12 +495,13 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
                     requiredAsset: NULL_ADDRESS,
                     requiredAmount: 1,
                     whitelistId: 1
-                }
+                },
+                collection: super1155.address
             }, [1], [1], [1, 2], [[{
                 assetType: 1,
                 asset: NULL_ADDRESS,
                 price: 1
-            }]])).to.be.revertedWith("MintShop1155: item groups length must equal caps length");
+            }]])).to.be.revertedWith("0x4A");
         });
 
         it('Reverts: updatePool groups and prices length mismatch', async function(){
@@ -513,12 +518,13 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
                     requiredAsset: NULL_ADDRESS,
                     requiredAmount: 1,
                     whitelistId: 1
-                }
+                },
+                collection: super1155.address
             }, [1, 2], [1, 2], [1, 2], [[{
                 assetType: 1,
                 asset: NULL_ADDRESS,
                 price: 1
-            }]])).to.be.revertedWith("MintShop1155: item groups length must equal prices input length");
+            }]])).to.be.revertedWith("0x4A");
         });
 
         it('Reverts: updatePool no mintable amount', async function(){
@@ -535,12 +541,13 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
                     requiredAsset: NULL_ADDRESS,
                     requiredAmount: 1,
                     whitelistId: 1
-                }
+                },
+                collection: super1155.address
             }, [1], [1], [0], [[{
                 assetType: 1,
                 asset: NULL_ADDRESS,
                 price: 1
-            }]])).to.be.revertedWith("MintShop1155: cannot add an item group with no mintable amount");
+            }]])).to.be.revertedWith("0x5A");
         });
 
         it('should add a pool, update it, get the pool', async function(){
@@ -557,7 +564,8 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
                     requiredAsset: NULL_ADDRESS,
                     requiredAmount: 1,
                     whitelistId: 1
-                }
+                },
+                collection: super1155.address
             }, [1, 2], [1, 1], [10, 1], [[{
                 assetType: 1,
                 asset: NULL_ADDRESS,
@@ -581,7 +589,8 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
                     requiredAsset: NULL_ADDRESS,
                     requiredAmount: 1,
                     whitelistId: 1
-                }
+                },
+                collection: super1155.address
             }, [1, 2], [1, 1], [10, 1], [[{
                 assetType: 1,
                 asset: NULL_ADDRESS,
@@ -594,7 +603,18 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
 
             //Get the pool
             let pools = await mintShop1155.connect(owner).getPools([0], 0);
-            expect(pools[0].name).to.be.equal("firstPool");
+            console.log(pools[0].config);
+            console.log("================= COLLECTION ================");
+            console.log(pools[0].config.collection)
+            console.log("================= COLLECTION ================");
+
+            console.log(pools[0].config);
+            console.log("=================");
+
+            console.log(pools[0].config.name);
+
+
+            expect(pools[0].config.name).to.be.equal("firstPool");
         });
     });
 
@@ -644,7 +664,8 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
                     requiredAsset: NULL_ADDRESS,
                     requiredAmount: 1,
                     whitelistId: 0
-                    }
+                    },
+                    collection: super1155.address
                 }, [1, 2], // Groups 1 = FT, 2 = NFT
                 [1, 0], // NumberOffset 1 = FT, 0 = NFT // FT's are coerced to index 1
                 [10, 5], // Caps 10 = FT, 5 = NFT
@@ -690,7 +711,8 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
                     requiredAsset: NULL_ADDRESS,
                     requiredAmount: 1,
                     whitelistId: 0
-                    }
+                    },
+                    collection: super1155.address
                 }, [3], // Group
                 [0], // NumberOffset
                 [2], // Caps
@@ -708,35 +730,35 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
 
             // Get the pool
             let pools = await mintShop1155.connect(owner).getPools([0], 0);
-            expect(pools[0].name).to.be.equal("firstPool");
+            expect(pools[0].config.name).to.be.equal("firstPool");
         });
 
         it('Reverts: mintFromPool amount less than 0', async function(){
             // Mint from pool
             await expect(
                 mintShop1155.connect(owner).mintFromPool(0, 2, 1, 0, 0)
-            ).to.be.revertedWith("MintShop1155: must purchase at least one item");
+            ).to.be.revertedWith("0x0B");
         });
 
         it('Reverts: mintFromPool pool not active', async function(){
             // Mint from pool
             await expect(
                 mintShop1155.connect(owner).mintFromPool(2, 2, 1, 1, 0)
-            ).to.be.revertedWith("MintShop1155: can only purchase items from an active pool");
+            ).to.be.revertedWith("0x1B");
         });
 
         it('Reverts: mintFromPool amount greater than singlePurchaseLimit', async function(){
             // Mint from pool
             await expect(
                 mintShop1155.connect(owner).mintFromPool(0, 2, 1, 3, 0)
-            ).to.be.revertedWith("MintShop1155: cannot exceed the per-transaction maximum");
+            ).to.be.revertedWith("0x2B");
         });
 
         it('Reverts: mintFromPool assetindex not valid', async function(){
             // Mint from pool
             await expect(
                 mintShop1155.connect(owner).mintFromPool(0, 2, 5, 1, 0)
-            ).to.be.revertedWith("MintShop1155: specified asset index is not valid");
+            ).to.be.revertedWith("0x3B");
         });
 
         it('Reverts: mintFromPool pool is not running', async function(){
@@ -747,7 +769,7 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
             // Mint from pool
             await expect(
                 mintShop1155.connect(owner).mintFromPool(0, 2, 0, 1, 0)
-            ).to.be.revertedWith("MintShop1155: pool is not currently running its sale");
+            ).to.be.revertedWith("0x4B");
         });
 
         it('Reverts: mintFromPool pool purchase limit reach', async function(){
@@ -767,7 +789,7 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
             // Mint again surpassing the purchase limit of the pool
             await expect(
                 mintShop1155.connect(owner).mintFromPool(0, 2, 0, 1, 0, {value: ethers.utils.parseEther("1")})
-            ).to.be.revertedWith("MintShop1155: you may not purchase any more items from this pool");
+            ).to.be.revertedWith("0x5B");
         });
 
         it('Reverts: mintFromPool global purchase limit reach', async function(){
@@ -788,7 +810,7 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
             // Mint again surpassing the global purchase limit
             await expect(
                 mintShop1155.connect(owner).mintFromPool(1, 3, 1, 1, 0, {value: ethers.utils.parseEther("1")})
-            ).to.be.revertedWith("MintShop1155: you may not purchase any more items from this shop");
+            ).to.be.revertedWith("0x5B");
         });
 
         it('Reverts: mintFromPool not whitelisted in the pool', async function(){
@@ -823,7 +845,8 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
                     requiredAsset: NULL_ADDRESS,
                     requiredAmount: 1,
                     whitelistId: 1
-                    }
+                    },
+                    collection: super1155.address
                 }, [3], // Group
                 [0], // NumberOffset
                 [2], // Caps
@@ -842,7 +865,7 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
             // Mint
             await expect(
                 mintShop1155.connect(signer1).mintFromPool(1, 3, 0, 1, 0, {value: ethers.utils.parseEther("1")})
-            ).to.be.revertedWith("MintShop1155: you are not whitelisted on this pool");
+            ).to.be.revertedWith("0x6B");
         });
 
         it('Reverts: mintFromPool not enough items available for purchase', async function(){
@@ -867,7 +890,8 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
                     requiredAsset: NULL_ADDRESS,
                     requiredAmount: 1,
                     whitelistId: 0
-                    }
+                    },
+                    collection: super1155.address
                 }, [3], // Group
                 [0], // NumberOffset
                 [1], // Caps
@@ -888,7 +912,7 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
             // Mint until cap reached
             await expect(
                 mintShop1155.connect(signer1).mintFromPool(1, 3, 0, 1, 0, {value: ethers.utils.parseEther("1")})
-            ).to.be.revertedWith("MintShop1155: there are not enough items available for you to purchase");
+            ).to.be.revertedWith("0x7B");
         });
 
         it('Reverts: not enough ether sent', async function(){
@@ -905,7 +929,8 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
                     requiredAsset: NULL_ADDRESS,
                     requiredAmount: 1,
                     whitelistId: 0
-                    }
+                    },
+                    collection: super1155.address
                 }, [3], // Group
                 [0], // NumberOffset
                 [2], // Caps
@@ -931,7 +956,7 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
 
             await expect(
                 mintShop1155.connect(owner).mintFromPool(1, 3, 0, 1, 0, {value: ethers.utils.parseEther("0.5")})
-            ).to.be.revertedWith("MintShop1155: you did not send enough Ether to complete the purchase");
+            ).to.be.revertedWith("0x9B");
         });
 
         it('Reverts => Success: mintFromPool not enough ERC20 tokens for the pool then getPrchaseCount', async function(){
@@ -956,7 +981,8 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
                     requiredAsset: mockERC20.address,
                     requiredAmount: ethers.utils.parseEther("10"),
                     whitelistId: 0
-                    }
+                    },
+                    collection: super1155.address
                 }, [3], // Group
                 [0], // NumberOffset
                 [5], // Caps
@@ -978,7 +1004,7 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
             // Mint until cap reached
             await expect(
                 mintShop1155.connect(signer1).mintFromPool(1, 3, 0, 1, 0)
-            ).to.be.revertedWith("MintShop1155: you do not have enough required token for this pool");
+            ).to.be.revertedWith("0x8B");
 
             // Give signer1 some more amount of ERC20 Tokens
             await mockERC20.connect(deployer).transfer(signer1.address, ethers.utils.parseEther("5"));
@@ -988,7 +1014,7 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
 
             await expect(
                 mintShop1155.connect(signer1).mintFromPool(1, 3, 1, 3, 0)
-            ).to.be.revertedWith("MintShop1155: you do not have enough token to complete the purchase");
+            ).to.be.revertedWith("0x1C");
 
             // Successful purchase, Give signer1 some more amount of ERC20 Tokens
             await mockERC20.connect(deployer).transfer(signer1.address, ethers.utils.parseEther("5"));
@@ -1026,7 +1052,8 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
                     requiredAsset: NULL_ADDRESS,
                     requiredAmount: 1,
                     whitelistId: 0
-                    }
+                    },
+                    collection: super1155.address
                 }, [3], // Group
                 [0], // NumberOffset
                 [2], // Caps
@@ -1066,7 +1093,8 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
                     requiredAsset: super1155.address,
                     requiredAmount: 1,
                     whitelistId: 0
-                    }
+                    },
+                    collection: super1155.address
                 }, [3], // Group
                 [0], // NumberOffset
                 [2], // Caps
@@ -1085,7 +1113,7 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
                 // Mint based on ERC1155 item holdings
                 await expect(
                     mintShop1155.connect(signer1).mintFromPool(1, 3, 1, 1, 0, )
-                ).to.be.revertedWith("MintShop1155: you do not have enough required item for this pool");
+                ).to.be.revertedWith("0x8B");
 
                 // Mint ERC1155 for signer1
                 await super1155.connect(owner).mintBatch(signer1.address, [shiftedItemGroupId], ["1"], DATA);
@@ -1097,7 +1125,7 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
             // Get all the pools mentioned
             let pools = await mintShop1155.connect(owner).getPoolsWithAddress([0, 1], owner.address, 0);
             await expect(
-                pools[0].name
+                pools[0].config.name
             ).to.be.equal("firstPool")
         });
     });
@@ -1128,7 +1156,8 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
                     requiredAsset: staker.address,
                     requiredAmount: 1000, // Required amount of points
                     whitelistId: 0
-                    }
+                    },
+                    collection: super1155.address
                 }, [1], // Groups 1 = FT, 2 = NFT
                 [0], // NumberOffset 1 = FT, 0 = NFT // FT's are coerced to index 1
                 [10], // Caps 10 = FT, 5 = NFT
