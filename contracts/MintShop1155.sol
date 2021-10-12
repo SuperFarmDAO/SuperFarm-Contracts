@@ -105,10 +105,10 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop {
     This mapping relates each item group ID to the next item ID within that
     group which should be issued, minus one.
   */
-  mapping (uint256 => uint256) public nextItemIssues;
+  mapping (bytes32 => uint256) public nextItemIssues;
 
   /**
-    This struct tracks information about a single item pool in the Shop.
+    This struct is a source of mapping-free input to the `addPool` function.
 
     @param name A name for the pool.
     @param startTime The timestamp when this pool begins allowing purchases.
@@ -117,64 +117,169 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop {
       purchase from this pool.
     @param singlePurchaseLimit The maximum number of items a single address may
       purchase from this pool in a single transaction.
-    @param purchaseCounts A mapping of addresses to the number of items each has
-      purchased from this pool.
     @param requirement A PoolRequirement requisite for users who want to
       participate in this pool.
-    @param itemGroups An array of all item groups currently present in this
-      pool.
-    @param currentPoolVersion A version number hashed with item group IDs before
-           being used as keys to other mappings. This supports efficient
-           invalidation of stale mappings.
-    @param itemCaps A mapping of item group IDs to the maximum number this pool
-      is allowed to mint.
-    @param itemMinted A mapping of item group IDs to the number this pool has
-      currently minted.
-    @param itemPricesLength A mapping of item group IDs to the number of price
-      assets available to purchase with.
-    @param itemPrices A mapping of item group IDs to a mapping of available
-      Price assets available to purchase with.
   */
-  struct Pool {
-    string name;
+  struct PoolInput {
     uint256 startTime;
     uint256 endTime;
     uint256 purchaseLimit;
     uint256 singlePurchaseLimit;
+    PoolRequirement requirement;
+    address collection;
+    string name;
+  }
+
+  /**
+    This struct tracks information about a single item pool in the Shop.
+    @param currentPoolVersion A version number hashed with item group IDs before
+           being used as keys to other mappings. This supports efficient
+           invalidation of stale mappings.
+    @param config configuration  struct PoolInput.
+    @param purchaseCounts A mapping of addresses to the number of items each has
+      purchased from this pool.
+    @param itemCaps A mapping of item group IDs to the maximum number this pool
+      is allowed to mint.
+    @param itemMinted A mapping of item group IDs to the number this pool has
+      currently minted.
+    @param itemPrices A mapping of item group IDs to a mapping of available
+      Price assets available to purchase with.
+    @param itemGroups An array of all item groups currently present in this
+      pool.
+  */
+  struct Pool {
     uint256 currentPoolVersion;
-    DFStorage.PoolRequirement requirement;
-    uint256[] itemGroups;
+    PoolInput config;
     mapping (address => uint256) purchaseCounts;
     mapping (bytes32 => uint256) itemCaps;
     mapping (bytes32 => uint256) itemMinted;
     mapping (bytes32 => uint256) itemPricesLength;
-    mapping (bytes32 => mapping (uint256 => DFStorage.Price)) itemPrices;
+    mapping (bytes32 => mapping (uint256 => Price)) itemPrices;
+    uint256[] itemGroups;
+  }
+
+  /**
+    This enumeration type specifies the different access rules that may be
+    applied to pools in this shop. Access to a pool may be restricted based on
+    the buyer's holdings of either tokens or items.
+    @param Public This specifies a pool which requires no special asset holdings
+      to buy from.
+    @param TokenRequired This specifies a pool which requires the buyer to hold
+      some amount of ERC-20 tokens to buy from.
+    @param ItemRequired This specifies a pool which requires the buyer to hold
+      some amount of an ERC-1155 item to buy from.
+    @param PointRequired This specifies a pool which requires the buyer to hold
+      some amount of points in a Staker to buy from.
+  */
+  enum AccessType {
+    Public,
+    TokenRequired,
+    ItemRequired,
+    PointRequired
+  }
+
+  /**
+    This struct tracks information about a prerequisite for a user to
+    participate in a pool.
+    @param requiredAmount The amount of the specified `requiredAsset` required
+      for the buyer to purchase from this pool.
+    @param whitelistId The ID of an address whitelist to restrict participants
+      in this pool. To participate, a purchaser must have their address present
+      in the corresponding whitelist. Other requirements from `requiredType`
+      also apply. An ID of 0 is a sentinel value for no whitelist required.
+    @param requiredAsset Some more specific information about the asset to
+      require. If the `requiredType` is `TokenRequired`, we use this address to
+      find the ERC-20 token that we should be specifically requiring holdings
+      of. If the `requiredType` is `ItemRequired`, we use this address to find
+      the item contract that we should be specifically requiring holdings of. If
+      the `requiredType` is `PointRequired`, we treat this address as the
+      address of a Staker contract. Do note that in order for this to work, the
+      Staker must have approved this shop as a point spender.
+    @param requiredType The `AccessType` being applied to gate buyers from
+      participating in this pool. See `requiredAsset` for how additional data
+      can apply to the access type.
+  */
+  struct PoolRequirement {
+    uint256 requiredAmount;
+    uint256 whitelistId;
+    address requiredAsset;
+    AccessType requiredType;
+  }
+
+  /**
+    This enumeration type specifies the different assets that may be used to
+    complete purchases from this mint shop.
+    @param Point This specifies that the asset being used to complete
+      this purchase is non-transferrable points from a `Staker` contract.
+    @param Ether This specifies that the asset being used to complete
+      this purchase is native Ether currency.
+    @param Token This specifies that the asset being used to complete
+      this purchase is an ERC-20 token.
+  */
+  enum AssetType {
+    Point,
+    Ether,
+    Token
+  }
+
+  /**
+    This struct tracks information about a single asset with the associated
+    price that an item is being sold in the shop for. It also includes an
+    `asset` field which is used to convey optional additional data about the
+    asset being used to purchase with.
+    @param price The amount of the specified `assetType` and `asset` to charge.
+    @param asset Some more specific information about the asset to charge in.
+     If the `assetType` is Point, we use this address to find the specific
+     Staker whose points are used as the currency.
+     If the `assetType` is Ether, we ignore this field.
+     If the `assetType` is Token, we use this address to find the
+     ERC-20 token that we should be specifically charging with.
+    @param assetType The `AssetType` type of the asset being used to buy.
+  */
+  struct Price {
+    uint256 price;
+    address asset;
+    AssetType assetType;
+  }
+
+  /**
+    This struct is a source of mapping-free input to the `addWhitelist`
+    function.
+    @param expiryTime A block timestamp after which this whitelist is
+      automatically considered inactive, no matter the value of `isActive`.
+    @param isActive Whether or not this whitelist is actively restricting
+      purchases in blocks ocurring before `expiryTime`.
+    @param addresses An array of addresses to whitelist for participation in a
+      purchases guarded by a whitelist.
+  */
+  struct WhitelistInput {
+    uint256 expiryTime;
+    bool isActive;
+    address[] addresses;
   }
 
   /**
     This struct tracks information about a single whitelist known to this shop.
     Whitelists may be shared across multiple different item pools.
-
     @param expiryTime A block timestamp after which this whitelist is
       automatically considered inactive, no matter the value of `isActive`.
-    @param isActive Whether or not this whitelist is actively restricting
-      purchases in blocks ocurring before `expiryTime`.
     @param currentWhitelistVersion A version number hashed with item group IDs
       before being used as keys to other mappings. This supports efficient
       invalidation of stale mappings to easily clear the whitelist.
+    @param isActive Whether or not this whitelist is actively restricting
+      purchases in blocks ocurring before `expiryTime`.
     @param addresses A mapping of hashed addresses to a flag indicating whether
       this whitelist allows the address to participate in a purchase.
   */
   struct Whitelist {
     uint256 expiryTime;
-    bool isActive;
     uint256 currentWhitelistVersion;
+    bool isActive;
     mapping (bytes32 => bool) addresses;
   }
 
   /**
     This struct tracks information about a single item being sold in a pool.
-
     @param groupId The group ID of the specific NFT in the collection being sold
       by a pool.
     @param cap The maximum number of items that this shop may mint for the
@@ -194,28 +299,14 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop {
   /**
     This struct contains the information gleaned from the `getPool` and
     `getPools` functions; it represents a single pool's data.
-
-    @param name A name for the pool.
-    @param startTime The timestamp when this pool begins allowing purchases.
-    @param endTime The timestamp after which this pool disallows purchases.
-    @param purchaseLimit The maximum number of items a single address may
-      purchase from this pool.
-    @param singlePurchaseLimit The maximum number of items a single address may
-      purchase from this pool in a single transaction.
-    @param requirement A PoolRequirement requisite for users who want to
-      participate in this pool.
+    @param config configuration struct PoolInput
     @param itemMetadataUri The metadata URI of the item collection being sold
       by this launchpad.
     @param items An array of PoolItems representing each item for sale in the
       pool.
   */
   struct PoolOutput {
-    string name;
-    uint256 startTime;
-    uint256 endTime;
-    uint256 purchaseLimit;
-    uint256 singlePurchaseLimit;
-    DFStorage.PoolRequirement requirement;
+    PoolInput config;
     string itemMetadataUri;
     PoolItem[] items;
   }
@@ -224,36 +315,22 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop {
     This struct contains the information gleaned from the `getPool` and
     `getPools` functions; it represents a single pool's data. It also includes
     additional information relevant to a user's address lookup.
-
-    @param name A name for the pool.
-    @param startTime The timestamp when this pool begins allowing purchases.
-    @param endTime The timestamp after which this pool disallows purchases.
-    @param purchaseLimit The maximum number of items a single address may
-      purchase from this pool.
-    @param singlePurchaseLimit The maximum number of items a single address may
-      purchase from this pool in a single transaction.
-    @param requirement A PoolRequirement requisite for users who want to
-      participate in this pool.
+    @param purchaseCount The amount of items purchased from this pool by the
+      specified address.
+    @param config configuration struct PoolInput.
+    @param whitelistStatus Whether or not the specified address is whitelisted
+      for this pool.
     @param itemMetadataUri The metadata URI of the item collection being sold by
       this launchpad.
     @param items An array of PoolItems representing each item for sale in the
       pool.
-    @param purchaseCount The amount of items purchased from this pool by the
-      specified address.
-    @param whitelistStatus Whether or not the specified address is whitelisted
-      for this pool.
   */
   struct PoolAddressOutput {
-    string name;
-    uint256 startTime;
-    uint256 endTime;
-    uint256 purchaseLimit;
-    uint256 singlePurchaseLimit;
-    DFStorage.PoolRequirement requirement;
+    uint256 purchaseCount;
+    PoolInput config;
+    bool whitelistStatus;
     string itemMetadataUri;
     PoolItem[] items;
-    uint256 purchaseCount;
-    bool whitelistStatus;
   }
 
   /**
@@ -610,13 +687,8 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop {
 
       // Track the pool.
       poolOutputs[i] = PoolOutput({
-        name: pools[id].name,
-        startTime: pools[id].startTime,
-        endTime: pools[id].endTime,
-        purchaseLimit: pools[id].purchaseLimit,
-        singlePurchaseLimit: pools[id].singlePurchaseLimit,
-        requirement: pools[id].requirement,
-        itemMetadataUri: items[_itemIndex].getThisMetadataUri(),
+        config: pools[id].config,
+        itemMetadataUri: items[_itemIndex].metadataUri(),
         items: poolItems
       });
     }
@@ -688,17 +760,12 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop {
       }
 
       // Track the pool.
-      uint256 whitelistId = pools[id].requirement.whitelistId;
+      uint256 whitelistId = pools[id].config.requirement.whitelistId;
       bytes32 addressKey = keccak256(
         abi.encode(whitelists[whitelistId].currentWhitelistVersion, _address));
       poolOutputs[i] = PoolAddressOutput({
-        name: pools[id].name,
-        startTime: pools[id].startTime,
-        endTime: pools[id].endTime,
-        purchaseLimit: pools[id].purchaseLimit,
-        singlePurchaseLimit: pools[id].singlePurchaseLimit,
-        requirement: pools[id].requirement,
-        itemMetadataUri: items[_itemIndex].getThisMetadataUri(),
+        config: pools[id].config,
+        itemMetadataUri: items[_itemIndex].metadataUri(),
         items: poolItems,
         purchaseCount: pools[id].purchaseCounts[_address],
         whitelistStatus: whitelists[whitelistId].addresses[addressKey]
@@ -734,6 +801,48 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop {
     nextPoolId += 1;
   }
 
+     /**
+    Allow the owner of the shop or an approved manager to update an existing
+    pool of items.
+
+    @param _id The ID of the pool to update.
+    @param _config The PoolInput full of data defining the pool's operation.
+    @param _groupIds The specific item group IDs to sell in this pool,
+      keyed to the `_amounts` array.
+    @param _issueNumberOffsets The offset for the next issue number minted for a
+      particular item group in `_groupIds`. This is *important* to handle
+      pre-minted or partially-minted item groups.
+    @param _caps The maximum amount of each particular groupId that can be sold
+      by this pool.
+    @param _prices The asset address to price pairings to use for selling each
+      item.
+  */
+  function updatePool(uint256 _id, PoolInput calldata _config,
+    uint256[] calldata _groupIds, uint256[] calldata _issueNumberOffsets,
+    uint256[] calldata _caps, Price[][] memory _prices) public
+    hasValidPermit(UNIVERSAL, POOL) {
+    require(_id <= nextPoolId,
+      "MintShop1155: cannot update a non-existent pool");
+    require(_config.endTime >= _config.startTime,
+      "MintShop1155: cannot create a pool which ends before it starts");
+    require(_groupIds.length > 0,
+      "MintShop1155: must list at least one item group");
+    require(_groupIds.length == _caps.length && _caps.length == _prices.length && _issueNumberOffsets.length == _prices.length,
+      "MintShop1155: item groups length must equal caps, issue offsets and prices input length");
+
+    // Immediately store some given information about this pool.
+    Pool storage pool = pools[_id];
+    pool.config = _config;
+    pool.itemGroups = _groupIds;
+    pool.currentPoolVersion = pools[_id].currentPoolVersion + 1;
+
+    // Delegate work to a helper function to avoid stack-too-deep errors.
+    _updatePoolHelper(_id, _groupIds, _issueNumberOffsets, _caps, _prices);
+
+    // Emit an event indicating that a pool has been updated.
+    emit PoolUpdated(_msgSender(), _id, _config, _groupIds, _caps, _prices);
+  }
+
   /**
     A private helper function for `updatePool` to prevent it from running too
     deep into the stack. This function will store the amount of each item group
@@ -756,12 +865,13 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop {
     for (uint256 i = 0; i < _groupIds.length; i++) {
       require(_caps[i] > 0,
         "MintShop1155: cannot add an item group with no mintable amount");
-      bytes32 itemKey = keccak256(abi.encode(
-        pools[_id].currentPoolVersion, _groupIds[i]));
+      bytes32 itemKey = keccak256(abi.encodePacked(pools[_id].config.collection, pools[_id].currentPoolVersion, _groupIds[i]));
       pools[_id].itemCaps[itemKey] = _caps[i];
-
+      
       // Pre-seed the next item issue IDs given the pool offsets.
-      nextItemIssues[_groupIds[i]] = _issueNumberOffsets[i];
+      // We generate a key from collection address and groupId.
+      bytes32 key = keccak256(abi.encodePacked(pools[_id].config.collection, _groupIds[i]));
+      nextItemIssues[key] = _issueNumberOffsets[i];
 
       // Store future purchase information for the item group.
       for (uint256 j = 0; j < _prices[i].length; j++) {
@@ -771,55 +881,12 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop {
     }
   }
 
-  /**
-    Allow the owner of the shop or an approved manager to update an existing
-    pool of items.
-
-    @param _id The ID of the pool to update.
-    @param _pool The PoolInput full of data defining the pool's operation.
-    @param _groupIds The specific item group IDs to sell in this pool,
-      keyed to the `_amounts` array.
-    @param _issueNumberOffsets The offset for the next issue number minted for a
-      particular item group in `_groupIds`. This is *important* to handle
-      pre-minted or partially-minted item groups.
-    @param _caps The maximum amount of each particular groupId that can be sold
-      by this pool.
-    @param _prices The asset address to price pairings to use for selling each
-      item.
-  */
-  function updatePool(uint256 _id, DFStorage.PoolInput calldata _pool,
-    uint256[] calldata _groupIds, uint256[] calldata _issueNumberOffsets,
-    uint256[] calldata _caps, DFStorage.Price[][] memory _prices) public
-    hasValidPermit(UNIVERSAL, POOL) {
+  function updatePoolConfig(uint256 _id, PoolInput calldata _config) external hasValidPermit(UNIVERSAL, POOL){
     require(_id <= nextPoolId,
       "MintShop1155: cannot update a non-existent pool");
-    require(_pool.endTime >= _pool.startTime,
+    require(_config.endTime >= _config.startTime,
       "MintShop1155: cannot create a pool which ends before it starts");
-    require(_groupIds.length > 0,
-      "MintShop1155: must list at least one item group");
-    require(_groupIds.length == _issueNumberOffsets.length,
-      "MintShop1155: item groups length must equal issue offsets length");
-    require(_groupIds.length == _caps.length,
-      "MintShop1155: item groups length must equal caps length");
-    require(_groupIds.length == _prices.length,
-      "MintShop1155: item groups length must equal prices input length");
-
-    // Immediately store some given information about this pool.
-    Pool storage pool = pools[_id];
-    pool.name = _pool.name;
-    pool.startTime = _pool.startTime;
-    pool.endTime = _pool.endTime;
-    pool.purchaseLimit = _pool.purchaseLimit;
-    pool.singlePurchaseLimit = _pool.singlePurchaseLimit;
-    pool.itemGroups = _groupIds;
-    pool.currentPoolVersion = pools[_id].currentPoolVersion + 1;
-    pool.requirement = _pool.requirement;
-
-    // Delegate work to a helper function to avoid stack-too-deep errors.
-    _updatePoolHelper(_id, _groupIds, _issueNumberOffsets, _caps, _prices);
-
-    // Emit an event indicating that a pool has been updated.
-    emit PoolUpdated(_msgSender(), _id, _pool, _groupIds, _caps, _prices);
+    pools[_id].config = _config;
   }
 
   /**
@@ -838,7 +905,7 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop {
       "MintShop1155: must purchase at least one item");
     require(_id < nextPoolId,
       "MintShop1155: can only purchase items from an active pool");
-    require(pools[_id].singlePurchaseLimit >= _amount,
+    require(pools[_id].config.singlePurchaseLimit >= _amount,
       "MintShop1155: cannot exceed the per-transaction maximum");
 
     // Verify that the asset being used in the purchase is valid.
@@ -848,8 +915,8 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop {
       "MintShop1155: specified asset index is not valid");
 
     // Verify that the pool is running its sale.
-    require(block.timestamp >= pools[_id].startTime
-      && block.timestamp <= pools[_id].endTime,
+    require(block.timestamp >= pools[_id].config.startTime
+      && block.timestamp <= pools[_id].config.endTime,
       "MintShop1155: pool is not currently running its sale");
 
     // Verify that the pool is respecting per-address global purchase limits.
@@ -861,13 +928,13 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop {
     // Verify that the pool is respecting per-address pool purchase limits.
     uint256 userPoolPurchaseAmount =
       _amount + pools[_id].purchaseCounts[_msgSender()];
-    require(userPoolPurchaseAmount <= pools[_id].purchaseLimit,
+    require(userPoolPurchaseAmount <= pools[_id].config.purchaseLimit,
       "MintShop1155: you may not purchase any more items from this pool");
 
     // Verify that the pool is either public, inactive, time-expired,
     // or the caller's address is whitelisted.
     {
-      uint256 whitelistId = pools[_id].requirement.whitelistId;
+      uint256 whitelistId = pools[_id].config.requirement.whitelistId;
       uint256 whitelistVersion =
         whitelists[whitelistId].currentWhitelistVersion;
       bytes32 addressKey = keccak256(abi.encode(whitelistVersion,
@@ -887,8 +954,8 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop {
 
     // Verify that the user meets any requirements gating participation in this
     // pool. Verify that any possible ERC-20 requirements are met.
-    DFStorage.PoolRequirement memory poolRequirement = pools[_id].requirement;
-    if (poolRequirement.requiredType == DFStorage.AccessType.TokenRequired) {
+    PoolRequirement memory poolRequirement = pools[_id].config.requirement;
+    if (poolRequirement.requiredType == AccessType.TokenRequired) {
       IERC20 requiredToken = IERC20(poolRequirement.requiredAsset);
       require(requiredToken.balanceOf(_msgSender())
         >= poolRequirement.requiredAmount,
@@ -952,7 +1019,8 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop {
      // If payment is successful, mint each of the user's purchased items.
     uint256[] memory itemIds = new uint256[](_amount);
     uint256[] memory amounts = new uint256[](_amount);
-    uint256 nextIssueNumber = nextItemIssues[_groupId];
+    bytes32 key = keccak256(abi.encodePacked(pools[_id].config.collection, _groupId));
+    uint256 nextIssueNumber = nextItemIssues[key];
     {
       uint256 shiftedGroupId = _groupId << 128;
       for (uint256 i = 1; i <= _amount; i++) {
@@ -962,7 +1030,7 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop {
       }
     }
      // Update the tracker for available item issue numbers.
-    nextItemIssues[_groupId] = nextIssueNumber + _amount;
+    nextItemIssues[key] = nextIssueNumber + _amount;
 
     // Update the count of circulating items from this pool.
     pools[_id].itemMinted[_itemKey] = _newCirculatingTotal;
