@@ -84,15 +84,11 @@ contract DropFactory is Ownable {
         )
     {
         require(
-            _itemGroupInput.length == _poolInput.length,
-            "DropFactory: arrays of input parametres must be same length!"
-        );
-        require(
-            _itemGroupInput.length == _poolConfigurationData.length,
+            _poolConfigurationData.length == _poolConfigurationData.length,
             "DropFactory: arrays of input parametres must be same length!"
         );
 
-        super1155 = createSuper1155(_owner, _collectionName, _uri, _proxyRegistry, _itemGroupInput, _poolInput);  
+        super1155 = createSuper1155(_owner, _collectionName, _uri, _proxyRegistry, _itemGroupInput);  
 
         mintShop = createMintShop(
             _owner,
@@ -119,8 +115,7 @@ contract DropFactory is Ownable {
         string memory _collectionName,
         string memory _uri,
         address _proxyRegistry,
-        DFStorage.ItemGroupInput[] memory _itemGroupInput,
-        DFStorage.PoolInput[] memory _poolInput
+        DFStorage.ItemGroupInput[] memory _itemGroupInput
         ) private returns (address super1155) {
             
          bytes memory super1155Bytecode = IHelper(super1155Helper).getByteCode();
@@ -145,7 +140,7 @@ contract DropFactory is Ownable {
             }
         }
 
-        for (uint256 i = 0; i < _poolInput.length; i++) {
+        for (uint256 i = 0; i < _itemGroupInput.length; i++) {
             ISuper1155(super1155).configureGroup(i + 1, _itemGroupInput[i]);
         }
 
