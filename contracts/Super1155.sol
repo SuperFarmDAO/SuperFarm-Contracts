@@ -322,6 +322,10 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
       transferOwnership(_owner);
   }
 
+  function getMINTPermit() external override pure returns (bytes32) {
+    return MINT;
+  }
+
 
   /**
     Allow the item collection owner or an approved manager to update the

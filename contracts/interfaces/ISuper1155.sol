@@ -24,5 +24,8 @@ interface ISuper1155 {
     external;
 
 
+    /// The public identifier for the right to mint items.
+    function getMINTPermit() external pure returns (bytes32);
+
     function _transferOwnership(address _owner) external;
 }

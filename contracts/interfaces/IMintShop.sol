@@ -17,4 +17,6 @@ interface IMintShop {
     function addWhitelist(DFStorage.WhitelistInput memory _whitelist) external;
 
     function setItems(ISuper1155[] memory _items) external;
+
+    function grantMintPermit(address super1155, bytes32 _circumstance) external; 
 }

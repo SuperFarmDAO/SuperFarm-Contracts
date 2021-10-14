@@ -24,6 +24,8 @@ import "./libraries/DFStorage.sol";
 contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop {
   using SafeERC20 for IERC20;
 
+  uint256 MAX_UINT = 2 ** 256 - 1;
+
   /// The public identifier for the right to set the payment receiver.
   bytes32 public constant SET_PAYMENT_RECEIVER
     = keccak256("SET_PAYMENT_RECEIVER");
@@ -970,6 +972,9 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop {
 
   }
 
+  function grantMintPermit(address super1155, bytes32 _circumstance) external override onlyOwner {
+    super.setPermit(super1155, _circumstance, UNIVERSAL, MAX_UINT);
+  }
 
 
 }

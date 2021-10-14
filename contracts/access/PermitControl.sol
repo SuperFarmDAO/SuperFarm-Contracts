@@ -168,7 +168,7 @@ abstract contract PermitControl is Ownable {
     bytes32 _circumstance,
     bytes32 _right,
     uint256 _expirationTime
-  ) external virtual hasValidPermit(UNIVERSAL, managerRight[_right]) {
+  ) public virtual hasValidPermit(UNIVERSAL, managerRight[_right]) {
     require(_right != ZERO_RIGHT,
       "PermitControl: you may not grant the zero right");
     permissions[_address][_circumstance][_right] = _expirationTime;

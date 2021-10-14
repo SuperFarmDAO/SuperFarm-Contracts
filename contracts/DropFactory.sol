@@ -199,7 +199,8 @@ contract DropFactory is Ownable {
                 _poolConfigurationData[i].prices
             );
         }
-
+        bytes32 MINT = ISuper1155(super1155).getMINTPermit();
+        IMintShop(mintShop).grantMintPermit(super1155, MINT);
         IMintShop(mintShop)._transferOwnership(_owner);
         return mintShop;
     }
