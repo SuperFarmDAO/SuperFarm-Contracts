@@ -40,7 +40,7 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
   bytes32 public constant SET_PROXY_REGISTRY = keccak256("SET_PROXY_REGISTRY");
 
   /// The public identifier for the right to configure item groups.
-  bytes32 public constant CONFIGURE_GROUP = keccak256("CONFIGURE_GROUP");
+  bytes32 public constant override CONFIGURE_GROUP = keccak256("CONFIGURE_GROUP");
 
   /// The public identifier for the right to mint items.
   bytes32 public constant MINT = keccak256("MINT");

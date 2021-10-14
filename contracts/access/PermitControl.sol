@@ -104,7 +104,7 @@ abstract contract PermitControl is Ownable {
     bytes32 _circumstance,
     bytes32 _right
   ) {
-    require(_msgSender() == owner() || tx.origin == owner()
+    require(_msgSender() == owner()
       || hasRight(_msgSender(), _circumstance, _right),
       "PermitControl: sender does not have a valid permit");
     _;

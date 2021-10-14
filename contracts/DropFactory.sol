@@ -7,6 +7,7 @@ import "./interfaces/ISuper1155.sol";
 import "./interfaces/IMintShop.sol";
 import "./libraries/DFStorage.sol";
 import "./interfaces/IHelper.sol";
+import "./IPermitControl.sol";
 
 contract DropFactory is Ownable {
     string public version = "v0.1";
@@ -139,11 +140,10 @@ contract DropFactory is Ownable {
                 revert(0, 0)
             }
         }
-
+        grantPermitsSuper1155(super1155);
         for (uint256 i = 0; i < _itemGroupInput.length; i++) {
             ISuper1155(super1155).configureGroup(i + 1, _itemGroupInput[i]);
         }
-
         ISuper1155(super1155)._transferOwnership(_owner);
 
         return (super1155);
@@ -182,6 +182,8 @@ contract DropFactory is Ownable {
         ISuper1155[] memory items = new ISuper1155[](1);
         items[0] = ISuper1155(super1155);
 
+        grantPermitsMintShop1155(mintShop);
+
         IMintShop(mintShop).setItems(items);
         
 
@@ -199,8 +201,12 @@ contract DropFactory is Ownable {
                 _poolConfigurationData[i].prices
             );
         }
+
+        bytes32 UNIVERSAL = IPermitControl(mintShop).UNIVERSAL();
+
         bytes32 MINT = ISuper1155(super1155).getMINTPermit();
-        IMintShop(mintShop).grantMintPermit(super1155, MINT);
+        IPermitControl(mintShop).setPermit(mintShop, MINT, UNIVERSAL, MAX_INT);
+
         IMintShop(mintShop)._transferOwnership(_owner);
         return mintShop;
     }
@@ -214,6 +220,25 @@ contract DropFactory is Ownable {
     function updateHelpersAddress(address _mintShopHelper, address _super1155Helper) external onlyOwner {
         mintShopHelper = _mintShopHelper;
         super1155Helper = _super1155Helper;
+    }
+
+    function grantPermitsSuper1155(address super1155) private {
+        bytes32 CONFIGURE_GROUP = ISuper1155(super1155).CONFIGURE_GROUP();
+        bytes32 UNIVERSAL = IPermitControl(super1155).UNIVERSAL();
+
+        IPermitControl(super1155).setPermit(address(this), CONFIGURE_GROUP, UNIVERSAL, MAX_INT);
+    }
+
+    function grantPermitsMintShop1155(address mintShop) private {
+        bytes32 UNIVERSAL = IPermitControl(mintShop).UNIVERSAL();
+        bytes32 POOL = IMintShop(mintShop).POOL();
+        bytes32 SET_ITEMS = IMintShop(mintShop).SET_ITEMS();
+        bytes32 WHITELIST = IMintShop(mintShop).WHITELIST();
+
+        IPermitControl(mintShop).setPermit(address(this), SET_ITEMS, UNIVERSAL, MAX_INT);
+        IPermitControl(mintShop).setPermit(address(this), POOL, UNIVERSAL, MAX_INT);
+        IPermitControl(mintShop).setPermit(address(this), WHITELIST, UNIVERSAL, MAX_INT);
+
     }
 
     /**

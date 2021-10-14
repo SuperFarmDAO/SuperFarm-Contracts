@@ -28,4 +28,6 @@ interface ISuper1155 {
     function getMINTPermit() external pure returns (bytes32);
 
     function _transferOwnership(address _owner) external;
+
+    function CONFIGURE_GROUP() external view returns (bytes32);
 }

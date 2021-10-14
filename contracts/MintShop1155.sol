@@ -42,13 +42,13 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop {
   bytes32 public constant LOCK_GLOBAL_LIMIT = keccak256("LOCK_GLOBAL_LIMIT");
 
   /// The public identifier for the right to manage whitelists.
-  bytes32 public constant WHITELIST = keccak256("WHITELIST");
+  bytes32 public constant override WHITELIST = keccak256("WHITELIST");
 
   /// The public identifier for the right to manage item pools.
-  bytes32 public constant POOL = keccak256("POOL");
+  bytes32 public constant override POOL = keccak256("POOL");
 
   /// The public identifier for the right to set new items.
-  bytes32 public constant SET_ITEMS = keccak256("SET_ITEMS");
+  bytes32 public constant override SET_ITEMS = keccak256("SET_ITEMS");
 
   /// @dev A mask for isolating an item's group ID.
   uint256 constant GROUP_MASK = uint256(type(uint128).max) << 128;
