@@ -388,7 +388,7 @@ contract Super721 is PermitControl, ERC165Storage, IERC721 {
     to 64 characters in length.
     @return The metadata URI string of the item with ID `_itemId`.
   */
-  function uri(uint256 id) external view returns (string memory) {
+  function tokenURI(uint256 id) external view returns (string memory) {
     Strings.Slice memory slice1 = metadataUri.toSlice();
     Strings.Slice memory slice2 = metadataUri.toSlice();
     string memory tokenFirst = "{";
