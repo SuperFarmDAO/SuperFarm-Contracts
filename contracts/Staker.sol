@@ -100,7 +100,9 @@ contract Staker is Ownable, ReentrancyGuard {
   struct UserInfo {
     uint256 amount;
     uint256 tokenPaid;
+    uint256 tokenRewards;
     uint256 pointPaid;
+    uint256 pointRewards;
   }
 
   /// Stored information for each user staking in each pool.
@@ -502,10 +504,10 @@ contract Staker is Ownable, ReentrancyGuard {
     updatePool(_token);
     if (user.amount > 0) {
       uint256 pendingTokens = ((user.amount * pool.tokensPerShare) / 1e12) - user.tokenPaid;
-      token.safeTransferFrom(address(this), msg.sender, pendingTokens);
+      user.tokenRewards += pendingTokens;
       totalTokenDisbursed = totalTokenDisbursed + pendingTokens;
       uint256 pendingPoints = ((user.amount * pool.pointsPerShare) / 1e30) - user.pointPaid;
-      userPoints[msg.sender] = userPoints[msg.sender] + pendingPoints;
+      user.pointRewards += pendingPoints;
     }
     pool.token.safeTransferFrom(address(msg.sender), address(this), _amount);
     user.amount = user.amount +_amount;
@@ -526,15 +528,26 @@ contract Staker is Ownable, ReentrancyGuard {
       "You cannot withdraw that much of the specified token; you are not owed it.");
     updatePool(_token);
     uint256 pendingTokens = ((user.amount * pool.tokensPerShare) / 1e12) - user.tokenPaid;
-    token.safeTransferFrom(address(this), msg.sender, pendingTokens);
+    user.tokenRewards += pendingTokens;
     totalTokenDisbursed = totalTokenDisbursed + pendingTokens;
     uint256 pendingPoints = ((user.amount * pool.pointsPerShare) / 1e30) - user.pointPaid;
-    userPoints[msg.sender] = userPoints[msg.sender] + pendingPoints;
+    user.pointRewards += pendingPoints;
     user.amount = user.amount - _amount;
     user.tokenPaid = (user.amount * pool.tokensPerShare) / 1e12;
     user.pointPaid = (user.amount * pool.pointsPerShare) / 1e30;
     pool.token.safeTransfer(address(msg.sender), _amount);
     emit Withdraw(msg.sender, _token, _amount);
+  }
+
+  /**
+    Claim accumulated token and point rewards from the Staker.
+    @param _token The asset to claim rewards from.
+   */
+  function claim(IERC20 _token) external nonReentrant {
+    UserInfo storage user = userInfo[_token][msg.sender];
+
+    token.safeTransferFrom(address(this), msg.sender, user.tokenRewards);
+    userPoints[msg.sender] = userPoints[msg.sender] + user.pointRewards;
   }
 
   /**
