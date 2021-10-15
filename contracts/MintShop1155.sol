@@ -11,7 +11,6 @@ import "./interfaces/IStaker.sol";
 import "./interfaces/IMintShop.sol";
 
 import "./libraries/DFStorage.sol";
-
 /**
   @title A Shop contract for selling NFTs via direct minting through particular
     pools with specific participation requirements.
@@ -367,9 +366,12 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop {
     @param _globalPurchaseLimit A global limit on the number of items that a
       single address may purchase across all item pools in the shop.
   */
-  constructor(address _paymentReceiver,
+  constructor(address _owner, address _paymentReceiver,
     uint256 _globalPurchaseLimit) {
 
+    if (_owner != owner()) {
+      transferOwnership(_owner);
+    }
     // Initialization.
     paymentReceiver = _paymentReceiver;
     globalPurchaseLimit = _globalPurchaseLimit;
@@ -607,7 +609,7 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop {
       // Track the pool.
       poolOutputs[i] = PoolOutput({
         config: pools[id].config,
-        itemMetadataUri: items[_itemIndex].getThisMetadataUri(),
+        itemMetadataUri: items[_itemIndex].metadataUri(),
         items: poolItems
       });
     }
@@ -684,7 +686,7 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop {
         abi.encode(whitelists[whitelistId].currentWhitelistVersion, _address));
       poolOutputs[i] = PoolAddressOutput({
         config: pools[id].config,
-        itemMetadataUri: items[_itemIndex].getThisMetadataUri(),
+        itemMetadataUri: items[_itemIndex].metadataUri(),
         items: poolItems,
         purchaseCount: pools[id].purchaseCounts[_address],
         whitelistStatus: whitelists[whitelistId].addresses[addressKey]
@@ -885,7 +887,7 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop {
     // Verify that any possible ERC-1155 ownership requirements are met.
     } else if (poolRequirement.requiredType == DFStorage.AccessType.ItemRequired) {
       ISuper1155 requiredItem = ISuper1155(poolRequirement.requiredAsset);
-      require(requiredItem.getTotalBalances(_msgSender())
+      require(requiredItem.totalBalances(_msgSender())
         >= poolRequirement.requiredAmount,
         "0x8B");
 
@@ -940,10 +942,12 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop {
      // If payment is successful, mint each of the user's purchased items.
     uint256[] memory itemIds = new uint256[](_amount);
     uint256[] memory amounts = new uint256[](_amount);
-    bytes32 key = keccak256(abi.encodePacked(pools[_id].config.collection, _groupId));
+    bytes32 key = keccak256(abi.encodePacked(pools[_id].config.collection, 
+       pools[_id].currentPoolVersion, _groupId));
     uint256 nextIssueNumber = nextItemIssues[key];
     {
       uint256 shiftedGroupId = _groupId << 128;
+
       for (uint256 i = 1; i <= _amount; i++) {
         uint256 itemId = (shiftedGroupId + nextIssueNumber) + i;
         itemIds[i - 1] = itemId;
@@ -968,13 +972,6 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop {
     items[_itemIndex].mintBatch(_msgSender(), itemIds, amounts, "");
 
     emit ItemPurchased(_msgSender(), _id, itemIds, amounts);
-
-
   }
-
-  function grantMintPermit(address super1155, bytes32 _circumstance) external override onlyOwner {
-    super.setPermit(super1155, _circumstance, UNIVERSAL, MAX_UINT);
-  }
-
 
 }

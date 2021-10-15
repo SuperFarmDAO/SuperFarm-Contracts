@@ -18,8 +18,6 @@ interface IMintShop {
 
     function setItems(ISuper1155[] memory _items) external;
 
-    function grantMintPermit(address super1155, bytes32 _circumstance) external;
-
     function SET_ITEMS() external view returns (bytes32); 
     function POOL() external view returns (bytes32); 
     function WHITELIST() external view returns (bytes32); 

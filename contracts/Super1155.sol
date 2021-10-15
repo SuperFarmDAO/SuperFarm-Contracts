@@ -33,6 +33,8 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
   using Address for address;
   using Strings for string;
 
+  uint256 MAX_INT = 2 ** 256 - 1;
+
   /// The public identifier for the right to set this contract's metadata URI.
   bytes32 public constant SET_URI = keccak256("SET_URI");
 
@@ -43,7 +45,7 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
   bytes32 public constant override CONFIGURE_GROUP = keccak256("CONFIGURE_GROUP");
 
   /// The public identifier for the right to mint items.
-  bytes32 public constant MINT = keccak256("MINT");
+  bytes32 public constant override MINT  = keccak256("MINT");
 
   /// The public identifier for the right to burn items.
   bytes32 public constant BURN = keccak256("BURN");
@@ -72,19 +74,12 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
   /// The public name of this contract.
   string public name;
 
-
-  /// Struct for 
-  struct TypesOutput {
-    DFStorage.SupplyType supplyType;
-    DFStorage.ItemType itemType;
-    DFStorage.BurnType burnType;
-  }
   /**
     The ERC-1155 URI for tracking item metadata, supporting {id} substitution.
     For example: https://token-cdn-domain/{id}.json. See the ERC-1155 spec for
     more details: https://eips.ethereum.org/EIPS/eip-1155#metadata.
   */
-  string public metadataUri;
+  string public override metadataUri;
 
   /// A proxy registry address for supporting automatic delegated approval.
   address public proxyRegistryAddress;
@@ -96,7 +91,7 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
   mapping (uint256 => mapping(address => uint256)) public groupBalances;
 
   /// A mapping from each address to a collection-wide balance.
-  mapping(address => uint256) public totalBalances;
+  mapping(address => uint256) override public totalBalances;
 
   /**
     @dev This is a mapping from each address to per-address operator approvals.
@@ -259,13 +254,18 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
     @param _uri The metadata URI to perform later token ID substitution with.
     @param _proxyRegistryAddress The address of a proxy registry contract.
   */
-  constructor(string memory _name, string memory _uri,
+  constructor(address _owner, string memory _name, string memory _uri,
     address _proxyRegistryAddress) {
 
     // Register the ERC-165 interfaces.
     _registerInterface(INTERFACE_ERC1155);
     _registerInterface(INTERFACE_ERC1155_METADATA_URI);
 
+    setPermit(msg.sender, UNIVERSAL, CONFIGURE_GROUP, MAX_INT);
+
+     if (_owner != owner()) {
+      transferOwnership(_owner);
+    }
     // Continue initialization.
     name = _name;
     metadataUri = _uri;
@@ -289,43 +289,14 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
 
     @return The metadata URI string of the item with ID `_itemId`.
   */
-  function uri(uint256 id) external override view returns (string memory) {
-    Strings.Slice memory slice1 = metadataUri.toSlice();
-    Strings.Slice memory slice2 = metadataUri.toSlice(); 
-    string memory tokenFirst = "{";
-    string memory tokenLast = "}";
-    Strings.Slice memory firstSlice = tokenFirst.toSlice();
-    Strings.Slice memory secondSlice = tokenLast.toSlice();
-    firstSlice = Strings.beforeMatch(slice1, firstSlice);
-    secondSlice = Strings.afterMatch(slice2, secondSlice);
-    string memory first = Strings.toString(firstSlice);
-    string memory second = Strings.toString(secondSlice);
-    string memory result = string(abi.encodePacked(first, Strings.uint2str(id), second));
-    return result;
-  }
-
-  function getThisMetadataUri() external override view returns (string memory) {
+  function uri(uint256) external override view returns (string memory) {
     return metadataUri;
-  }
-
-
-  function getTotalBalances(address _recepient)
-        external
-        view
-        override
-        returns (uint256) {
-          return totalBalances[_recepient];
   }
 
 
   function _transferOwnership(address _owner) override external onlyOwner {
       transferOwnership(_owner);
   }
-
-  function getMINTPermit() external override pure returns (bytes32) {
-    return MINT;
-  }
-
 
   /**
     Allow the item collection owner or an approved manager to update the
@@ -950,25 +921,5 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
   function lock() external virtual hasValidPermit(UNIVERSAL, LOCK_CREATION) {
     locked = true;
     emit CollectionLocked(_msgSender());
-  }
-
-
-  function getSupplyType(uint256 _groupId) public view returns (DFStorage.SupplyType) {
-    return itemGroups[_groupId].supplyType;
-  }
-  
-
-  function getItemType(uint256 _groupId) public view returns (DFStorage.ItemType) {
-    return itemGroups[_groupId].itemType;
-  }
-
-  function getBurnType(uint256 _groupId) public view returns (DFStorage.BurnType) {
-    return itemGroups[_groupId].burnType;
-  }
-
-  function getGroupTypes(uint256 _groupId) public view returns (TypesOutput memory types) {
-    types.itemType = itemGroups[_groupId].itemType;
-    types.supplyType = itemGroups[_groupId].supplyType;
-    types.burnType = itemGroups[_groupId].burnType;
   }
 }

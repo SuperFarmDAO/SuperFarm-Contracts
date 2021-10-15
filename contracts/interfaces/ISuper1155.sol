@@ -6,7 +6,9 @@ import "../libraries/DFStorage.sol";
 
 interface ISuper1155 {
   
-    function getThisMetadataUri() external view returns (string memory);
+    function metadataUri() external view returns (string memory);
+
+    function totalBalances (address) external view returns (uint256);
 
     function mintBatch(
         address _recipient,
@@ -15,19 +17,15 @@ interface ISuper1155 {
         bytes calldata _data
     ) external;
 
-    function getTotalBalances(address _recepient)
-        external
-        view
-        returns (uint256);
-
     function configureGroup(uint256 _groupId, DFStorage.ItemGroupInput calldata _data)
     external;
 
 
     /// The public identifier for the right to mint items.
-    function getMINTPermit() external pure returns (bytes32);
 
     function _transferOwnership(address _owner) external;
 
     function CONFIGURE_GROUP() external view returns (bytes32);
+    function MINT() external view returns (bytes32);
+
 }

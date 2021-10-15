@@ -34,7 +34,7 @@ describe("DropFactory test", function () {
 
 
         await factory.deployed();
-
+        console.log(factory.address);
         let value = await factory.version();
         expect(value).to.equal('v0.1');
         // done();
@@ -128,25 +128,86 @@ describe("DropFactory test", function () {
         // let bytecodeInContract = await factory.getData();
         // console.log(bytecodeInContract);
         // console.log(address.toString());
-        let whitelistAddresses = [owner.address, user_one.address];
-        let whiteListData = {
-            expiryTime: ethers.constants.MaxUint256,
-            isActive: true,
-            addresses: whitelistAddresses
-        };
+
         let salt = ethers.utils.formatBytes32String("HelloWorld");
 
-        let addresses = await factory.createDrop(
-            owner.address,
-            "TEST_COLLECTION",
-            "data_uri",
-            "0x0000000000000000000000000000000000000000",
-            user_one.address,
+        const drop = await factory.createDrop(
+            '0x0656886450758213b1C2CDD73A4DcdeeC10d4D20',
+            'Test ETH Collection',
+            'https://d20l5i85b8vtpg.cloudfront.net/thumbnail/4c7c68ed-f446-4ca6-9e55-de65fa7aace2.png',
+            '0xf57b2c51ded3a29e6891aba85459d600256cf317',
+            '0x0656886450758213b1C2CDD73A4DcdeeC10d4D20',
             100,
-            [configGroup],
-            [poolInput],
-            [data2], 
-            [whiteListData],
+            [
+                {
+                    name: "TEST ETH NFT",
+                    supplyType: 0,
+                    supplyData: 200,
+                    itemType: 0,
+                    itemData: 0,
+                    burnType: 1,
+                    burnData: 200
+                },
+                {
+                    name: "TES NFT ETH CONTRACT",
+                    supplyType: 1,
+                    supplyData: 200,
+                    itemType: 0,
+                    itemData: 0,
+                    burnType: 1,
+                    burnData: 200
+                }
+            ],
+            [
+                {
+                    name: "Test ETH Collection",
+                    startTime: 0,
+                    endTime: 1640933280,
+                    purchaseLimit: 100,
+                    singlePurchaseLimit: 1,
+                    requirement: {
+                        requiredType: 0,
+                        requiredAsset: "0x0000000000000000000000000000000000000000",
+                        requiredAmount: 0,
+                        whitelistId: 0
+                    },
+                    collection: "0x0000000000000000000000000000000000000000"
+                }
+            ],
+            [[[1, 2], [1, 1], [5, 5],
+                [
+                    [
+                        {
+                            assetType: 1,
+                            asset: "0x0000000000000000000000000000000000000000",
+                            price: ethers.utils.parseEther("0.5")
+                            
+                        }
+                    ],
+                    [
+                        {
+                            assetType: 1,
+                            asset: "0x0000000000000000000000000000000000000000",
+                            price: {
+                                type: "BigNumber",
+                                hex: "0x00"
+                            }
+                        }
+                    ]
+                ]
+            ]],
+            [
+                {
+                    expiryTime:{
+                        type:"BigNumber",
+                        hex:"0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+                    },
+                    isActive:true,
+                    addresses:[
+                        "0x0000000000000000000000000000000000000000"
+                    ]
+                }
+            ],
             salt
         );
 
@@ -154,23 +215,38 @@ describe("DropFactory test", function () {
 
         // let drops = await factory.getDrops();
 
-        let drops = await factory.getExactDrop(salt);
+        // let drops = await factory.getExactDrop(salt);
+
+
         
         // let MS =await  hre.ethers.getContractAt("MintShop1155", mintShopAddres);
-        // let setWhiteListRight = await MS.WHITELIST();
-        //
+        let addresses = await factory.getExactDrop(salt);
+        let newMintShopAddress = addresses[1];
+        let MSHOP = await hre.ethers.getContractAt("MintShop1155", newMintShopAddress);
+        // let signers = await hre.ethers.getSigners();
+        // console.log("signer1 ", signers[1]);
+        console.log("newMintShopAddress ", newMintShopAddress);
+        let poolData = await MSHOP.getPools([0], 0);
+        // console.log(poolData);
+        // console.log(poolData.toString());
 
-        // await MS.connect(owner).addWhitelist({
-        //     expiryTime: ethers.constants.MaxUint256,
-        //     isActive: true,
-        //     addresses: whitelistAddresses
-        // });
+            const id = 0; // In MVP there is only 1 pool in the drop, i.e. 1 collection, and there is no need to find it out of many others.
+            const assetIndex = 0; // Hardcoded value only ETH
+            const amount = 1; // In MVP in a single transaction, the user can buy only 1 instance of NFT.
+            const itemIndex = 0; // In MVP only one contract address is used, for this reason it is hardcoded 0.
+            const transactionData = {
+                gasLimit: '0xe4e1c0',
+                value: ethers.utils.parseEther("0.5")
+            }
 
-        
+        let transaction = await MSHOP.mintFromPool( id,
+            1,
+            assetIndex,
+            amount,
+            itemIndex,
+            transactionData);
 
-        console.log(drops.toString());
-        // done();
-        console.log(addresses[0]);
+        console.log(transaction);
         
 
     }).timeout(10000);

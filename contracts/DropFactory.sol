@@ -9,6 +9,7 @@ import "./libraries/DFStorage.sol";
 import "./interfaces/IHelper.sol";
 import "./IPermitControl.sol";
 
+
 contract DropFactory is Ownable {
     string public version = "v0.1";
     uint256 MAX_INT = 2**256 - 1;
@@ -89,11 +90,11 @@ contract DropFactory is Ownable {
             "DropFactory: arrays of input parametres must be same length!"
         );
 
-        super1155 = createSuper1155(_owner, _collectionName, _uri, _proxyRegistry, _itemGroupInput);  
+        super1155 = createSuper1155(_collectionName, _uri, _proxyRegistry, _itemGroupInput);  
 
         mintShop = createMintShop(
             _owner,
-            address(super1155),
+            super1155,
             _paymentReceiver,
             _globalPurchaseLimit,
             _poolInput,
@@ -112,7 +113,6 @@ contract DropFactory is Ownable {
 
 
     function createSuper1155( 
-        address _owner,
         string memory _collectionName,
         string memory _uri,
         address _proxyRegistry,
@@ -123,7 +123,7 @@ contract DropFactory is Ownable {
 
         bytes memory bytecodeSuper1155 = abi.encodePacked(
             super1155Bytecode,
-            abi.encode(_collectionName, _uri, _proxyRegistry)
+            abi.encode(address(this), _collectionName, _uri, _proxyRegistry)
         );
 
         bytes32 salt = keccak256(
@@ -140,12 +140,11 @@ contract DropFactory is Ownable {
                 revert(0, 0)
             }
         }
-        grantPermitsSuper1155(super1155);
+        ISuper1155(super1155)._transferOwnership(address(this));
+        
         for (uint256 i = 0; i < _itemGroupInput.length; i++) {
             ISuper1155(super1155).configureGroup(i + 1, _itemGroupInput[i]);
         }
-        ISuper1155(super1155)._transferOwnership(_owner);
-
         return (super1155);
     }
 
@@ -163,6 +162,7 @@ contract DropFactory is Ownable {
         bytes memory bytecodeMintShop = abi.encodePacked(
             mintShopBytecode,
             abi.encode(
+                address(this),
                 _paymentReceiver,
                 _globalPurchaseLimit
             )
@@ -179,8 +179,11 @@ contract DropFactory is Ownable {
                 revert(0, 0)
             }
         }
+        // IMintShop(mintShop)._transferOwnership(address(this));
+
         ISuper1155[] memory items = new ISuper1155[](1);
         items[0] = ISuper1155(super1155);
+
 
         grantPermitsMintShop1155(mintShop);
 
@@ -202,12 +205,14 @@ contract DropFactory is Ownable {
             );
         }
 
-        bytes32 UNIVERSAL = IPermitControl(mintShop).UNIVERSAL();
+        bytes32 UNIVERSAL = IPermitControl(super1155).UNIVERSAL();
 
-        bytes32 MINT = ISuper1155(super1155).getMINTPermit();
-        IPermitControl(mintShop).setPermit(mintShop, MINT, UNIVERSAL, MAX_INT);
+        bytes32 MINT = ISuper1155(super1155).MINT();
+        IPermitControl(super1155).setPermit(mintShop, UNIVERSAL, MINT, MAX_INT);
 
         IMintShop(mintShop)._transferOwnership(_owner);
+        ISuper1155(super1155)._transferOwnership(_owner);
+
         return mintShop;
     }
 
@@ -222,24 +227,18 @@ contract DropFactory is Ownable {
         super1155Helper = _super1155Helper;
     }
 
-    function grantPermitsSuper1155(address super1155) private {
-        bytes32 CONFIGURE_GROUP = ISuper1155(super1155).CONFIGURE_GROUP();
-        bytes32 UNIVERSAL = IPermitControl(super1155).UNIVERSAL();
-
-        IPermitControl(super1155).setPermit(address(this), CONFIGURE_GROUP, UNIVERSAL, MAX_INT);
-    }
-
     function grantPermitsMintShop1155(address mintShop) private {
         bytes32 UNIVERSAL = IPermitControl(mintShop).UNIVERSAL();
         bytes32 POOL = IMintShop(mintShop).POOL();
         bytes32 SET_ITEMS = IMintShop(mintShop).SET_ITEMS();
         bytes32 WHITELIST = IMintShop(mintShop).WHITELIST();
 
-        IPermitControl(mintShop).setPermit(address(this), SET_ITEMS, UNIVERSAL, MAX_INT);
-        IPermitControl(mintShop).setPermit(address(this), POOL, UNIVERSAL, MAX_INT);
-        IPermitControl(mintShop).setPermit(address(this), WHITELIST, UNIVERSAL, MAX_INT);
-
+        IPermitControl(mintShop).setPermit(address(this), UNIVERSAL, SET_ITEMS, MAX_INT);
+        IPermitControl(mintShop).setPermit(address(this), UNIVERSAL, POOL, MAX_INT);
+        IPermitControl(mintShop).setPermit(address(this), UNIVERSAL, WHITELIST, MAX_INT);
     }
+
+
 
     /**
      * @notice Get exact Drop struct.
