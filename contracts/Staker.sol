@@ -324,16 +324,16 @@ contract Staker is Ownable, ReentrancyGuard {
       uint256 emissionTime = tokenEmissionEvents[i].timeStamp;
       uint256 emissionRate = tokenEmissionEvents[i].rate;
       if (_toTime < emissionTime) {
-        totalEmittedTokens = totalEmittedTokens + (((_toTime - workingTime) / 15) * workingRate);
+        totalEmittedTokens = totalEmittedTokens + ((_toTime - workingTime) * workingRate);
         return totalEmittedTokens;
       } else if (workingTime < emissionTime) {
-        totalEmittedTokens = totalEmittedTokens + (((emissionTime - workingTime) / 15) * workingRate);
+        totalEmittedTokens = totalEmittedTokens + ((emissionTime - workingTime) * workingRate);
         workingTime = emissionTime;
       }
       workingRate = emissionRate;
     }
     if (workingTime < _toTime) {
-      totalEmittedTokens = totalEmittedTokens + (((_toTime - workingTime) / 15) * workingRate);
+      totalEmittedTokens = totalEmittedTokens + ((_toTime - workingTime) * workingRate);
     }
     return totalEmittedTokens;
   }
@@ -355,16 +355,16 @@ contract Staker is Ownable, ReentrancyGuard {
       uint256 emissionTime = pointEmissionEvents[i].timeStamp;
       uint256 emissionRate = pointEmissionEvents[i].rate;
       if (_toTime < emissionTime) {
-        totalEmittedPoints = totalEmittedPoints + (((_toTime - workingTime) / 15) * workingRate);
+        totalEmittedPoints = totalEmittedPoints + ((_toTime - workingTime) * workingRate);
         return totalEmittedPoints;
       } else if (workingTime < emissionTime) {
-        totalEmittedPoints = totalEmittedPoints + (((emissionTime - workingTime) / 15) * workingRate);
+        totalEmittedPoints = totalEmittedPoints + ((emissionTime - workingTime) * workingRate);
         workingTime = emissionTime;
       }
       workingRate = emissionRate;
     }
     if (workingTime < _toTime) {
-      totalEmittedPoints = totalEmittedPoints + (((_toTime - workingTime) / 15) * workingRate);
+      totalEmittedPoints = totalEmittedPoints + ((_toTime - workingTime) * workingRate);
     }
     return totalEmittedPoints;
   }
@@ -560,8 +560,8 @@ contract Staker is Ownable, ReentrancyGuard {
     }
     uint256 _tokenRewards = user.tokenRewards + pendingTokens;
     uint256 _pointRewards = user.pointRewards + pendingPoints;
-    token.safeTransferFrom(address(this), msg.sender, user.tokenRewards);
-    userPoints[msg.sender] = userPoints[msg.sender] + user.pointRewards;
+    token.safeTransferFrom(address(this), msg.sender, _tokenRewards);
+    userPoints[msg.sender] = userPoints[msg.sender] + _pointRewards;
     user.tokenRewards = 0;
     user.pointRewards = 0;
 

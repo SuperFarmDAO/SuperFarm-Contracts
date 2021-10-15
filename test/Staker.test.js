@@ -393,8 +393,8 @@ describe('===Staker===', function () {
             let emissionPoints = await staker.connect(signer1).getTotalEmittedPoints(await (await ethers.provider.getBlock()).timestamp, 
             (await (await ethers.provider.getBlock()).timestamp) + 150);
 
-            await expect(emissionTokens).to.be.equal(ethers.utils.parseEther("30"));
-            await expect(emissionPoints).to.be.equal("300");
+            await expect(emissionTokens).to.be.equal(ethers.utils.parseEther("510"));
+            await expect(emissionPoints).to.be.equal("5100");
         });
 
         it('should get emitted points where workingTime < emissionTime', async function () {
@@ -519,7 +519,7 @@ describe('===Staker===', function () {
 
             // Signer2 spends points more than available
             await expect(
-                staker.connect(signer2).spendPoints(signer1.address, 100)
+                staker.connect(signer2).spendPoints(signer1.address, 10000)
                 ).to.be.revertedWith("The user does not have enough points to spend the requested amount.");
 
             // Signer2 spends correct amount
@@ -542,6 +542,59 @@ describe('===Staker===', function () {
             await expect(
                 await rewardToken.balanceOf(staker.address)
             ).to.be.equal("0");
+        });
+    });
+
+    describe("Check claim function", function () {
+        it('should be able to claim correctly', async function () {
+            await staker.connect(owner).setEmissions([
+                {  timeStamp: await (await ethers.provider.getBlock()).timestamp,  rate: ethers.utils.parseEther("6.6666") }
+            ],[
+                {  timeStamp: await (await ethers.provider.getBlock()).timestamp,  rate: ethers.utils.parseEther("6.6666") }
+            ]);
+
+            // Create new pool
+            await staker.connect(owner).addPool(
+                    depositToken.address,
+                    1,
+                    1
+                );
+
+            // Give the signer some mockERC20 tokens
+            await depositToken.connect(deployer).transfer(signer1.address, ethers.utils.parseEther("10"));
+            await rewardToken.connect(deployer).transfer(staker.address, ethers.utils.parseEther("1000000"));
+
+            // Signer approves staker contract
+            await depositToken.connect(signer1).approve(staker.address, ethers.utils.parseEther("10"));
+
+            // Signer deposits the tokens
+            await staker.connect(signer1).deposit(depositToken.address, ethers.utils.parseEther("5")); //==
+            console.log(await(await rewardToken.balanceOf(signer1.address)).toString()); // Should be 0 //==
+            await network.provider.send("evm_increaseTime", [30])//==
+            
+            await staker.connect(signer1).claim(depositToken.address);//==
+            console.log(await(await rewardToken.balanceOf(signer1.address)).toString()); // Should be some balance
+            await network.provider.send("evm_increaseTime", [30])
+    
+            // Signer deposits some more tokens
+            await staker.connect(signer1).deposit(depositToken.address, ethers.utils.parseEther("5"));
+            console.log(await(await rewardToken.balanceOf(signer1.address)).toString()); // Should be the same as last claim
+
+            await staker.connect(signer1).claim(depositToken.address);
+            console.log(await(await rewardToken.balanceOf(signer1.address)).toString()); // Should increase more
+
+            await staker.connect(signer1).claim(depositToken.address);
+            console.log(await(await rewardToken.balanceOf(signer1.address)).toString()); // Should be almost the same
+
+            await staker.connect(signer1).withdraw(depositToken.address, ethers.utils.parseEther("10"));
+            await network.provider.send("evm_increaseTime", [30])
+            await staker.connect(signer1).claim(depositToken.address);
+            console.log(await(await rewardToken.balanceOf(signer1.address)).toString()); // Should be almost the same
+
+            await network.provider.send("evm_increaseTime", [30])
+            console.log(await(await rewardToken.balanceOf(signer1.address)).toString()); // Should be exactly the same
+
+
         });
     });
 });
