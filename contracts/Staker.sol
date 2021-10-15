@@ -95,7 +95,9 @@ contract Staker is Ownable, ReentrancyGuard {
     @param amount amount of the pool asset being provided by the user.
     @param tokenPaid value of user's total token earnings paid out. 
     pending reward = (user.amount * pool.tokensPerShare) - user.rewardDebt.
+    @param tokenRewards amount of token rewards accumulated to be claimed.
     @param pointPaid value of user's total point earnings paid out.
+    @param pointRewards amount of point rewards accumulated to be claimed.
   */
   struct UserInfo {
     uint256 amount;
@@ -125,6 +127,7 @@ contract Staker is Ownable, ReentrancyGuard {
   /// Events for depositing assets into the Staker and later withdrawing them.
   event Deposit(address indexed user, IERC20 indexed token, uint256 amount);
   event Withdraw(address indexed user, IERC20 indexed token, uint256 amount);
+  event Claim(address indexed user, IERC20 indexed token, uint256 tokensAmount, uint256 pointsAmount);
 
   /// An event for tracking when a user has spent points.
   event SpentPoints(address indexed source, address indexed user, uint256 amount);
@@ -545,9 +548,26 @@ contract Staker is Ownable, ReentrancyGuard {
    */
   function claim(IERC20 _token) external nonReentrant {
     UserInfo storage user = userInfo[_token][msg.sender];
+    PoolInfo storage pool = poolInfo[_token];
+    uint256 pendingTokens;
+    uint256 pendingPoints;
 
+    updatePool(_token);
+    if (user.amount > 0) {
+      pendingTokens = ((user.amount * pool.tokensPerShare) / 1e12) - user.tokenPaid;
+      pendingPoints = ((user.amount * pool.pointsPerShare) / 1e30) - user.pointPaid;
+      totalTokenDisbursed = totalTokenDisbursed + pendingTokens;
+    }
+    uint256 _tokenRewards = user.tokenRewards + pendingTokens;
+    uint256 _pointRewards = user.pointRewards + pendingPoints;
     token.safeTransferFrom(address(this), msg.sender, user.tokenRewards);
     userPoints[msg.sender] = userPoints[msg.sender] + user.pointRewards;
+    user.tokenRewards = 0;
+    user.pointRewards = 0;
+
+    user.tokenPaid = (user.amount * pool.tokensPerShare) / 1e12;
+    user.pointPaid = (user.amount * pool.pointsPerShare) / 1e30;
+    emit Claim(msg.sender, token, _tokenRewards, _pointRewards);
   }
 
   /**
