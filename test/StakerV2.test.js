@@ -157,6 +157,9 @@ describe('===Stakerv2===', function () {
             await stakerv2.connect(signer2).deposit(depositToken.address, ethers.utils.parseEther("150"));
             await network.provider.send("evm_increaseTime", [15])
             
+            //User1-Claims
+            await stakerv2.connect(signer1).claim(depositToken.address);
+
             //User1-UnstakeITEMS
             await stakerv2.connect(signer1).unstakeItemsBatch(depositToken.address, 0);
             await network.provider.send("evm_increaseTime", [15])
@@ -164,14 +167,19 @@ describe('===Stakerv2===', function () {
             //User2-Withdraw
             await stakerv2.connect(signer2).withdraw(depositToken.address, ethers.utils.parseEther("100"));
             await network.provider.send("evm_increaseTime", [15])
+
+            //User2-Claims
+            await stakerv2.connect(signer2).claim(depositToken.address);
             
             //User1-Deposit
             await stakerv2.connect(signer1).deposit(depositToken.address, ethers.utils.parseEther("150"));
             await network.provider.send("evm_increaseTime", [15])
 
-            //User-2 && User-1 Withdraw-All
+            //User-2 && User-1 Withdraw-All and Claim
             await stakerv2.connect(signer2).withdraw(depositToken.address, ethers.utils.parseEther("50"));
-            await stakerv2.connect(signer1).withdraw(depositToken.address, ethers.utils.parseEther("350"))
+            await stakerv2.connect(signer1).withdraw(depositToken.address, ethers.utils.parseEther("350"));
+            await stakerv2.connect(signer1).claim(depositToken.address);
+            await stakerv2.connect(signer2).claim(depositToken.address);
             console.log(await (await rewardToken.balanceOf(signer1.address)).toString());
             console.log(await (await rewardToken.balanceOf(signer2.address)).toString());
             console.log(await stakerv2.connect(signer3).getItemsUserInfo(signer2.address, 1));

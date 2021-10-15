@@ -5,7 +5,7 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
-import "@openzeppelin/contracts/token/ERC1155/IERC1155Receiver.sol";
+import "@openzeppelin/contracts/token/ERC1155/utils/ERC1155Holder.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import "./base/Sweepable.sol";
 import "./ISuperGeneric.sol";
@@ -21,7 +21,7 @@ import "./ISuperGeneric.sol";
   This code is inspired by and modified from Sushi's Master Chef contract.
   https://github.com/sushiswap/sushiswap/blob/master/contracts/MasterChef.sol
 */
-contract StakerV2 is Sweepable, ReentrancyGuard, IERC721Receiver, IERC1155Receiver {
+contract StakerV2 is Sweepable, ReentrancyGuard, IERC721Receiver, ERC1155Holder {
   using SafeERC20 for IERC20;
   using EnumerableSet for EnumerableSet.UintSet;
 
@@ -150,6 +150,8 @@ contract StakerV2 is Sweepable, ReentrancyGuard, IERC721Receiver, IERC1155Receiv
     @param amount amount of the pool asset being provided by the user.
     @param tokenBoostedAmount tokens amount after boosts are applied.
     @param pointBoostedAmount points amount after boosts are applied.
+    @param tokenRewards amount of token rewards accumulated to be claimed.
+    @param pointRewards amount of point rewards accumulated to be claimed.
     @param tokenPaid value of user's total token earnings paid out. 
       pending reward = (user.amount * pool.tokensPerShare) - user.rewardDebt.
     @param pointPaid value of user's total point earnings paid out.
@@ -158,6 +160,8 @@ contract StakerV2 is Sweepable, ReentrancyGuard, IERC721Receiver, IERC1155Receiv
     uint256 amount;
     uint256 tokenBoostedAmount;
     uint256 pointBoostedAmount;
+    uint256 tokenRewards;
+    uint256 pointRewards;
     uint256 tokenPaid;
     uint256 pointPaid;
   }
@@ -261,6 +265,9 @@ contract StakerV2 is Sweepable, ReentrancyGuard, IERC721Receiver, IERC1155Receiv
 
   /// Event for withdrawing Fungible assets.
   event Withdraw(address indexed user, IERC20 indexed token, uint256 amount);
+
+  /// Event for claiming rewards from Fungible assets.
+  event Claim(address indexed user, IERC20 indexed token, uint256 tokenRewards, uint256 pointRewards);
 
   /// Event for staking non fungible items for boosters.
   event StakeItemBatch(address indexed user, IERC20 indexed token, uint256 boosterId);
@@ -716,10 +723,10 @@ contract StakerV2 is Sweepable, ReentrancyGuard, IERC721Receiver, IERC1155Receiv
     
     if (_user.amount > 0) {
       uint256 pendingTokens = ((_user.tokenBoostedAmount * _pool.tokensPerShare) / 1e12) - _user.tokenPaid;
-      IERC20(token).safeTransfer(msg.sender, pendingTokens);
-      totalTokenDisbursed = totalTokenDisbursed + pendingTokens;
       uint256 pendingPoints = ((_user.pointBoostedAmount * _pool.pointsPerShare) / 1e30) - _user.pointPaid;
-      userPoints[msg.sender] = userPoints[msg.sender] + pendingPoints;
+      _user.tokenRewards += pendingTokens;
+      _user.pointRewards += pendingPoints;
+      totalTokenDisbursed = totalTokenDisbursed + pendingTokens;
       _pool.tokenBoostedDeposit -= _user.tokenBoostedAmount;
       _pool.pointBoostedDeposit -= _user.pointBoostedAmount;
     }
@@ -748,7 +755,7 @@ contract StakerV2 is Sweepable, ReentrancyGuard, IERC721Receiver, IERC1155Receiv
     @param _isToken is true if '_unboosted' argument is of token type.
     @return _boosted return value with applied boosts.
    */
-  function applyBoosts(uint256 _unboosted, IERC20 _token, bool _isToken ) internal view returns(uint256 _boosted) {
+  function applyBoosts(uint256 _unboosted, IERC20 _token, bool _isToken) internal view returns(uint256 _boosted) {
 
     if (_unboosted <= 0) {
         return 0;
@@ -814,6 +821,34 @@ contract StakerV2 is Sweepable, ReentrancyGuard, IERC721Receiver, IERC1155Receiv
 
     pool.token.safeTransfer(msg.sender, _amount);
     emit Withdraw(msg.sender, _token, _amount);
+  }
+
+  /**
+    Claim accumulated token and point rewards from the Staker.
+    @param _token The asset to claim rewards from.
+   */
+  function claim(IERC20 _token) external nonReentrant {
+    UserInfo storage user = userInfo[_token][msg.sender];
+    PoolInfo storage pool = poolInfo[_token];
+    uint256 pendingTokens;
+    uint256 pendingPoints;
+
+    updatePool(_token);
+    if (user.amount > 0) {
+      pendingTokens = ((user.tokenBoostedAmount * pool.tokensPerShare) / 1e12) - user.tokenPaid;
+      pendingPoints = ((user.pointBoostedAmount * pool.pointsPerShare) / 1e30) - user.pointPaid;
+      totalTokenDisbursed = totalTokenDisbursed + pendingTokens;
+    }
+    uint256 _tokenRewards = user.tokenRewards + pendingTokens;
+    uint256 _pointRewards = user.pointRewards + pendingPoints;
+    IERC20(token).safeTransfer(msg.sender, _tokenRewards);
+    userPoints[msg.sender] = userPoints[msg.sender] + _pointRewards;
+    user.tokenRewards = 0;
+    user.pointRewards = 0;
+
+    user.tokenPaid = (user.tokenBoostedAmount * pool.tokensPerShare) / 1e12;
+    user.pointPaid = (user.pointBoostedAmount * pool.pointsPerShare) / 1e30;
+    emit Claim(msg.sender, IERC20(token), _tokenRewards, _pointRewards);
   }
 
   /**
@@ -1007,31 +1042,5 @@ contract StakerV2 is Sweepable, ReentrancyGuard, IERC721Receiver, IERC1155Receiv
   ) external override returns (bytes4) {
 
     return this.onERC721Received.selector;
-  }
-
-  function onERC1155Received(
-      address operator,
-      address from,
-      uint256 id,
-      uint256 value,
-      bytes calldata data
-  ) external override returns (bytes4) {
-
-      return this.onERC1155Received.selector;
-  }
-
-  function onERC1155BatchReceived(
-      address operator,
-      address from,
-      uint256[] calldata ids,
-      uint256[] calldata values,
-      bytes calldata data
-  ) external override returns (bytes4) {
-
-      return this.onERC1155BatchReceived.selector;
-  }
-
-  function supportsInterface(bytes4 interfaceId) external view override returns (bool) {
-
   }
 }
