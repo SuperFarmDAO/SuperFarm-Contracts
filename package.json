@@ -28,7 +28,6 @@
   },
   "dependencies": {
     "@chainlink/contracts": "^0.2.1",
-    "@openzeppelin/contracts-upgradeable": "^3.4.1-solc-0.7-2",
     "@uniswap/lib": "^1.1.4",
     "@uniswap/v2-core": "^1.0.1",
     "@uniswap/v2-periphery": "^1.1.0-beta.0",
@@ -45,7 +44,8 @@
     "@nomiclabs/hardhat-etherscan": "^2.1.1",
     "@nomiclabs/hardhat-ganache": "^2.0.0",
     "@nomiclabs/hardhat-waffle": "^2.0.0",
-    "@openzeppelin/contracts": "^4.3.1",
+    "@openzeppelin/contracts": "^4.3.2",
+    "@openzeppelin/contracts-upgradeable": "^4.3.2",
     "axios": "^0.21.1",
     "chai": "^4.2.0",
     "csv-writer": "^1.6.0",
