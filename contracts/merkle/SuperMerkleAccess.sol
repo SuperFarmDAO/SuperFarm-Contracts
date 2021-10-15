@@ -16,7 +16,7 @@ import "../base/Sweepable.sol";
 
   October 12th, 2021.
 */
-abstract contract SuperMerkleAccess is Sweepable {
+contract SuperMerkleAccess is Sweepable {
 
   /// The public identifier for the right to set a root for a round.
   bytes32 public constant SET_ROUND_ROOT = keccak256("SET_ROUND_ROOT");
@@ -74,7 +74,7 @@ abstract contract SuperMerkleAccess is Sweepable {
     the merkleRoot as a groupId if whitelist is airdrop or distributive.
    */
   function verify(uint256 _merkleRootId, uint256 _index, bytes32 _node, 
-  bytes32[] calldata _merkleProof) internal view returns(bool) {
+  bytes32[] calldata _merkleProof) public view returns(bool) {
 
     require(merkleRoots[_merkleRootId].merkleRoot != 0, 
       "Inactive.");
