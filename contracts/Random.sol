@@ -18,7 +18,7 @@ import "./base/Sweepable.sol";
   trusted randomness and helper functions to retrieve random values within a
   specific range.
 
-  July 26th, 2021.
+  October 17th, 2021.
 */
 contract Random is Named, Sweepable, VRFConsumerBase {
   using SafeERC20 for IERC20;
@@ -135,7 +135,7 @@ contract Random is Named, Sweepable, VRFConsumerBase {
   */
   function version() external virtual override(Named, Sweepable) pure returns
     (uint256) {
-    return 1;
+    return 2;
   }
 
   /**
@@ -234,5 +234,58 @@ contract Random is Named, Sweepable, VRFConsumerBase {
 
     // Return the interpreted result.
     return (chainlinkResponses[_source].result % (_bound - _origin)) + _origin;
+  }
+
+  /**
+    Interpret the randomness response from Chainlink as an expanded range of
+    multiple random integers.
+
+    @param _source The caller-specified ID for a source of Chainlink randomness.
+    @param _count The number of random values to expand `_source` into.
+  */
+  function expand(
+    bytes32 _source,
+    uint256 _count
+  ) external view returns (uint256[] memory) {
+    require(chainlinkResponses[_source].requester != address(0)
+      && !chainlinkResponses[_source].pending,
+      "Random: you may only interpret the results of a fulfilled request");
+    uint256[] memory expandedValues = new uint256[](_count);
+    for (uint256 i = 0; i < _count; i++) {
+      expandedValues[i] = uint256(keccak256(abi.encode(
+        chainlinkResponses[_source].result,
+        i
+      )));
+    }
+    return expandedValues;
+  }
+
+  /**
+    Interpret the randomness response from Chainlink as an expanded range of
+    multiple random integers within some range from `_origin` (inclusive) to
+    `_bound` (exclusive).
+
+    @param _source The caller-specified ID for a source of Chainlink randomness.
+    @param _count The number of random values to expand `_source` into.
+    @param _origin The first value to include in the range.
+    @param _bound The end of the range; this value is excluded from the range.
+  */
+  function expandAsRange(
+    bytes32 _source,
+    uint256 _count,
+    uint256 _origin,
+    uint256 _bound
+  ) external view returns (uint256[] memory) {
+    require(chainlinkResponses[_source].requester != address(0)
+      && !chainlinkResponses[_source].pending,
+      "Random: you may only interpret the results of a fulfilled request");
+    uint256[] memory expandedValues = new uint256[](_count);
+    for (uint256 i = 0; i < _count; i++) {
+      expandedValues[i] = (uint256(keccak256(abi.encode(
+        chainlinkResponses[_source].result,
+        i
+      ))) % (_bound - _origin)) + _origin;
+    }
+    return expandedValues;
   }
 }
