@@ -11,10 +11,15 @@ import "./access/PermitControl.sol";
 import "./proxy/StubProxyRegistry.sol";
 import "./utils/LocalStrings.sol";
 
+import "./libraries/DFStorage.sol";
+import "./interfaces/ISuper1155.sol";
+
 /**
   @title An ERC-1155 item creation contract.
   @author Tim Clancy
   @author Qazawat Zirak
+  @author Rostislav Khlebnikov
+  @author Nikita Elunin
 
   This contract represents the NFTs within a single collection. It allows for a
   designated collection owner address to manage the creation of NFTs within this
@@ -26,9 +31,11 @@ import "./utils/LocalStrings.sol";
 
   July 19th, 2021.
 */
-contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataURI {
+contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataURI, ISuper1155 {
   using Address for address;
   using Strings for string;
+
+  uint256 MAX_INT = type(uint256).max;
 
   /// The public identifier for the right to set this contract's metadata URI.
   bytes32 public constant SET_URI = keccak256("SET_URI");
@@ -40,7 +47,7 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
   bytes32 public constant CONFIGURE_GROUP = keccak256("CONFIGURE_GROUP");
 
   /// The public identifier for the right to mint items.
-  bytes32 public constant MINT = keccak256("MINT");
+  bytes32 public constant MINT  = keccak256("MINT");
 
   /// The public identifier for the right to burn items.
   bytes32 public constant BURN = keccak256("BURN");
@@ -97,86 +104,6 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
   mapping (address => mapping(address => bool)) private operatorApprovals;
 
   /**
-    This enumeration lists the various supply types that each item group may
-    use. In general, the administrator of this collection or those permissioned
-    to do so may move from a more-permissive supply type to a less-permissive.
-    For example: an uncapped or flexible supply type may be converted to a
-    capped supply type. A capped supply type may not be uncapped later, however.
-
-    @param Capped There exists a fixed cap on the size of the item group. The
-      cap is set by `supplyData`.
-    @param Uncapped There is no cap on the size of the item group. The value of
-      `supplyData` cannot be set below the current circulating supply but is
-      otherwise ignored.
-    @param Flexible There is a cap which can be raised or lowered (down to
-      circulating supply) freely. The value of `supplyData` cannot be set below
-      the current circulating supply and determines the cap.
-  */
-  enum SupplyType {
-    Capped,
-    Uncapped,
-    Flexible
-  }
-
-  /**
-    This enumeration lists the various item types that each item group may use.
-    In general, these are static once chosen.
-
-    @param Nonfungible The item group is truly nonfungible where each ID may be
-      used only once. The value of `itemData` is ignored.
-    @param Fungible The item group is truly fungible and collapses into a single
-      ID. The value of `itemData` is ignored.
-    @param Semifungible The item group may be broken up across multiple
-      repeating token IDs. The value of `itemData` is the cap of any single
-      token ID in the item group.
-  */
-  enum ItemType {
-    Nonfungible,
-    Fungible,
-    Semifungible
-  }
-
-  /**
-    This enumeration lists the various burn types that each item group may use.
-    These are static once chosen.
-
-    @param None The items in this group may not be burnt. The value of
-      `burnData` is ignored.
-    @param Burnable The items in this group may be burnt. The value of
-      `burnData` is the maximum that may be burnt.
-    @param Replenishable The items in this group, once burnt, may be reminted by
-      the owner. The value of `burnData` is ignored.
-  */
-  enum BurnType {
-    None,
-    Burnable,
-    Replenishable
-  }
-
-  /**
-    This struct is a source of mapping-free input to the `configureGroup`
-    function. It defines the settings for a particular item group.
-   
-    @param supplyData An optional integer used by some `supplyType` values.
-    @param itemData An optional integer used by some `itemType` values.
-    @param burnData An optional integer used by some `burnType` values.
-    @param name A name for the item group.
-    @param supplyType The supply type for this group of items.
-    @param itemType The type of item represented by this item group.
-    @param burnType The type of burning permitted by this item group.
-    
-  */
-  struct ItemGroupInput {
-    uint256 supplyData;
-    uint256 itemData;
-    uint256 burnData;
-    SupplyType supplyType;
-    ItemType itemType;
-    BurnType burnType;
-    string name;
-  }
-
-  /**
     This struct defines the settings for a particular item group and is tracked
     in storage.
 
@@ -201,9 +128,9 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
     uint256 supplyData;
     uint256 itemData;
     bool initialized;
-    SupplyType supplyType;
-    ItemType itemType;
-    BurnType burnType;
+    DFStorage.SupplyType supplyType;
+    DFStorage.ItemType itemType;
+    DFStorage.BurnType burnType;
     string name;
   }
 
@@ -267,7 +194,7 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
     @param newGroup The new group configuration.
   */
   event ItemGroupConfigured(address indexed manager, uint256 groupId,
-    ItemGroupInput indexed newGroup);
+    DFStorage.ItemGroupInput indexed newGroup);
 
   /**
     An event that gets emitted when the item collection is locked to further
@@ -325,7 +252,6 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
   /**
     Construct a new ERC-1155 item collection.
 
-    @param _owner The address of the administrator governing this collection.
     @param _name The name to assign to this item collection contract.
     @param _uri The metadata URI to perform later token ID substitution with.
     @param _proxyRegistryAddress The address of a proxy registry contract.
@@ -337,12 +263,11 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
     _registerInterface(INTERFACE_ERC1155);
     _registerInterface(INTERFACE_ERC1155_METADATA_URI);
 
-    // Do not perform a redundant ownership transfer if the deployer should
-    // remain as the owner of the collection.
-    if (_owner != owner()) {
+    setPermit(_msgSender(), UNIVERSAL, CONFIGURE_GROUP, MAX_INT);
+
+     if (_owner != owner()) {
       transferOwnership(_owner);
     }
-
     // Continue initialization.
     name = _name;
     metadataUri = _uri;
@@ -366,20 +291,10 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
 
     @return The metadata URI string of the item with ID `_itemId`.
   */
-  function uri(uint256 id) external override view returns (string memory) {
-    Strings.Slice memory slice1 = metadataUri.toSlice();
-    Strings.Slice memory slice2 = metadataUri.toSlice();
-    string memory tokenFirst = "{";
-    string memory tokenLast = "}";
-    Strings.Slice memory firstSlice = tokenFirst.toSlice();
-    Strings.Slice memory secondSlice = tokenLast.toSlice();
-    firstSlice = Strings.beforeMatch(slice1, firstSlice);
-    secondSlice = Strings.afterMatch(slice2, secondSlice);
-    string memory first = Strings.toString(firstSlice);
-    string memory second = Strings.toString(secondSlice);
-    string memory result = string(abi.encodePacked(first, Strings.uint2str(id), second));
-    return result;
+  function uri(uint256) external view returns (string memory) {
+    return metadataUri;
   }
+
 
   /**
     Allow the item collection owner or an approved manager to update the
@@ -420,7 +335,7 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
     @param _id The ID of the token to check for a balance.
     @return The amount of token `_id` owned by `_owner`.
   */
-  function balanceOf(address _owner, uint256 _id) public override view virtual
+  function balanceOf(address _owner, uint256 _id) public view virtual
   returns (uint256) {
     require(_owner != address(0),
       "ERC1155: balance query for the zero address");
@@ -436,7 +351,7 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
     @return the amount of each token owned by each owner.
   */
   function balanceOfBatch(address[] calldata _owners, uint256[] calldata _ids)
-    external override view virtual returns (uint256[] memory) {
+    external view virtual returns (uint256[] memory) {
     require(_owners.length == _ids.length,
       "ERC1155: accounts and ids length mismatch");
 
@@ -457,7 +372,7 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
     @param _operator The potential transferrer of `_owner`'s items.
     @return Whether `_operator` may transfer items owned by `_owner`.
   */
-  function isApprovedForAll(address _owner, address _operator) public override
+  function isApprovedForAll(address _owner, address _operator) public
     view virtual returns (bool) {
     StubProxyRegistry proxyRegistry = StubProxyRegistry(proxyRegistryAddress);
     if (address(proxyRegistry.proxies(_owner)) == _operator) {
@@ -477,7 +392,7 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
     @param _approved The status of the `_operator`'s approval for the caller.
   */
   function setApprovalForAll(address _operator, bool _approved) external
-    override virtual {
+    virtual {
     require(_msgSender() != _operator,
       "ERC1155: setting approval status for self");
     operatorApprovals[_msgSender()][_operator] = _approved;
@@ -580,7 +495,7 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
   */
   function safeBatchTransferFrom(address _from, address _to,
     uint256[] memory _ids, uint256[] memory _amounts, bytes memory _data)
-    public override virtual {
+    public virtual {
     require(_ids.length == _amounts.length,
       "ERC1155: ids and amounts length mismatch");
     require(_to != address(0),
@@ -623,7 +538,7 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
     @param _data Additional call data to send with this transfer.
   */
   function safeTransferFrom(address _from, address _to, uint256 _id,
-    uint256 _amount, bytes calldata _data) external override virtual {
+    uint256 _amount, bytes calldata _data) external  virtual {
       safeBatchTransferFrom(_from, _to, _asSingletonArray(_id), _asSingletonArray(_amount), _data);
   }
 
@@ -636,7 +551,7 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
     @param _groupId The ID of the item group to create or configure.
     @param _data The `ItemGroup` data input.
   */
-  function configureGroup(uint256 _groupId, ItemGroupInput calldata _data) external virtual {
+  function configureGroup(uint256 _groupId, DFStorage.ItemGroupInput calldata _data) external  {
     require(_groupId != 0,
       "Super1155: group ID 0 is invalid");
     require(_hasItemRight(_groupId, CONFIGURE_GROUP), "Super1155: you don't have rights to configure group");
@@ -665,8 +580,8 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
 
       // A capped supply type may not change.
       // It may also not have its cap increased.
-      if (itemGroups[_groupId].supplyType == SupplyType.Capped) {
-        require(_data.supplyType == SupplyType.Capped,
+      if (itemGroups[_groupId].supplyType == DFStorage.SupplyType.Capped) {
+        require(_data.supplyType == DFStorage.SupplyType.Capped,
           "Super1155: you may not uncap a capped supply type");
         require(_data.supplyData <= itemGroups[_groupId].supplyData,
           "Super1155: you may not increase the supply of a capped type");
@@ -682,27 +597,27 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
       itemGroups[_groupId].supplyData = _data.supplyData;
 
       // A nonfungible item may not change type.
-      if (itemGroups[_groupId].itemType == ItemType.Nonfungible) {
-        require(_data.itemType == ItemType.Nonfungible,
+      if (itemGroups[_groupId].itemType == DFStorage.ItemType.Nonfungible) {
+        require(_data.itemType == DFStorage.ItemType.Nonfungible,
           "Super1155: you may not alter nonfungible items");
 
       // A semifungible item may not change type.
-      } else if (itemGroups[_groupId].itemType == ItemType.Semifungible) {
-        require(_data.itemType == ItemType.Semifungible,
+      } else if (itemGroups[_groupId].itemType == DFStorage.ItemType.Semifungible) {
+        require(_data.itemType == DFStorage.ItemType.Semifungible,
           "Super1155: you may not alter nonfungible items");
 
       // A fungible item may change type if it is unique enough.
-      } else if (itemGroups[_groupId].itemType == ItemType.Fungible) {
-        if (_data.itemType == ItemType.Nonfungible) {
+      } else if (itemGroups[_groupId].itemType == DFStorage.ItemType.Fungible) {
+        if (_data.itemType == DFStorage.ItemType.Nonfungible) {
           require(itemGroups[_groupId].circulatingSupply <= 1,
             "Super1155: the fungible item is not unique enough to change");
-          itemGroups[_groupId].itemType = ItemType.Nonfungible;
+          itemGroups[_groupId].itemType = DFStorage.ItemType.Nonfungible;
 
         // We may also try for semifungible items with a high-enough cap.
-        } else if (_data.itemType == ItemType.Semifungible) {
+        } else if (_data.itemType == DFStorage.ItemType.Semifungible) {
           require(itemGroups[_groupId].circulatingSupply <= _data.itemData,
             "Super1155: the fungible item is not unique enough to change");
-          itemGroups[_groupId].itemType = ItemType.Semifungible;
+          itemGroups[_groupId].itemType = DFStorage.ItemType.Semifungible;
           itemGroups[_groupId].itemData = _data.itemData;
         }
       }
@@ -761,31 +676,31 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
     // supply matters. Otherwise, historic mints are what determine the cap.
     uint256 currentGroupSupply = itemGroups[groupId].mintCount;
     uint256 currentItemSupply = mintCount[_id];
-    if (itemGroups[groupId].burnType == BurnType.Replenishable) {
+    if (itemGroups[groupId].burnType == DFStorage.BurnType.Replenishable) {
       currentGroupSupply = itemGroups[groupId].circulatingSupply;
       currentItemSupply = circulatingSupply[_id];
     }
 
     // If we are subject to a cap on group size, ensure we don't exceed it.
-    if (itemGroups[groupId].supplyType != SupplyType.Uncapped) {
+    if (itemGroups[groupId].supplyType != DFStorage.SupplyType.Uncapped) {
       require((currentGroupSupply + _amount) <= itemGroups[groupId].supplyData,
         "Super1155: you cannot mint a group beyond its cap");
     }
 
     // Do not violate nonfungibility rules.
-    if (itemGroups[groupId].itemType == ItemType.Nonfungible) {
+    if (itemGroups[groupId].itemType == DFStorage.ItemType.Nonfungible) {
       require((currentItemSupply + _amount) <= 1,
         "Super1155: you cannot mint more than a single nonfungible item");
 
     // Do not violate semifungibility rules.
-    } else if (itemGroups[groupId].itemType == ItemType.Semifungible) {
+    } else if (itemGroups[groupId].itemType == DFStorage.ItemType.Semifungible) {
       require((currentItemSupply + _amount) <= itemGroups[groupId].itemData,
         "Super1155: you cannot mint more than the alloted semifungible items");
     }
 
     // Fungible items are coerced into the single group ID + index one slot.
     uint256 mintedItemId = _id;
-    if (itemGroups[groupId].itemType == ItemType.Fungible) {
+    if (itemGroups[groupId].itemType == DFStorage.ItemType.Fungible) {
       mintedItemId = shiftedGroupId + 1;
     }
     return mintedItemId;
@@ -805,7 +720,7 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
   */
   function mintBatch(address _recipient, uint256[] calldata _ids,
     uint256[] calldata _amounts, bytes calldata _data)
-    external virtual {
+    external  {
     require(_recipient != address(0),
       "ERC1155: mint to the zero address");
     require(_ids.length == _amounts.length,
@@ -862,12 +777,12 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
       "Super1155: you cannot burn a non-existent item group");
 
     // If the item group is non-burnable, then revert.
-    if (itemGroups[groupId].burnType == BurnType.None) {
+    if (itemGroups[groupId].burnType == DFStorage.BurnType.None) {
       revert("Super1155: you cannot burn a non-burnable item group");
     }
 
     // If we can burn items, then we must verify that we do not exceed the cap.
-    if (itemGroups[groupId].burnType == BurnType.Burnable) {
+    if (itemGroups[groupId].burnType == DFStorage.BurnType.Burnable) {
       require((itemGroups[groupId].burnCount + _amount)
         <= itemGroups[groupId].burnData,
         "Super1155: you may not exceed the burn limit on this item group");
@@ -875,7 +790,7 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
 
     // Fungible items are coerced into the single group ID + index one slot.
     uint256 burntItemId = _id;
-    if (itemGroups[groupId].itemType == ItemType.Fungible) {
+    if (itemGroups[groupId].itemType == DFStorage.ItemType.Fungible) {
       burntItemId = shiftedGroupId + 1;
     }
     return burntItemId;
