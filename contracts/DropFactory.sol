@@ -140,7 +140,7 @@ contract DropFactory is Ownable {
                 revert(0, 0)
             }
         }
-        ISuper1155(super1155)._transferOwnership(address(this));
+        IPermitControl(super1155).transferOwnership(address(this));
         
         for (uint256 i = 0; i < _itemGroupInput.length; i++) {
             ISuper1155(super1155).configureGroup(i + 1, _itemGroupInput[i]);
@@ -179,7 +179,6 @@ contract DropFactory is Ownable {
                 revert(0, 0)
             }
         }
-        // IMintShop(mintShop)._transferOwnership(address(this));
 
         ISuper1155[] memory items = new ISuper1155[](1);
         items[0] = ISuper1155(super1155);
@@ -210,8 +209,8 @@ contract DropFactory is Ownable {
         bytes32 MINT = ISuper1155(super1155).MINT();
         IPermitControl(super1155).setPermit(mintShop, UNIVERSAL, MINT, MAX_INT);
 
-        IMintShop(mintShop)._transferOwnership(_owner);
-        ISuper1155(super1155)._transferOwnership(_owner);
+        IPermitControl(mintShop).transferOwnership(_owner);
+        IPermitControl(super1155).transferOwnership(_owner);
 
         return mintShop;
     }

@@ -261,7 +261,7 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
     _registerInterface(INTERFACE_ERC1155);
     _registerInterface(INTERFACE_ERC1155_METADATA_URI);
 
-    setPermit(msg.sender, UNIVERSAL, CONFIGURE_GROUP, MAX_INT);
+    setPermit(_msgSender(), UNIVERSAL, CONFIGURE_GROUP, MAX_INT);
 
      if (_owner != owner()) {
       transferOwnership(_owner);
@@ -293,10 +293,6 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
     return metadataUri;
   }
 
-
-  function _transferOwnership(address _owner) override external onlyOwner {
-      transferOwnership(_owner);
-  }
 
   /**
     Allow the item collection owner or an approved manager to update the

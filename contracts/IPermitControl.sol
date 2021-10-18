@@ -83,4 +83,11 @@ interface IPermitControl {
     bytes32 _managedRight,
     bytes32 _managerRight
   ) external;
+
+  /**
+  * @dev Transfers ownership of the contract to a new account (`newOwner`).
+  * Can only be called by the current owner.
+  */
+  function transferOwnership(address newOwner) external;
+  
 }

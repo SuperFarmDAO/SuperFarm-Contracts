@@ -12,7 +12,6 @@ interface IMintShop {
         DFStorage.Price[][] memory _prices
     ) external;
 
-    function _transferOwnership(address _owner) external;
 
     function addWhitelist(DFStorage.WhitelistInput memory _whitelist) external;
 

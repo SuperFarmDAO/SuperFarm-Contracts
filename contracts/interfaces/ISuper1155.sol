@@ -20,11 +20,6 @@ interface ISuper1155 {
     function configureGroup(uint256 _groupId, DFStorage.ItemGroupInput calldata _data)
     external;
 
-
-    /// The public identifier for the right to mint items.
-
-    function _transferOwnership(address _owner) external;
-
     function CONFIGURE_GROUP() external view returns (bytes32);
     function MINT() external view returns (bytes32);
 

@@ -384,11 +384,6 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop {
     return 1;
   }
 
-
-  function _transferOwnership(address _owner) override external onlyOwner {
-    transferOwnership(_owner);
-  }
-
   /**
     Allow the shop owner or an approved manager to update the payment receiver
     address if it has not been locked.
