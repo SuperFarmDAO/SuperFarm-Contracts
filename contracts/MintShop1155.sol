@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity ^0.8.7;
+pragma solidity ^0.8.8;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
@@ -16,6 +16,9 @@ import "./libraries/DFStorage.sol";
     pools with specific participation requirements.
   @author Tim Clancy
   @author Qazawat Zirak
+  @author Rostislav Khlebnikov
+  @author Nikita Elunin
+
 
   This launchpad contract sells new items by minting them into existence. It
   cannot be used to sell items that already exist.
@@ -23,7 +26,7 @@ import "./libraries/DFStorage.sol";
 contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop {
   using SafeERC20 for IERC20;
 
-  uint256 MAX_UINT = 2 ** 256 - 1;
+  uint256 MAX_UINT = type(uint256).max;
 
   /// The public identifier for the right to set the payment receiver.
   bytes32 public constant SET_PAYMENT_RECEIVER
@@ -41,13 +44,13 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop {
   bytes32 public constant LOCK_GLOBAL_LIMIT = keccak256("LOCK_GLOBAL_LIMIT");
 
   /// The public identifier for the right to manage whitelists.
-  bytes32 public constant override WHITELIST = keccak256("WHITELIST");
+  bytes32 public constant WHITELIST = keccak256("WHITELIST");
 
   /// The public identifier for the right to manage item pools.
-  bytes32 public constant override POOL = keccak256("POOL");
+  bytes32 public constant POOL = keccak256("POOL");
 
   /// The public identifier for the right to set new items.
-  bytes32 public constant override SET_ITEMS = keccak256("SET_ITEMS");
+  bytes32 public constant SET_ITEMS = keccak256("SET_ITEMS");
 
   /// @dev A mask for isolating an item's group ID.
   uint256 constant GROUP_MASK = uint256(type(uint128).max) << 128;
@@ -406,7 +409,7 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop {
 
     @param _items The array of Super1155 addresses.
   */
-  function setItems(ISuper1155[] memory _items) external override hasValidPermit(UNIVERSAL, SET_ITEMS) {
+  function setItems(ISuper1155[] memory _items) external hasValidPermit(UNIVERSAL, SET_ITEMS) {
     items = _items;
   }
 
@@ -451,7 +454,7 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop {
 
     @param _whitelist The WhitelistInput full of data defining the whitelist.
   */
-  function addWhitelist(DFStorage.WhitelistInput memory _whitelist) external override
+  function addWhitelist(DFStorage.WhitelistInput memory _whitelist) external
     hasValidPermit(UNIVERSAL, WHITELIST) {
     updateWhitelist(nextWhitelistId, _whitelist);
 
@@ -709,7 +712,7 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop {
   */
   function addPool(DFStorage.PoolInput calldata _pool, uint256[] calldata _groupIds,
     uint256[] calldata _issueNumberOffsets, uint256[] calldata _caps,
-    DFStorage.Price[][] memory _prices) external override hasValidPermit(UNIVERSAL, POOL) {
+    DFStorage.Price[][] memory _prices) external hasValidPermit(UNIVERSAL, POOL) {
     updatePool(nextPoolId, _pool, _groupIds, _issueNumberOffsets, _caps,
       _prices);
 

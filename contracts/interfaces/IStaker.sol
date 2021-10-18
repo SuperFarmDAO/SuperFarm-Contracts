@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity 0.8.7;
+pragma solidity 0.8.8;
 
 interface IStaker {
     function spendPoints(address _user, uint256 _amount) external;

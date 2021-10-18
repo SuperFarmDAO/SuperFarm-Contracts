@@ -18,6 +18,8 @@ import "./interfaces/ISuper1155.sol";
   @title An ERC-1155 item creation contract.
   @author Tim Clancy
   @author Qazawat Zirak
+  @author Rostislav Khlebnikov
+  @author Nikita Elunin
 
   This contract represents the NFTs within a single collection. It allows for a
   designated collection owner address to manage the creation of NFTs within this
@@ -33,7 +35,7 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
   using Address for address;
   using Strings for string;
 
-  uint256 MAX_INT = 2 ** 256 - 1;
+  uint256 MAX_INT = type(uint256).max;
 
   /// The public identifier for the right to set this contract's metadata URI.
   bytes32 public constant SET_URI = keccak256("SET_URI");
@@ -42,10 +44,10 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
   bytes32 public constant SET_PROXY_REGISTRY = keccak256("SET_PROXY_REGISTRY");
 
   /// The public identifier for the right to configure item groups.
-  bytes32 public constant override CONFIGURE_GROUP = keccak256("CONFIGURE_GROUP");
+  bytes32 public constant CONFIGURE_GROUP = keccak256("CONFIGURE_GROUP");
 
   /// The public identifier for the right to mint items.
-  bytes32 public constant override MINT  = keccak256("MINT");
+  bytes32 public constant MINT  = keccak256("MINT");
 
   /// The public identifier for the right to burn items.
   bytes32 public constant BURN = keccak256("BURN");
@@ -79,7 +81,7 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
     For example: https://token-cdn-domain/{id}.json. See the ERC-1155 spec for
     more details: https://eips.ethereum.org/EIPS/eip-1155#metadata.
   */
-  string public override metadataUri;
+  string public metadataUri;
 
   /// A proxy registry address for supporting automatic delegated approval.
   address public proxyRegistryAddress;
@@ -91,7 +93,7 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
   mapping (uint256 => mapping(address => uint256)) public groupBalances;
 
   /// A mapping from each address to a collection-wide balance.
-  mapping(address => uint256) override public totalBalances;
+  mapping(address => uint256) public totalBalances;
 
   /**
     @dev This is a mapping from each address to per-address operator approvals.
@@ -289,7 +291,7 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
 
     @return The metadata URI string of the item with ID `_itemId`.
   */
-  function uri(uint256) external override view returns (string memory) {
+  function uri(uint256) external view returns (string memory) {
     return metadataUri;
   }
 
@@ -333,7 +335,7 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
     @param _id The ID of the token to check for a balance.
     @return The amount of token `_id` owned by `_owner`.
   */
-  function balanceOf(address _owner, uint256 _id) public override view virtual
+  function balanceOf(address _owner, uint256 _id) public view virtual
   returns (uint256) {
     require(_owner != address(0),
       "ERC1155: balance query for the zero address");
@@ -349,7 +351,7 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
     @return the amount of each token owned by each owner.
   */
   function balanceOfBatch(address[] calldata _owners, uint256[] calldata _ids)
-    external override view virtual returns (uint256[] memory) {
+    external view virtual returns (uint256[] memory) {
     require(_owners.length == _ids.length,
       "ERC1155: accounts and ids length mismatch");
 
@@ -370,7 +372,7 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
     @param _operator The potential transferrer of `_owner`'s items.
     @return Whether `_operator` may transfer items owned by `_owner`.
   */
-  function isApprovedForAll(address _owner, address _operator) public override
+  function isApprovedForAll(address _owner, address _operator) public
     view virtual returns (bool) {
     StubProxyRegistry proxyRegistry = StubProxyRegistry(proxyRegistryAddress);
     if (address(proxyRegistry.proxies(_owner)) == _operator) {
@@ -390,7 +392,7 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
     @param _approved The status of the `_operator`'s approval for the caller.
   */
   function setApprovalForAll(address _operator, bool _approved) external
-    override virtual {
+    virtual {
     require(_msgSender() != _operator,
       "ERC1155: setting approval status for self");
     operatorApprovals[_msgSender()][_operator] = _approved;
@@ -493,7 +495,7 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
   */
   function safeBatchTransferFrom(address _from, address _to,
     uint256[] memory _ids, uint256[] memory _amounts, bytes memory _data)
-    public override virtual {
+    public virtual {
     require(_ids.length == _amounts.length,
       "ERC1155: ids and amounts length mismatch");
     require(_to != address(0),
@@ -536,7 +538,7 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
     @param _data Additional call data to send with this transfer.
   */
   function safeTransferFrom(address _from, address _to, uint256 _id,
-    uint256 _amount, bytes calldata _data) external override virtual {
+    uint256 _amount, bytes calldata _data) external  virtual {
       safeBatchTransferFrom(_from, _to, _asSingletonArray(_id), _asSingletonArray(_amount), _data);
   }
 
@@ -549,7 +551,7 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
     @param _groupId The ID of the item group to create or configure.
     @param _data The `ItemGroup` data input.
   */
-  function configureGroup(uint256 _groupId, DFStorage.ItemGroupInput calldata _data) override external  {
+  function configureGroup(uint256 _groupId, DFStorage.ItemGroupInput calldata _data) external  {
     require(_groupId != 0,
       "Super1155: group ID 0 is invalid");
     require(_hasItemRight(_groupId, CONFIGURE_GROUP), "Super1155: you don't have rights to configure group");
@@ -718,7 +720,7 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
   */
   function mintBatch(address _recipient, uint256[] calldata _ids,
     uint256[] calldata _amounts, bytes calldata _data)
-    external override {
+    external  {
     require(_recipient != address(0),
       "ERC1155: mint to the zero address");
     require(_ids.length == _amounts.length,

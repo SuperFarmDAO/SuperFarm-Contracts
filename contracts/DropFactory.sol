@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity 0.8.7;
+pragma solidity 0.8.8;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 
@@ -10,9 +10,16 @@ import "./interfaces/IHelper.sol";
 import "./IPermitControl.sol";
 
 
+/**
+  @title A Factory contract
+  @author Nikita Elunin 
+
+  The contract is designed to create drops on the ETH network. 
+  The contract creates Super1155 and MintShop1155 contracts.
+*/
 contract DropFactory is Ownable {
     string public version = "v0.1";
-    uint256 MAX_INT = 2**256 - 1;
+    uint256 MAX_INT = type(uint256).max;
     address mintShopHelper;
     address super1155Helper;
 
