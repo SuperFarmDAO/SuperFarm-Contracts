@@ -1,101 +1,81 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8.7;
 
-import "../base/Sweepable.sol";
+import "./MerkleCore.sol";
 
 /**
-  @title A merkle distributor.
+  @title A merkle tree based access control.
   @author Qazawat Zirak
 
-  This contract replaces the traditional whitelists by using a merkle 
-  tree, storing the root on-chain instead of all the addressses. The 
-  merkle tree alongside the whitelist is kept off-chain for lookups and 
-  creating proofs to validate a claim.
-  This code is inspired by and modified from incredible work from RicMoo.
+  This contract replaces the traditional whitelists for access control
+  by using a merkle tree, storing the root on-chain instead of all the 
+  addressses. The merkle tree alongside the whitelist is kept off-chain 
+  for lookups and creating proofs to validate an access.
+  This code is inspired by and modified from incredible work of RicMoo.
   https://github.com/ricmoo/ethers-airdrop/blob/master/AirDropToken.sol
 
   October 12th, 2021.
 */
-contract SuperMerkleAccess is Sweepable {
+contract SuperMerkleAccess is MerkleCore {
 
   /// The public identifier for the right to set a root for a round.
-  bytes32 public constant SET_ROUND_ROOT = keccak256("SET_ROUND_ROOT");
+  bytes32 public constant SET_ACCESS_ROUND = keccak256("SET_ACCESS_ROUND");
 
   /** 
-    The base struct containing whitelist information.
+    A struct containing information about the AccessList.
     @param merkleRoot the proof stored on chain to verify against.
-    @param startTime the start time of validity for the whitelist.
-    @param endTime the end time of validity for the whitelist.
-    @param rounds the number times the whitelsit has been set.
-
-    A 0 value for startTime and endTime represent time indepedence.
+    @param startTime the start time of validity for the accesslist.
+    @param endTime the end time of validity for the accesslist.
+    @param round the number times the accesslist has been set.
   */ 
-  struct Whitelist {
+  struct AccessList {
     bytes32 merkleRoot;
     uint256 startTime;
     uint256 endTime;
-    uint256 rounds;
+    uint256 round;
   }
   
-  /// 'MerkleRootId' to 'Whitelist', each containing a merkleRoot.
-  mapping (uint256 => Whitelist) public merkleRoots;
-
-  /// Event emitted when a new round is set.
-  event NewRound(uint256 indexed round, address indexed caller);
+  /// MerkleRootId to 'Accesslist', each containing a merkleRoot.
+  mapping (uint256 => AccessList) public accessRoots;
 
   /** 
-    Set a new round for the whitelist.
-    @param _whitelistId the whitelist id containg the merkleRoots.
+    Set a new round for the accesslist.
+    @param _accesslistId the accesslist id containg the merkleRoot.
     @param _merkleRoot the new merkleRoot for the round.
     @param _startTime the start time of the new round.
     @param _endTime the end time of the new round.
   */
-  function setAccessRound(uint256 _whitelistId, bytes32 _merkleRoot, 
-  uint256 _startTime, uint256 _endTime) external virtual 
-  hasValidPermit(UNIVERSAL, SET_ROUND_ROOT) {
+  function setAccessRound(uint256 _accesslistId, bytes32 _merkleRoot, 
+  uint256 _startTime, uint256 _endTime) external
+  hasValidPermit(UNIVERSAL, SET_ACCESS_ROUND) {
 
-    merkleRoots[_whitelistId].merkleRoot = _merkleRoot;
-    merkleRoots[_whitelistId].startTime = _startTime;
-    merkleRoots[_whitelistId].endTime = _endTime;
-    merkleRoots[_whitelistId].rounds += 1;
-    emit NewRound(merkleRoots[_whitelistId].rounds += 1, msg.sender);
+    AccessList memory accesslist = AccessList({
+      merkleRoot: _merkleRoot,
+      startTime: _startTime,
+      endTime: _endTime,
+      round: accessRoots[_accesslistId].round + 1
+    });
+    accessRoots[_accesslistId] = accesslist;
   }
 
   /**
-    Inheritable generic function used as an standalone access control or
-    to verify a claim against a targetted markleRoot on-chain.
-    @param _merkleRootId the id of merkleRoot that is verified against. 
+    Verify an access against a targetted markleRoot on-chain.
+    @param _accesslistId the id of the accesslist containing the merkleRoot.
     @param _index index of the hashed node from off-chain list.
-    @param _node the actual hashed node which needs to be verified. This
-      is a hash of node. kecck256(abi.encodePacked(<parameters>))
-    @param _merkleProof related merkle hashes from off-chain binary tree.
-
-    '_merkleRootId' is a generic input parameter. It represents Id of
-    the merkleRoot as a groupId if whitelist is airdrop or distributive.
+    @param _node the actual hashed node which needs to be verified.
+    @param _merkleProof required merkle hashes from off-chain merkle tree.
    */
-  function verify(uint256 _merkleRootId, uint256 _index, bytes32 _node, 
+  function verify(uint256 _accesslistId, uint256 _index, bytes32 _node, 
   bytes32[] calldata _merkleProof) public view returns(bool) {
 
-    require(merkleRoots[_merkleRootId].merkleRoot != 0, 
+    require(accessRoots[_accesslistId].merkleRoot != 0, 
       "Inactive.");
-    require(merkleRoots[_merkleRootId].startTime == 0 || 
-      block.timestamp > merkleRoots[_merkleRootId].startTime,
+    require(block.timestamp > accessRoots[_accesslistId].startTime,
       "Early.");
-    require(merkleRoots[_merkleRootId].endTime == 0 || 
-      block.timestamp < merkleRoots[_merkleRootId].endTime , 
+    require(block.timestamp < accessRoots[_accesslistId].endTime , 
       "Late.");
-
-    uint256 path = _index;
-    for (uint256 i = 0; i < _merkleProof.length; i++) {
-      if ((path & 0x01) == 1) {
-          _node = keccak256(abi.encodePacked(_merkleProof[i], _node));
-      } else {
-          _node = keccak256(abi.encodePacked(_node, _merkleProof[i]));
-      }
-      path /= 2;
-    }
-
-    require(_node == merkleRoots[_merkleRootId].merkleRoot, 
+    require(getRootHash(_index, _node, _merkleProof) == 
+      accessRoots[_accesslistId].merkleRoot, 
       "Invalid Proof.");
 
     return true;
