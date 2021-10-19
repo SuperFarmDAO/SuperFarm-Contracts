@@ -560,13 +560,13 @@ contract Staker is Ownable, ReentrancyGuard {
     }
     uint256 _tokenRewards = user.tokenRewards + pendingTokens;
     uint256 _pointRewards = user.pointRewards + pendingPoints;
-    token.safeTransferFrom(address(this), msg.sender, _tokenRewards);
     userPoints[msg.sender] = userPoints[msg.sender] + _pointRewards;
     user.tokenRewards = 0;
     user.pointRewards = 0;
 
     user.tokenPaid = (user.amount * pool.tokensPerShare) / 1e12;
     user.pointPaid = (user.amount * pool.pointsPerShare) / 1e30;
+    token.safeTransferFrom(address(this), msg.sender, _tokenRewards);
     emit Claim(msg.sender, token, _tokenRewards, _pointRewards);
   }
 
