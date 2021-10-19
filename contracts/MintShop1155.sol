@@ -11,7 +11,6 @@ import "./interfaces/IStaker.sol";
 import "./interfaces/IMintShop.sol";
 
 import "./libraries/DFStorage.sol";
-import "hardhat/console.sol";
 /**
   @title A Shop contract for selling NFTs via direct minting through particular
     pools with specific participation requirements.
@@ -56,6 +55,8 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop {
   /// @dev A mask for isolating an item's group ID.
   uint256 constant GROUP_MASK = uint256(type(uint128).max) << 128;
 
+
+  /// The maximum amount that can be minted through all collections. 
   uint256 public immutable maxAllocation;
 
   /// The item collection contract that minted items are sold from.
@@ -980,19 +981,21 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop {
     emit ItemPurchased(_msgSender(), _id, itemIds, amounts);
   }
 
+
+
+  /**
+  * Private function for checking maxAllocation among all pools.
+  */
   function checkTotalMinted() private view returns (uint256 result) {
-    for (uint256 i = 1; i < nextPoolId; i++) {
+    for (uint256 i = 0; i < nextPoolId; i++) {
         for (uint256 j = 0; j < pools[i].itemGroups.length; j++) {
         uint256 itemGroupId = pools[i].itemGroups[j];
-        console.log("itemGroupId: ", itemGroupId);
+
         bytes32 itemKey = keccak256(abi.encodePacked(pools[i].config.collection,
           pools[i].currentPoolVersion, itemGroupId));
-        console.log();
-
         result += pools[i].itemMinted[itemKey];
       }
     }
-    console.log("result: ", result);
     return result;
   }
 

@@ -1263,4 +1263,78 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
             ).to.be.equal(ethers.utils.parseEther("10"));
         });
     });
+
+    describe("max allocation test", function() {
+        it("Shoud revert", async function() {
+            let mShop = await this.MintShop1155.deploy(
+                deployer.address,
+                paymentReceiver.address,
+                "4",
+                1
+            );
+
+
+            let sup = await this.Super1155.deploy(
+                owner.address,
+                "Super1155142",
+                originalUri + "uri2",
+                proxyRegistry.address
+            );
+            await sup.connect(owner).configureGroup(1, {
+                name: 'NFT',
+                supplyType: 0,
+                supplyData: 5,
+                itemType: 0,
+                itemData: 0,
+                burnType: 0,
+                burnData: 0
+            });
+
+            await sup.connect(owner).setPermit(
+                mShop.address,
+                UNIVERSAL,
+                setMintRight,
+                ethers.constants.MaxUint256
+            );
+
+            await mShop.setItems([sup.address]);
+
+            // await super1155.setPermit();
+
+            let latestBlock = await ethers.provider.getBlock(await ethers.provider.getBlockNumber());
+            console.log()
+            await mShop.connect(deployer).addPool({
+                name: "maxAllocationTest",
+                startTime: latestBlock.timestamp,
+                endTime: latestBlock.timestamp + 60,
+                purchaseLimit: 100,
+                singlePurchaseLimit: 1,
+                requirement: {
+                    requiredType: 0,
+                    requiredAsset: NULL_ADDRESS,
+                    requiredAmount: 1,
+                    whitelistId: 0
+                    },
+                    collection: sup.address
+                }, [1], // Groups 1 = FT, 2 = NFT
+                [1], // NumberOffset 1 = FT, 0 = NFT // FT's are coerced to index 1
+                [10], // Caps 10 = FT, 5 = NFT
+                [
+                    [{ // Price pairs for NFTs, 5 NFTs = 5 Prices Pairs
+                        assetType: 1,
+                        asset: NULL_ADDRESS,
+                        price: 1
+                    }]
+                ]);
+
+                let pools = await mShop.getPools([0], 0);
+                console.log(pools[0].items[0].groupId.toString());
+
+                await mShop.connect(signer1).mintFromPool(0, 1, 0, 1, 0, {value: ethers.utils.parseEther("1")})
+
+                await expect(
+                    mShop.connect(signer1).mintFromPool(0, 1, 0, 1, 0, {value: ethers.utils.parseEther("1")})
+                ).to.be.revertedWith("0x0D");
+        });
+    });
 });
