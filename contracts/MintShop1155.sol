@@ -11,6 +11,7 @@ import "./interfaces/IStaker.sol";
 import "./interfaces/IMintShop.sol";
 
 import "./libraries/DFStorage.sol";
+import "hardhat/console.sol";
 /**
   @title A Shop contract for selling NFTs via direct minting through particular
     pools with specific participation requirements.
@@ -54,6 +55,8 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop {
 
   /// @dev A mask for isolating an item's group ID.
   uint256 constant GROUP_MASK = uint256(type(uint128).max) << 128;
+
+  uint256 public immutable maxAllocation;
 
   /// The item collection contract that minted items are sold from.
   ISuper1155[] public items;
@@ -370,7 +373,7 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop {
       single address may purchase across all item pools in the shop.
   */
   constructor(address _owner, address _paymentReceiver,
-    uint256 _globalPurchaseLimit) {
+    uint256 _globalPurchaseLimit, uint256 _maxAllocation) {
 
     if (_owner != owner()) {
       transferOwnership(_owner);
@@ -378,6 +381,7 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop {
     // Initialization.
     paymentReceiver = _paymentReceiver;
     globalPurchaseLimit = _globalPurchaseLimit;
+    maxAllocation = _maxAllocation;
   }
 
   /**
@@ -852,6 +856,8 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop {
     require(userPoolPurchaseAmount <= pools[_id].config.purchaseLimit,
       "0x5B");
 
+    
+
     // Verify that the pool is either public, inactive, time-expired,
     // or the caller's address is whitelisted.
     {
@@ -872,6 +878,8 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop {
     uint256 newCirculatingTotal = pools[_id].itemMinted[itemKey] + _amount;
     require(newCirculatingTotal <= pools[_id].itemCaps[itemKey],
       "0x7B");
+
+    require(maxAllocation >= checkTotalMinted() + _amount, "0x0D");
 
     // Verify that the user meets any requirements gating participation in this
     // pool. Verify that any possible ERC-20 requirements are met.
@@ -970,6 +978,22 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop {
     items[_itemIndex].mintBatch(_msgSender(), itemIds, amounts, "");
 
     emit ItemPurchased(_msgSender(), _id, itemIds, amounts);
+  }
+
+  function checkTotalMinted() private view returns (uint256 result) {
+    for (uint256 i = 1; i < nextPoolId; i++) {
+        for (uint256 j = 0; j < pools[i].itemGroups.length; j++) {
+        uint256 itemGroupId = pools[i].itemGroups[j];
+        console.log("itemGroupId: ", itemGroupId);
+        bytes32 itemKey = keccak256(abi.encodePacked(pools[i].config.collection,
+          pools[i].currentPoolVersion, itemGroupId));
+        console.log();
+
+        result += pools[i].itemMinted[itemKey];
+      }
+    }
+    console.log("result: ", result);
+    return result;
   }
 
 }

@@ -62,23 +62,27 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
         await proxyRegistry.transferOwnership(proxyRegistryOwner.address);
 
         super1155 = await this.Super1155.deploy(
+            owner.address,
             "Super1155",
             originalUri,
             proxyRegistry.address
         );
 
-        await super1155._transferOwnership(owner.address);
+        // await super1155._transferOwnership(owner.address);
         super1155Second = await this.Super1155.deploy(
+            owner.address,
             "Super1155142",
             originalUri + "uri2",
             proxyRegistry.address
         );
         await super1155.deployed();
-        await super1155Second._transferOwnership(owner.address);
+        // await super1155Second._transferOwnership(owner.address);
 
         mintShop1155 = await this.MintShop1155.deploy(
+            owner.address,
             paymentReceiver.address,
-            "4"
+            "4",
+            200
         );
         await mintShop1155.deployed();
 
@@ -90,7 +94,7 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
             mockERC20.address
         );
 
-        await mintShop1155.connect(deployer)._transferOwnership(owner.address);
+        // await mintShop1155.connect(deployer)._transferOwnership(owner.address);
         
         /// adding items to MintShop
         await mintShop1155.connect(owner).setItems([super1155.address, super1155Second.address]);
@@ -129,12 +133,14 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
 
         it('should deploy a new instance where deployer is the owner', async function () {
             let mintShop1155v2 = await this.MintShop1155.deploy(
+                deployer.address,
                 paymentReceiver.address,
-                "4"
+                "4",
+                1
             );
             await super1155.deployed();
 
-            await mintShop1155v2._transferOwnership(deployer.address);
+            // await mintShop1155v2._transferOwnership(deployer.address);
 
             expect(await mintShop1155v2.owner()).to.equal(deployer.address);
             // expect(await mintShop1155v2.item()).to.equal(super1155.address);
