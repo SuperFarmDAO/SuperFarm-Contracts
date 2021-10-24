@@ -1,7 +1,7 @@
 const { expect } = require('chai');
 const { BigNumber } = require('ethers');
 const { mnemonicToSeed } = require('ethers/lib/utils');
-const { ethers } = require('hardhat');
+// const { ethers } = require('hardhat');
 const Web3 = require('web3');
 
 const NULL_ADDRESS = '0x0000000000000000000000000000000000000000';
@@ -45,6 +45,8 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
     let shiftedItemGroupId = itemGroupId.shl(128);
     let itemGroupId2 = ethers.BigNumber.from(2);
     let shiftedItemGroupId2 = itemGroupId2.shl(128);
+    let item721, Item721;
+    let MINT721;
 
     before(async function () {
         this.MintShop1155 = await ethers.getContractFactory("MintShop1155");
@@ -52,6 +54,7 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
         this.Staker = await ethers.getContractFactory("Staker");
         this.ProxyRegistry = await ethers.getContractFactory("ProxyRegistry");
         this.Super1155 = await ethers.getContractFactory("Super1155");
+        // this.Item721 = await ethers.getContractFactory("Super721");
     });
 
     beforeEach(async function () {
@@ -94,6 +97,10 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
             mockERC20.address
         );
 
+        Item721 = await ethers.getContractFactory("Super721");
+
+        item721 = await Item721.deploy(owner.address, "TEST721", "SYM", "uri", NULL_ADDRESS);
+
         // await mintShop1155.connect(deployer)._transferOwnership(owner.address);
         
         /// adding items to MintShop
@@ -104,6 +111,7 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
         UNIVERSAL = await mintShop1155.UNIVERSAL();
         MANAGER = await mintShop1155.MANAGER();
         zeroRight = await mintShop1155.ZERO_RIGHT();
+        MINT721 = await item721.MINT();
 
         setSweepRight = await mintShop1155.SWEEP();
         setLockSweepRight = await mintShop1155.LOCK_SWEEP();
@@ -1336,5 +1344,192 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
                     mShop.connect(signer1).mintFromPool(0, 1, 0, 1, 0, {value: ethers.utils.parseEther("1")})
                 ).to.be.revertedWith("0x0D");
         });
+    });
+
+
+    describe("721 restrictions", async function() { 
+            it("Shoud revert", async function() {
+                let Item721 = await ethers.getContractFactory("Super721");
+                let itemGroupId = ethers.BigNumber.from(1);
+                let shiftedItemGroupId = itemGroupId.shl(128);
+                let item721 = await Item721.deploy(owner.address, "TEST721", "SYM", "uri", NULL_ADDRESS);
+
+                let configRigth = await item721.CONFIGURE_GROUP();
+
+                await item721.connect(owner).setPermit(
+                    owner.address,
+                    UNIVERSAL,
+                    configRigth,
+                    ethers.constants.MaxUint256
+                );
+
+                await item721.connect(owner).configureGroup(shiftedItemGroupId, {
+                    name: 'NFT',
+                    supplyType: 0,
+                    supplyData: 20000,
+                    burnType: 1,
+                    burnData: 100
+                });
+
+                let mShop = await this.MintShop1155.deploy(
+                    deployer.address,
+                    paymentReceiver.address,
+                    "4",
+                    1
+                );
+
+
+                let sup = await this.Super1155.deploy(
+                    owner.address,
+                    "Super1155142",
+                    originalUri + "uri2",
+                    proxyRegistry.address
+                );
+                await sup.connect(owner).configureGroup(1, {
+                    name: 'NFT',
+                    supplyType: 0,
+                    supplyData: 5,
+                    itemType: 0,
+                    itemData: 0,
+                    burnType: 0,
+                    burnData: 0
+                });
+
+                await sup.connect(owner).setPermit(
+                    mShop.address,
+                    UNIVERSAL,
+                    setMintRight,
+                    ethers.constants.MaxUint256
+                );
+
+                await mShop.setItems([sup.address]);
+
+                // await super1155.setPermit();
+
+                let latestBlock = await ethers.provider.getBlock(await ethers.provider.getBlockNumber());
+                console.log()
+                await mShop.connect(deployer).addPool({
+                    name: "maxAllocationTest",
+                    startTime: latestBlock.timestamp,
+                    endTime: latestBlock.timestamp + 60,
+                    purchaseLimit: 100,
+                    singlePurchaseLimit: 1,
+                    requirement: {
+                        requiredType: 4,
+                        requiredAsset: item721.address,
+                        requiredAmount: 1,
+                        whitelistId: 0
+                        },
+                        collection: sup.address
+                    }, [1], // Groups 1 = FT, 2 = NFT
+                    [1], // NumberOffset 1 = FT, 0 = NFT // FT's are coerced to index 1
+                    [10], // Caps 10 = FT, 5 = NFT
+                    [
+                        [{ // Price pairs for NFTs, 5 NFTs = 5 Prices Pairs
+                            assetType: 1,
+                            asset: NULL_ADDRESS,
+                            price: 1
+                        }]
+                    ]);
+                        await expect(
+                            mShop.connect(signer1).mintFromPool(0, 1, 0, 1, 0, {value: ethers.utils.parseEther("1")})
+                        ).to.be.revertedWith("0x8B");
+            });
+
+            it("Shoud not revert", async function() {
+                let Item721 = await ethers.getContractFactory("Super721");
+                
+                let item721 = await Item721.deploy(owner.address, "TEST721", "SYM", "uri", NULL_ADDRESS);
+
+                let configRigth = await item721.CONFIGURE_GROUP();
+                let itemGroupId = ethers.BigNumber.from(2);
+                let shiftedItemGroupId = itemGroupId.shl(128);
+
+                await item721.connect(owner).setPermit(
+                    owner.address,
+                    UNIVERSAL,
+                    configRigth,
+                    ethers.constants.MaxUint256
+                );
+
+                await item721.connect(owner).configureGroup(itemGroupId, {
+                    name: 'NFT',
+                    supplyType: 0,
+                    supplyData: 20000,
+                    burnType: 1,
+                    burnData: 100
+                });
+
+
+                let mShop = await this.MintShop1155.deploy(
+                    deployer.address,
+                    paymentReceiver.address,
+                    "4",
+                    1
+                );
+
+               
+
+
+                let sup = await this.Super1155.deploy(
+                    owner.address,
+                    "Super1155142",
+                    originalUri + "uri2",
+                    proxyRegistry.address
+                );
+                await sup.connect(owner).configureGroup(1, {
+                    name: 'NFT',
+                    supplyType: 0,
+                    supplyData: 5,
+                    itemType: 0,
+                    itemData: 0,
+                    burnType: 0,
+                    burnData: 0
+                });
+
+                await sup.connect(owner).setPermit(
+                    mShop.address,
+                    UNIVERSAL,
+                    setMintRight,
+                    ethers.constants.MaxUint256
+                );
+
+                await mShop.setItems([sup.address]);
+
+                // await super1155.setPermit();
+
+                let latestBlock = await ethers.provider.getBlock(await ethers.provider.getBlockNumber());
+                await mShop.connect(deployer).addPool({
+                    name: "maxAllocationTest",
+                    startTime: latestBlock.timestamp,
+                    endTime: latestBlock.timestamp + 60,
+                    purchaseLimit: 100,
+                    singlePurchaseLimit: 1,
+                    requirement: {
+                        requiredType: 4,
+                        requiredAsset: item721.address,
+                        requiredAmount: 1,
+                        whitelistId: 0
+                        },
+                        collection: sup.address
+                    }, [1], // Groups 1 = FT, 2 = NFT
+                    [1], // NumberOffset 1 = FT, 0 = NFT // FT's are coerced to index 1
+                    [10], // Caps 10 = FT, 5 = NFT
+                    [
+                        [{ // Price pairs for NFTs, 5 NFTs = 5 Prices Pairs
+                            assetType: 1,
+                            asset: NULL_ADDRESS,
+                            price: 1
+                        }]
+                    ]);
+                        await item721.connect(owner).mintBatch(
+                            signer1.address,
+                            [shiftedItemGroupId],
+                            ethers.utils.id('a')
+                        );
+
+                        mShop.connect(signer1).mintFromPool(0, 1, 0, 1, 0, {value: ethers.utils.parseEther("1")})
+                    });
+
     });
 });

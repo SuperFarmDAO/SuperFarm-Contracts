@@ -4,6 +4,7 @@ pragma solidity ^0.8.8;
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 
 import "./base/Sweepable.sol";
 import "./interfaces/ISuper1155.sol";
@@ -895,6 +896,12 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop {
     } else if (poolRequirement.requiredType == DFStorage.AccessType.ItemRequired) {
       ISuper1155 requiredItem = ISuper1155(poolRequirement.requiredAsset);
       require(requiredItem.totalBalances(_msgSender())
+        >= poolRequirement.requiredAmount,
+        "0x8B");
+    }    
+    else if (poolRequirement.requiredType == DFStorage.AccessType.ItemRequired721) {
+      IERC721 requiredItem = IERC721(poolRequirement.requiredAsset);
+      require(requiredItem.balanceOf(_msgSender())
         >= poolRequirement.requiredAmount,
         "0x8B");
 
