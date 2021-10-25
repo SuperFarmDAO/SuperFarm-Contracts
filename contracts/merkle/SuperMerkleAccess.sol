@@ -2,6 +2,7 @@
 pragma solidity ^0.8.7;
 
 import "./MerkleCore.sol";
+import "./IMerkle.sol";
 
 /**
   @title A merkle tree based access control.
@@ -16,7 +17,7 @@ import "./MerkleCore.sol";
 
   October 12th, 2021.
 */
-contract SuperMerkleAccess is MerkleCore {
+abstract contract SuperMerkleAccess is MerkleCore {
 
   /// The public identifier for the right to set a root for a round.
   bytes32 public constant SET_ACCESS_ROUND = keccak256("SET_ACCESS_ROUND");
@@ -46,7 +47,7 @@ contract SuperMerkleAccess is MerkleCore {
     @param _endTime the end time of the new round.
   */
   function setAccessRound(uint256 _accesslistId, bytes32 _merkleRoot, 
-  uint256 _startTime, uint256 _endTime) external
+  uint256 _startTime, uint256 _endTime) public virtual
   hasValidPermit(UNIVERSAL, SET_ACCESS_ROUND) {
 
     AccessList memory accesslist = AccessList({

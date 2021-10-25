@@ -197,11 +197,11 @@ contract DropFactory is Ownable {
         
 
         for (uint256 i = 0; i < _poolInput.length; i++) {
-            _poolInput[i].collection = super1155;
-            DFStorage.PoolRequirement memory req = _poolInput[i].requirement;
-            if (req.whitelistId != 0) {
-                IMintShop(mintShop).addWhitelist(_whiteListInput[i]);
-            }
+            // _poolInput[i].collection = super1155;
+            // DFStorage.PoolRequirement memory req = _poolInput[i].requirement;
+            // if (req.whitelistId != 0) {
+            //     IMintShop(mintShop).addWhitelist(_whiteListInput[i]);
+            // }
             IMintShop(mintShop).addPool(
                 _poolInput[i],
                 _poolConfigurationData[i].groupIds,
