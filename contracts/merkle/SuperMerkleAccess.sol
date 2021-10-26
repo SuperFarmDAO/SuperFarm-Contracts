@@ -17,7 +17,7 @@ import "./IMerkle.sol";
 
   October 12th, 2021.
 */
-abstract contract SuperMerkleAccess is MerkleCore {
+contract SuperMerkleAccess is MerkleCore {
 
   /// The public identifier for the right to set a root for a round.
   bytes32 public constant SET_ACCESS_ROUND = keccak256("SET_ACCESS_ROUND");

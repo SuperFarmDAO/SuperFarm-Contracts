@@ -464,6 +464,8 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop, SuperMerkleAcces
 
     super.setAccessRound(_accesslistId, _merkleRoot, _startTime, _endTime);
     pools[_poolId].whiteListId = _accesslistId;
+    console.log("ON CHAIN in whiteList");
+    console.logBytes32(_merkleRoot);
   }
 
 

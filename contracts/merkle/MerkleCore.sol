@@ -2,6 +2,7 @@
 pragma solidity ^0.8.7;
 
 import "../base/Sweepable.sol";
+import "hardhat/console.sol";
 
 /**
   @title A merkle tree root finder.
@@ -22,7 +23,7 @@ abstract contract MerkleCore is Sweepable {
     @return a root hash from given parameters.
    */
   function getRootHash(uint256 _index, bytes32 _node, 
-  bytes32[] calldata _merkleProof) internal pure returns(bytes32) {
+  bytes32[] calldata _merkleProof) internal view returns(bytes32) {
 
     uint256 path = _index;
     for (uint256 i = 0; i < _merkleProof.length; i++) {
@@ -33,6 +34,9 @@ abstract contract MerkleCore is Sweepable {
       }
       path /= 2;
     }
+    console.log("ON CHAIN");
+    // bytes32 test = keccak256(abi.encodePacked("Nikita"));
+    console.logBytes32(_node);
     return _node;
   }
 }
