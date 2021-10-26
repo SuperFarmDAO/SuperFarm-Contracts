@@ -108,13 +108,36 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
         // const whiteListAddresses = [owner.address, signer2.address, owner.address, signer1.address, signer2.address];
         // console.log(whiteListAddresses);
         
-        this.tree = getMerkleTree(whiteListAddresses);
-        const root = computeRootHash(whiteListAddresses);
+        let tree = getMerkleTree(whiteListAddresses);
+        let newTree = [];
+        for (let i = 0; i < tree.leaves.length; i++) {
+            newTree.push(tree.leaves[i].address);
+        }
+        // console.log(newTree);
+        const buf2hex = x => '0x'+x.toString('hex');
+
+        const root = computeRootHash(newTree);
+
         console.log("ROOT js ", root);
-        console.log("OWNER: ", owner.address);
+        // console.log("OWNER: ", owner.address);
         // await mintShop1155.connect(deployer)._transferOwnership(owner.address);
         
         /// adding items to MintShop
+        // let anotherTree = new MerkleTree(whiteListAddresses, keccak256);
+        // console.log(anotherTree);
+        // const anotherRoot = anotherTree.getRoot();
+        // console.log(anotherRoot.toString('hex'));
+        // const hexroot = buf2hex(anotherRoot);
+        // console.log(hexroot)
+
+
+
+
+
+
+
+
+
         await mintShop1155.connect(owner).setItems([super1155.address, super1155Second.address]);
         await mintShop1155.connect(owner).addWhiteList(0, 0, root, 0, ethers.constants.MaxUint256);
         
@@ -756,11 +779,11 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
             // Mint from pool
             const whiteListAddresses = [owner.address, signer2.address, owner.address, signer1.address, signer2.address];
 
-
+            let tree =  getMerkleTree(whiteListAddresses);
             let whiteListInput = {
-                index: 1,
-                node: hash(1, whiteListAddresses[0]),
-                merkleProof: computeMerkleProof(whiteListAddresses, 1)
+                index: tree.leaves[1].index,
+                node: hash(tree.leaves[1].index, tree.leaves[1].address),
+                merkleProof: tree.leaves[1].proof
 
             };
             await expect(
@@ -773,12 +796,12 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
             const whiteListAddresses = [owner.address, signer2.address, owner.address, signer1.address, signer2.address];
             // let tree1 = this.tree;
 
-            console.log(tree1);
+            let tree =  getMerkleTree(whiteListAddresses);
             let whiteListInput = {
-                index: tree1.leaves[1].index,
-                node: hash(tree1.leaves[1].index, tree1.leaves[1].address),
-                merkleProof: tree1.leaves[1].proof
-        
+                index: tree.leaves[1].index,
+                node: hash(tree.leaves[1].index, tree.leaves[1].address),
+                merkleProof: tree.leaves[1].proof
+
             };
             await expect(
                 mintShop1155.connect(owner).mintFromPool(2, 2, 1, 1, 0, whiteListInput)
@@ -804,12 +827,14 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
             // Mint from pool
             const whiteListAddresses = [owner.address, signer2.address, owner.address, signer1.address, signer2.address];
 
+            let tree =  getMerkleTree(whiteListAddresses);
             let whiteListInput = {
-                index: 0,
-                node: hash(0, whiteListAddresses[0]),
-                merkleProof: computeMerkleProof(whiteListAddresses, 0)
-        
+                index: tree.leaves[1].index,
+                node: hash(tree.leaves[1].index, tree.leaves[1].address),
+                merkleProof: tree.leaves[1].proof
             };
+            console.log(tree.leaves[1].proof);
+
             await expect(
                 mintShop1155.connect(owner).mintFromPool(0, 2, 5, 1, 0, whiteListInput)
             ).to.be.revertedWith("0x3B");
@@ -1529,6 +1554,7 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
         return leaves[0];
     }
 
+
     const computeMerkleProof = function(balances, index) {
         var leaves = getLeaves(balances);
 
@@ -1563,7 +1589,7 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
             var left = leaves.shift();
             var right = (leaves.length === 0) ? left: leaves.shift();
             //output.push(ethers.utils.keccak256(ethers.utils.concat([ left, right ])));
-            output.push(ethers.utils.solidityKeccak256(["string"], [left + right.substring(2)]));
+            output.push(ethers.utils.solidityKeccak256(["bytes"], [left + right.substring(2)]));
             // output.push(ethers.utils.soliditySha3((["string"], [left + right.substring(2)])));
             // console.log(left + right.substring(2));
             // console.log("======================");
@@ -1576,4 +1602,9 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
         output.forEach(function(leaf) {
             leaves.push(leaf);
         });
+    }
+
+
+    const kekkak = function (address) {
+        ethers.utils.solidityKeccak256(["string"], [left + right.substring(2)]);
     }
