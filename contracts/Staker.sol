@@ -95,12 +95,16 @@ contract Staker is Ownable, ReentrancyGuard {
     @param amount amount of the pool asset being provided by the user.
     @param tokenPaid value of user's total token earnings paid out. 
     pending reward = (user.amount * pool.tokensPerShare) - user.rewardDebt.
+    @param tokenRewards amount of token rewards accumulated to be claimed.
     @param pointPaid value of user's total point earnings paid out.
+    @param pointRewards amount of point rewards accumulated to be claimed.
   */
   struct UserInfo {
     uint256 amount;
     uint256 tokenPaid;
+    uint256 tokenRewards;
     uint256 pointPaid;
+    uint256 pointRewards;
   }
 
   /// Stored information for each user staking in each pool.
@@ -123,6 +127,7 @@ contract Staker is Ownable, ReentrancyGuard {
   /// Events for depositing assets into the Staker and later withdrawing them.
   event Deposit(address indexed user, IERC20 indexed token, uint256 amount);
   event Withdraw(address indexed user, IERC20 indexed token, uint256 amount);
+  event Claim(address indexed user, IERC20 indexed token, uint256 tokensAmount, uint256 pointsAmount);
 
   /// An event for tracking when a user has spent points.
   event SpentPoints(address indexed source, address indexed user, uint256 amount);
@@ -319,16 +324,16 @@ contract Staker is Ownable, ReentrancyGuard {
       uint256 emissionTime = tokenEmissionEvents[i].timeStamp;
       uint256 emissionRate = tokenEmissionEvents[i].rate;
       if (_toTime < emissionTime) {
-        totalEmittedTokens = totalEmittedTokens + (((_toTime - workingTime) / 15) * workingRate);
+        totalEmittedTokens = totalEmittedTokens + ((_toTime - workingTime) * workingRate);
         return totalEmittedTokens;
       } else if (workingTime < emissionTime) {
-        totalEmittedTokens = totalEmittedTokens + (((emissionTime - workingTime) / 15) * workingRate);
+        totalEmittedTokens = totalEmittedTokens + ((emissionTime - workingTime) * workingRate);
         workingTime = emissionTime;
       }
       workingRate = emissionRate;
     }
     if (workingTime < _toTime) {
-      totalEmittedTokens = totalEmittedTokens + (((_toTime - workingTime) / 15) * workingRate);
+      totalEmittedTokens = totalEmittedTokens + ((_toTime - workingTime) * workingRate);
     }
     return totalEmittedTokens;
   }
@@ -350,16 +355,16 @@ contract Staker is Ownable, ReentrancyGuard {
       uint256 emissionTime = pointEmissionEvents[i].timeStamp;
       uint256 emissionRate = pointEmissionEvents[i].rate;
       if (_toTime < emissionTime) {
-        totalEmittedPoints = totalEmittedPoints + (((_toTime - workingTime) / 15) * workingRate);
+        totalEmittedPoints = totalEmittedPoints + ((_toTime - workingTime) * workingRate);
         return totalEmittedPoints;
       } else if (workingTime < emissionTime) {
-        totalEmittedPoints = totalEmittedPoints + (((emissionTime - workingTime) / 15) * workingRate);
+        totalEmittedPoints = totalEmittedPoints + ((emissionTime - workingTime) * workingRate);
         workingTime = emissionTime;
       }
       workingRate = emissionRate;
     }
     if (workingTime < _toTime) {
-      totalEmittedPoints = totalEmittedPoints + (((_toTime - workingTime) / 15) * workingRate);
+      totalEmittedPoints = totalEmittedPoints + ((_toTime - workingTime) * workingRate);
     }
     return totalEmittedPoints;
   }
@@ -502,10 +507,10 @@ contract Staker is Ownable, ReentrancyGuard {
     updatePool(_token);
     if (user.amount > 0) {
       uint256 pendingTokens = ((user.amount * pool.tokensPerShare) / 1e12) - user.tokenPaid;
-      token.safeTransferFrom(address(this), msg.sender, pendingTokens);
+      user.tokenRewards += pendingTokens;
       totalTokenDisbursed = totalTokenDisbursed + pendingTokens;
       uint256 pendingPoints = ((user.amount * pool.pointsPerShare) / 1e30) - user.pointPaid;
-      userPoints[msg.sender] = userPoints[msg.sender] + pendingPoints;
+      user.pointRewards += pendingPoints;
     }
     pool.token.safeTransferFrom(address(msg.sender), address(this), _amount);
     user.amount = user.amount +_amount;
@@ -526,15 +531,43 @@ contract Staker is Ownable, ReentrancyGuard {
       "You cannot withdraw that much of the specified token; you are not owed it.");
     updatePool(_token);
     uint256 pendingTokens = ((user.amount * pool.tokensPerShare) / 1e12) - user.tokenPaid;
-    token.safeTransferFrom(address(this), msg.sender, pendingTokens);
+    user.tokenRewards += pendingTokens;
     totalTokenDisbursed = totalTokenDisbursed + pendingTokens;
     uint256 pendingPoints = ((user.amount * pool.pointsPerShare) / 1e30) - user.pointPaid;
-    userPoints[msg.sender] = userPoints[msg.sender] + pendingPoints;
+    user.pointRewards += pendingPoints;
     user.amount = user.amount - _amount;
     user.tokenPaid = (user.amount * pool.tokensPerShare) / 1e12;
     user.pointPaid = (user.amount * pool.pointsPerShare) / 1e30;
     pool.token.safeTransfer(address(msg.sender), _amount);
     emit Withdraw(msg.sender, _token, _amount);
+  }
+
+  /**
+    Claim accumulated token and point rewards from the Staker.
+    @param _token The asset to claim rewards from.
+   */
+  function claim(IERC20 _token) external nonReentrant {
+    UserInfo storage user = userInfo[_token][msg.sender];
+    PoolInfo storage pool = poolInfo[_token];
+    uint256 pendingTokens;
+    uint256 pendingPoints;
+
+    updatePool(_token);
+    if (user.amount > 0) {
+      pendingTokens = ((user.amount * pool.tokensPerShare) / 1e12) - user.tokenPaid;
+      pendingPoints = ((user.amount * pool.pointsPerShare) / 1e30) - user.pointPaid;
+      totalTokenDisbursed = totalTokenDisbursed + pendingTokens;
+    }
+    uint256 _tokenRewards = user.tokenRewards + pendingTokens;
+    uint256 _pointRewards = user.pointRewards + pendingPoints;
+    userPoints[msg.sender] = userPoints[msg.sender] + _pointRewards;
+    user.tokenRewards = 0;
+    user.pointRewards = 0;
+
+    user.tokenPaid = (user.amount * pool.tokensPerShare) / 1e12;
+    user.pointPaid = (user.amount * pool.pointsPerShare) / 1e30;
+    token.safeTransferFrom(address(this), msg.sender, _tokenRewards);
+    emit Claim(msg.sender, token, _tokenRewards, _pointRewards);
   }
 
   /**
