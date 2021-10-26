@@ -3,7 +3,8 @@ pragma solidity ^0.8.7;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 
-import "./OwnableMutableDelegateProxy.sol";
+import "./AuthenticatedProxy.sol";
+import "../interfaces/IProxyRegistry.sol";
 
 /**
   @title A proxy registry contract.
@@ -16,7 +17,7 @@ import "./OwnableMutableDelegateProxy.sol";
   to support a more modern version of Solidity with associated best practices.
   The documentation has also been improved to provide more clarity.
 */
-contract ProxyRegistry is Ownable {
+contract ProxyRegistry is IProxyRegistry, Ownable {
 
   /**
     Each `OwnableDelegateProxy` contract ultimately dictates its implementation
@@ -29,7 +30,7 @@ contract ProxyRegistry is Ownable {
     which allow it to proxy functionality to the various callers contained in
     `authorizedCallers`.
   */
-  mapping(address => OwnableMutableDelegateProxy) public proxies;
+  mapping(address => address) public proxies;
 
   /**
     This mapping relates addresses which are pending access to the registry to
@@ -60,6 +61,15 @@ contract ProxyRegistry is Ownable {
     compromised `OwnableDelegateProxy` contracts.
   */
   uint256 public DELAY_PERIOD = 2 weeks;
+
+    /**
+    Construct this registry by specifying the initial implementation of all
+    `OwnableDelegateProxy` contracts that are registered by users. This registry
+    will use `AuthenticatedProxy` as its initial implementation.
+  */
+  constructor() {
+    delegateProxyImplementation = address(new AuthenticatedProxy());
+  }
 
   /**
     Allow the `ProxyRegistry` owner to begin the process of enabling access to
@@ -128,7 +138,7 @@ contract ProxyRegistry is Ownable {
       _msgSender(), delegateProxyImplementation,
       abi.encodeWithSignature("initialize(address,address)", _msgSender(),
         address(this)));
-    proxies[_msgSender()] = proxy;
+    proxies[_msgSender()] = address(proxy);
     return proxy;
   }
 }
