@@ -43,7 +43,7 @@ contract Exchange is ExchangeCore {
     }
 
     /**
-     * @dev Call calculateFinalPrice - library function exposed for testing.
+     * @dev Call calculateFinalPrice 
      */
     function calculateFinalPrice(Sales.Side side, Sales.SaleKind saleKind, uint basePrice, uint extra, uint listingTime, uint expirationTime)
         external view
@@ -53,7 +53,7 @@ contract Exchange is ExchangeCore {
     }
 
     /**
-     * @dev Call hashOrder - Solidity ABI encoding limitation workaround, hopefully temporary.
+     * @dev Call hashOrder
      */
     function hashOrder(Order calldata order)
         external pure
@@ -63,7 +63,7 @@ contract Exchange is ExchangeCore {
     }
 
     /**
-     * @dev Call hashToSign - Solidity ABI encoding limitation workaround, hopefully temporary.
+     * @dev Call hashToSign
      */
     function hashToSign(Order calldata order) external pure returns (bytes32)
     { 
@@ -71,7 +71,7 @@ contract Exchange is ExchangeCore {
     }
 
     /**
-     * @dev Call validateOrderParameters - Solidity ABI encoding limitation workaround, hopefully temporary.
+     * @dev Call validateOrderParameters
      */
     function validateOrderParameters(Order calldata order)
         external view
@@ -81,7 +81,7 @@ contract Exchange is ExchangeCore {
     }
 
     /**
-     * @dev Call validateOrder - Solidity ABI encoding limitation workaround, hopefully temporary.
+     * @dev Call validateOrder
      */
     function validateOrder(Order calldata order, Sig calldata sig)
         external view
@@ -91,7 +91,7 @@ contract Exchange is ExchangeCore {
     }
 
     /**
-     * @dev Call approveOrder - Solidity ABI encoding limitation workaround, hopefully temporary.
+     * @dev Call approveOrder
      */
     function approveOrder_(Order calldata order, bool orderbookInclusionDesired)
         external
@@ -100,7 +100,7 @@ contract Exchange is ExchangeCore {
     }
 
     /**
-     * @dev Call cancelOrder - Solidity ABI encoding limitation workaround, hopefully temporary.
+     * @dev Call cancelOrder
      */
     function cancelOrder_(Order calldata order, Sig calldata sig)
         external
@@ -109,7 +109,7 @@ contract Exchange is ExchangeCore {
     }
 
     /**
-     * @dev Call calculateCurrentPrice - Solidity ABI encoding limitation workaround, hopefully temporary.
+     * @dev Call calculateCurrentPrice
      */
     function calculateCurrentPrice(Order calldata order)
         external view
@@ -119,7 +119,7 @@ contract Exchange is ExchangeCore {
     }
 
     /**
-     * @dev Call ordersCanMatch - Solidity ABI encoding limitation workaround, hopefully temporary.
+     * @dev Call ordersCanMatch
      */
     function ordersCanMatch(Order calldata buy, Order calldata sell)
         external view
@@ -150,7 +150,7 @@ contract Exchange is ExchangeCore {
     }
 
     /**
-     * @dev Call calculateMatchPrice - Solidity ABI encoding limitation workaround, hopefully temporary.
+     * @dev Call calculateMatchPrice 
      */
     function calculateMatchPrice(Order calldata buy, Order calldata sell)
         external view
@@ -160,7 +160,7 @@ contract Exchange is ExchangeCore {
     }
 
     /**
-     * @dev Call atomicMatch - Solidity ABI encoding limitation workaround, hopefully temporary.
+     * @dev Call atomicMatch
      */
     function atomicMatch_(
         Order calldata buy,
