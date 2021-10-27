@@ -10,6 +10,7 @@ import "../interfaces/IProxyRegistry.sol";
   @title A proxy registry contract.
   @author Protinam, Project Wyvern
   @author Tim Clancy
+  @author Rostislav Khlebnikov
 
   This contract was originally developed by Project Wyvern
   (https://github.com/ProjectWyvern/) where it currently enjoys great success as
@@ -128,17 +129,19 @@ contract ProxyRegistry is IProxyRegistry, Ownable {
     @return The new `OwnableMutableDelegateProxy` contract with its
       `delegateProxyImplementation` implementation.
   */
-  function registerProxy() external returns (OwnableMutableDelegateProxy) {
+  function registerProxy() external returns (address) {
     require(address(proxies[_msgSender()]) == address(0),
       "ProxyRegistry: you have already registered a proxy");
 
     // Construct the new `OwnableDelegateProxy` with this registry's initial
     // implementation and call said implementation's "initialize" function.
     OwnableMutableDelegateProxy proxy = new OwnableMutableDelegateProxy(
-      _msgSender(), delegateProxyImplementation,
-      abi.encodeWithSignature("initialize(address,address)", _msgSender(),
-        address(this)));
-    proxies[_msgSender()] = address(proxy);
-    return proxy;
+      _msgSender(), 
+      delegateProxyImplementation,
+      abi.encodeWithSignature("initialize(address)", address(this))
+    );
+    address proxyAddr = address(proxy);
+    proxies[_msgSender()] = proxyAddr;
+    return proxyAddr;
   }
 }

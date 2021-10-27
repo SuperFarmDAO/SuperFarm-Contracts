@@ -25,6 +25,7 @@ contract SuperMarketplace is Exchange {
             chainId           : chainId,
             verifyingContract : address(this)
         }));
+        registry = _registries[0];
         exchangeToken = _exchangeToken;
         tokenTransferProxy = _tokenTransferProxy;
         protocolFeeRecipient = _protocolFeeRecipient;

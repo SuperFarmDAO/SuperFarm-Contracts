@@ -11,6 +11,8 @@ import "../../../libraries/SaleKind.sol";
 import "../../../libraries/EIP712.sol";
 import "../../../libraries/EIP1271.sol";
 
+import "hardhat/console.sol";
+
 /**
     @title modified ExchangeCore of ProjectWyvernV2
     @author Project Wyvern Developers
@@ -319,18 +321,15 @@ contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
         if (!_validateOrderParameters(order)) {
             return false;
         }
-
         /* Order must have not been canceled or already filled. */
         if (cancelledOrFinalized[hash]) {
             return false;
         }
-        
         /* Order authentication. Order must be either:
         /* (a) previously approved */
         if (approvedOrders[hash]) {
             return true;
         }
-
         /* or (b) ECDSA-signed by maker. */
         if (ecrecover(hash, sig.v, sig.r, sig.s) == order.maker) {
             return true;
@@ -589,6 +588,25 @@ contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
         view
         returns (bool)
     {
+         /* Must be opposite-side. */
+            // console.logBool(buy.side == Sales.Side.Buy && sell.side == Sales.Side.Sell);     
+            // /* Must use same fee method. */
+            // console.logBool(buy.feeMethod == sell.feeMethod);
+            // /* Must use same payment token. */
+            // console.logBool(buy.paymentToken == sell.paymentToken);
+            // /* Must match maker/taker addresses. */
+            // console.logBool(sell.taker == address(0) || sell.taker == buy.maker);
+            // console.logBool(buy.taker == address(0) || buy.taker == sell.maker) ;
+            // /* One must be maker and the other must be taker (no bool XOR in Solidity). */
+            // console.logBool((sell.feeRecipient == address(0) && buy.feeRecipient != address(0)) || (sell.feeRecipient != address(0) && buy.feeRecipient == address(0)));
+            // /* Must match target. */
+            // console.logBool(buy.target == sell.target);
+            // /* Must match callType. */
+            // console.logBool(buy.callType == sell.callType);
+            // /* Buy-side order must be settleable. */
+            // console.logBool(Sales.canSettleOrder(buy.listingTime, buy.expirationTime));
+            // /* Sell-side order must be settleable. */
+            // console.logBool(Sales.canSettleOrder(sell.listingTime, sell.expirationTime));
         return (
             /* Must be opposite-side. */
             (buy.side == Sales.Side.Buy && sell.side == Sales.Side.Sell) &&     
@@ -619,9 +637,8 @@ contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
      * @param sell Sell-side order
      * @param sellSig Sell-side order signature
      */
-    function _atomicMatch(Order calldata buy, Sig calldata buySig, Order calldata sell, Sig calldata sellSig, bytes32 metadata, Order[] calldata additionalSales, Sig[] calldata sigs )
+    function _atomicMatch(Order memory buy, Sig calldata buySig, Order memory sell, Sig calldata sellSig, bytes32 metadata, Order[] calldata additionalSales, Sig[] calldata sigs )
         internal
-        nonReentrant
     {
         /* CHECKS */
         bytes32 buyHash;
@@ -661,7 +678,8 @@ contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
 
         /* Proxy must exist. */
         require(exists(delegateProxy));
-
+        //console.logAddress(OwnableDelegateProxy(payable(delegateProxy)).implementation());
+        //console.logAddress(IProxyRegistry(registry).delegateProxyImplementation());
         /* Assert implementation. */
         require(OwnableDelegateProxy(payable(delegateProxy)).implementation() == IProxyRegistry(registry).delegateProxyImplementation());
 
