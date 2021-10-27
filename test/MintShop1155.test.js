@@ -1382,7 +1382,10 @@ const computeMerkleProof = function(index, address) {
         if ((path % 2) == 1) {
             proof.push(leaves[path - 1])
         } else {
-            proof.push(leaves[path + 1])
+            if (typeof leaves[path + 1] != "undefined")
+                proof.push(leaves[path + 1])
+            else
+                proof.push(leaves[path])
         }
 
         // Reduce the merkle tree one level
