@@ -1,5 +1,5 @@
-pragma solidity 0.8.8;
-
+pragma solidity ^0.8.8;
+ 
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
 import "../../../access/PermitControl.sol";
