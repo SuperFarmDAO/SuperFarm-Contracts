@@ -108,8 +108,8 @@ contract Super721IMX is PermitControl, ERC165Storage, IERC721 {
   */
   string public metadataUri;
 
-  /// URL for the storefront-level metadata of contract
-  string public metadataURL;
+  /// The URI for the storefront-level metadata of contract
+  string public contractURI;
 
   /// A proxy registry address for supporting automatic delegated approval.
   address public proxyRegistryAddress;
@@ -257,6 +257,9 @@ contract Super721IMX is PermitControl, ERC165Storage, IERC721 {
   /// Whether or not the metadata URI has been locked to future changes.
   bool public uriLocked;
 
+  /// Whether or not the metadata URI has been locked to future changes.
+  bool public contractUriLocked;
+
   /// Whether or not the item collection has been locked to all further minting.
   bool public locked;
 
@@ -266,6 +269,13 @@ contract Super721IMX is PermitControl, ERC165Storage, IERC721 {
     @param newURI The new metadata URI.
   */
   event ChangeURI(string indexed oldURI, string indexed newURI);
+
+  /**
+    An event that gets emitted when the contract URI is changed.
+    @param oldURI The old metadata URI.
+    @param newURI The new metadata URI.
+  */
+  event ChangeContractURI(string indexed oldURI, string indexed newURI);
 
   /**
     An event that gets emitted when the proxy registry address is changed.
@@ -310,6 +320,13 @@ contract Super721IMX is PermitControl, ERC165Storage, IERC721 {
   event PermanentURI(string _value, uint256 indexed _id);
 
   /**
+    An event that indicates we have set a permanent contract URI.
+    @param _value The value of the permanent contract URI.
+    @param _id The token ID associated with the permanent contract value.
+  */
+  event PermanentContractURI(string _value, uint256 indexed _id);
+
+  /**
     A modifier which allows only the super-administrative owner or addresses
     with a specified valid right to perform a call on some specific item. Rights
     can be applied to the universal circumstance, the item-group-level
@@ -338,12 +355,13 @@ contract Super721IMX is PermitControl, ERC165Storage, IERC721 {
     Construct a new ERC-721 item collection.
     @param _owner The address of the administrator governing this collection.
     @param _name The name to assign to this item collection contract.
-    @param _uri The metadata URI to perform later token ID substitution with.
+    @param _metadataURI The metadata URI to perform later token ID substitution with.
+    @param _contractURI The contract URI. 
     @param _proxyRegistryAddress The address of a proxy registry contract.
     @param _imxCoreAddress The address of the IMX core contract for L2 minting.
   */
-  constructor(address _owner, string memory _name, string memory _symbol, string memory _uri,
-    string memory _url, address _proxyRegistryAddress, address _imxCoreAddress, address _super721IMXLock) {
+  constructor(address _owner, string memory _name, string memory _symbol, string memory _metadataURI,
+    string memory _contractURI, address _proxyRegistryAddress, address _imxCoreAddress, address _super721IMXLock) {
 
     // Do not perform a redundant ownership transfer if the deployer should
     // remain as the owner of the collection.
@@ -359,8 +377,8 @@ contract Super721IMX is PermitControl, ERC165Storage, IERC721 {
     // Continue initialization.
     name = _name;
     symbol = _symbol;
-    metadataUri = _uri;
-    metadataURL = _url;
+    metadataUri = _metadataURI;
+    contractURI = _contractURI;
     proxyRegistryAddress = _proxyRegistryAddress;
     imxCoreAddress = _imxCoreAddress;
     super721IMXLock = _super721IMXLock;
@@ -430,6 +448,21 @@ contract Super721IMX is PermitControl, ERC165Storage, IERC721 {
     string memory oldURI = metadataUri;
     metadataUri = _uri;
     emit ChangeURI(oldURI, _uri);
+  }
+
+  /**
+    Allow approved manager to update the contract URI. At the end of update, we 
+    emit our own event to reflect changes in the URI.
+
+    @param _uri The new contract URI to update to.
+   */
+  function setContractURI(string calldata _uri) external virtual
+    hasValidPermit(UNIVERSAL, SET_URI) {
+      require(!contractUriLocked,
+        "Super721::setContractURI: the contract URI has been permanently locked");
+      string memory oldContractUri = contractURI;
+      contractURI = _uri;
+      emit ChangeContractURI(oldContractUri, _uri);
   }
   // TODO: change all require messages
 
@@ -1011,6 +1044,20 @@ contract Super721IMX is PermitControl, ERC165Storage, IERC721 {
   }
 
   /**
+    Allow the associated manager to forever lock the contract URI to future changes
+    
+    @param _uri The value of the URI to lock for `_id`.
+   */
+  function lockContractUri(string calldata _uri) external
+    hasValidPermit(UNIVERSAL, LOCK_URI) {
+    string memory oldURI = contractURI;
+    contractURI = _uri;
+    emit ChangeContractURI(oldURI, _uri);
+    contractUriLocked = true;
+    emit PermanentContractURI(_uri, 2 ** 256 - 1);   
+  }
+
+  /**
     Allow the item collection owner or an associated manager to forever lock the
     metadata URI on an item to future changes.
     @param _uri The value of the URI to lock for `_id`.
@@ -1102,13 +1149,6 @@ contract Super721IMX is PermitControl, ERC165Storage, IERC721 {
   function tokenByIndex(uint256 index) public view returns (uint256) {
       (uint256 tokenId, ) = _tokenOwners.at(index);
       return tokenId;
-  }
-  
-  /** 
-   * @dev return a URL for the storefront-level metadata of contract
-   */
-  function contractURI() public view returns (string memory) {
-      return metadataURL;
   }
 
 }

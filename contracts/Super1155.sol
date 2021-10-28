@@ -83,8 +83,8 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
   */
   string public metadataUri;
 
-  /// URL for the storefront-level metadata of contract
-  string public metadataURL;
+  /// The URI for the storefront-level metadata of contract
+  string public contractURI;
 
   /// A proxy registry address for supporting automatic delegated approval.
   address public proxyRegistryAddress;
@@ -169,6 +169,9 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
   /// Whether or not the metadata URI has been locked to future changes.
   bool public uriLocked;
 
+  /// Whether or not the contract URI has been locked to future changes.
+  bool public contractUriLocked;
+
   /// Whether or not the item collection has been locked to all further minting.
   bool public locked;
 
@@ -227,6 +230,22 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
   */
   event PermanentURI(string _value, uint256 indexed _id);
 
+  /**
+    An event that emmited when the contract URI is changed
+
+    @param oldURI The old contract URI
+    @param newURI The new contract URI
+   */
+  event ChangeContractURI(string indexed oldURI, string indexed newURI);
+
+  /**
+    An event that indicates we have set a permanent contract URI.
+
+    @param _value The value of the permanent contract URI.
+    @param _id The token ID associated with the permanent metadata value.
+  */
+  event PermanentContractURI(string _value, uint256 indexed _id);
+
 //     Commented due to excessive instruction bytecode size
 //   /**
 //     A modifier which allows only the super-administrative owner or addresses
@@ -256,11 +275,12 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
     Construct a new ERC-1155 item collection.
 
     @param _name The name to assign to this item collection contract.
-    @param _uri The metadata URI to perform later token ID substitution with.
+    @param _metadataURI The metadata URI to perform later token ID substitution with.
+    @param _contractURI The contract URI.
     @param _proxyRegistryAddress The address of a proxy registry contract.
   */
-  constructor(address _owner, string memory _name, string memory _uri,
-    string memory _url, address _proxyRegistryAddress) {
+  constructor(address _owner, string memory _name, string memory _metadataURI,
+    string memory _contractURI, address _proxyRegistryAddress) {
 
     // Register the ERC-165 interfaces.
     _registerInterface(INTERFACE_ERC1155);
@@ -273,8 +293,8 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
     }
     // Continue initialization.
     name = _name;
-    metadataUri = _uri;
-    metadataURL = _url;
+    metadataUri = _metadataURI;
+    contractURI = _contractURI;
     proxyRegistryAddress = _proxyRegistryAddress;
   }
 
@@ -315,6 +335,21 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
     string memory oldURI = metadataUri;
     metadataUri = _uri;
     emit ChangeURI(oldURI, _uri);
+  }
+
+  /**
+    Allow approved manager to update the contract URI. At the end of update, we 
+    emit our own event to reflect changes in the URI.
+
+    @param _uri The new contract URI to update to.
+  */
+  function setContractUri(string calldata _uri) external virtual
+    hasValidPermit(UNIVERSAL, SET_URI) {
+      require(!contractUriLocked,
+        "Super1155: the contract URI has been permanently locked");
+      string memory oldContractUri = contractURI;
+      contractURI = _uri;
+      emit ChangeContractURI(oldContractUri, _uri);
   }
 
   /**
@@ -891,6 +926,20 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
   }
 
   /**
+    Allow the associated manager to forever lock the contract URI to future changes
+    
+    @param _uri The value of the URI to lock for `_id`.
+   */
+  function lockContractUri(string calldata _uri) external
+    hasValidPermit(UNIVERSAL, LOCK_URI) {
+    string memory oldURI = contractURI;
+    contractURI = _uri;
+    emit ChangeContractURI(oldURI, _uri);
+    contractUriLocked = true;
+    emit PermanentContractURI(_uri, 2 ** 256 - 1);   
+  }
+
+  /**
     Allow the item collection owner or an associated manager to forever lock the
     metadata URI on an item to future changes.
 
@@ -925,10 +974,4 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
     emit CollectionLocked(_msgSender());
   }
 
-   /** 
-   * @dev return a URL for the storefront-level metadata of contract
-   */
-  function contractURI() public view returns (string memory) {
-      return metadataURL;
-  }
 }
