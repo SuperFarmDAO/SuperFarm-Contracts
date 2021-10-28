@@ -83,6 +83,9 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
   */
   string public metadataUri;
 
+  /// URL for the storefront-level metadata of contract
+  string public metadataURL;
+
   /// A proxy registry address for supporting automatic delegated approval.
   address public proxyRegistryAddress;
 
@@ -257,7 +260,7 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
     @param _proxyRegistryAddress The address of a proxy registry contract.
   */
   constructor(address _owner, string memory _name, string memory _uri,
-    address _proxyRegistryAddress) {
+    string memory _url, address _proxyRegistryAddress) {
 
     // Register the ERC-165 interfaces.
     _registerInterface(INTERFACE_ERC1155);
@@ -271,6 +274,7 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
     // Continue initialization.
     name = _name;
     metadataUri = _uri;
+    metadataURL = _url;
     proxyRegistryAddress = _proxyRegistryAddress;
   }
 
@@ -919,5 +923,12 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
   function lock() external virtual hasValidPermit(UNIVERSAL, LOCK_CREATION) {
     locked = true;
     emit CollectionLocked(_msgSender());
+  }
+
+   /** 
+   * @dev return a URL for the storefront-level metadata of contract
+   */
+  function contractURI() public view returns (string memory) {
+      return metadataURL;
   }
 }

@@ -108,6 +108,9 @@ contract Super721IMX is PermitControl, ERC165Storage, IERC721 {
   */
   string public metadataUri;
 
+  /// URL for the storefront-level metadata of contract
+  string public metadataURL;
+
   /// A proxy registry address for supporting automatic delegated approval.
   address public proxyRegistryAddress;
 
@@ -340,7 +343,7 @@ contract Super721IMX is PermitControl, ERC165Storage, IERC721 {
     @param _imxCoreAddress The address of the IMX core contract for L2 minting.
   */
   constructor(address _owner, string memory _name, string memory _symbol, string memory _uri,
-    address _proxyRegistryAddress, address _imxCoreAddress, address _super721IMXLock) {
+    string memory _url, address _proxyRegistryAddress, address _imxCoreAddress, address _super721IMXLock) {
 
     // Do not perform a redundant ownership transfer if the deployer should
     // remain as the owner of the collection.
@@ -357,6 +360,7 @@ contract Super721IMX is PermitControl, ERC165Storage, IERC721 {
     name = _name;
     symbol = _symbol;
     metadataUri = _uri;
+    metadataURL = _url;
     proxyRegistryAddress = _proxyRegistryAddress;
     imxCoreAddress = _imxCoreAddress;
     super721IMXLock = _super721IMXLock;
@@ -1098,6 +1102,13 @@ contract Super721IMX is PermitControl, ERC165Storage, IERC721 {
   function tokenByIndex(uint256 index) public view returns (uint256) {
       (uint256 tokenId, ) = _tokenOwners.at(index);
       return tokenId;
+  }
+  
+  /** 
+   * @dev return a URL for the storefront-level metadata of contract
+   */
+  function contractURI() public view returns (string memory) {
+      return "https://metadata-url.com/my-metadata";
   }
 
 }
