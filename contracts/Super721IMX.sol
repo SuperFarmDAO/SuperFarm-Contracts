@@ -1108,7 +1108,7 @@ contract Super721IMX is PermitControl, ERC165Storage, IERC721 {
    * @dev return a URL for the storefront-level metadata of contract
    */
   function contractURI() public view returns (string memory) {
-      return "https://metadata-url.com/my-metadata";
+      return metadataURL;
   }
 
 }
