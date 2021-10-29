@@ -17,11 +17,11 @@ library Sales {
     enum Side { Buy, Sell }
 
     /**
-     * Currently supported kinds of sale: fixed price, Dutch auction. 
+     * Currently supported kinds of sale: fixed price, Dutch auction, DecreasingPrice. 
      * English auctions cannot be supported without stronger escrow guarantees.
      * Future interesting options: Vickrey auction, nonlinear Dutch auctions.
      */
-    enum SaleKind { FixedPrice, DutchAuction }
+    enum SaleKind { FixedPrice, DutchAuction, DecreasingPrice }
 
     /**
      * @dev Check whether the parameters of a sale are valid
@@ -62,7 +62,7 @@ library Sales {
      * @param listingTime Order listing time
      * @param expirationTime Order expiration time
      */
-    function calculateFinalPrice(Side side, SaleKind saleKind, uint basePrice, uint extra, uint listingTime, uint expirationTime)
+    function calculateFinalPrice(Side side, SaleKind saleKind, uint basePrice, uint extra, uint listingTime, uint expirationTime, uint endingPrice)
         view
         internal
         returns (uint finalPrice)
@@ -78,6 +78,9 @@ library Sales {
                 /* Buy-side - start price: basePrice. End price: basePrice + extra. */
                 return basePrice + diff;
             }
+        } else if (saleKind == SaleKind.DecreasingPrice) {
+            uint decreasedPrice = 60 * (basePrice - endingPrice) / (expirationTime - listingTime);
+            return basePrice - decreasedPrice;
         }
     }
 

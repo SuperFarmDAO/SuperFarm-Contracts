@@ -88,6 +88,8 @@ contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
         uint makerProtocolFee;
         /* Taker protocol fee of the order, or maximum taker fee for a taker order. */
         uint takerProtocolFee;
+        /* Ending price for order with DecreasingPrice */
+        uint endingPrice;
         /* Exchange address, intended as a versioning mechanism. */
         address exchange;
         /* Fee method (protocol token or split fee). */
@@ -226,6 +228,7 @@ contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
         index = ArrayUtils.unsafeWriteUint(index, order.takerRelayerFee);
         index = ArrayUtils.unsafeWriteUint(index, order.makerProtocolFee);
         index = ArrayUtils.unsafeWriteUint(index, order.takerProtocolFee);
+        index = ArrayUtils.unsafeWriteUint(index, order.endingPrice);
         index = ArrayUtils.unsafeWriteAddress(index, order.exchange);
         index = ArrayUtils.unsafeWriteUint8(index, uint8(order.feeMethod));
         index = ArrayUtils.unsafeWriteAddress(index, order.maker);
@@ -404,7 +407,7 @@ contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
         view
         returns (uint)
     {
-        return Sales.calculateFinalPrice(order.side, order.saleKind, order.basePrice, order.extra, order.listingTime, order.expirationTime);
+        return Sales.calculateFinalPrice(order.side, order.saleKind, order.basePrice, order.extra, order.listingTime, order.expirationTime, order.endingPrice);
     }
 
     /**
@@ -419,10 +422,10 @@ contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
         returns (uint)
     {
         /* Calculate sell price. */
-        uint sellPrice = Sales.calculateFinalPrice(sell.side, sell.saleKind, sell.basePrice, sell.extra, sell.listingTime, sell.expirationTime);
+        uint sellPrice = Sales.calculateFinalPrice(sell.side, sell.saleKind, sell.basePrice, sell.extra, sell.listingTime, sell.expirationTime, sell.endingPrice);
 
         /* Calculate buy price. */
-        uint buyPrice = Sales.calculateFinalPrice(buy.side, buy.saleKind, buy.basePrice, buy.extra, buy.listingTime, buy.expirationTime);
+        uint buyPrice = Sales.calculateFinalPrice(buy.side, buy.saleKind, buy.basePrice, buy.extra, buy.listingTime, buy.expirationTime, buy.endingPrice);
 
         /* Require price cross. */
         require(buyPrice >= sellPrice);
