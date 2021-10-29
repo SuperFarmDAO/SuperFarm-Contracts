@@ -76,7 +76,7 @@ library Sales {
     {
         if (saleKind == SaleKind.Offer || saleKind == SaleKind.SaleFixedPrice ) {
             return basePrice;
-        } else if ( saleKind == SaleKind.Auction) {
+        } else if (saleKind == SaleKind.Auction) {
             uint diff = extra * (block.timestamp - listingTime) / (expirationTime -listingTime);
             if (side == Side.Sell) {
                 /* Sell-side - start price: basePrice. End price: basePrice - extra. */
