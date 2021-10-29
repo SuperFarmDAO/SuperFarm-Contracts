@@ -7,7 +7,7 @@ import "../../../interfaces/IProxyRegistry.sol";
 import "../../../proxy/TokenTransferProxy.sol";
 import "../../../proxy/AuthenticatedProxy.sol";
 import "../../../utils/ArrayUtils.sol";
-import "../../../libraries/SaleKind.sol";
+import "../../../libraries/Sales.sol";
 import "../../../libraries/EIP712.sol";
 import "../../../libraries/EIP1271.sol";
 

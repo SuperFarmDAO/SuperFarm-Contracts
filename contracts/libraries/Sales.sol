@@ -17,11 +17,18 @@ library Sales {
     enum Side { Buy, Sell }
 
     /**
-     * Currently supported kinds of sale: fixed price, Dutch auction. 
+     * Currently supported kinds of sale: fixed price, Dutch auction, DecreasingPrice. 
      * English auctions cannot be supported without stronger escrow guarantees.
      * Future interesting options: Vickrey auction, nonlinear Dutch auctions.
      */
-    enum SaleKind { FixedPrice, DutchAuction }
+    // enum SaleKind { FixedPrice, DutchAuction, DecreasingPrice }
+
+    enum SaleKind {
+        SaleFixedPrice,
+        SaleDecreasingPrice,
+        Auction,
+        Offer
+    }
 
     /**
      * @dev Check whether the parameters of a sale are valid
@@ -35,7 +42,7 @@ library Sales {
         returns (bool)
     {
         /* Auctions must have a set expiration date. */
-        return (saleKind == SaleKind.FixedPrice || expirationTime > 0);
+        return (saleKind == SaleKind.SaleFixedPrice || saleKind == SaleKind.SaleDecreasingPrice || saleKind == SaleKind.Auction || saleKind == SaleKind.Offer ||  expirationTime > 0);
     }
 
     /**
@@ -67,9 +74,9 @@ library Sales {
         internal
         returns (uint finalPrice)
     {
-        if (saleKind == SaleKind.FixedPrice) {
+        if (saleKind == SaleKind.Offer || saleKind == SaleKind.SaleFixedPrice ) {
             return basePrice;
-        } else if (saleKind == SaleKind.DutchAuction) {
+        } else if (saleKind == SaleKind.Auction) {
             uint diff = extra * (block.timestamp - listingTime) / (expirationTime -listingTime);
             if (side == Side.Sell) {
                 /* Sell-side - start price: basePrice. End price: basePrice - extra. */
@@ -78,6 +85,9 @@ library Sales {
                 /* Buy-side - start price: basePrice. End price: basePrice + extra. */
                 return basePrice + diff;
             }
+        } else if (saleKind == SaleKind.SaleDecreasingPrice) {
+            uint decreasedPrice = 60 * (basePrice - extra) / (expirationTime - listingTime);
+            return basePrice - decreasedPrice;
         }
     }
 
