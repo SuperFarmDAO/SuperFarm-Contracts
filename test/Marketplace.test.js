@@ -80,8 +80,7 @@ describe("SuperFarm Marketplace", function(){
             erc721.address,
             dataSell,
             utils.replacementPatternSell,
-            1,
-            0
+            1
         )
         salt++
         let dataBuy = iface.encodeFunctionData("transferFrom", [utils.NULL_ADDRESS, alice.address, 1]);
@@ -98,7 +97,6 @@ describe("SuperFarm Marketplace", function(){
             erc721.address,
             dataBuy,
             utils.replacementPatternBuy,
-            0,
             0
         )
         let sellHash = await marketplace.hashOrder(orderSell)
@@ -135,8 +133,7 @@ describe("SuperFarm Marketplace", function(){
             erc721.address,
             dataSell,
             utils.replacementPatternSell,
-            1,
-            0
+            1
         )
         salt++
         let dataBuy = iface.encodeFunctionData("transferFrom", [utils.NULL_ADDRESS, alice.address, 1]);
@@ -153,7 +150,6 @@ describe("SuperFarm Marketplace", function(){
             erc721.address,
             dataBuy,
             utils.replacementPatternBuy,
-            0,
             0
         )
         let sellHash = await marketplace.hashOrder(orderSell)
@@ -165,7 +161,7 @@ describe("SuperFarm Marketplace", function(){
         let proxy = await registry.proxies(bob.address)
         await erc721.connect(bob).approve(proxy, 1)
         await weth.connect(alice).approve(transferProxy.address, ethers.utils.parseEther("0.12"))
-        let price = await marketplace.connect(alice).calculateFinalPrice(1, 2, ethers.utils.parseEther("0.12"), 0, time, (time+360), 0);
+        let price = await marketplace.connect(alice).calculateFinalPrice(1, 1, ethers.utils.parseEther("0.12"), 0, time, (time+360));
         console.log(price.toString());
         // await marketplace.connect(alice).atomicMatch_(orderBuy, {v: sigBuy.v, r: sigBuy.r, s: sigBuy.s}, orderSell, {v: sigSell.v, r: sigSell.r, s: sigSell.s}, "0x0000000000000000000000000000000000000000000000000000000000000000", [], [])
     });

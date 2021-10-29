@@ -55,8 +55,7 @@ export function makeOrder(
     _target,
     _data,
     _replacementPattern,
-    _side,
-    _endingPrice
+    _side
     ){
     return {
         basePrice: _basePrice,
@@ -81,8 +80,7 @@ export function makeOrder(
         paymentToken: _paymentToken,
         data: _data,
         replacementPattern: _replacementPattern,
-        staticExtradata: 0x0,
-        endingPrice: _endingPrice
+        staticExtradata: 0x0
     }
 }
 async function withTestTokens(){
