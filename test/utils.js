@@ -55,7 +55,8 @@ export function makeOrder(
     _target,
     _data,
     _replacementPattern,
-    _side
+    _side, 
+    _saleKind
     ){
     return {
         basePrice: _basePrice,
@@ -72,7 +73,7 @@ export function makeOrder(
         maker: _maker,
         side: _side,
         taker: _taker,
-        saleKind: 0,
+        saleKind: _saleKind,
         feeRecipient: _feeRecipient,
         callType: 0,
         target: _target,
