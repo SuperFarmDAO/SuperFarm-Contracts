@@ -1032,29 +1032,21 @@ contract Super721IMX is PermitControl, ERC165Storage, IERC721 {
   /**
     Allow the item collection owner or an associated manager to forever lock the
     metadata URI on the entire collection to future changes.
-    @param _uri The value of the URI to lock for `_id`.
   */
-  function lockURI(string calldata _uri) external
+  function lockURI() external
     hasValidPermit(UNIVERSAL, LOCK_URI) {
-    string memory oldURI = metadataUri;
-    metadataUri = _uri;
-    emit ChangeURI(oldURI, _uri);
     uriLocked = true;
-    emit PermanentURI(_uri, 2 ** 256 - 1);
+    emit PermanentURI(metadataUri, 2 ** 256 - 1);
   }
 
   /**
-    Allow the associated manager to forever lock the contract URI to future changes
-    
-    @param _uri The value of the URI to lock for `_id`.
+    Allow the associated manager to forever lock the contract URI to future 
+    changes
    */
-  function lockContractUri(string calldata _uri) external
+  function lockContractUri() external
     hasValidPermit(UNIVERSAL, LOCK_URI) {
-    string memory oldURI = contractURI;
-    contractURI = _uri;
-    emit ChangeContractURI(oldURI, _uri);
     contractUriLocked = true;
-    emit PermanentContractURI(_uri, 2 ** 256 - 1);   
+    emit PermanentContractURI(contractURI, 2 ** 256 - 1);   
   }
 
   /**
