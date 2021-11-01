@@ -10,25 +10,14 @@ import "./ExchangeCore.sol";
 contract Exchange is ExchangeCore {
 
     /**
-     * @dev Change the minimum maker fee paid to the protocol
-     * @param newMinimumMakerProtocolFee New fee to set in basis points
-     */
-    function changeMinimumMakerProtocolFee(uint newMinimumMakerProtocolFee)
-        external
-        hasValidPermit(UNIVERSAL, SET_FEES)
-    {
-        minimumMakerProtocolFee = newMinimumMakerProtocolFee;
-    }
-
-    /**
      * @dev Change the minimum taker fee paid to the protocol
-     * @param newMinimumTakerProtocolFee New fee to set in basis points
+     * @param newMinimumPlatformFee New fee to set in basis points
      */
-    function changeMinimumTakerProtocolFee(uint newMinimumTakerProtocolFee)
+    function changeMinimumPlatformFee(uint newMinimumPlatformFee)
         external
         hasValidPermit(UNIVERSAL, SET_FEES)
     {
-        minimumTakerProtocolFee = newMinimumTakerProtocolFee;
+        minimumPlatformFee = newMinimumPlatformFee;
     }
 
     /**
@@ -39,7 +28,7 @@ contract Exchange is ExchangeCore {
         external
         hasValidPermit(UNIVERSAL, SET_FEES)
     {
-        protocolFeeRecipient = newProtocolFeeRecipient;
+        platformFeeRecipient = newProtocolFeeRecipient;
     }
 
     /**
