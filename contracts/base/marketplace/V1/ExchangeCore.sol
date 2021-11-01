@@ -419,7 +419,7 @@ contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
         require(buyPrice >= sellPrice);
         
         /* Maker/taker priority. */
-        return buyPrice;
+        return sell.feeRecipient != address(0) ? sellPrice : buyPrice;
     }
 
     /**
