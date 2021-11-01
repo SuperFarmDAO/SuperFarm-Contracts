@@ -5,18 +5,12 @@ import {BigNumber} from "ethers";
 import * as utils from "./utils.js"
 
 describe("SuperFarm Marketplace", function(){
-    let owner, protocolFeeRecipient, alice, bob;
+    let owner, protocolFeeRecipient, creator, alice, bob;
     let marketplace, registry, transferProxy, erc1155, erc721, exchangeToken, weth;
 
-    // before(async function(){
-
-    // })
-
     beforeEach(async function () {
-        [owner, protocolFeeRecipient, alice, bob] = await ethers.getSigners();
-        [marketplace, registry, transferProxy, erc1155, erc721, exchangeToken, weth] =  await utils.withContracts(protocolFeeRecipient.address, network.config.chainId);
-        await exchangeToken.mint(alice.address, utils.mint.exchangeToken.alice)
-        await exchangeToken.mint(bob.address, utils.mint.exchangeToken.bob)
+        [owner, protocolFeeRecipient, creator, alice, bob] = await ethers.getSigners();
+        [marketplace, registry, transferProxy, erc1155, erc721, weth] =  await utils.withContracts(protocolFeeRecipient.address, network.config.chainId);
         await weth.mint(alice.address, utils.mint.weth.alice)
         await weth.mint(bob.address, utils.mint.weth.bob)
         await erc721.mint(alice.address, utils.mint.erc721.alice)
@@ -34,20 +28,6 @@ describe("SuperFarm Marketplace", function(){
     });
 
     it("Deploy and mint", async function(){
-        // await exchangeToken.mint(alice.address, utils.mint.exchangeToken.alice)
-        // await exchangeToken.mint(bob.address, utils.mint.exchangeToken.bob)
-        // await weth.mint(alice.address, utils.mint.weth.alice)
-        // await weth.mint(bob.address, utils.mint.weth.bob)
-        // await erc721.mint(alice.address, utils.mint.erc721.alice)
-        // await erc721.mint(alice.address, 4)
-        // await erc721.mint(bob.address, 5)
-        // // await erc721.mint(bob.address, utils.mint.erc721.bob)
-
-        // await erc1155.mint(alice.address, utils.mint.erc1155.alice.id, utils.mint.erc1155.alice.amount, utils.mint.erc1155.alice.data)
-        // await erc1155.mint(bob.address, utils.mint.erc1155.bob.id, utils.mint.erc1155.bob.amount, utils.mint.erc1155.bob.data)
-
-        expect(await exchangeToken.balanceOf(bob.address)).to.be.eq(utils.mint.exchangeToken.bob)
-        expect(await exchangeToken.balanceOf(alice.address)).to.be.eq(utils.mint.exchangeToken.alice)
         expect(await weth.balanceOf(bob.address)).to.be.eq(utils.mint.weth.bob)
         expect(await weth.balanceOf(alice.address)).to.be.eq(utils.mint.weth.alice)
         expect(await erc721.balanceOf(bob.address)).to.be.eq("1")
@@ -71,10 +51,10 @@ describe("SuperFarm Marketplace", function(){
         let orderSell = utils.makeOrder(
             ethers.utils.parseEther("0.1"),
             weth.address,
-            exchangeToken.address,
             time,
             salt, 
             protocolFeeRecipient.address,
+            creator.address,
             marketplace.address,
             bob.address,
             utils.NULL_ADDRESS,
@@ -89,10 +69,10 @@ describe("SuperFarm Marketplace", function(){
         let orderBuy = utils.makeOrder(
             ethers.utils.parseEther("0.12"),
             weth.address,
-            exchangeToken.address,
             time,
             salt,
             utils.NULL_ADDRESS,
+            creator.address,
             marketplace.address,
             alice.address,
             utils.NULL_ADDRESS,
@@ -102,12 +82,16 @@ describe("SuperFarm Marketplace", function(){
             0,
             0
         )
+        console.log("entered")
         let sellHash = await marketplace.hashOrder(orderSell)
         let buyHash = await marketplace.hashOrder(orderBuy)
+        console.log("entered")
         let signatureSell = await bob.signMessage(ethers.utils.arrayify(sellHash));
         let signatureBuy = await alice.signMessage(ethers.utils.arrayify(buyHash));
+        console.log("entered")
         let sigSell = ethers.utils.splitSignature(signatureSell);
         let sigBuy = ethers.utils.splitSignature(signatureBuy);
+        console.log("entered")
         let proxy = await registry.proxies(bob.address)
         await erc721.connect(bob).approve(proxy, 1)
         await weth.connect(alice).approve(transferProxy.address, ethers.utils.parseEther("0.12"))
@@ -126,10 +110,10 @@ describe("SuperFarm Marketplace", function(){
         let orderSell = utils.makeOrder(
             ethers.utils.parseEther("0.1"),
             weth.address,
-            exchangeToken.address,
             time,
             salt, 
             protocolFeeRecipient.address,
+            creator.address,
             marketplace.address,
             bob.address,
             utils.NULL_ADDRESS,
@@ -144,10 +128,10 @@ describe("SuperFarm Marketplace", function(){
         let orderBuy = utils.makeOrder(
             ethers.utils.parseEther("0.12"),
             weth.address,
-            exchangeToken.address,
             time,
             salt,
             utils.NULL_ADDRESS,
+            creator.address,
             marketplace.address,
             alice.address,
             utils.NULL_ADDRESS,
@@ -181,10 +165,10 @@ describe("SuperFarm Marketplace", function(){
         let orderSell = utils.makeOrder(
             ethers.utils.parseEther("12"),
             utils.NULL_ADDRESS,
-            exchangeToken.address,
             time,
             salt, 
             protocolFeeRecipient.address,
+            creator.address,
             marketplace.address,
             bob.address,
             utils.NULL_ADDRESS,
@@ -199,10 +183,10 @@ describe("SuperFarm Marketplace", function(){
         let orderBuy = utils.makeOrder(
             ethers.utils.parseEther("12"),
             utils.NULL_ADDRESS,
-            exchangeToken.address,
             time,
             salt,
             utils.NULL_ADDRESS,
+            creator.address,
             marketplace.address,
             alice.address,
             utils.NULL_ADDRESS,
@@ -254,10 +238,10 @@ describe("SuperFarm Marketplace", function(){
         let orderSell = utils.makeOrder(
             ethers.utils.parseEther("0.1"),
             utils.NULL_ADDRESS,
-            exchangeToken.address,
             time,
             salt, 
             protocolFeeRecipient.address,
+            creator.address,
             marketplace.address,
             bob.address,
             utils.NULL_ADDRESS,
@@ -272,10 +256,10 @@ describe("SuperFarm Marketplace", function(){
         let orderBuy = utils.makeOrder(
             ethers.utils.parseEther("0.12"),
             utils.NULL_ADDRESS,
-            exchangeToken.address,
             time,
             salt,
             utils.NULL_ADDRESS,
+            creator.address,
             marketplace.address,
             alice.address,
             utils.NULL_ADDRESS,
@@ -308,10 +292,10 @@ describe("SuperFarm Marketplace", function(){
         let orderSell = utils.makeOrder(
             ethers.utils.parseEther("0.1"),
             utils.NULL_ADDRESS,
-            exchangeToken.address,
             time,
             salt, 
             protocolFeeRecipient.address,
+            creator.address,
             marketplace.address,
             bob.address,
             utils.NULL_ADDRESS,
@@ -326,10 +310,10 @@ describe("SuperFarm Marketplace", function(){
         let orderBuy = utils.makeOrder(
             ethers.utils.parseEther("0.12"),
             utils.NULL_ADDRESS,
-            exchangeToken.address,
             time,
             salt,
             utils.NULL_ADDRESS,
+            creator.address,
             marketplace.address,
             alice.address,
             utils.NULL_ADDRESS,
