@@ -8,6 +8,7 @@ import "../../../proxy/TokenTransferProxy.sol";
 import "../../../proxy/AuthenticatedProxy.sol";
 import "../../../utils/ArrayUtils.sol";
 import "../../../libraries/Sales.sol";
+import "../../../libraries/Fees.sol";
 import "../../../libraries/EIP712.sol";
 import "../../../libraries/EIP1271.sol";
 
@@ -71,10 +72,10 @@ contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
         uint expirationTime;
         /* Order salt, used to prevent duplicate hashes. */
         uint salt;
-        /* Creator royalty fee stored off-chain */
-        uint creatorFee; 
-        /* Platform royaly fee */
-        uint platformFee;
+        /* Royalty fees per group */ 
+        uint[] fees;
+        /* Royalty fees receivers per group */ 
+        address[][] addresses; 
         /* Exchange address, intended as a versioning mechanism. */
         address exchange;
         /* Order maker address. */
@@ -85,8 +86,6 @@ contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
         address taker;
         /* Kind of sale. */
         Sales.SaleKind saleKind;
-        /* Order fee recipient or zero address for taker order. */
-        address feeRecipient;
         /* callType. */
         AuthenticatedProxy.CallType callType;
         /* Target. */
@@ -95,8 +94,6 @@ contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
         address staticTarget;
         /* Token used to pay for the order, or the zero-address as a sentinel value for Ether. */
         address paymentToken;
-        /* Creator fee address */
-        address creatorAddress; 
         /* Calldata. */
         bytes data;
         /* Calldata replacement pattern, or an empty byte array for no replacement. */
@@ -123,29 +120,6 @@ contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
         if (amount > 0) {
             require(TokenTransferProxy(tokenTransferProxy).transferFrom(token, from, to, amount));
         }
-    }
-
-    /**
-     * @dev Charge fees in platform tokens
-     * @param sell sell side of the match
-     * @param buy buy side of the match
-     * @param requiredAmount the base amount for the exchange to happen
-     * @return platformFees - platform royalty fees, creatorFees - creator royalty fees, 
-     *  feeRecipient - address of platform fee receiver, creatorAddress - address of creator fee receiver
-     */
-    function chargeFee(Order memory sell, Order memory buy, uint requiredAmount)
-        internal pure returns(uint platformFees, uint creatorFees, address feeRecipient, address creatorAddress)
-    {   
-        /*get fees to charge */
-        uint creatorFee = sell.creatorFee != 0 ? sell.creatorFee : buy.creatorFee; //basis points
-        uint platformFee = sell.platformFee != 0 ? sell.platformFee : buy.platformFee; // basis points
-        /* get addresses to transfer fees */
-        feeRecipient = sell.feeRecipient != address(0) ? sell.feeRecipient: buy.feeRecipient;
-        creatorAddress = sell.creatorAddress != address(0) ? sell.creatorAddress : buy.creatorAddress;
-        /* Determine maker/taker and charge fees accordingly. */
-        platformFees = (requiredAmount * creatorFee) / INVERSE_BASIS_POINT;
-        creatorFees = (requiredAmount * platformFee) / INVERSE_BASIS_POINT;
-        return (platformFees, creatorFees, feeRecipient, creatorAddress);
     }
 
     /**
@@ -220,19 +194,17 @@ contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
         index = ArrayUtils.unsafeWriteUint(index, order.listingTime);
         index = ArrayUtils.unsafeWriteUint(index, order.expirationTime);
         index = ArrayUtils.unsafeWriteUint(index, order.salt);
-        index = ArrayUtils.unsafeWriteUint(index, order.creatorFee);
-        index = ArrayUtils.unsafeWriteUint(index, order.platformFee);
+        index = ArrayUtils.unsafeWriteUintMap(index, order.fees);
+        index = ArrayUtils.unsafeWriteNestedAddressMap(index, order.addresses);
         index = ArrayUtils.unsafeWriteAddress(index, order.exchange);
         index = ArrayUtils.unsafeWriteAddress(index, order.maker);
         index = ArrayUtils.unsafeWriteUint8(index, uint8(order.side));
         index = ArrayUtils.unsafeWriteAddress(index, order.taker);
         index = ArrayUtils.unsafeWriteUint8(index, uint8(order.saleKind));
-        index = ArrayUtils.unsafeWriteAddress(index, order.feeRecipient);
         index = ArrayUtils.unsafeWriteUint8(index, uint8(order.callType));
         index = ArrayUtils.unsafeWriteAddress(index, order.target);
         index = ArrayUtils.unsafeWriteAddress(index, order.staticTarget);
         index = ArrayUtils.unsafeWriteAddress(index, order.paymentToken);
-        index = ArrayUtils.unsafeWriteAddress(index, order.creatorAddress);
         index = ArrayUtils.unsafeWriteBytes(index, order.data);
         index = ArrayUtils.unsafeWriteBytes(index, order.replacementPattern);
         index = ArrayUtils.unsafeWriteBytes(index, order.staticExtradata);
@@ -279,7 +251,7 @@ contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
         internal
         view
         returns (bool)
-    {
+    {   // TODO (2) sell order must have fees as mandatory
         /* Order must be targeted at this platform version (this Exchange contract). */
         if (order.exchange != address(this)) {
             return false;
@@ -353,7 +325,7 @@ contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
   
         /* Log approval event. Must be split in two due to Solidity stack size limitations. */
         {
-            emit OrderApprovedPartOne(hash, order.exchange, order.maker, order.taker, order.platformFee, order.feeRecipient, order.side, order.saleKind, order.target);
+            emit OrderApprovedPartOne(hash, order.exchange, order.maker, order.taker, order.fees[0], order.addresses[0][0], order.side, order.saleKind, order.target);
         }
         {   
             emit OrderApprovedPartTwo(hash, order.callType, order.data, order.replacementPattern, order.staticTarget, order.staticExtradata, order.paymentToken, order.basePrice, order.extra, order.listingTime, order.expirationTime, order.salt, orderbookInclusionDesired);
@@ -419,7 +391,7 @@ contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
         require(buyPrice >= sellPrice);
         
         /* Maker/taker priority. */
-        return sell.feeRecipient != address(0) ? sellPrice : buyPrice;
+        return sellPrice;
     }
 
     /**
@@ -433,30 +405,34 @@ contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
     {
         /* Calculate match price. */
         uint requiredAmount = _calculateMatchPrice(buy, sell);
-        /* calculate fees */
-        (uint platformFees, uint creatorFees, address feeRecipient, address creatorAddress) =  chargeFee(sell, buy, requiredAmount);
-        /* calculate amount for seller to receive */
-        uint receiveAmount =  requiredAmount - (platformFees + creatorFees);
+
+        /* Calculate royalty fees */
+        (address[] memory addresses, uint[] memory fees) = Fees.chargeFee(sell.addresses, sell.fees, requiredAmount);
+
+        /* Calculate amount for seller to receive */
+        uint receiveAmount =  requiredAmount;
 
         if (requiredAmount > 0){
             /* If paying using a token (not Ether), transfer tokens. */
             if (sell.paymentToken != address(0)){
                 require(msg.value == 0);
-                transferTokens(sell.paymentToken, buy.maker, sell.maker, receiveAmount);
-                /* transfer fee */
-                transferTokens(buy.paymentToken, buy.maker, feeRecipient, platformFees);
-                if(creatorAddress != address(0) && creatorFees > 0){
-                    transferTokens(buy.paymentToken, buy.maker, creatorAddress, creatorFees);
+                for(uint256 i = 0; i < addresses.length; i++){
+                    receiveAmount -= fees[i];
+                    transferTokens(buy.paymentToken, buy.maker, addresses[i], fees[i]);
                 }
+                transferTokens(sell.paymentToken, buy.maker, sell.maker, receiveAmount);
             } else {
                 /* Special-case Ether, order must be matched by buyer. */
                 require(msg.value >= requiredAmount);
-                payable(sell.maker).transfer(receiveAmount);
                 /* transfer fees */
-                payable(sell.feeRecipient).transfer(platformFees);
-                if(creatorAddress != address(0) && creatorFees > 0){
-                    payable(sell.creatorAddress).transfer(creatorFees);
+                for(uint256 i = 0; i < addresses.length; i++){
+                    receiveAmount -= fees[i];
+                    transferTokens(buy.paymentToken, buy.maker, addresses[i], fees[i]);
+                    payable(addresses[i]).transfer(fees[i]);
+
                 }
+                payable(sell.maker).transfer(receiveAmount);
+
                 /* Allow overshoot for variable-price auctions, refund difference. */
                 uint diff = msg.value - requiredAmount;
                 if (diff > 0) {
@@ -464,6 +440,7 @@ contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
                 }
             }
         }   
+
         return requiredAmount;
     }
 
@@ -487,9 +464,9 @@ contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
             (sell.taker == address(0) || sell.taker == buy.maker) &&
             (buy.taker == address(0) || buy.taker == sell.maker) &&
             /* One must be maker and the other must be taker (no bool XOR in Solidity). */
-            (sell.feeRecipient == address(0) ? buy.feeRecipient != address(0) : buy.feeRecipient == address(0)) &&
-            /* One must have platform fee */
-            (sell.platformFee >= minimumPlatformFee ? buy.platformFee == 0 : buy.platformFee >= minimumPlatformFee) &&
+            (sell.addresses[0][0] == address(0) ? buy.addresses[0][0] != address(0) : buy.addresses[0][0] == address(0)) &&
+            /* One must have platform fee on seller side */
+            (sell.fees[0] >= minimumPlatformFee) &&
             /* Must match target. */
             (buy.target == sell.target) &&
             /* Must match callType. */
@@ -587,7 +564,7 @@ contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
         }
 
         /* Log match event. */
-        emit OrdersMatched(buyHash, sellHash, sell.feeRecipient != address(0) ? sell.maker : buy.maker, sell.feeRecipient != address(0) ? buy.maker : sell.maker, price, metadata);
+        emit OrdersMatched(buyHash, sellHash, sell.addresses[0][0] != address(0) ? sell.maker : buy.maker, sell.addresses[0][0] != address(0) ? buy.maker : sell.maker, price, metadata);
     }
 
 }
