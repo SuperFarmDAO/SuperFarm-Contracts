@@ -124,7 +124,7 @@ describe("SuperFarm Marketplace", function(){
         let dataSell = iface.encodeFunctionData("transferFrom", [bob.address, utils.NULL_ADDRESS, 1]);
         let time = await utils.getCurrentTime()
         let orderSell = utils.makeOrder(
-            ethers.utils.parseEther("0.1"),
+            ethers.utils.parseEther("1"),
             weth.address,
             exchangeToken.address,
             time,
@@ -137,12 +137,12 @@ describe("SuperFarm Marketplace", function(){
             dataSell,
             utils.replacementPatternSell,
             1,
-            0
+            1
         )
         salt++
         let dataBuy = iface.encodeFunctionData("transferFrom", [utils.NULL_ADDRESS, alice.address, 1]);
         let orderBuy = utils.makeOrder(
-            ethers.utils.parseEther("0.12"),
+            ethers.utils.parseEther("1"),
             weth.address,
             exchangeToken.address,
             time,
@@ -155,7 +155,7 @@ describe("SuperFarm Marketplace", function(){
             dataBuy,
             utils.replacementPatternBuy,
             0,
-            0
+            1
         )
         let sellHash = await marketplace.hashOrder(orderSell)
         let buyHash = await marketplace.hashOrder(orderBuy)
@@ -165,10 +165,12 @@ describe("SuperFarm Marketplace", function(){
         let sigBuy = ethers.utils.splitSignature(signatureBuy);
         let proxy = await registry.proxies(bob.address)
         await erc721.connect(bob).approve(proxy, 1)
-        await weth.connect(alice).approve(transferProxy.address, ethers.utils.parseEther("0.12"))
-        let price = await marketplace.connect(alice).calculateFinalPrice(1, 1, ethers.utils.parseEther("0.12"), 0, time, (time+360));
-        console.log(price.toString());
-        // await marketplace.connect(alice).atomicMatch_(orderBuy, {v: sigBuy.v, r: sigBuy.r, s: sigBuy.s}, orderSell, {v: sigSell.v, r: sigSell.r, s: sigSell.s}, "0x0000000000000000000000000000000000000000000000000000000000000000", [], [])
+        await weth.connect(alice).approve(transferProxy.address, ethers.utils.parseEther("2"))
+        let price = await marketplace.connect(alice).calculateFinalPrice(1, 1, ethers.utils.parseEther("1"), 0, time, (time+360));
+        console.log("Decreased price: ", price.toString());
+        await marketplace.connect(alice).atomicMatch_(orderBuy, {v: sigBuy.v, r: sigBuy.r, s: sigBuy.s}, orderSell, {v: sigSell.v, r: sigSell.r, s: sigSell.s}, "0x0000000000000000000000000000000000000000000000000000000000000000", [], [])
+        let aliceBalance = await weth.balanceOf(alice.address);
+        console.log("Alice's balance: ", aliceBalance.toString());
     });
 
     it("Buy erc721 for ether", async function() {
