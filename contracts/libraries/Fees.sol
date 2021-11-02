@@ -23,28 +23,22 @@ library Fees {
      */
     function chargeFee(address[][] memory _addresses, uint[] memory _fees, uint _requiredAmount)
         internal pure returns(address[] memory, uint[] memory)
-    {   
+    {  
+        require(_addresses.length == _fees.length, "Fees: price array and addresses map mismatch.");
         uint256 length;
         for (uint256 x = 0; x < _addresses.length; x++) {
             length += _addresses[x].length;
         }
-
         address[] memory addresses = new address[](length);
         uint256[] memory fees = new uint256[](length);
-        uint256 addressIndex;
-        uint256 feesIndex;
-
-        for (uint256 i = 0; i < addresses.length; i++) { // Group
-            uint256 fee = (_requiredAmount * _fees[i]) / INVERSE_BASIS_POINT;
-            uint256 feePerAddress = fee / _addresses[i].length;
-
-            for (uint256 j = 0; j < _addresses[i].length; j++) { // Address
-                fees[feesIndex] = feePerAddress;
-                addresses[addressIndex] = _addresses[i][j];
-                addressIndex++;
-                feesIndex++;
+        uint index;
+        for (uint i = 0; i < _fees.length; i++){
+            for(uint j = 0; j < _addresses[i].length; j++){
+                addresses[index] = _addresses[i][j];
+                fees[index] = (_requiredAmount*_fees[i])/INVERSE_BASIS_POINT;
+                index++;
             }
-        }
+        } 
         return (addresses, fees);
     }
 

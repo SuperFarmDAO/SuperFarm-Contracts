@@ -408,7 +408,7 @@ contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
 
         /* Calculate royalty fees */
         (address[] memory addresses, uint[] memory fees) = Fees.chargeFee(sell.addresses, sell.fees, requiredAmount);
-
+        
         /* Calculate amount for seller to receive */
         uint receiveAmount =  requiredAmount;
 
@@ -464,7 +464,7 @@ contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
             (sell.taker == address(0) || sell.taker == buy.maker) &&
             (buy.taker == address(0) || buy.taker == sell.maker) &&
             /* One must be maker and the other must be taker (no bool XOR in Solidity). */
-            (sell.addresses[0][0] == address(0) ? buy.addresses[0][0] != address(0) : buy.addresses[0][0] == address(0)) &&
+            sell.addresses[0][0] != address(0) &&
             /* One must have platform fee on seller side */
             (sell.fees[0] >= minimumPlatformFee) &&
             /* Must match target. */
