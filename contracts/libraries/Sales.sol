@@ -4,7 +4,6 @@
 */
 
 pragma solidity ^0.8.8;
-import "hardhat/console.sol";
 
 /**
  * @title SaleKindInterface
@@ -74,11 +73,16 @@ library Sales {
         internal
         returns (uint finalPrice)
     {
-        if (saleKind == SaleKind.SaleDecreasingPrice ) {
-            uint step = ((basePrice - extra) / (expirationTime - listingTime)) * 60;
-            if(block.timestamp >= expirationTime)
+        if (saleKind == SaleKind.SaleDecreasingPrice) {
+            if(block.timestamp >= expirationTime) {
                 return extra;
-            return basePrice - (((block.timestamp - listingTime) / 60) * step);
+            }
+            //lowering price by 1sec
+            uint allSteps = (expirationTime - listingTime)/60;
+            uint currentSteps =  (expirationTime - block.timestamp) / 60;
+            uint priceRange = basePrice - extra;
+            uint res = priceRange*currentSteps/allSteps;
+            return extra + res;
         } else {
             return basePrice;
         }
