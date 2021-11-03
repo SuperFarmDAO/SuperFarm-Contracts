@@ -79,12 +79,15 @@ library Sales {
         if (saleKind == SaleKind.Offer || saleKind == SaleKind.SaleFixedPrice || saleKind == SaleKind.Auction ) {
             return basePrice;
         } else if (saleKind == SaleKind.SaleDecreasingPrice) {
+            if(block.timestamp >= expirationTime) {
+                return extra;
+            }
             //lowering price by 1sec
             uint allSteps = (expirationTime - listingTime)/60;
             uint currentSteps =  (expirationTime - block.timestamp) / 60;
             uint priceRange = basePrice - extra;
             uint res = priceRange*currentSteps/allSteps;
-            return extra+res;
+            return extra + res;
         }
     }
 

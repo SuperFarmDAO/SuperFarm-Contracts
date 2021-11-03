@@ -199,7 +199,7 @@ describe("SuperFarm Marketplace", function(){
         console.log(time)
         console.log(time2)
         console.log(time2 - time);
-        let price = await marketplace.connect(alice).calculateFinalPrice(1, 1, ethers.utils.parseEther("1"),  ethers.utils.parseEther("0.2"), time, (time2+500));
+        let price = await marketplace.connect(alice).calculateFinalPrice(1, 1, ethers.utils.parseEther("1.5"),  ethers.utils.parseEther("0.5"), time, (time2-100));
         console.log("Decreased price: ", price.toString());
 
         // const currentBlock = await ethers.provider.getBlockNumber();
