@@ -11,6 +11,7 @@ import "../../../libraries/Sales.sol";
 import "../../../libraries/Fees.sol";
 import "../../../libraries/EIP712.sol";
 import "../../../libraries/EIP1271.sol";
+import "hardhat/console.sol";
 
 /**
     @title modified ExchangeCore of ProjectWyvernV2
@@ -392,9 +393,12 @@ contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
 
         if (sell.saleKind == Sales.SaleKind.Auction) {
             return buyPrice;
-        } else {
+        } else if (sell.saleKind == Sales.SaleKind.Offer) {
         /* Maker/taker priority. */
-            return sell.addresses[0][0] != address(0) ? sellPrice : buyPrice;
+            return buyPrice;
+        } 
+        else {
+            return sellPrice;
         }
     }
 
@@ -412,6 +416,13 @@ contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
 
         /* Calculate royalty fees */
         (address[] memory addresses, uint[] memory fees) = Fees.chargeFee(sell.addresses, sell.fees, requiredAmount);
+
+        console.log("***********************************");
+        for (uint256 i = 0; i < fees.length; i++) {
+            console.log(addresses[i]);
+            console.log(fees[i]);
+        }
+                console.log("***********************************");
         
         /* Calculate amount for seller to receive */
         uint receiveAmount =  requiredAmount;
@@ -459,6 +470,25 @@ contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
         view
         returns (bool)
     {
+        // // /* Must be opposite-side. */
+        // console.logBool((buy.side == Sales.Side.Buy && sell.side == Sales.Side.Sell));    
+        // /* Must use same payment token. */
+        // console.logBool((buy.paymentToken == sell.paymentToken));
+        // /* Must match maker/taker addresses. */
+        // console.logBool((sell.taker == address(0) || sell.taker == buy.maker));
+        // console.logBool((buy.taker == address(0) || buy.taker == sell.maker));
+        // /* One must be maker and the other must be taker (no bool XOR in Solidity). */
+        // console.logBool(sell.addresses[0][0] != address(0));
+        // /* One must have platform fee on seller side */
+        // console.logBool((sell.fees[0] >= minimumPlatformFee));
+        // /* Must match target. */
+        // console.logBool((buy.target == sell.target));
+        // /* Must match callType. */
+        // console.logBool((buy.callType == sell.callType));
+        // /* Buy-side order must be settleable. */
+        // console.logBool(Sales.canSettleOrder(buy.listingTime, buy.expirationTime));
+        // /* Sell-side order must be settleable. */
+        // console.logBool(Sales.canSettleOrder(sell.listingTime, sell.expirationTime));
         return (
             /* Must be opposite-side. */
             (buy.side == Sales.Side.Buy && sell.side == Sales.Side.Sell) &&     
