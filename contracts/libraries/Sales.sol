@@ -5,6 +5,8 @@
 
 pragma solidity ^0.8.8;
 
+import "hardhat/console.sol";
+
 /**
  * @title SaleKindInterface
  * @author Project Wyvern Developers
@@ -78,10 +80,11 @@ library Sales {
             return basePrice;
         } else if (saleKind == SaleKind.SaleDecreasingPrice) {
             //lowering price by 1sec
-            uint decreasedPrice = 60 * ((basePrice - extra) / (expirationTime - listingTime));
-            uint res = ((block.timestamp - listingTime) / 60) * decreasedPrice;
-            if (basePrice - res <= extra) return extra;
-            return basePrice - res;
+            uint allSteps = (expirationTime - listingTime)/60;
+            uint currentSteps =  (expirationTime - block.timestamp) / 60;
+            uint priceRange = basePrice - extra;
+            uint res = priceRange*currentSteps/allSteps;
+            return extra+res;
         }
     }
 

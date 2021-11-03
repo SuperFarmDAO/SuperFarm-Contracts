@@ -194,8 +194,12 @@ describe("SuperFarm Marketplace", function(){
         let proxy = await registry.proxies(bob.address)
         await erc721.connect(bob).approve(proxy, 1)
         await weth.connect(alice).approve(transferProxy.address, ethers.utils.parseEther("2"))
-        await utils.evm_increaseTime(1000);
-        let price = await marketplace.connect(alice).calculateFinalPrice(1, 1, ethers.utils.parseEther("1"), 0, time, (time+1000));
+        await utils.evm_increaseTime(500);
+        let time2 = await utils.getCurrentTime()
+        console.log(time)
+        console.log(time2)
+        console.log(time2 - time);
+        let price = await marketplace.connect(alice).calculateFinalPrice(1, 1, ethers.utils.parseEther("1"),  ethers.utils.parseEther("0.2"), time, (time2+500));
         console.log("Decreased price: ", price.toString());
 
         // const currentBlock = await ethers.provider.getBlockNumber();
