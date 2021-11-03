@@ -111,59 +111,72 @@ describe("SuperFarm Marketplace", function(){
         expect(await erc721.balanceOf(alice.address)).to.be.eq("2")
     })
 
-//     it("MarketPlace listing with decreasing price", async function() {
-//         let salt = 1;
-//         let abi = ["function transferFrom(address from,address to,uint256 tokenId)"]
-//         let iface = new ethers.utils.Interface(abi)
-//         let dataSell = iface.encodeFunctionData("transferFrom", [bob.address, utils.NULL_ADDRESS, 1]);
-//         let time = await utils.getCurrentTime()
-//         let orderSell = utils.makeOrder(
-//             ethers.utils.parseEther("0.1"),
-//             weth.address,
-//             time,
-//             salt, 
-//             protocolFeeRecipient.address,
-//             creator.address,
-//             marketplace.address,
-//             bob.address,
-//             utils.NULL_ADDRESS,
-//             erc721.address,
-//             dataSell,
-//             utils.replacementPatternSell,
-//             1,
-//             0
-//         )
-//         salt++
-//         let dataBuy = iface.encodeFunctionData("transferFrom", [utils.NULL_ADDRESS, alice.address, 1]);
-//         let orderBuy = utils.makeOrder(
-//             ethers.utils.parseEther("0.12"),
-//             weth.address,
-//             time,
-//             salt,
-//             utils.NULL_ADDRESS,
-//             creator.address,
-//             marketplace.address,
-//             alice.address,
-//             utils.NULL_ADDRESS,
-//             erc721.address,
-//             dataBuy,
-//             utils.replacementPatternBuy,
-//             0,
-//             0
-//         )
-//         let sellHash = await marketplace.hashOrder(orderSell)
-//         let buyHash = await marketplace.hashOrder(orderBuy)
-//         let signatureSell = await bob.signMessage(ethers.utils.arrayify(sellHash));
-//         let signatureBuy = await alice.signMessage(ethers.utils.arrayify(buyHash));
-//         let sigSell = ethers.utils.splitSignature(signatureSell);
-//         let sigBuy = ethers.utils.splitSignature(signatureBuy);
-//         let proxy = await registry.proxies(bob.address)
-//         await erc721.connect(bob).approve(proxy, 1)
-//         await weth.connect(alice).approve(transferProxy.address, ethers.utils.parseEther("0.12"))
-//         let price = await marketplace.connect(alice).calculateFinalPrice(1, 1, ethers.utils.parseEther("0.12"), 0, time, (time+360));
-//         console.log(price.toString());
-//         // await marketplace.connect(alice).atomicMatch_(orderBuy, {v: sigBuy.v, r: sigBuy.r, s: sigBuy.s}, orderSell, {v: sigSell.v, r: sigSell.r, s: sigSell.s}, "0x0000000000000000000000000000000000000000000000000000000000000000", [], [])
-//     });
+    it("MarketPlace listing with decreasing price", async function() {
+        let salt = 1;
+        let abi = ["function transferFrom(address from,address to,uint256 tokenId)"]
+        let iface = new ethers.utils.Interface(abi)
+        let dataSell = iface.encodeFunctionData("transferFrom", [bob.address, utils.NULL_ADDRESS, 1]);
+        let time = await utils.getCurrentTime()
+        let orderSell = utils.makeOrder(
+            ethers.utils.parseEther("1"),
+            weth.address,
+            exchangeToken.address,
+            time,
+            salt, 
+            protocolFeeRecipient.address,
+            marketplace.address,
+            bob.address,
+            utils.NULL_ADDRESS,
+            erc721.address,
+            dataSell,
+            utils.replacementPatternSell,
+            1,
+            1
+        )
+        salt++
+        let dataBuy = iface.encodeFunctionData("transferFrom", [utils.NULL_ADDRESS, alice.address, 1]);
+        let orderBuy = utils.makeOrder(
+            ethers.utils.parseEther("1"),
+            weth.address,
+            exchangeToken.address,
+            time,
+            salt,
+            utils.NULL_ADDRESS,
+            marketplace.address,
+            alice.address,
+            utils.NULL_ADDRESS,
+            erc721.address,
+            dataBuy,
+            utils.replacementPatternBuy,
+            0,
+            1
+        )
+        let sellHash = await marketplace.hashOrder(orderSell)
+        let buyHash = await marketplace.hashOrder(orderBuy)
+        let signatureSell = await bob.signMessage(ethers.utils.arrayify(sellHash));
+        let signatureBuy = await alice.signMessage(ethers.utils.arrayify(buyHash));
+        let sigSell = ethers.utils.splitSignature(signatureSell);
+        let sigBuy = ethers.utils.splitSignature(signatureBuy);
+        let proxy = await registry.proxies(bob.address)
+        await erc721.connect(bob).approve(proxy, 1)
+        await weth.connect(alice).approve(transferProxy.address, ethers.utils.parseEther("2"))
+        let price = await marketplace.connect(alice).calculateFinalPrice(1, 1, ethers.utils.parseEther("1"), 0, time, (time+360));
+        console.log("Decreased price: ", price.toString());
+
+        const currentBlock = await ethers.provider.getBlockNumber();
+		const block = await ethers.provider.getBlock(currentBlock);
+		let currentTime = block.timestamp;
+        await network.provider.request({
+            method: 'evm_setNextBlockTimestamp',
+            params: [ currentTime + 60 ]
+        });
+        await  network.provider.send('evm_mine');
+        price = await marketplace.connect(alice).calculateFinalPrice(1, 1, ethers.utils.parseEther("1"), 0, time, (time+120));
+        console.log("Decreased2 price: ", price.toString());
+        await marketplace.connect(alice).atomicMatch_(orderBuy, {v: sigBuy.v, r: sigBuy.r, s: sigBuy.s}, orderSell, {v: sigSell.v, r: sigSell.r, s: sigSell.s}, "0x0000000000000000000000000000000000000000000000000000000000000000", [], [])
+        let aliceBalance = await weth.balanceOf(alice.address);
+        console.log("Alice's balance: ", aliceBalance.toString());
+    });
 
 //     it("Buy erc721 for ether", async function() {
 

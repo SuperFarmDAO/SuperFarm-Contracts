@@ -2,7 +2,7 @@
 pragma solidity ^0.8.7;
 
 import "./MerkleCore.sol";
-import "../ISuper1155.sol";
+import "../interfaces/ISuper1155.sol";
 
 /**
   @title A merkle tree based distributor.

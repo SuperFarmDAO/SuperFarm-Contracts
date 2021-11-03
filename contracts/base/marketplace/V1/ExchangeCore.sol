@@ -389,9 +389,13 @@ contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
 
         /* Require price cross. */
         require(buyPrice >= sellPrice);
-        
+
+        if (sell.saleKind == Sales.SaleKind.Auction) {
+            return buyPrice;
+        } else {
         /* Maker/taker priority. */
-        return sellPrice;
+            return sell.addresses[0][0] != address(0) ? sellPrice : buyPrice;
+        }
     }
 
     /**

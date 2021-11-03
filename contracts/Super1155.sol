@@ -31,7 +31,7 @@ import "./interfaces/ISuper1155.sol";
 
   July 19th, 2021.
 */
-contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataURI, ISuper1155 {
+contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataURI {
   using Address for address;
   using Strings for string;
 

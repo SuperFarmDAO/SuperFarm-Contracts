@@ -74,20 +74,14 @@ library Sales {
         internal
         returns (uint finalPrice)
     {
-        if (saleKind == SaleKind.Offer || saleKind == SaleKind.SaleFixedPrice ) {
+        if (saleKind == SaleKind.Offer || saleKind == SaleKind.SaleFixedPrice || saleKind == SaleKind.Auction ) {
             return basePrice;
-        } else if (saleKind == SaleKind.Auction) {
-            uint diff = extra * (block.timestamp - listingTime) / (expirationTime -listingTime);
-            if (side == Side.Sell) {
-                /* Sell-side - start price: basePrice. End price: basePrice - extra. */
-                return basePrice - diff;
-            } else {
-                /* Buy-side - start price: basePrice. End price: basePrice + extra. */
-                return basePrice + diff;
-            }
         } else if (saleKind == SaleKind.SaleDecreasingPrice) {
-            uint decreasedPrice = 60 * (basePrice - extra) / (expirationTime - listingTime);
-            return basePrice - decreasedPrice;
+            //lowering price by 1sec
+            uint decreasedPrice = 60 * ((basePrice - extra) / (expirationTime - listingTime));
+            uint res = ((block.timestamp - listingTime) / 60) * decreasedPrice;
+            if (basePrice - res <= extra) return extra;
+            return basePrice - res;
         }
     }
 
