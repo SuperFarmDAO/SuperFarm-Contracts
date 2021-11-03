@@ -368,11 +368,11 @@ contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
         view
         returns (uint)
     {
-        return Sales.calculateFinalPrice(order.side, order.saleKind, order.basePrice, order.extra, order.listingTime, order.expirationTime);
+        return Sales.calculateFinalPrice(order.saleKind, order.basePrice, order.extra, order.listingTime, order.expirationTime);
     }
 
    /**
-     * @dev Calculate the price two orders would match at, if in fact they would match (otherwise fail)
+     * @dev Calculate the price two orders would matchs at, if in fact they would match (otherwise fail)
      * @param buy Buy-side order
      * @param sell Sell-side order
      * @return Match price
@@ -383,10 +383,10 @@ contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
         returns (uint)
     {
         /* Calculate sell price. */
-        uint sellPrice = Sales.calculateFinalPrice(sell.side, sell.saleKind, sell.basePrice, sell.extra, sell.listingTime, sell.expirationTime);
+        uint sellPrice = Sales.calculateFinalPrice(sell.saleKind, sell.basePrice, sell.extra, sell.listingTime, sell.expirationTime);
 
         /* Calculate buy price. */
-        uint buyPrice = Sales.calculateFinalPrice(buy.side, buy.saleKind, buy.basePrice, buy.extra, buy.listingTime, buy.expirationTime);
+        uint buyPrice = Sales.calculateFinalPrice(buy.saleKind, buy.basePrice, buy.extra, buy.listingTime, buy.expirationTime);
 
         /* Require price cross. */
         require(buyPrice >= sellPrice);

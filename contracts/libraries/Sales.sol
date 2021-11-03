@@ -4,6 +4,7 @@
 */
 
 pragma solidity ^0.8.8;
+import "hardhat/console.sol";
 
 /**
  * @title SaleKindInterface
@@ -62,26 +63,24 @@ library Sales {
     /**
      * @dev Calculate the settlement price of an order
      * @dev Precondition: parameters have passed validateParameters.
-     * @param side Order side
      * @param saleKind Method of sale
      * @param basePrice Order base price
      * @param extra Order extra price data
      * @param listingTime Order listing time
      * @param expirationTime Order expiration time
      */
-    function calculateFinalPrice(Side side, SaleKind saleKind, uint basePrice, uint extra, uint listingTime, uint expirationTime)
+    function calculateFinalPrice(SaleKind saleKind, uint basePrice, uint extra, uint listingTime, uint expirationTime)
         view
         internal
         returns (uint finalPrice)
     {
-        if (saleKind == SaleKind.Offer || saleKind == SaleKind.SaleFixedPrice || saleKind == SaleKind.Auction ) {
+        if (saleKind == SaleKind.SaleDecreasingPrice ) {
+            uint step = ((basePrice - extra) / (expirationTime - listingTime)) * 60;
+            if(block.timestamp >= expirationTime)
+                return extra;
+            return basePrice - (((block.timestamp - listingTime) / 60) * step);
+        } else {
             return basePrice;
-        } else if (saleKind == SaleKind.SaleDecreasingPrice) {
-            //lowering price by 1sec
-            uint decreasedPrice = 60 * ((basePrice - extra) / (expirationTime - listingTime));
-            uint res = ((block.timestamp - listingTime) / 60) * decreasedPrice;
-            if (basePrice - res <= extra) return extra;
-            return basePrice - res;
         }
     }
 

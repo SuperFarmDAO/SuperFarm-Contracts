@@ -134,7 +134,7 @@ describe("SuperFarm Marketplace", function(){
         let dataSell = iface.encodeFunctionData("transferFrom", [bob.address, utils.NULL_ADDRESS, 1]);
         let time = await utils.getCurrentTime()
         let orderSell = utils.makeOrder(
-            ethers.utils.parseEther("1"),
+            ethers.utils.parseEther("1.5"),
             ethers.utils.parseEther("0.5"),
             time, 
             time + 1000, 
@@ -158,9 +158,9 @@ describe("SuperFarm Marketplace", function(){
         let dataBuy = iface.encodeFunctionData("transferFrom", [utils.NULL_ADDRESS, alice.address, 1]);
         let orderBuy = utils.makeOrder(
             ethers.utils.parseEther("1.5"),
-            0,
-            await utils.getCurrentTime(), 
-            await utils.getCurrentTime() + 100, 
+            ethers.utils.parseEther("0.5"),
+            time, 
+            time + 1000, 
             salt, 
             [], 
             [[]], 
@@ -194,8 +194,9 @@ describe("SuperFarm Marketplace", function(){
         let proxy = await registry.proxies(bob.address)
         await erc721.connect(bob).approve(proxy, 1)
         await weth.connect(alice).approve(transferProxy.address, ethers.utils.parseEther("2"))
-        await utils.evm_increaseTime(1000);
-        let price = await marketplace.connect(alice).calculateFinalPrice(1, 1, ethers.utils.parseEther("1"), 0, time, (time+1000));
+        await utils.evm_increaseTime(500);
+        //Side side, SaleKind saleKind, uint basePrice, uint extra, uint listingTime, uint expirationTime
+        let price = await marketplace.connect(alice).calculateFinalPrice(1, 1, ethers.utils.parseEther("1.5"), ethers.utils.parseEther("0.5"), time, (time+1000));
         console.log("Decreased price: ", price.toString());
 
         // const currentBlock = await ethers.provider.getBlockNumber();
