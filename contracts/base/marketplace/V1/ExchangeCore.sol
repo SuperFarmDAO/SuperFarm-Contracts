@@ -11,7 +11,6 @@ import "../../../libraries/Sales.sol";
 import "../../../libraries/Fees.sol";
 import "../../../libraries/EIP712.sol";
 import "../../../libraries/EIP1271.sol";
-import "hardhat/console.sol";
 
 /**
     @title modified ExchangeCore of ProjectWyvernV2
@@ -416,13 +415,6 @@ contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
 
         /* Calculate royalty fees */
         (address[] memory addresses, uint[] memory fees) = Fees.chargeFee(sell.addresses, sell.fees, requiredAmount);
-
-        console.log("***********************************");
-        for (uint256 i = 0; i < fees.length; i++) {
-            console.log(addresses[i]);
-            console.log(fees[i]);
-        }
-                console.log("***********************************");
         
         /* Calculate amount for seller to receive */
         uint receiveAmount =  requiredAmount;
@@ -442,9 +434,7 @@ contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
                 /* transfer fees */
                 for(uint256 i = 0; i < addresses.length; i++){
                     receiveAmount -= fees[i];
-                    transferTokens(buy.paymentToken, buy.maker, addresses[i], fees[i]);
                     payable(addresses[i]).transfer(fees[i]);
-
                 }
                 payable(sell.maker).transfer(receiveAmount);
 

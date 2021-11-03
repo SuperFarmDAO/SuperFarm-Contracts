@@ -14,7 +14,7 @@ library Fees {
     uint public constant INVERSE_BASIS_POINT = 10000;
 
      /**
-     * @dev Calculate royalty fees
+     * @dev Calculate royalty fees. Specific percentage per fee group.
      * @param _addresses group number to addresses, that will get royalty
      * @param _fees group number to the fees
      * @param _requiredAmount the base amount for the exchange to happen
@@ -24,7 +24,7 @@ library Fees {
     function chargeFee(address[][] memory _addresses, uint[] memory _fees, uint _requiredAmount)
         internal pure returns(address[] memory, uint[] memory)
     {  
-        require(_addresses.length == _fees.length, "Fees: price array and addresses map mismatch.");
+        require(_addresses.length == _fees.length, "Fees: array length mismatch.");
         uint256 length;
         for (uint256 x = 0; x < _addresses.length; x++) {
             length += _addresses[x].length;
@@ -35,7 +35,7 @@ library Fees {
         for (uint i = 0; i < _fees.length; i++){
             for(uint j = 0; j < _addresses[i].length; j++){
                 addresses[index] = _addresses[i][j];
-                fees[index] = (_requiredAmount*_fees[i])/INVERSE_BASIS_POINT;
+                fees[index] = ((_requiredAmount*_fees[i])/INVERSE_BASIS_POINT) / _addresses[i].length;
                 index++;
             }
         } 

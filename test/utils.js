@@ -21,10 +21,6 @@ export const mint = {
         bob: ethers.utils.parseEther("100"),
         alice: ethers.utils.parseEther("10")
     },
-    exchangeToken:{
-        bob: ethers.utils.parseEther("1000"),
-        alice: ethers.utils.parseEther("2000")
-    },
     erc721:{
         bob: 1,
         alice: 2

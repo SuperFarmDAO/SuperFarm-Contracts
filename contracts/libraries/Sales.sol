@@ -74,14 +74,13 @@ library Sales {
         returns (uint finalPrice)
     {
         if (saleKind == SaleKind.SaleDecreasingPrice) {
+            if(block.timestamp <= listingTime) {
+                return basePrice;
+            }
             if(block.timestamp >= expirationTime) {
                 return extra;
             }
-            //lowering price by 1sec
-            uint allSteps = (expirationTime - listingTime)/60;
-            uint currentSteps =  (expirationTime - block.timestamp) / 60;
-            uint priceRange = basePrice - extra;
-            uint res = priceRange*currentSteps/allSteps;
+            uint res = (basePrice - extra)*((expirationTime - block.timestamp) / 60)/((expirationTime - listingTime)/60);
             return extra + res;
         } else {
             return basePrice;
