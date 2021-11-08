@@ -531,6 +531,13 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop {
     emit WhitelistRemoval(_msgSender(), _id, _addresses);
   }
 
+  function isInWhiteList(uint256 _id, address _user) view external returns (bool) {
+     uint256 whitelistVersion = whitelists[_id].currentWhitelistVersion;
+     bytes32 addressKey = keccak256(abi.encode(whitelistVersion,
+        _user));
+      return whitelists[_id].addresses[addressKey];
+  }
+
   /**
     Allow the owner or an approved manager to manually set the active status of
     a specific whitelist.
