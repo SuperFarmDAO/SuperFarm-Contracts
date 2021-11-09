@@ -21,17 +21,6 @@ contract Exchange is ExchangeCore {
     }
 
     /**
-     * @dev Change the protocol fee recipient
-     * @param newProtocolFeeRecipient New protocol fee recipient address
-     */
-    function changeProtocolFeeRecipient(address newProtocolFeeRecipient)
-        external
-        hasValidPermit(UNIVERSAL, SET_FEES)
-    {
-        platformFeeRecipient = newProtocolFeeRecipient;
-    }
-
-    /**
      * @dev Call calculateFinalPrice 
      */
     function calculateFinalPrice(Sales.SaleKind saleKind, uint basePrice, uint extra, uint listingTime, uint expirationTime)

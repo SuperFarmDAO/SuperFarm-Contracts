@@ -80,7 +80,7 @@ library Sales {
             if(block.timestamp >= expirationTime) {
                 return extra;
             }
-            uint res = (basePrice - extra)*((expirationTime - block.timestamp) / 60)/((expirationTime - listingTime)/60);
+            uint res = (basePrice - extra)*((expirationTime - block.timestamp) / 60)/((expirationTime - listingTime)/60); // priceMaxRange * minutesPassed / totalListingMinutes
             return extra + res;
         } else {
             return basePrice;

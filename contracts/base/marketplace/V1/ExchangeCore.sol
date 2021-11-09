@@ -44,9 +44,6 @@ contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
     /* The royalty fee for this platform. */
     uint public minimumPlatformFee; 
 
-    /* Recipient of platform fees. */
-    address public platformFeeRecipient;
-
     /* Inverse basis point. */
     uint public constant INVERSE_BASIS_POINT = 10000;
 
@@ -390,13 +387,10 @@ contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
         /* Require price cross. */
         require(buyPrice >= sellPrice);
 
-        if (sell.saleKind == Sales.SaleKind.Auction) {
-            return buyPrice;
-        } else if (sell.saleKind == Sales.SaleKind.Offer) {
         /* Maker/taker priority. */
+        if (sell.saleKind == Sales.SaleKind.Auction || sell.saleKind == Sales.SaleKind.Offer) {
             return buyPrice;
-        } 
-        else {
+        } else {
             return sellPrice;
         }
     }
