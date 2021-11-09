@@ -21,7 +21,6 @@ library Sales {
      * English auctions cannot be supported without stronger escrow guarantees.
      * Future interesting options: Vickrey auction, nonlinear Dutch auctions.
      */
-    // enum SaleKind { FixedPrice, DutchAuction, DecreasingPrice }
 
     enum SaleKind {
         SaleFixedPrice,
@@ -42,7 +41,7 @@ library Sales {
         returns (bool)
     {
         /* Auctions must have a set expiration date. */
-        return (saleKind == SaleKind.SaleFixedPrice || saleKind == SaleKind.SaleDecreasingPrice || saleKind == SaleKind.Auction || saleKind == SaleKind.Offer ||  expirationTime > 0);
+        return (saleKind == SaleKind.SaleFixedPrice || saleKind == SaleKind.SaleDecreasingPrice || saleKind == SaleKind.Offer || (saleKind == SaleKind.Auction && expirationTime > 0));
     }
 
     /**

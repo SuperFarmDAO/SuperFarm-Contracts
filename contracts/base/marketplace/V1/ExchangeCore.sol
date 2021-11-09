@@ -61,8 +61,8 @@ contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
     struct Order {
         /* Base price of the order (in paymentTokens). */
         uint basePrice;
-        /* Auction extra parameter - minimum bid increment for English auctions, starting/ending price difference. */
-        uint extra;
+        /* ending time + ending price.*/
+        uint[] extra;
         /* Listing timestamp. */
         uint listingTime;
         /* Expiration timestamp - 0 for no expiry. */
@@ -454,25 +454,6 @@ contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
         view
         returns (bool)
     {
-        // // /* Must be opposite-side. */
-        // console.logBool((buy.side == Sales.Side.Buy && sell.side == Sales.Side.Sell));    
-        // /* Must use same payment token. */
-        // console.logBool((buy.paymentToken == sell.paymentToken));
-        // /* Must match maker/taker addresses. */
-        // console.logBool((sell.taker == address(0) || sell.taker == buy.maker));
-        // console.logBool((buy.taker == address(0) || buy.taker == sell.maker));
-        // /* One must be maker and the other must be taker (no bool XOR in Solidity). */
-        // console.logBool(sell.addresses[0][0] != address(0));
-        // /* One must have platform fee on seller side */
-        // console.logBool((sell.fees[0] >= minimumPlatformFee));
-        // /* Must match target. */
-        // console.logBool((buy.target == sell.target));
-        // /* Must match callType. */
-        // console.logBool((buy.callType == sell.callType));
-        // /* Buy-side order must be settleable. */
-        // console.logBool(Sales.canSettleOrder(buy.listingTime, buy.expirationTime));
-        // /* Sell-side order must be settleable. */
-        // console.logBool(Sales.canSettleOrder(sell.listingTime, sell.expirationTime));
         return (
             /* Must be opposite-side. */
             (buy.side == Sales.Side.Buy && sell.side == Sales.Side.Sell) &&     
@@ -544,8 +525,7 @@ contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
 
         /* Proxy must exist. */
         require(exists(delegateProxy));
-        //console.logAddress(OwnableDelegateProxy(payable(delegateProxy)).implementation());
-        //console.logAddress(IProxyRegistry(registry).delegateProxyImplementation());
+
         /* Assert implementation. */
         require(OwnableDelegateProxy(payable(delegateProxy)).implementation() == IProxyRegistry(registry).delegateProxyImplementation());
 
