@@ -21,10 +21,6 @@ export const mint = {
         bob: ethers.utils.parseEther("100"),
         alice: ethers.utils.parseEther("10")
     },
-    exchangeToken:{
-        bob: ethers.utils.parseEther("1000"),
-        alice: ethers.utils.parseEther("2000")
-    },
     erc721:{
         bob: 1,
         alice: 2
@@ -44,37 +40,38 @@ export const mint = {
 }
 export function makeOrder(
     _basePrice,
-    _paymentToken,
-    _exchangeToken,
+    _extra,
     _listingTime,
+    _expirationTime, 
     _salt,
-    _feeRecipient,
-    _exchange,
+    _fees, 
+    _addresses, 
+    _exchange, 
     _maker,
-    _taker,
+    _side,
+    _taker, 
+    _saleKind,
+    _callType,
     _target,
+    _staticTarget,
+    _paymentToken,
     _data,
     _replacementPattern,
-    _side, 
-    _saleKind
+    _staticExtraData,
     ){
     return {
         basePrice: _basePrice,
-        extra: 0,
+        extra: _extra,
         listingTime: _listingTime,
-        expirationTime: _listingTime+6000,
+        expirationTime: _expirationTime,
         salt: _salt,
-        makerRelayerFee: 0,
-        takerRelayerFee: 0,
-        makerProtocolFee: 0,
-        takerProtocolFee: 0,
+        fees: _fees,
+        addresses: _addresses,
         exchange: _exchange,
-        feeMethod: 0,
         maker: _maker,
         side: _side,
         taker: _taker,
         saleKind: _saleKind,
-        feeRecipient: _feeRecipient,
         callType: 0,
         target: _target,
         staticTarget: NULL_ADDRESS,
@@ -87,19 +84,16 @@ export function makeOrder(
 async function withTestTokens(){
     const TestERC1155 = await ethers.getContractFactory("TestERC1155");
     const TestERC721 = await ethers.getContractFactory("TestERC721");
-    const TestExchangeToken = await ethers.getContractFactory("TestExchangeToken");
     const TestWrappedEther = await ethers.getContractFactory("TestWETH");
 
     const erc1155 = await TestERC1155.deploy();
     await erc1155.deployed()
     const erc721 = await TestERC721.deploy();
     await erc721.deployed()
-    const exchangeToken = await TestExchangeToken.deploy();
-    await exchangeToken.deployed()
     const weth = await TestWrappedEther.deploy();
     await weth.deployed()
 
-    return [erc1155, erc721, exchangeToken, weth]
+    return [erc1155, erc721, weth]
 }
 
 async function withProxies(){
@@ -114,8 +108,8 @@ async function withProxies(){
     return [registry, transferProxy]
 }
 
-export const withContracts = async function(protocolFeeRecipient, chainId){
-    const [erc1155, erc721, exchangeToken, weth] = await withTestTokens();
+export const withContracts = async function(chainId){
+    const [erc1155, erc721, weth] = await withTestTokens();
     const[registry, transferProxy] = await withProxies();
 
     const Marketplace = await ethers.getContractFactory("SuperMarketplace");
@@ -124,12 +118,10 @@ export const withContracts = async function(protocolFeeRecipient, chainId){
         chainId,
         [registry.address],
         ethers.utils.defaultAbiCoder.encode(["string"],["\x19Ethereum Signed Message:\n"]),
-        exchangeToken.address,
         transferProxy.address,
-        protocolFeeRecipient
     );
     await marketplace.deployed()
 
-    return [marketplace, registry, transferProxy, erc1155, erc721, exchangeToken, weth]
+    return [marketplace, registry, transferProxy, erc1155, erc721, weth]
 }
 /*=======================MARKETPLACE===========================*/

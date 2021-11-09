@@ -141,6 +141,52 @@ library ArrayUtils {
     }
 
     /**
+     * Unsafe write address array into a memory location
+     *
+     * @param index Memory location
+     * @param source Address array to write
+     * @return End memory index
+     */
+    function unsafeWriteUintMap(uint index, uint[] memory source)
+        internal 
+        pure
+        returns (uint)
+    {   
+        for (uint i = 0; i < source.length; i++){
+            uint conv = uint(uint160(source[i])) << 0x60;
+            assembly {
+                mstore(index, conv)
+                index := add(index, 0x14)
+            }
+        }
+        return index;
+    }
+
+    /**
+     * Unsafe write address nested array into a memory location
+     *
+     * @param index Memory location
+     * @param source Address nested array to write
+     * @return End memory index
+     */
+    function unsafeWriteNestedAddressMap(uint index, address[][] memory source)
+        internal 
+        pure
+        returns (uint)
+    {   
+        for (uint i = 0; i < source.length; i++){
+            for (uint j = 0; j < source[i].length; j++){
+                uint conv = uint(uint160(source[i][j])) << 0x60;
+                assembly {
+                    mstore(index, conv)
+                    index := add(index, 0x14)
+                }
+            }
+        }
+        return index;
+    }
+
+    /**
      * Unsafe write address into a memory location
      *
      * @param index Memory location

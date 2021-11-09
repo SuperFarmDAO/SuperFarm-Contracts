@@ -10,46 +10,24 @@ import "./ExchangeCore.sol";
 contract Exchange is ExchangeCore {
 
     /**
-     * @dev Change the minimum maker fee paid to the protocol
-     * @param newMinimumMakerProtocolFee New fee to set in basis points
-     */
-    function changeMinimumMakerProtocolFee(uint newMinimumMakerProtocolFee)
-        external
-        hasValidPermit(UNIVERSAL, SET_FEES)
-    {
-        minimumMakerProtocolFee = newMinimumMakerProtocolFee;
-    }
-
-    /**
      * @dev Change the minimum taker fee paid to the protocol
-     * @param newMinimumTakerProtocolFee New fee to set in basis points
+     * @param newMinimumPlatformFee New fee to set in basis points
      */
-    function changeMinimumTakerProtocolFee(uint newMinimumTakerProtocolFee)
+    function changeMinimumPlatformFee(uint newMinimumPlatformFee)
         external
         hasValidPermit(UNIVERSAL, SET_FEES)
     {
-        minimumTakerProtocolFee = newMinimumTakerProtocolFee;
-    }
-
-    /**
-     * @dev Change the protocol fee recipient
-     * @param newProtocolFeeRecipient New protocol fee recipient address
-     */
-    function changeProtocolFeeRecipient(address newProtocolFeeRecipient)
-        external
-        hasValidPermit(UNIVERSAL, SET_FEES)
-    {
-        protocolFeeRecipient = newProtocolFeeRecipient;
+        minimumPlatformFee = newMinimumPlatformFee;
     }
 
     /**
      * @dev Call calculateFinalPrice 
      */
-    function calculateFinalPrice(Sales.Side side, Sales.SaleKind saleKind, uint basePrice, uint extra, uint listingTime, uint expirationTime)
+    function calculateFinalPrice(Sales.SaleKind saleKind, uint basePrice, uint extra, uint listingTime, uint expirationTime)
         external view
         returns (uint)
     {
-        return Sales.calculateFinalPrice(side, saleKind, basePrice, extra, listingTime, expirationTime);
+        return Sales.calculateFinalPrice(saleKind, basePrice, extra, listingTime, expirationTime);
     }
 
     /**

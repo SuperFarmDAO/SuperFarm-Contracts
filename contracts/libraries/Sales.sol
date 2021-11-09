@@ -62,32 +62,28 @@ library Sales {
     /**
      * @dev Calculate the settlement price of an order
      * @dev Precondition: parameters have passed validateParameters.
-     * @param side Order side
      * @param saleKind Method of sale
      * @param basePrice Order base price
      * @param extra Order extra price data
      * @param listingTime Order listing time
      * @param expirationTime Order expiration time
      */
-    function calculateFinalPrice(Side side, SaleKind saleKind, uint basePrice, uint extra, uint listingTime, uint expirationTime)
+    function calculateFinalPrice(SaleKind saleKind, uint basePrice, uint extra, uint listingTime, uint expirationTime)
         view
         internal
         returns (uint finalPrice)
     {
-        if (saleKind == SaleKind.Offer || saleKind == SaleKind.SaleFixedPrice ) {
-            return basePrice;
-        } else if (saleKind == SaleKind.Auction) {
-            uint diff = extra * (block.timestamp - listingTime) / (expirationTime -listingTime);
-            if (side == Side.Sell) {
-                /* Sell-side - start price: basePrice. End price: basePrice - extra. */
-                return basePrice - diff;
-            } else {
-                /* Buy-side - start price: basePrice. End price: basePrice + extra. */
-                return basePrice + diff;
+        if (saleKind == SaleKind.SaleDecreasingPrice) {
+            if(block.timestamp <= listingTime) {
+                return basePrice;
             }
-        } else if (saleKind == SaleKind.SaleDecreasingPrice) {
-            uint decreasedPrice = 60 * (basePrice - extra) / (expirationTime - listingTime);
-            return basePrice - decreasedPrice;
+            if(block.timestamp >= expirationTime) {
+                return extra;
+            }
+            uint res = (basePrice - extra)*((expirationTime - block.timestamp) / 60)/((expirationTime - listingTime)/60); // priceMaxRange * minutesPassed / totalListingMinutes
+            return extra + res;
+        } else {
+            return basePrice;
         }
     }
 
