@@ -147,7 +147,7 @@ library ArrayUtils {
      * @param source Address array to write
      * @return End memory index
      */
-    function unsafeWriteUintMap(uint index, uint[] memory source)
+    function unsafeWriteUintArray(uint index, uint[] memory source)
         internal 
         pure
         returns (uint)
@@ -169,7 +169,7 @@ library ArrayUtils {
      * @param source Address nested array to write
      * @return End memory index
      */
-    function unsafeWriteNestedAddressMap(uint index, address[][] memory source)
+    function unsafeWriteAddressMap(uint index, address[][] memory source)
         internal 
         pure
         returns (uint)

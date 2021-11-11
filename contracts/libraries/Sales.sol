@@ -63,11 +63,10 @@ library Sales {
      * @dev Precondition: parameters have passed validateParameters.
      * @param saleKind Method of sale
      * @param basePrice Order base price
-     * @param extra Order extra price data
+     * @param extra Order extra price and time data
      * @param listingTime Order listing time
-     * @param expirationTime Order expiration time
      */
-    function calculateFinalPrice(SaleKind saleKind, uint basePrice, uint extra, uint listingTime, uint expirationTime)
+    function calculateFinalPrice(SaleKind saleKind, uint basePrice, uint[] memory extra, uint listingTime)
         view
         internal
         returns (uint finalPrice)
@@ -76,11 +75,11 @@ library Sales {
             if(block.timestamp <= listingTime) {
                 return basePrice;
             }
-            if(block.timestamp >= expirationTime) {
-                return extra;
+            if(block.timestamp >= extra[1]) {
+                return extra[0];
             }
-            uint res = (basePrice - extra)*((expirationTime - block.timestamp) / 60)/((expirationTime - listingTime)/60); // priceMaxRange * minutesPassed / totalListingMinutes
-            return extra + res;
+            uint res = (basePrice - extra[0])*((extra[1] - block.timestamp) / 60)/((extra[1] - listingTime)/60); // priceMaxRange * minutesPassed / totalListingMinutes
+            return extra[0] + res;
         } else {
             return basePrice;
         }

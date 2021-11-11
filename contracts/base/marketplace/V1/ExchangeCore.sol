@@ -100,7 +100,7 @@ contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
     }
 
     event OrderApprovedPartOne    (bytes32 indexed hash, address exchange, address indexed maker, address taker, uint platformFee, address indexed feeRecipient, Sales.Side side, Sales.SaleKind saleKind, address target);
-    event OrderApprovedPartTwo    (bytes32 indexed hash, AuthenticatedProxy.CallType callType, bytes data, bytes replacementPattern, address staticTarget, bytes staticExtradata, address paymentToken, uint basePrice, uint extra, uint listingTime, uint expirationTime, uint salt, bool orderbookInclusionDesired);
+    event OrderApprovedPartTwo    (bytes32 indexed hash, AuthenticatedProxy.CallType callType, bytes data, bytes replacementPattern, address staticTarget, bytes staticExtradata, address paymentToken, uint basePrice, uint[] extra, uint listingTime, uint expirationTime, uint salt, bool orderbookInclusionDesired);
     event OrderCancelled                    (bytes32 indexed hash);
     event OrdersMatched                    (bytes32 buyHash, bytes32 sellHash, address indexed maker, address indexed taker, uint price, bytes32 indexed metadata);
     
@@ -187,12 +187,12 @@ contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
             index := add(array, 0x20)
         }
         index = ArrayUtils.unsafeWriteUint(index, order.basePrice);
-        index = ArrayUtils.unsafeWriteUint(index, order.extra);
+        index = ArrayUtils.unsafeWriteUintArray(index, order.extra);
         index = ArrayUtils.unsafeWriteUint(index, order.listingTime);
         index = ArrayUtils.unsafeWriteUint(index, order.expirationTime);
         index = ArrayUtils.unsafeWriteUint(index, order.salt);
-        index = ArrayUtils.unsafeWriteUintMap(index, order.fees);
-        index = ArrayUtils.unsafeWriteNestedAddressMap(index, order.addresses);
+        index = ArrayUtils.unsafeWriteUintArray(index, order.fees);
+        index = ArrayUtils.unsafeWriteAddressMap(index, order.addresses);
         index = ArrayUtils.unsafeWriteAddress(index, order.exchange);
         index = ArrayUtils.unsafeWriteAddress(index, order.maker);
         index = ArrayUtils.unsafeWriteUint8(index, uint8(order.side));
@@ -364,7 +364,7 @@ contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
         view
         returns (uint)
     {
-        return Sales.calculateFinalPrice(order.saleKind, order.basePrice, order.extra, order.listingTime, order.expirationTime);
+        return Sales.calculateFinalPrice(order.saleKind, order.basePrice, order.extra, order.listingTime);
     }
 
    /**
@@ -379,10 +379,10 @@ contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
         returns (uint)
     {
         /* Calculate sell price. */
-        uint sellPrice = Sales.calculateFinalPrice(sell.saleKind, sell.basePrice, sell.extra, sell.listingTime, sell.expirationTime);
+        uint sellPrice = Sales.calculateFinalPrice(sell.saleKind, sell.basePrice, sell.extra, sell.listingTime);
 
         /* Calculate buy price. */
-        uint buyPrice = Sales.calculateFinalPrice(buy.saleKind, buy.basePrice, buy.extra, buy.listingTime, buy.expirationTime);
+        uint buyPrice = Sales.calculateFinalPrice(buy.saleKind, buy.basePrice, buy.extra, buy.listingTime);
 
         /* Require price cross. */
         require(buyPrice >= sellPrice);

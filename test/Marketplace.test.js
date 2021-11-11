@@ -52,7 +52,7 @@ describe("SuperFarm Marketplace", function(){
         let time = await utils.getCurrentTime()
         let orderSell = utils.makeOrder(
             ethers.utils.parseEther("1"),
-            0,
+            [],
             time, 
             time + 100, 
             salt, 
@@ -75,7 +75,7 @@ describe("SuperFarm Marketplace", function(){
         let dataBuy = iface.encodeFunctionData("transferFrom", [utils.NULL_ADDRESS, alice.address, 1]);
         let orderBuy = utils.makeOrder(
             ethers.utils.parseEther("1.5"),
-            0,
+            [],
             await utils.getCurrentTime(), 
             await utils.getCurrentTime() + 100, 
             salt, 
@@ -137,7 +137,7 @@ describe("SuperFarm Marketplace", function(){
         let time = await utils.getCurrentTime()
         let orderSell = utils.makeOrder(
             ethers.utils.parseEther("1.5"),
-            ethers.utils.parseEther("0.5"),
+            [ethers.utils.parseEther("0.5"), ethers.BigNumber.from(time+500)],
             time, 
             time + 1000, 
             salt, 
@@ -161,7 +161,7 @@ describe("SuperFarm Marketplace", function(){
         let dataBuy = iface.encodeFunctionData("transferFrom", [utils.NULL_ADDRESS, alice.address, 1]);
         let orderBuy = utils.makeOrder(
             ethers.utils.parseEther("1.5"),
-            ethers.utils.parseEther("0.5"),
+            [ethers.utils.parseEther("0.5"), ethers.BigNumber.from(time+500)],
             time, 
             time + 1000, 
             salt, 
@@ -184,25 +184,25 @@ describe("SuperFarm Marketplace", function(){
         // Create Orders Hashes
         let sellHash = await marketplace.hashOrder(orderSell)
         let buyHash = await marketplace.hashOrder(orderBuy)
-
+        
         // Sign Transactions
         let signatureSell = await bob.signMessage(ethers.utils.arrayify(sellHash));
         let signatureBuy = await alice.signMessage(ethers.utils.arrayify(buyHash));
-
+        
         // Get V, R, S
         let sigSell = ethers.utils.splitSignature(signatureSell);
         let sigBuy = ethers.utils.splitSignature(signatureBuy);
-
+        
         // Approve corresponding proxy
         let proxy = await registry.proxies(bob.address)
         await erc721.connect(bob).approve(proxy, 1)
         await weth.connect(alice).approve(transferProxy.address, ethers.utils.parseEther("2"))
-        await utils.evm_increaseTime(500);
-        let price = await marketplace.connect(alice).calculateFinalPrice(1, ethers.utils.parseEther("1.5"), ethers.utils.parseEther("0.5"), time, (time+1000));
-        expect(price).to.be.above(ethers.utils.parseEther("0.95"))
         await utils.evm_increaseTime(250);
-        price = await marketplace.connect(alice).calculateFinalPrice(1, ethers.utils.parseEther("1.5"), ethers.utils.parseEther("0.5"), time, (time+1000));
-        expect(price).to.be.below(ethers.utils.parseEther("0.80"))
+        let price = await marketplace.connect(alice).calculateFinalPrice(1, ethers.utils.parseEther("1.5"), [ethers.utils.parseEther("0.5"), ethers.BigNumber.from(time+500)], time);
+        expect(price).to.be.eq(ethers.utils.parseEther("1"))
+        await utils.evm_increaseTime(250);
+        price = await marketplace.connect(alice).calculateFinalPrice(1, ethers.utils.parseEther("1.5"), [ethers.utils.parseEther("0.5"), ethers.BigNumber.from(time+500)], time);
+        expect(price).to.be.eq(ethers.utils.parseEther("0.5"))
 
         // BOOM ! Atomic Match
         await marketplace.connect(alice).atomicMatch_(orderBuy, {v: sigBuy.v, r: sigBuy.r, s: sigBuy.s}, orderSell, {v: sigSell.v, r: sigSell.r, s: sigSell.s}, "0x0000000000000000000000000000000000000000000000000000000000000000", [], [])
@@ -216,10 +216,6 @@ describe("SuperFarm Marketplace", function(){
         expect(await weth.balanceOf(alice.address)).to.be.below(ethers.utils.parseEther("10"))
 
         // Confirm fee tranfers
-        // console.log(await (await weth.balanceOf(protocolFeeRecipient.address)).toString());
-        // console.log(await (await weth.balanceOf(creator.address)).toString());
-        // console.log(await (await weth.balanceOf(royaltyOwner1.address)).toString());
-        // console.log(await (await weth.balanceOf(royaltyOwner2.address)).toString());
         expect(await weth.balanceOf(protocolFeeRecipient.address)).to.be.above(ethers.utils.parseEther("0"))
         expect(await weth.balanceOf(creator.address)).to.be.above(ethers.utils.parseEther("0"))
         expect(await weth.balanceOf(royaltyOwner1.address)).to.be.above(ethers.utils.parseEther("0"))
@@ -234,7 +230,7 @@ describe("SuperFarm Marketplace", function(){
         let time = await utils.getCurrentTime()
         let orderSell = utils.makeOrder(
             ethers.utils.parseEther("12"),
-            0,
+            [],
             time, 
             time + 1000, 
             salt, 
@@ -257,7 +253,7 @@ describe("SuperFarm Marketplace", function(){
         let dataBuy = iface.encodeFunctionData("transferFrom", [utils.NULL_ADDRESS, alice.address, 1]);
         let orderBuy = utils.makeOrder(
             ethers.utils.parseEther("12"),
-            0,
+            [],
             time, 
             time + 1000, 
             salt, 
@@ -315,7 +311,7 @@ describe("SuperFarm Marketplace", function(){
         let time = await utils.getCurrentTime()
         let orderSell = utils.makeOrder(
             ethers.utils.parseEther("12"),
-            0,
+            [],
             time, 
             time + 1000, 
             salt, 
@@ -338,7 +334,7 @@ describe("SuperFarm Marketplace", function(){
         let dataBuy = iface.encodeFunctionData("transferFrom", [utils.NULL_ADDRESS, alice.address, 1]);
         let orderBuy = utils.makeOrder(
             ethers.utils.parseEther("12"),
-            0,
+            [],
             time, 
             time + 1000, 
             salt, 
@@ -394,7 +390,7 @@ describe("SuperFarm Marketplace", function(){
         let time = await utils.getCurrentTime()
         let orderSell = utils.makeOrder(
             0, // Not needed since buyer is offering
-            0,
+            [],
             time, 
             time + 1000, 
             salt, 
@@ -417,7 +413,7 @@ describe("SuperFarm Marketplace", function(){
         let dataBuy = iface.encodeFunctionData("transferFrom", [utils.NULL_ADDRESS, alice.address, 1]);
         let orderBuy = utils.makeOrder(
             ethers.utils.parseEther("200"),
-            0,
+            [],
             time, 
             time + 1000, 
             salt, 

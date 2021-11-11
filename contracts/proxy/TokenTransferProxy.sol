@@ -3,7 +3,6 @@ pragma solidity ^0.8.8;
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import "../interfaces/IProxyRegistry.sol";
-import "hardhat/console.sol";
 
 contract TokenTransferProxy {
 
@@ -30,8 +29,6 @@ contract TokenTransferProxy {
         public
         returns (bool)
     {   
-        console.logAddress(msg.sender);
-        console.logBool(registry.authorizedCallers(msg.sender));
         require(registry.authorizedCallers(msg.sender));
         return IERC20(token).transferFrom(from, to, amount);
     }

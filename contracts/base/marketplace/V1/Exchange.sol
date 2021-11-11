@@ -23,11 +23,11 @@ contract Exchange is ExchangeCore {
     /**
      * @dev Call calculateFinalPrice 
      */
-    function calculateFinalPrice(Sales.SaleKind saleKind, uint basePrice, uint extra, uint listingTime, uint expirationTime)
+    function calculateFinalPrice(Sales.SaleKind saleKind, uint basePrice, uint[] calldata extra, uint listingTime)
         external view
         returns (uint)
     {
-        return Sales.calculateFinalPrice(saleKind, basePrice, extra, listingTime, expirationTime);
+        return Sales.calculateFinalPrice(saleKind, basePrice, extra, listingTime);
     }
 
     /**
