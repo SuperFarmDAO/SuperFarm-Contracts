@@ -212,8 +212,8 @@ describe("SuperFarm Marketplace", function(){
         expect(await erc721.balanceOf(bob.address)).to.be.eq("0")
         
         // Confirm Price Token Transfer
-        expect(await weth.balanceOf(bob.address)).to.be.above(ethers.utils.parseEther("100"))
-        expect(await weth.balanceOf(alice.address)).to.be.below(ethers.utils.parseEther("10"))
+        expect(await weth.balanceOf(bob.address)).to.be.eq(ethers.utils.parseEther("100.45"))
+        expect(await weth.balanceOf(alice.address)).to.be.eq(ethers.utils.parseEther("9.5"))
 
         // Confirm fee tranfers
         expect(await weth.balanceOf(protocolFeeRecipient.address)).to.be.above(ethers.utils.parseEther("0"))
