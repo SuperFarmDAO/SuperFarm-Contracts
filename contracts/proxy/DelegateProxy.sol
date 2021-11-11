@@ -42,7 +42,7 @@ abstract contract DelegateProxy {
     this proxy to the contract specified from `implementation()`. Anything
     returned from the delegated call will also be returned here.
   */
-  receive() external virtual payable {
+  fallback() external virtual payable {
     address target = implementation();
     require(target != address(0));
 
