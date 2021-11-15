@@ -3,6 +3,9 @@
 // Imports.
 import { ethers } from "hardhat";
 import "chai/register-should";
+import { expect } from "chai";
+
+const DATA = "0x02";
 
 const AssetType = Object.freeze({
     Eth: 0,
@@ -10,14 +13,6 @@ const AssetType = Object.freeze({
     ERC1155: 2,
     ERC721: 3,
 });
-
-/**
- * TODO LIST
- *
- *
- *
- *
- */
 
 // Test the TokenVault with Timelock and MultiSigWallet functionality.
 describe("TokenVault", function () {
@@ -48,6 +43,8 @@ describe("TokenVault", function () {
         tokenVault,
         super721,
         super1155,
+        super721Additional,
+        super1155Additional,
         proxyRegistry;
     beforeEach(async () => {
         token = await Token.connect(admin).deploy(
@@ -80,10 +77,18 @@ describe("TokenVault", function () {
             admin.address,
             "SUPER721",
             "S721",
-            "URI_SUPER21",
+            "URI_SUPER721",
             proxyRegistry.address
         );
         await super721.deployed();
+        super721Additional = await Super721.connect(admin).deploy(
+            admin.address,
+            "SUPER721ADD",
+            "S721A",
+            "URI_SUPER721A",
+            proxyRegistry.address
+        );
+        await super721Additional.deployed();
         super1155 = await Super1155.connect(admin).deploy(
             admin.address,
             "SUPER1155",
@@ -91,6 +96,14 @@ describe("TokenVault", function () {
             proxyRegistry.address
         );
         await super1155.deployed();
+        super1155Additional = await super1155Additional.connect(admin).deploy(
+            admin.address,
+            "SUPER1155ADD",
+            "URI_SUPER1155A",
+            proxyRegistry.address
+        );
+        await super1155.deployed();
+
         await tokenVault.connect(admin).transferOwnership(timeLock.address);
         await token
             .connect(admin)
@@ -254,23 +267,200 @@ describe("TokenVault", function () {
 
     it("should update panic data", async () => {
         // TODO
+        let estimatesTimeOfArrival = Math.floor(Date.now() / 1000 + 180000);
+        let transactionValue = ethers.utils.parseEther("0");
+        let signatureMSG = "";
+
+        let changePanicDetails =
+            await tokenVault.populateTransaction.changePanicDetails(
+                admin.address,
+                alice.address
+            );
+        let enqueueTransaction =
+            await timelock.populateTransaction.queueTransaction(
+                tokenVault.address, // target
+                transactionValue, // value
+                signatureMSG, // signature
+                changePanicDetails.data, // data
+                estimatesTimeOfArrival // estimated time of arrival
+            );
+        let executeTransaction =
+            await timeLock.populateTransaction.executeTransaction(
+                tokenVault.address,  
+                transactionValue, 
+                signatureMSG,
+                changePanicDetails.data,
+                estimatesTimeOfArrival
+            );
+
+        await multiSig.connect(alice).submitTransaction(
+            timeLock.address, 
+            transactionValue,
+            enqueueTransaction.data
+        );
+        await multiSig.connect(bob).confirmTransaction(0);
+        await multiSig.connect(alice).submitTransaction(
+            timeLock.address, 
+            transactionValue, 
+            executeTransaction.data
+        );
+        await multiSig.connect(bob).confirmTransaction(1);
+        
+        let currentTime = Math.floor(Date.now() / 1000);
+        ethers.provider.send("evm_increaseTime", [currentTime + 190000]);
+        ethers.provider.send("evm_mine");
+
+        await multiSig.connect(bob).executeTransaction(1);
+            
+        expect(tokenVault.panicOwner).to.be.equal(admin.address);
+        expect(tokenVault.panicDestination).to.be.equal(alice.address);
     });
 
-    it("should send ERC20 tokens", async () => {
-        // TODO
+    it(" add Super1155 and Super721 contracts to TokenVault contract", async () => {
+        let transValue = ethers.utils.parseEther("0");
+        let eta = Math.floor(Date.now() / 1000 + 10001);
+        
+        let addS721 = await tokenVault.populateTransaction.addSuper721Addr(super721.address);
+        let addS1155 = await tokenVault.populateTransaction.addSuper1155Addr(super1155.address);
+        
+        let enqueueAddS721 = await timeLock.populateTransaction.queueTransaction(
+            tokenVault.address, transValue, "", addS721.data, eta
+        ); 
+        let enqueueAddS1155 = await timeLock.populateTransaction.queueTransaction(
+            tokenVault.address, transValue, "", addS1155.data, eta
+        ); 
+
+        let executeAddS721 = await timeLock.populateTransaction.executeTransaction(
+            tokenVault.address, transValue, "", addS721.data, eta
+        );
+        let executeAddS1155 = await timeLock.populateTransaction.executeTransaction(
+            tokenVault.address, transValue, "", addS721.data, eta
+        );
+
+        await multiSig.connect(alice).submitTransaction(timeLock.address, transValue, enqueueAddS721.data);
+        await multiSig.connect(alice).submitTransaction(timeLock.address, transValue, enqueueAddS1155.data);
+        await multiSig.connect(alice).submitTransaction(timeLock.address, transValue, executeAddS721.data);
+        await multiSig.connect(alice).submitTransaction(timeLock.address, transValue, executeAddS1155.data);
+        await multiSig.connect(carol).submitTransaction(timeLock.address, transValue, executeAddS721.data);
+        await multiSig.connect(carol).submitTransaction(timeLock.address, transValue, executeAddS1155.data);
+
+        await multiSig.connect(bob).confirmTransaction(0);
+        await multiSig.connect(bob).confirmTransaction(1);
+        await multiSig.connect(bob).confirmTransaction(2);
+        await multiSig.connect(bob).confirmTransaction(3);
+        await multiSig.connect(bob).confirmTransaction(4); // carol's transaction
+        await multiSig.connect(bob).confirmTransaction(5); // carol's transaction
+
+        let currentTime = Math.floor(Date.now() / 1000);
+        ethers.provider.send("evm_increaseTime", [currentTime + 11000]);
+        ethers.provider.send("evm_mine");
+
+        await multiSig.connect(bob).executeTransaction(2);
+        await multiSig.connect(bob).executeTransaction(3);
+
+        // revert if trying to add in second time 
+        await expect(
+        multiSig.connect(bob).executeTransaction(4)
+        ).to.be.revertedWith("address of super721 already presented in set");
+        await expect(
+        multiSig.connect(bob).executeTransaction(5)
+        ).to.be.revertedWith("address of super1155 already presented in set");
+
+    })
+
+
+
+    describe("Testing of token send", function () {
+        // create different types of tokens and send them to contract
+        beforeEach(async () => {
+            // TODO add tokens examples for super contract
+            // mint tokens to 
+            let itemGroupId = ethers.BigNumber.from(1);
+            let itemGroupId2 = ethers.BigNumber.from(1);
+            let shiftedItemGroupId = itemGroupId.shl(128);
+            let shiftedItemGroupId2 = itemGroupId.shl(128);
+
+            await super721.connect(admin).configureGroup(
+                itemGroupId, 
+                {
+                    name: 'NFT',
+                    supplyType: 0,
+                    supplyData: 20000,
+                    burnType: 1,
+                    burnData: 100
+                }
+            );
+
+            await super721.connect(admin).configureGroup(
+                itemGroupId2,
+                {
+                    name: 'NFT2',
+                    supplyType: 0,
+                    supplyData: 20000,
+                    burnType: 1, // what if 0/none? Update: 0 is unburnable
+                    burnData: 100
+                }
+            );
+
+            await super721.connect(admin).mintBatch( tokenVault.address, [shiftedItemGroupId], ethers.utils.id('a'));
+            await super721.connect(admin).mintBatch( tokenVault.address, [shiftedItemGroupId2], ethers.utils.id('a'));
+
+            await super1155.connect(admin).configureGroup(
+                itemGroupId,
+                {
+                    name: 'PEPSI',
+                    supplyType: 0,
+                    supplyData: 10,
+                    itemType: 1,
+                    itemData: 0,
+                    burnType: 1,
+                    burnData: 6
+                }
+            );
+            
+            await super1155.connect(admin).configureGroup(
+                itemGroupId2,
+                {
+                    name: 'COLA',
+                    supplyType: 0,
+                    supplyData: 15,
+                    itemType: 1,
+                    itemData: 0,
+                    burnType: 2,
+                    burnData: 5
+                }
+            );
+
+            // Mint fungible item
+            await super1155.connect(admin).mintBatch(tokenVault.address, [shiftedItemGroupId], ["7"], DATA);
+            await super1155.connect(admin).mintBatch(tokenVault.address, [shiftedItemGroupId2], ["7"], DATA);
+
+            // TODO balances of token vault for ERC721 and ERC1155 are okay 
+            // TODO add tokens in contract lists 
+        });
+
+        // TESTS starts
+        it("should send ERC20 tokens", async () => {
+            // TODO
+            expect(0).to.be.equal(1)
+        
+        });
+    
+        it("should send ERC751 tokens", async () => {
+            // TODO
+        });
+    
+        it("should send ERC1155 tokens", async () => {
+            // TODO
+        });
+    
+        it("should send ETH ", async () => {
+            // TODO
+        });
     });
 
-    it("should send ERC751 tokens", async () => {
-        // TODO
-    });
 
-    it("should send ERC1155 tokens", async () => {
-        // TODO
-    });
 
-    it("should send ETH ", async () => {
-        // TODO
-    });
 
     it("PANIC", async () => {
         // TODO

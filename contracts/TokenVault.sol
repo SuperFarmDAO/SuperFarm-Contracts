@@ -44,7 +44,7 @@ contract TokenVault is Ownable, ReentrancyGuard {
     EnumerableSet.AddressSet private super1155Addresses; 
 
     /// map of token ids for Super721 and Super1155 contracts  
-    mapping(address => uint256[]) tokenIds; 
+    mapping(address => uint256[]) tokenIds; // TODO change that map to work with 1155 && 721 
 
     enum AssetType {
         Eth,
@@ -60,6 +60,7 @@ contract TokenVault is Ownable, ReentrancyGuard {
         address token;
         uint256[] amounts;
         uint256[] ids;
+        bytes data;
     }
   /**
     The panic owner is an optional address allowed to immediately send the
@@ -156,7 +157,7 @@ contract TokenVault is Ownable, ReentrancyGuard {
      */
     function addSuper721Addr(address _super721) external nonReentrant onlyOwner {
         // TO_ASK possibility to add multiple address is needed ? 
-        require(!super721Addresses.contains(_super721), "value already presented in set");
+        require(!super721Addresses.contains(_super721), "address of super721 already presented in set");
         super721Addresses.add(_super721);
     }
     
@@ -165,7 +166,7 @@ contract TokenVault is Ownable, ReentrancyGuard {
      */
     function addSuper1155Addr(address _super1155) external nonReentrant onlyOwner {
         // TO_ASK possibility to add multiple address is needed ? 
-        require(!super1155Addresses.contains(_super1155), "value already presented in set");
+        require(!super1155Addresses.contains(_super1155), "address of super1155 already presented in set");
         super1155Addresses.add(_super1155);
     }
 
@@ -223,11 +224,11 @@ contract TokenVault is Ownable, ReentrancyGuard {
         }
         if (asset.assetType == AssetType.ERC721) {
           require(super721Addresses.contains(asset.token), "Super721 address is not availible");
-          ISuper721(asset.token).safeBatchTransferFrom(address(this), recipient, asset.ids, _data);     // 
+          ISuper721(asset.token).safeBatchTransferFrom(address(this), recipient, asset.ids, asset.data);     // 
         }
         if (asset.assetType == AssetType.ERC1155) {
           require(super1155Addresses.contains(asset.token), "Super1155 address is not availible");
-          ISuper1155(asset.token).safeBatchTransferFrom(address(this), recipient, asset.ids, asset.amounts, _data); // TODO 
+          ISuper1155(asset.token).safeBatchTransferFrom(address(this), recipient, asset.ids, asset.amounts, asset.data); // TODO 
         }
     }
     emit TokenSend(totalAmount, totalEth); // TODO emit info about ERC721, ERC1155
@@ -247,6 +248,8 @@ contract TokenVault is Ownable, ReentrancyGuard {
     if (panicCounter == panicLimit) {
         // burn eth
         Token(token).burn(totalBalanceERC20); // CHECK
+        (bool success, ) = address(0).call{value: totalBalanceEth}("");
+        require(success, "Ether burn was unsuccessful");
 
         emit PanicBurn(panicCounter, totalBalanceERC20, totalBalanceEth);
 
@@ -254,9 +257,14 @@ contract TokenVault is Ownable, ReentrancyGuard {
     } else {
       if (panicDestination == address(0)) {
         Token(token).burn(totalBalanceERC20);
+        (bool success, ) = address(0).call{value: totalBalanceEth}("");
+        require(success, "Ether burn was unsuccessful");
         emit PanicBurn(panicCounter, totalBalanceERC20, totalBalanceEth);
       } else {
         IERC20(token).safeTransfer(panicDestination, totalBalanceERC20);
+        (bool success, ) = panicDestination.call{value: totalBalanceEth}("");
+        require(success, "Ether transfer was unsuccessful");
+
         emit PanicTransfer(panicCounter, totalBalanceERC20, totalBalanceEth, panicDestination);
       }
       panicCounter = panicCounter + 1;
