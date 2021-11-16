@@ -7,6 +7,7 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Burnable.sol";
 import "./ISuper1155.sol"; // CHECK not that interface
 import "./interfaces/ISuper721.sol";
 import "./Token.sol";
@@ -44,9 +45,10 @@ contract TokenVault is Ownable, ReentrancyGuard {
     EnumerableSet.AddressSet private super1155Addresses; 
 
     /// map of token ids for Super721 and Super1155 contracts  
-    mapping(address => uint256[]) tokenIds; // TODO change that map to work with 1155 && 721 
+    mapping(address => Asset) assets;  
 
     enum AssetType {
+        None,
         Eth,
         ERC20,
         ERC1155,
@@ -57,10 +59,8 @@ contract TokenVault is Ownable, ReentrancyGuard {
     */ 
     struct Asset { 
         AssetType assetType;
-        address token;
         uint256[] amounts;
         uint256[] ids;
-        bytes data;
     }
   /**
     The panic owner is an optional address allowed to immediately send the
@@ -99,13 +99,13 @@ contract TokenVault is Ownable, ReentrancyGuard {
   event PanicDetailsLocked();
 
   /// An event for tracking a disbursement of tokens.
-  event TokenSend(uint256 tokenAmount, uint256 etherAmount);
+  event TokenSend(uint256 tokenAmount, uint256 etherAmount, uint256 amountSuper721, uint256 amountSuper1155);
 
   /// An event for tracking a panic transfer of tokens.
-  event PanicTransfer(uint256 panicCounter, uint256 tokenAmount, uint256 etherAmount, address indexed destination);
+  event PanicTransfer(uint256 panicCounter, uint256 tokenAmount, uint256 etherAmount, uint256 amountSuper721, uint256 amountSuper1155, address indexed destination);
 
   /// An event for tracking a panic burn of tokens.
-  event PanicBurn(uint256 panicCounter, uint256 tokenAmount, uint256 etherAmount);
+  event PanicBurn(uint256 panicCounter, uint256 tokenAmount, uint256 etherAmount, uint256 amountSuper721, uint256 amountSuper1155);
 
   /// An event that indicates that contract receives ether. 
   event Receive(address caller, uint256 amount);
@@ -154,30 +154,39 @@ contract TokenVault is Ownable, ReentrancyGuard {
   }
     /**
         add Super721 contract address to the set of addreses
+        @param _super721 array with addresses of super721 contracts
      */
-    function addSuper721Addr(address _super721) external nonReentrant onlyOwner {
-        // TO_ASK possibility to add multiple address is needed ? 
-        require(!super721Addresses.contains(_super721), "address of super721 already presented in set");
-        super721Addresses.add(_super721);
+    function addSuper721Addr(address[] calldata _super721) external onlyOwner {
+      for (uint256 i = 0; i < _super721.length; i++) {
+        address super721 = _super721[i];
+        require(!super721Addresses.contains(super721), "address of super721 already presented in set");
+        super721Addresses.add(super721);
+      }
     }
     
     /**
         add Super1155 contract addresses to the set of addreses
+        @param _super1155 array with addresses of super1155 contracts
      */
-    function addSuper1155Addr(address _super1155) external nonReentrant onlyOwner {
-        // TO_ASK possibility to add multiple address is needed ? 
-        require(!super1155Addresses.contains(_super1155), "address of super1155 already presented in set");
-        super1155Addresses.add(_super1155);
+    function addSuper1155Addr(address[] calldata _super1155) external onlyOwner {
+      for (uint256 i = 0; i < _super1155.length; i++) {
+        address super1155 = _super1155[i];
+        require(!super1155Addresses.contains(super1155), "address of super1155 already presented in set");
+        super1155Addresses.add(super1155);
+      }
     }
 
-    /** function for adding token ids for specific 
+    /** function for adding ERC1155 and ERC721 tokens to contract 
+        @param _contrAddrs array of contracts addresses for which asset is added 
+        @param _assets array of assets that added to contract  
      */
-    function addTokens(address[] calldata _contrAddrs, uint256[] calldata _ids) external nonReentrant onlyOwner {
-      require(_contrAddrs.length == _ids.length, "Number of contracts and id should be the same");
-
+    function addTokens(address[] calldata _contrAddrs, Asset[] calldata _assets) external nonReentrant onlyOwner {
+      require(_contrAddrs.length == _assets.length, "Number of contracts and id should be the same");
+ 
       for (uint256 i = 0; i < _contrAddrs.length; i++) {
         require(super1155Addresses.contains(_contrAddrs[i]) || super721Addresses.contains(_contrAddrs[i]), "Address of token is not permited"); 
-        tokenIds[_contrAddrs[i]].push(_ids[i]);
+        require(_assets[i].assetType == AssetType.ERC721 || _assets[i].assetType == AssetType.ERC1155, "Type of asset isn't ERC721 or ERC1155");
+        assets[_contrAddrs[i]] = (_assets[i]);
       }
       // TO_ASK add smth to emit
     }
@@ -195,43 +204,58 @@ contract TokenVault is Ownable, ReentrancyGuard {
     Allows the TokenVault owner to send tokens out of the vault.
 
     @param _recipients The array of addresses to receive tokens.
-    @param _amounts The array of amounts sent to each address in `_recipients`.
+    @param _assets The struct array that stores information about tokens that should bew sended
   */
-  function sendTokens(address[] calldata _recipients, uint256[] calldata _amounts, Asset[] calldata _assets) external nonReentrant onlyOwner {
-    // CHECK that amounts are unused
+  function sendTokens(address[] calldata _recipients,address[] calldata _tokens, Asset[] calldata _assets) external nonReentrant onlyOwner {
     require(_recipients.length > 0,
       "You must send tokens to at least one recipient.");
-    require(_recipients.length == _amounts.length,
-      "Recipients length cannot be mismatched with amounts length.");
-    require(_assets.length == _amounts.length, 
-      "Assets lenght cannot be mismatched with amounts length.");
-
+    require(_recipients.length == _assets.length,
+      "Recipients length cannot be mismatched with assets length.");
+    
     // Iterate through every specified recipient and send tokens.
     uint256 totalAmount = 0;
     uint256 totalEth = 0;
+    uint256 totalSuper721 = 0;
+    uint256 totalSuper1155 = 0;
     for (uint256 i = 0; i < _recipients.length; i++) {
         address recipient = _recipients[i];
+        address tokenAddr = _tokens[i];
         Asset memory asset = _assets[i];
         uint256 amount = asset.amounts[0];
+
 
         if (asset.assetType == AssetType.Eth) {
             (bool success, ) = recipient.call{value: amount}("");
             require(success, "send Eth failed");
+            totalEth += amount;
         }
         if (asset.assetType == AssetType.ERC20) {
             IERC20(token).safeTransfer(recipient, amount);
             totalAmount = totalAmount + amount;
         }
         if (asset.assetType == AssetType.ERC721) {
-          require(super721Addresses.contains(asset.token), "Super721 address is not availible");
-          ISuper721(asset.token).safeBatchTransferFrom(address(this), recipient, asset.ids, asset.data);     // 
+          require(super721Addresses.contains(tokenAddr), "Super721 address is not availible");
+          ISuper721(tokenAddr).safeBatchTransferFrom(address(this), recipient, asset.ids, "");
+          totalSuper721 += 1; // TO_ASK calculate number of transfers, or may be change it to number of ids? 
         }
         if (asset.assetType == AssetType.ERC1155) {
-          require(super1155Addresses.contains(asset.token), "Super1155 address is not availible");
-          ISuper1155(asset.token).safeBatchTransferFrom(address(this), recipient, asset.ids, asset.amounts, asset.data); // TODO 
+          require(super1155Addresses.contains(tokenAddr), "Super1155 address is not availible");
+          ISuper1155(tokenAddr).safeBatchTransferFrom(address(this), recipient, asset.ids, asset.amounts, "");
+          totalSuper1155 += 1;
         }
+        _removeToken(tokenAddr, asset);
     }
-    emit TokenSend(totalAmount, totalEth); // TODO emit info about ERC721, ERC1155
+    emit TokenSend(totalAmount, totalEth, totalSuper721, totalSuper1155); 
+  }
+
+  function _removeToken(address _token, Asset memory _asset) internal {
+    if (_asset.assetType == AssetType.ERC721) {
+      super721Addresses.remove(_token);
+    } 
+    if (_asset.assetType == AssetType.ERC1155) {
+      super1155Addresses.remove(_token);
+    }
+    // TO_ASK we need to remove info about asset in map, think not 
   }
 
   /**
@@ -242,37 +266,48 @@ contract TokenVault is Ownable, ReentrancyGuard {
   function panic() external nonReentrant onlyPanicOwner {
     uint256 totalBalanceERC20 = IERC20(token).balanceOf(address(this));
     uint256 totalBalanceEth = address(this).balance;
+    uint256 totalAmountERC721 = super721Addresses.length();
+    uint256 totalAmountERC1155 = super1155Addresses.length();
     // TODO add support for ERC721 and ERC1155
 
     // If the panic limit is reached, burn the tokens.
-    if (panicCounter == panicLimit) {
+    if (panicCounter == panicLimit || panicDestination == address(0)) {
         // burn eth
-        Token(token).burn(totalBalanceERC20); // CHECK
+        ERC20Burnable(token).burn(totalBalanceERC20); // CHECK
         (bool success, ) = address(0).call{value: totalBalanceEth}("");
         require(success, "Ether burn was unsuccessful");
 
-        emit PanicBurn(panicCounter, totalBalanceERC20, totalBalanceEth);
-
-    // Otherwise, drain the vault to the panic destination.
+        for (uint256 i = 0; i < super721Addresses.length(); i++) {
+           ISuper721(super721Addresses.at(i)).burnBatch(
+             address(this),
+             assets[super721Addresses.at(i)].ids
+           );
+        }
+        for (uint256 i = 0; i < super1155Addresses.length(); i++) {
+          ISuper1155(super1155Addresses.at(i)).burnBatch(
+            address(this), 
+            assets[super1155Addresses.at(i)].ids, 
+            assets[super1155Addresses.at(i)].amounts
+          );
+        }
+        emit PanicBurn(panicCounter, totalBalanceERC20, totalBalanceEth, totalAmountERC721, totalAmountERC1155);
     } else {
-      if (panicDestination == address(0)) {
-        Token(token).burn(totalBalanceERC20);
-        (bool success, ) = address(0).call{value: totalBalanceEth}("");
-        require(success, "Ether burn was unsuccessful");
-        emit PanicBurn(panicCounter, totalBalanceERC20, totalBalanceEth);
-      } else {
         IERC20(token).safeTransfer(panicDestination, totalBalanceERC20);
         (bool success, ) = panicDestination.call{value: totalBalanceEth}("");
         require(success, "Ether transfer was unsuccessful");
-
-        emit PanicTransfer(panicCounter, totalBalanceERC20, totalBalanceEth, panicDestination);
+        for (uint256 i = 0; i < super721Addresses.length(); i++) {
+          ISuper721(super721Addresses.at(i)).safeBatchTransferFrom(address(this), panicDestination, assets[super721Addresses.at(i)].ids, "");
+        }
+        for (uint256 i = 0; i < super1155Addresses.length(); i++) {
+          ISuper1155(super721Addresses.at(i)).safeBatchTransferFrom(address(this), panicDestination, assets[super1155Addresses.at(i)].ids, assets[super1155Addresses.at(i)].amounts, "");
+        }
+        emit PanicTransfer(panicCounter, totalBalanceERC20, totalBalanceEth, totalAmountERC721, totalAmountERC1155, panicDestination);
       }
       panicCounter = panicCounter + 1;
     }
   }
 
-    /** 
-     */
+    /// function that allow contract to receive ether 
     receive() external payable {
         emit Receive(msg.sender, msg.value);
     }

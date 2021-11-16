@@ -1,17 +1,18 @@
 "use strict";
 
 // Imports.
-import { ethers } from "hardhat";
-import "chai/register-should";
+import { ethers, network, waffle } from "hardhat";
 import { expect } from "chai";
+import "chai/register-should";
 
 const DATA = "0x02";
 
 const AssetType = Object.freeze({
-    Eth: 0,
-    ERC20: 1,
-    ERC1155: 2,
-    ERC721: 3,
+    None: 0,
+    Eth: 1,
+    ERC20: 2,
+    ERC1155: 3,
+    ERC721: 4
 });
 
 // Test the TokenVault with Timelock and MultiSigWallet functionality.
@@ -24,6 +25,9 @@ describe("TokenVault", function () {
         Super721,
         Super1155,
         ProxyRegistry;
+    let transValue = ethers.utils.parseEther("0");
+    let prov = waffle.provider;        
+
     before(async () => {
         [admin, alice, bob, carol, dev] = await ethers.getSigners();
         // Create factories for deploying all required contracts using specified signers.
@@ -317,7 +321,6 @@ describe("TokenVault", function () {
     });
 
     it(" add Super1155 and Super721 contracts to TokenVault contract", async () => {
-        let transValue = ethers.utils.parseEther("0");
         let eta = Math.floor(Date.now() / 1000 + 10001);
         
         let addS721 = await tokenVault.populateTransaction.addSuper721Addr(super721.address);
@@ -369,11 +372,14 @@ describe("TokenVault", function () {
     })
 
 
-
+    let sendTokensERC20,
+        sendTokensEth,
+        sendTokensERC721,
+        sendTokensERC1155;
+        
     describe("Testing of token send", function () {
         // create different types of tokens and send them to contract
         beforeEach(async () => {
-            // TODO add tokens examples for super contract
             // mint tokens to 
             let itemGroupId = ethers.BigNumber.from(1);
             let itemGroupId2 = ethers.BigNumber.from(1);
@@ -435,28 +441,190 @@ describe("TokenVault", function () {
             await super1155.connect(admin).mintBatch(tokenVault.address, [shiftedItemGroupId], ["7"], DATA);
             await super1155.connect(admin).mintBatch(tokenVault.address, [shiftedItemGroupId2], ["7"], DATA);
 
+            await expect( dev.sendTransaction({
+                to: tokenVault.address,
+                value: ethers.utils.parseEther('5000')
+            })).to.emit(tokenVault, 'Receive').withArgs(dev.address, ethers.utils.parseEther("5000"))
+
             // TODO balances of token vault for ERC721 and ERC1155 are okay 
+            
+            sendTokensERC20 = await tokenVault.populateTransaction.sendTokens(
+                [dev.address], 
+                [{
+                    assetType: AssetType.ERC20,
+                    token: token.address,
+                    amounts: [ethers.utils.parseEther("1000")], 
+                    ids: [], 
+                    data: ""
+                }]
+            );
+
+            sendTokensEth = await tokenVault.populateTransaction.sendTokens(
+                [dev.address], 
+                [{
+                    assetType: AssetType.Eth,
+                    token: "",
+                    amounts: [ethers.utils.parseEther("1")], 
+                    ids: [], 
+                    data: ""
+                }]
+            );
+
+            sendTokensERC721 = await tokenVault.populateTransaction.sendTokens(
+                [dev.address], 
+                [{
+                    assetType: AssetType.ERC721,
+                    token: super721.address,
+                    amounts: [], 
+                    ids: [], 
+                    data: ""
+                }]
+            );
+
+            sendTokensERC1155 = await tokenVault.populateTransaction.sendTokens(
+                [dev.address], 
+                [{
+                    assetType: AssetType.ERC1155,
+                    token: super1155.address,
+                    amounts: [], 
+                    ids: [], 
+                    data: ""
+                }]
+            );
+
+            sendTokensAll = await tokenVault.populateTransaction.sendTokens(
+                [dev.address], 
+                [{ assetType: AssetType.ERC20,
+                   token: token.address,
+                   amounts: [ethers.utils.parseEther("1000")], 
+                   ids: [], 
+                   data: "" },
+                 { assetType: AssetType.Eth,
+                   token: "",
+                   amounts: [ethers.utils.parseEther("1")], 
+                   ids: [], 
+                   data: "" },
+                 { assetType: AssetType.ERC721,
+                   token: super721.address,
+                   amounts: [], 
+                   ids: [], 
+                   data: "" },
+                 { assetType: AssetType.ERC1155,
+                   token: super1155.address,
+                   amounts: [], 
+                   ids: [], 
+                   data: "" }]
+            ); 
+
+            // TODO set addresses S721 and s1155 availible
             // TODO add tokens in contract lists 
+
         });
 
         // TESTS starts
         it("should send ERC20 tokens", async () => {
-            // TODO
-            expect(0).to.be.equal(1)
-        
-        });
-    
-        it("should send ERC751 tokens", async () => {
-            // TODO
-        });
-    
-        it("should send ERC1155 tokens", async () => {
-            // TODO
+            eta = Math.floor(Date.now() / 1000 + 10000);
+            let executeSend = await timeLock.populateTransaction.executeTransaction(
+                tokenVault.address, transValue, "", sendTokensERC20.data, eta
+            )
+
+            let devBalanceBefore = token.balanceOf(dev.address);
+
+            await multiSig.connect(alice).submitTransaction(timeLock.address, transValue, executeSend.data);
+            await multiSig.connect(bob).confirmTransaction(0);
+
+            let currentTime = Math.floor(Date.now() / 1000);
+            ethers.provider.send("evm_increaseTime", [currentTime + 11000]);
+            ethers.provider.send("evm_mine");
+
+            await multiSig.connect(bob).executeTransaction(0);
+
+            let devBalanceAfter = token.balanceOf(dev.address);
+            
+            // check dev balance after 
+            expect(devBalanceAfter.sub(devBalanceBefore)).to.be.equal(ethers.utils.parseEther("1000"));
         });
     
         it("should send ETH ", async () => {
-            // TODO
+            eta = Math.floor(Date.now() / 1000 + 10000);
+            let executeSend = await timeLock.populateTransaction.executeTransaction(
+                tokenVault.address, transValue, "", sendTokensEth.data, eta
+            )
+
+            let devBalanceBefore = prov.getBalance(dev.address);
+
+            await multiSig.connect(alice).submitTransaction(timeLock.address, transValue, executeSend.data);
+            await multiSig.connect(bob).confirmTransaction(0);
+
+            let currentTime = Math.floor(Date.now() / 1000);
+            ethers.provider.send("evm_increaseTime", [currentTime + 11000]);
+            ethers.provider.send("evm_mine");
+
+            await multiSig.connect(bob).executeTransaction(0);
+
+            let devBalanceAfter = prov.getBalance(dev.address);
+            // check dev balance after 
+            expect(devBalanceAfter.sub(devBalanceBefore)).to.be.equal(ethers.utils.parseEther("1000"));
         });
+
+        it("should send ERC751 tokens", async () => {
+            eta = Math.floor(Date.now() / 1000 + 10000);
+            let executeSend = await timeLock.populateTransaction.executeTransaction(
+                tokenVault.address, transValue, "", sendTokensERC721.data, eta
+            )
+
+            let devBalanceBefore = ; // TODO balance check for 721
+
+            await multiSig.connect(alice).submitTransaction(timeLock.address, transValue, executeSend.data);
+            await multiSig.connect(bob).confirmTransaction(0);
+
+            let currentTime = Math.floor(Date.now() / 1000);
+            ethers.provider.send("evm_increaseTime", [currentTime + 11000]);
+            ethers.provider.send("evm_mine");
+
+            await multiSig.connect(bob).executeTransaction(0);
+
+            let devBalanceAfter = ; // TODO balance check for 721
+            // check dev balance after 
+            expect(devBalanceAfter.sub(devBalanceBefore)).to.be.equal(ethers.utils.parseEther("1000"));
+        });
+    
+        it("should send ERC1155 tokens", async () => {
+            eta = Math.floor(Date.now() / 1000 + 10000);
+            let executeSend = await timeLock.populateTransaction.executeTransaction(
+                tokenVault.address, transValue, "", sendTokensERC1155.data, eta
+            )
+
+            let devBalanceBefore = ; // TODO balance check for 1155
+
+            await multiSig.connect(alice).submitTransaction(timeLock.address, transValue, executeSend.data);
+            await multiSig.connect(bob).confirmTransaction(0);
+
+            let currentTime = Math.floor(Date.now() / 1000);
+            ethers.provider.send("evm_increaseTime", [currentTime + 11000]);
+            ethers.provider.send("evm_mine");
+
+            await multiSig.connect(bob).executeTransaction(0);
+
+            let devBalanceAfter = ; // TODO balance check for 1155
+            // check dev balance after 
+            expect(devBalanceAfter.sub(devBalanceBefore)).to.be.equal(ethers.utils.parseEther("1000"))
+        });
+
+        it("should send all types of tokens", async() => {
+            
+        });
+
+        it("REVERTS in sendTokens() function", async () => {
+
+            expect().to.be.revertedWith("You must send tokens to at least one recipient.");
+            expect().to.be.revertedWith("Recipients length cannot be mismatched with assets length.");
+            expect().to.be.revertedWith("send Eth failed");
+            expect().to.be.revertedWith("Super721 address is not availible");
+            expect().to.be.revertedWith("Super1155 address is not availible");
+
+        })
+    
     });
 
 
