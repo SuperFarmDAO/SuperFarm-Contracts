@@ -82,9 +82,9 @@ describe('===SuperMerkleAccess SuperMerkleDistributor===', function () {
 
             await expect(await sma.connect(signer1).verify(
                 0, // MerkleRoot maping Id
-                2, // Index of Node in the list off-chain
-                "0x8a3552d60a98e0ade765adddad0a2e420ca9b1eef5f326ba7ab860bb4ea72c94", // Node at that index
-                ["0x1ebaa930b8e9130423c183bf38b0564b0103180b7dad301013b18e59880541ae", "0xd23475cf57127790c97e39187b822dcff8f2746b545686570c611dbd95746be9", "0x5b2c3d7800af447e7cbc229fcfdf4bfd17eda56c98f29e340490723cf95b82d1"])) // Related hashes from Off-chain
+                4, // Index of Node in the list off-chain
+                "0xf4ca8532861558e29f9858a3804245bb30f0303cc71e4192e41546237b6ce58b", // Node at that index
+                ["0xe5c951f74bc89efa166514ac99d872f6b7a3c11aff63f51246c3742dfa925c9b", "0x475c5d26aa18ffb9161fadc3542fa0570c5ca4fc8a994f69219fd5157f2f7aa7", "0xcbd7db216427a61297ec0d7f576a864376cbd4f9fcf02d3c789a7447ec08903c"])) // Related hashes from Off-chain
                 .to.be.equal(true); 
 
             // Assuming wrong Node should revert. (Uncomment to check)

@@ -1,8 +1,12 @@
 const { expect } = require('chai');
 const { BigNumber } = require('ethers');
-const { mnemonicToSeed } = require('ethers/lib/utils');
-const { ethers } = require('hardhat');
+// const { getMerkleTree, hash, expandLeaves, getLeaves, computeRootHash, computeMerkleProof, reduceMerkleBranches} = require('./MerkleUtils');
+const { mnemonicToSeed, keccak256 } = require('ethers/lib/utils');
+// const { ethers } = require('hardhat');
 const Web3 = require('web3');
+const crypto = require('crypto')
+// const { MerkleTree } = require('merkletreejs')
+// const SHA256 = require('crypto-js/sha256')
 
 const NULL_ADDRESS = '0x0000000000000000000000000000000000000000';
 
@@ -17,6 +21,7 @@ const DATA = "0x02";
 
 // Start test block
 describe('===MintShop1155, PermitControl, Sweepable===', function () {
+    let tree;
     let deployer, owner, paymentReceiver, proxyRegistryOwner, signer1, signer2, signer3;
     let UNIVERSAL,
         MANAGER,
@@ -45,6 +50,8 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
     let shiftedItemGroupId = itemGroupId.shl(128);
     let itemGroupId2 = ethers.BigNumber.from(2);
     let shiftedItemGroupId2 = itemGroupId2.shl(128);
+    let item721, Item721;
+    let MINT721;
 
     before(async function () {
         this.MintShop1155 = await ethers.getContractFactory("MintShop1155");
@@ -52,33 +59,40 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
         this.Staker = await ethers.getContractFactory("Staker");
         this.ProxyRegistry = await ethers.getContractFactory("ProxyRegistry");
         this.Super1155 = await ethers.getContractFactory("Super1155");
+        // this.Item721 = await ethers.getContractFactory("Super721");
     });
 
     beforeEach(async function () {
         [deployer, owner, paymentReceiver, proxyRegistryOwner, signer1, signer2, signer3] = await ethers.getSigners();
+        // [deployer, owner, paymentReceiver, signer1, signer2, signer3] = await ethers.getSigners();
+
 
         proxyRegistry = await this.ProxyRegistry.deploy();
         await proxyRegistry.deployed();
         await proxyRegistry.transferOwnership(proxyRegistryOwner.address);
 
         super1155 = await this.Super1155.deploy(
+            owner.address,
             "Super1155",
             originalUri,
             proxyRegistry.address
         );
 
-        await super1155._transferOwnership(owner.address);
+        // await super1155._transferOwnership(owner.address);
         super1155Second = await this.Super1155.deploy(
+            owner.address,
             "Super1155142",
             originalUri + "uri2",
             proxyRegistry.address
         );
         await super1155.deployed();
-        await super1155Second._transferOwnership(owner.address);
+        // await super1155Second._transferOwnership(owner.address);
 
         mintShop1155 = await this.MintShop1155.deploy(
+            owner.address,
             paymentReceiver.address,
-            "4"
+            "4",
+            200
         );
         await mintShop1155.deployed();
 
@@ -89,17 +103,23 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
             "firstStaker",
             mockERC20.address
         );
-
-        await mintShop1155.connect(deployer)._transferOwnership(owner.address);
+        let whiteListAddresses = [deployer.address, owner.address, paymentReceiver.address, proxyRegistryOwner.address, signer1.address, signer2.address];
         
-        /// adding items to MintShop
+        let tree = getMerkleTree(whiteListAddresses);
+
+        const root = computeRootHash(whiteListAddresses);
+
+        console.log("ROOT js ", root);
+
         await mintShop1155.connect(owner).setItems([super1155.address, super1155Second.address]);
+        await mintShop1155.connect(owner).addWhiteList(0, 0, root, 0, ethers.constants.MaxUint256);
         
         await staker.transferOwnership(owner.address);
 
         UNIVERSAL = await mintShop1155.UNIVERSAL();
         MANAGER = await mintShop1155.MANAGER();
         zeroRight = await mintShop1155.ZERO_RIGHT();
+        MINT721 = await item721.MINT();
 
         setSweepRight = await mintShop1155.SWEEP();
         setLockSweepRight = await mintShop1155.LOCK_SWEEP();
@@ -113,6 +133,7 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
 
         setMintRight = await super1155.MINT();
     });
+
 
     // Test cases
 
@@ -129,12 +150,14 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
 
         it('should deploy a new instance where deployer is the owner', async function () {
             let mintShop1155v2 = await this.MintShop1155.deploy(
+                deployer.address,
                 paymentReceiver.address,
-                "4"
+                "4",
+                1
             );
             await super1155.deployed();
 
-            await mintShop1155v2._transferOwnership(deployer.address);
+            // await mintShop1155v2._transferOwnership(deployer.address);
 
             expect(await mintShop1155v2.owner()).to.equal(deployer.address);
             // expect(await mintShop1155v2.item()).to.equal(super1155.address);
@@ -223,128 +246,6 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
             await mintShop1155.connect(owner).updateGlobalPurchaseLimit("6");
         });
     });
-
-    describe("addWhiteList, updateWhitelist", function () {
-        it('should add a whitelist', async function(){
-            await mintShop1155.connect(owner).addWhitelist({
-                expiryTime: ethers.constants.MaxUint256,
-                isActive: false,
-                addresses: [signer1.address]
-            });
-
-            await expect(
-                await mintShop1155.connect(owner).nextWhitelistId()
-            ).to.be.equal("2");
-        });
-
-        it('should edit a whitelist', async function(){
-            // Add the whitelist
-            await mintShop1155.connect(owner).addWhitelist({
-                expiryTime: ethers.constants.MaxUint256,
-                isActive: false,
-                addresses: [signer1.address]
-            });
-
-            await expect(
-                await mintShop1155.connect(owner).nextWhitelistId()
-            ).to.be.equal("2");
-
-            // Edit the whitelist
-            await mintShop1155.connect(owner).updateWhitelist(0,{
-                expiryTime: ethers.constants.MaxUint256,
-                isActive: true,
-                addresses: [signer1.address]
-            });
-
-            await expect(
-                await mintShop1155.connect(owner).nextWhitelistId()
-            ).to.be.equal("2");
-        });
-    });
-
-    describe("addToWhitelist, getWhitelistStatus", function () {
-        it('should add addresses to whitelist', async function(){
-            // Create a whitelist with signer1 whitelisted
-            await mintShop1155.connect(owner).addWhitelist({
-                expiryTime: ethers.constants.MaxUint256,
-                isActive: false,
-                addresses: [signer1.address]
-            });
-
-            // Add more addresses to the whitelist including already existing one
-            await mintShop1155.connect(owner).addToWhitelist(
-                1,
-                [signer1.address, signer2.address, signer3.address]
-            );
-
-            let result = await mintShop1155.connect(owner).getWhitelistStatus([signer1.address, signer2.address, owner.address], [1]);
-
-            await expect(result[0][0]).to.be.equal(true); // First index is the addresses, second whitelists
-            await expect(result[1][0]).to.be.equal(true); // First index is the addresses, second whitelists
-            await expect(result[2][0]).to.be.equal(false); // First index is the addresses, second whitelists
-        });
-    });
-
-    describe("removeFromWhitelist", function () {
-        it('should remove addresses from whitelist', async function(){
-            // Create a whitelist with signer1 whitelisted
-            await mintShop1155.connect(owner).addWhitelist({
-                expiryTime: ethers.constants.MaxUint256,
-                isActive: false,
-                addresses: [signer1.address]
-            });
-
-            // Add more addresses to the whitelist including already existing one
-            await mintShop1155.connect(owner).addToWhitelist(
-                1,
-                [signer1.address, signer2.address, signer3.address]
-            );
-            
-            // Get the addresses that are in the whitelist
-            let result = await mintShop1155.connect(owner).getWhitelistStatus([signer1.address, signer3.address, owner.address, signer2.address], [1]);
-
-            // Expect their presence
-            await expect(result[0][0]).to.be.equal(true); // First index is the addresses, second whitelists
-            await expect(result[1][0]).to.be.equal(true); // First index is the addresses, second whitelists
-            await expect(result[2][0]).to.be.equal(false); // First index is the addresses, second whitelists
-            await expect(result[3][0]).to.be.equal(true); // First index is the addresses, second whitelists
-
-            // Remove one address from whitelist
-            await mintShop1155.connect(owner).removeFromWhitelist(1, [signer1.address]);
-
-            // Reload the addresses that are in the whitelist
-            result = await mintShop1155.connect(owner).getWhitelistStatus([signer1.address, signer3.address], [1]);
-
-            // Expect the absence
-            await expect(result[0][0]).to.be.equal(false); // First index is the addresses, second whitelists
-            await expect(result[1][0]).to.be.equal(true); // First index is the addresses, second whitelists
-        });
-    });
-
-    describe("setWhitelistActive", function () {
-        it('should return the correct version', async function(){
-            // Create a whitelist with signer1 whitelisted
-            await mintShop1155.connect(owner).addWhitelist({
-                expiryTime: ethers.constants.MaxUint256,
-                isActive: false,
-                addresses: [signer1.address]
-            });
-
-            let whitelist = await mintShop1155.whitelists(1);
-            await expect(
-                whitelist.isActive
-            ).to.be.equal(false);
-
-            // Set the whitelist status to active
-            await mintShop1155.connect(owner).setWhitelistActive(1, true);
-
-            whitelist = await mintShop1155.whitelists(1);
-            await expect(
-                whitelist.isActive
-            ).to.be.equal(true);
-        });
-    });
-
     describe("updatePool, addPool, getPools", function () {
         beforeEach(async function(){
             // Configure token groups
@@ -603,16 +504,6 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
 
             //Get the pool
             let pools = await mintShop1155.connect(owner).getPools([0], 0);
-            console.log(pools[0].config);
-            console.log("================= COLLECTION ================");
-            console.log(pools[0].config.collection)
-            console.log("================= COLLECTION ================");
-
-            console.log(pools[0].config);
-            console.log("=================");
-
-            console.log(pools[0].items[0].prices[0].price);
-
 
             expect(pools[0].config.name).to.be.equal("firstPool");
         });
@@ -735,29 +626,64 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
 
         it('Reverts: mintFromPool amount less than 0', async function(){
             // Mint from pool
+            const whiteListAddresses = [owner.address, signer2.address, owner.address, signer1.address, signer2.address];
+
+            let tree =  getMerkleTree(whiteListAddresses);
+            let whiteListInput = {
+                index: tree.leaves[1].index,
+                node: hash(tree.leaves[1].index, tree.leaves[1].address),
+                merkleProof: tree.leaves[1].proof
+
+            };
             await expect(
-                mintShop1155.connect(owner).mintFromPool(0, 2, 1, 0, 0)
+                mintShop1155.connect(owner).mintFromPool(0, 2, 1, 0, 0, whiteListInput)
             ).to.be.revertedWith("0x0B");
         });
 
         it('Reverts: mintFromPool pool not active', async function(){
             // Mint from pool
+            const whiteListAddresses = [owner.address, signer2.address, owner.address, signer1.address, signer2.address];
+            // let tree1 = this.tree;
+
+            let tree =  getMerkleTree(whiteListAddresses);
+            let whiteListInput = {
+                index: tree.leaves[1].index,
+                node: hash(tree.leaves[1].index, tree.leaves[1].address),
+                merkleProof: tree.leaves[1].proof
+
+            };
             await expect(
-                mintShop1155.connect(owner).mintFromPool(2, 2, 1, 1, 0)
+                mintShop1155.connect(owner).mintFromPool(2, 2, 1, 1, 0, whiteListInput)
             ).to.be.revertedWith("0x1B");
         });
 
         it('Reverts: mintFromPool amount greater than singlePurchaseLimit', async function(){
             // Mint from pool
+            let whiteListAddresses = [deployer.address, owner.address, paymentReceiver.address, proxyRegistryOwner.address,signer1.address, signer2.address];
+
+            let whiteListInput = {
+                index: 0,
+                node: "0x66bec8af3e1db24c080f949a93ecca4f99c46c7afb08389d93b59e5f73514c75",
+                merkleProof: computeMerkleProof(0, whiteListAddresses)
+            };
             await expect(
-                mintShop1155.connect(owner).mintFromPool(0, 2, 1, 3, 0)
+                mintShop1155.connect(owner).mintFromPool(0, 2, 1, 3, 0, whiteListInput)
             ).to.be.revertedWith("0x2B");
         });
 
         it('Reverts: mintFromPool assetindex not valid', async function(){
             // Mint from pool
+            let whiteListAddresses = [deployer.address, owner.address, paymentReceiver.address, proxyRegistryOwner.address,signer1.address, signer2.address];
+
+            let whiteListInput = {
+                index: 0,
+                node: "0x66bec8af3e1db24c080f949a93ecca4f99c46c7afb08389d93b59e5f73514c75",
+                merkleProof: computeMerkleProof(0, whiteListAddresses)
+            };
+            // console.log(tree.leaves[1].proof);
+
             await expect(
-                mintShop1155.connect(owner).mintFromPool(0, 2, 5, 1, 0)
+                mintShop1155.connect(owner).mintFromPool(0, 2, 5, 1, 0, whiteListInput)
             ).to.be.revertedWith("0x3B");
         });
 
@@ -765,10 +691,17 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
             // Jump forward in time more than the pool end time
             await ethers.provider.send("evm_increaseTime", [70]);
             await ethers.provider.send("evm_mine", []);
+            let whiteListAddresses = [deployer.address, owner.address, paymentReceiver.address, proxyRegistryOwner.address,signer1.address, signer2.address];
+
+            let whiteListInput = {
+                index: 0,
+                node: "0x66bec8af3e1db24c080f949a93ecca4f99c46c7afb08389d93b59e5f73514c75",
+                merkleProof: computeMerkleProof(0, whiteListAddresses)
+            };
 
             // Mint from pool
             await expect(
-                mintShop1155.connect(owner).mintFromPool(0, 2, 0, 1, 0)
+                mintShop1155.connect(owner).mintFromPool(0, 2, 0, 1, 0, whiteListInput)
             ).to.be.revertedWith("0x4B");
         });
 
@@ -780,15 +713,21 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
                 setMintRight,
                 ethers.constants.MaxUint256
             );
+            let whiteListAddresses = [deployer.address, owner.address, paymentReceiver.address, proxyRegistryOwner.address,signer1.address, signer2.address];
 
+            let whiteListInput = {
+                index: 0,
+                node: "0x66bec8af3e1db24c080f949a93ecca4f99c46c7afb08389d93b59e5f73514c75",
+                merkleProof: computeMerkleProof(0, whiteListAddresses)
+            };
             // Mint three times
-            await mintShop1155.connect(owner).mintFromPool(0, 2, 0, 1, 0, {value: ethers.utils.parseEther("1")})
-            await mintShop1155.connect(owner).mintFromPool(0, 2, 1, 1, 0, {value: ethers.utils.parseEther("1")})
-            await mintShop1155.connect(owner).mintFromPool(0, 2, 2, 1, 0, {value: ethers.utils.parseEther("1")})
+            await mintShop1155.connect(owner).mintFromPool(0, 2, 0, 1, 0, whiteListInput, {value: ethers.utils.parseEther("1")})
+            await mintShop1155.connect(owner).mintFromPool(0, 2, 1, 1, 0, whiteListInput, {value: ethers.utils.parseEther("1")})
+            await mintShop1155.connect(owner).mintFromPool(0, 2, 2, 1, 0, whiteListInput, {value: ethers.utils.parseEther("1")})
 
             // Mint again surpassing the purchase limit of the pool
             await expect(
-                mintShop1155.connect(owner).mintFromPool(0, 2, 0, 1, 0, {value: ethers.utils.parseEther("1")})
+                mintShop1155.connect(owner).mintFromPool(0, 2, 0, 1, 0,whiteListInput,  {value: ethers.utils.parseEther("1")})
             ).to.be.revertedWith("0x5B");
         });
 
@@ -800,16 +739,22 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
                 setMintRight,
                 ethers.constants.MaxUint256
             );
+            let whiteListAddresses = [deployer.address, owner.address, paymentReceiver.address, proxyRegistryOwner.address,signer1.address, signer2.address];
 
+            let whiteListInput = {
+                index: 0,
+                node: "0x66bec8af3e1db24c080f949a93ecca4f99c46c7afb08389d93b59e5f73514c75",
+                merkleProof: computeMerkleProof(0, whiteListAddresses)
+            };
             // Mint four times
-            await mintShop1155.connect(owner).mintFromPool(0, 2, 0, 1, 0, {value: ethers.utils.parseEther("1")})
-            await mintShop1155.connect(owner).mintFromPool(0, 2, 1, 1, 0, {value: ethers.utils.parseEther("1")})
-            await mintShop1155.connect(owner).mintFromPool(0, 2, 2, 1, 0, {value: ethers.utils.parseEther("1")})
-            await mintShop1155.connect(owner).mintFromPool(1, 3, 0, 1, 0, {value: ethers.utils.parseEther("1")})
+            await mintShop1155.connect(owner).mintFromPool(0, 2, 0, 1, 0,whiteListInput, {value: ethers.utils.parseEther("1")})
+            await mintShop1155.connect(owner).mintFromPool(0, 2, 1, 1, 0,whiteListInput, {value: ethers.utils.parseEther("1")})
+            await mintShop1155.connect(owner).mintFromPool(0, 2, 2, 1, 0,whiteListInput, {value: ethers.utils.parseEther("1")})
+            await mintShop1155.connect(owner).mintFromPool(1, 3, 0, 1, 0,whiteListInput, {value: ethers.utils.parseEther("1")})
 
             // Mint again surpassing the global purchase limit
             await expect(
-                mintShop1155.connect(owner).mintFromPool(1, 3, 1, 1, 0, {value: ethers.utils.parseEther("1")})
+                mintShop1155.connect(owner).mintFromPool(1, 3, 1, 1, 0,whiteListInput, {value: ethers.utils.parseEther("1")})
             ).to.be.revertedWith("0x5B");
         });
 
@@ -823,14 +768,14 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
             );
 
             // Create whitelist with deployer's address in it
-            await mintShop1155.connect(owner).addWhitelist({
-                expiryTime: ethers.constants.MaxUint256,
-                isActive: false,
-                addresses: [deployer.address]
-            });
+            // await mintShop1155.connect(owner).addWhitelist({
+            //     expiryTime: ethers.constants.MaxUint256,
+            //     isActive: false,
+            //     addresses: [deployer.address]
+            // });
 
             // Set the whitelist status to active
-            await mintShop1155.connect(owner).setWhitelistActive(1, true);
+            // await mintShop1155.connect(owner).setWhitelistActive(1, true);
 
             // Update the pool from beforeEach to include whitelist
             let latestBlock = await ethers.provider.getBlock(await ethers.provider.getBlockNumber());
@@ -861,11 +806,17 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
                         price: 1
                     }]
                 ]);
-           
+                let whiteListAddresses = [deployer.address, owner.address, paymentReceiver.address, proxyRegistryOwner.address,signer1.address, signer2.address];
+
+                let whiteListInput = {
+                    index: 1,
+                    node: "0x66bec8af3e1db24c080f949a93ecca4f99c46c7afb08389d93b59e5f73514c75",
+                    merkleProof: computeMerkleProof(1, whiteListAddresses)
+                };
             // Mint
             await expect(
-                mintShop1155.connect(signer1).mintFromPool(1, 3, 0, 1, 0, {value: ethers.utils.parseEther("1")})
-            ).to.be.revertedWith("0x6B");
+                mintShop1155.connect(signer1).mintFromPool(1, 3, 0, 1, 0, whiteListInput, {value: ethers.utils.parseEther("1")})
+            ).to.be.revertedWith("Invalid Proof.");
         });
 
         it('Reverts: mintFromPool not enough items available for purchase', async function(){
@@ -876,7 +827,13 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
                 setMintRight,
                 ethers.constants.MaxUint256
             );
+            let whiteListAddresses = [deployer.address, owner.address, paymentReceiver.address, proxyRegistryOwner.address,signer1.address, signer2.address];
 
+            let whiteListInput = {
+                index: 0,
+                node: "0x66bec8af3e1db24c080f949a93ecca4f99c46c7afb08389d93b59e5f73514c75",
+                merkleProof: computeMerkleProof(0, whiteListAddresses)
+            };
             // Update the pool from beforeEach to lower its cap
             let latestBlock = await ethers.provider.getBlock(await ethers.provider.getBlockNumber());
             await mintShop1155.connect(owner).updatePool(1, {
@@ -907,11 +864,11 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
                     }]
                 ]);
            
-            await mintShop1155.connect(signer1).mintFromPool(1, 3, 0, 1, 0, {value: ethers.utils.parseEther("1")})
+            await mintShop1155.connect(signer1).mintFromPool(1, 3, 0, 1, 0, whiteListInput,  {value: ethers.utils.parseEther("1")})
 
             // Mint until cap reached
             await expect(
-                mintShop1155.connect(signer1).mintFromPool(1, 3, 0, 1, 0, {value: ethers.utils.parseEther("1")})
+                mintShop1155.connect(signer1).mintFromPool(1, 3, 0, 1, 0, whiteListInput, {value: ethers.utils.parseEther("1")})
             ).to.be.revertedWith("0x7B");
         });
 
@@ -953,9 +910,15 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
                 setMintRight,
                 ethers.constants.MaxUint256
             );
+            let whiteListAddresses = [deployer.address, owner.address, paymentReceiver.address, proxyRegistryOwner.address,signer1.address, signer2.address];
 
+            let whiteListInput = {
+                index: 0,
+                node: "0x66bec8af3e1db24c080f949a93ecca4f99c46c7afb08389d93b59e5f73514c75",
+                merkleProof: computeMerkleProof(0, whiteListAddresses)
+            };
             await expect(
-                mintShop1155.connect(owner).mintFromPool(1, 3, 0, 1, 0, {value: ethers.utils.parseEther("0.5")})
+                mintShop1155.connect(owner).mintFromPool(1, 3, 0, 1, 0, whiteListInput, {value: ethers.utils.parseEther("0.5")})
             ).to.be.revertedWith("0x9B");
         });
 
@@ -997,13 +960,19 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
                         price: ethers.utils.parseEther("15")
                     }]
                 ]);
-           
+                let whiteListAddresses = [deployer.address, owner.address, paymentReceiver.address, proxyRegistryOwner.address,signer1.address, signer2.address];
+
+                let whiteListInput = {
+                    index: 0,
+                    node: "0x66bec8af3e1db24c080f949a93ecca4f99c46c7afb08389d93b59e5f73514c75",
+                    merkleProof: computeMerkleProof(0, whiteListAddresses)
+                };
             // Give signer1 some amount of ERC20 Tokens
             await mockERC20.connect(deployer).transfer(signer1.address, ethers.utils.parseEther("5"));
 
             // Mint until cap reached
             await expect(
-                mintShop1155.connect(signer1).mintFromPool(1, 3, 0, 1, 0)
+                mintShop1155.connect(signer1).mintFromPool(1, 3, 0, 1, 0, whiteListInput)
             ).to.be.revertedWith("0x8B");
 
             // Give signer1 some more amount of ERC20 Tokens
@@ -1013,13 +982,13 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
             await mockERC20.connect(signer1).approve(mintShop1155.address, ethers.utils.parseEther("15"));
 
             await expect(
-                mintShop1155.connect(signer1).mintFromPool(1, 3, 1, 3, 0)
+                mintShop1155.connect(signer1).mintFromPool(1, 3, 1, 3, 0,  whiteListInput)
             ).to.be.revertedWith("0x1C");
 
             // Successful purchase, Give signer1 some more amount of ERC20 Tokens
             await mockERC20.connect(deployer).transfer(signer1.address, ethers.utils.parseEther("5"));
 
-            await mintShop1155.connect(signer1).mintFromPool(1, 3, 1, 1, 0);
+            await mintShop1155.connect(signer1).mintFromPool(1, 3, 1, 1, 0,  whiteListInput);
 
             // getPurchaseCounts
             let balances = await mintShop1155.connect(signer1).getPurchaseCounts([signer1.address, signer2.address, owner.address], [1]);
@@ -1037,7 +1006,13 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
                 setMintRight,
                 ethers.constants.MaxUint256
             );
+            let whiteListAddresses = [deployer.address, owner.address, paymentReceiver.address, proxyRegistryOwner.address,signer1.address, signer2.address];
 
+            let whiteListInput = {
+                index: 0,
+                node: "0x66bec8af3e1db24c080f949a93ecca4f99c46c7afb08389d93b59e5f73514c75",
+                merkleProof: computeMerkleProof(0, whiteListAddresses)
+            };
             // Update the pool from beforeEach to include ERC20 token as price pair
             let latestBlock = await ethers.provider.getBlock(await ethers.provider.getBlockNumber());
             await expect(
@@ -1109,24 +1084,22 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
                         price: 1
                     }]
                 ]);
+                let whiteListAddresses = [deployer.address, owner.address, paymentReceiver.address, proxyRegistryOwner.address,signer1.address, signer2.address];
 
+                let whiteListInput = {
+                    index: 0,
+                    node: "0x66bec8af3e1db24c080f949a93ecca4f99c46c7afb08389d93b59e5f73514c75",
+                    merkleProof: computeMerkleProof(0, whiteListAddresses)
+                };
                 // Mint based on ERC1155 item holdings
                 await expect(
-                    mintShop1155.connect(signer1).mintFromPool(1, 3, 1, 1, 0, )
+                    mintShop1155.connect(signer1).mintFromPool(1, 3, 1, 1, 0, whiteListInput)
                 ).to.be.revertedWith("0x8B");
 
                 // Mint ERC1155 for signer1
                 await super1155.connect(owner).mintBatch(signer1.address, [shiftedItemGroupId], ["1"], DATA);
 
-                await mintShop1155.connect(signer1).mintFromPool(1, 3, 0, 1, 0, {value: ethers.utils.parseEther("1")});
-        });
-
-        it('should getPoolsWithAddress', async function(){
-            // Get all the pools mentioned
-            let pools = await mintShop1155.connect(owner).getPoolsWithAddress([0, 1], owner.address, 0);
-            await expect(
-                pools[0].config.name
-            ).to.be.equal("firstPool")
+                await mintShop1155.connect(signer1).mintFromPool(1, 3, 0, 1, 0, whiteListInput, {value: ethers.utils.parseEther("1")});
         });
     });
 
@@ -1201,11 +1174,17 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
             await expect((
                 await staker.connect(owner).getPendingPoints(mockERC20.address, signer1.address)).toString()
             ).to.be.equal("500");
-            
+            let whiteListAddresses = [deployer.address, owner.address, paymentReceiver.address, proxyRegistryOwner.address,signer1.address, signer2.address];
+
+            let whiteListInput = {
+                index: 0,
+                node: "0x66bec8af3e1db24c080f949a93ecca4f99c46c7afb08389d93b59e5f73514c75",
+                merkleProof: computeMerkleProof(0, whiteListAddresses)
+            };
             // Signer1 hasn't claimed points
             // mintFromPool of mintshop1155 must revert
             await expect(
-                mintShop1155.connect(signer1).mintFromPool(0, 1, 0, 1, 0)
+                mintShop1155.connect(signer1).mintFromPool(0, 1, 0, 1, 0, whiteListInput)
             ).to.be.revertedWith("MintShop1155: you do not have enough required points for this pool");
             
             // Jump forward and travel in time through the portal, signer1 must be eligible for the pool now
@@ -1232,7 +1211,7 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
             );
             
             // Signer1 Successfully mint
-            await mintShop1155.connect(signer1).mintFromPool(0, 1, 0, 1, 0);
+            await mintShop1155.connect(signer1).mintFromPool(0, 1, 0, 1, 0, whiteListInput);
         });
     });
 
@@ -1257,4 +1236,183 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
             ).to.be.equal(ethers.utils.parseEther("10"));
         });
     });
+
+    describe("max allocation test", function() {
+        it("Shoud revert", async function() {
+            let mShop = await this.MintShop1155.deploy(
+                deployer.address,
+                paymentReceiver.address,
+                "4"
+            );
+
+
+            let sup = await this.Super1155.deploy(
+                owner.address,
+                "Super1155142",
+                originalUri + "uri2",
+                proxyRegistry.address
+            );
+            await sup.connect(owner).configureGroup(1, {
+                name: 'NFT',
+                supplyType: 0,
+                supplyData: 5,
+                itemType: 0,
+                itemData: 0,
+                burnType: 0,
+                burnData: 0
+            });
+
+            await sup.connect(owner).setPermit(
+                mShop.address,
+                UNIVERSAL,
+                setMintRight,
+                ethers.constants.MaxUint256
+            );
+
+            await mShop.setItems([sup.address]);
+
+            // await super1155.setPermit();
+
+            let latestBlock = await ethers.provider.getBlock(await ethers.provider.getBlockNumber());
+            console.log()
+            await mShop.connect(deployer).addPool({
+                name: "maxAllocationTest",
+                startTime: latestBlock.timestamp,
+                endTime: latestBlock.timestamp + 60,
+                purchaseLimit: 100,
+                singlePurchaseLimit: 1,
+                requirement: {
+                    requiredType: 0,
+                    requiredAsset: NULL_ADDRESS,
+                    requiredAmount: 1,
+                    whitelistId: 0
+                    },
+                    collection: sup.address
+                }, [1], // Groups 1 = FT, 2 = NFT
+                [1], // NumberOffset 1 = FT, 0 = NFT // FT's are coerced to index 1
+                [10], // Caps 10 = FT, 5 = NFT
+                [
+                    [{ // Price pairs for NFTs, 5 NFTs = 5 Prices Pairs
+                        assetType: 1,
+                        asset: NULL_ADDRESS,
+                        price: 1
+                    }]
+                ]);
+                let whiteListAddresses = [deployer.address, owner.address, paymentReceiver.address, proxyRegistryOwner.address,signer1.address, signer2.address];
+
+            let whiteListInput = {
+                index: 0,
+                node: "0x66bec8af3e1db24c080f949a93ecca4f99c46c7afb08389d93b59e5f73514c75",
+                merkleProof: computeMerkleProof(0, whiteListAddresses)
+            };
+                let pools = await mShop.getPools([0], 0);
+                console.log(pools[0].items[0].groupId.toString());
+
+                await mShop.connect(signer1).mintFromPool(0, 1, 0, 1, 0, whiteListInput, {value: ethers.utils.parseEther("1")})
+
+                await expect(
+                    mShop.connect(signer1).mintFromPool(0, 1, 0, 1, 0, whiteListInput, {value: ethers.utils.parseEther("1")})
+                ).to.be.revertedWith("0x0D");
+        });
+    });
 });
+
+
+
+const expandLeaves = function (addresses) {
+    addresses.sort(function(a, b) {
+        var al = a.toLowerCase(), bl = b.toLowerCase();
+        if (al < bl) { return -1; }
+        if (al > bl) { return 1; }
+        return 0;
+    });
+
+    return addresses.map(function(a, i) { return { address: a, index: i }; });
+}
+
+const getMerkleTree = function(addresses) {
+    // Gets ordered list of leaf nodes <=================================
+    var leaves = expandLeaves(addresses);
+
+    var proofs = [];
+    
+    for(let i = 0; i < leaves.length; i++){
+      //compute merkle proof for each address
+      leaves[i].proof = computeMerkleProof(i, addresses)
+    }
+
+    var tree = {
+      merkleRoot: 0,  //calculated later
+      amount: leaves.length,
+      leaves: leaves
+    };
+    return tree;
+}
+
+
+
+const hash = function(index, address) {
+    return ethers.utils.solidityKeccak256(["uint256", "address"], [index, address]);
+
+}
+
+// Get hashes of leaf nodes
+const getLeaves = function(balances) {
+    var leaves = expandLeaves(balances);
+    
+    return leaves.map(function(leaf) {
+        return ethers.utils.solidityKeccak256(["uint256", "address"], [leaf.index, leaf.address]);
+    });
+}
+
+const computeRootHash = function(balances) {
+    var leaves = getLeaves(balances);
+    // console.log(leaves)
+    while (leaves.length > 1) {
+        reduceMerkleBranches(leaves);
+    }
+
+    return leaves[0];
+}
+
+
+const computeMerkleProof = function(index, address) {
+    var leaves = getLeaves(address);
+
+    if (index == null) { throw new Error('address not found'); }
+
+    var path = index;
+
+    var proof = [ ];
+    while (leaves.length > 1) {
+        if ((path % 2) == 1) {
+            proof.push(leaves[path - 1])
+        } else {
+            if (typeof leaves[path + 1] != "undefined")
+                proof.push(leaves[path + 1])
+            else
+                proof.push(leaves[path])
+        }
+
+        // Reduce the merkle tree one level
+        reduceMerkleBranches(leaves);
+
+        // Move up
+        path = parseInt(path / 2);
+    }
+    // console.log(proof)
+    return proof;
+}
+
+const reduceMerkleBranches = function(leaves) {
+    var output = [];
+
+    while (leaves.length) {
+        var left = leaves.shift();
+        var right = (leaves.length === 0) ? left: leaves.shift();
+        output.push(ethers.utils.solidityKeccak256(["bytes32", "bytes32"], [left, right]));
+    }
+    output.forEach(function(leaf) {
+        leaves.push(leaf);
+    });
+}
