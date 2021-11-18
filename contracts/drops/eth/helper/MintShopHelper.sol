@@ -2,8 +2,8 @@
 pragma solidity 0.8.8;
 
 // import "./ISuper1155.sol";
-import "../MintShop1155.sol";
-import "../interfaces/IHelper.sol";
+import "../SuperMintShop1155.sol";
+import "../../../interfaces/IHelper.sol";
 
 contract MintShopHelper is IHelper {
    constructor() {}

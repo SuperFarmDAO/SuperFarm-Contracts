@@ -5,8 +5,8 @@ import "@chainlink/contracts/src/v0.8/VRFConsumerBase.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
-import "./base/Named.sol";
-import "./base/Sweepable.sol";
+import "../base/Named.sol";
+import "../base/Sweepable.sol";
 
 /**
   @title A contract to retrieve secure on-chain randomness from Chainlink.

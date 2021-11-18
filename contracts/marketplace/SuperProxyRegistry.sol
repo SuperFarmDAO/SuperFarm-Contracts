@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8.8;
 
-import "./proxy/ProxyRegistry.sol";
+import "../proxy/ProxyRegistry.sol";
 
 /**
   @title A fully-implemented proxy registry contract.

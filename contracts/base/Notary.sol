@@ -7,8 +7,8 @@ import "@openzeppelin/contracts/token/ERC1155/extensions/IERC1155MetadataURI.sol
 import "@openzeppelin/contracts/token/ERC1155/IERC1155Receiver.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 
-import "./interfaces/ISuper1155.sol";
-import "./access/PermitControl.sol";
+import "../assets/erc1155/interfaces/ISuper1155.sol";
+import "../access/PermitControl.sol";
 
 /**
   @title A public notary contract where asset holders may publish a message tied

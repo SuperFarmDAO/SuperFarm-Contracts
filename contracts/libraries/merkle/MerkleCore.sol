@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8.7;
 
-import "../base/Sweepable.sol";
+import "../../base/Sweepable.sol";
 
 /**
   @title A merkle tree root finder.

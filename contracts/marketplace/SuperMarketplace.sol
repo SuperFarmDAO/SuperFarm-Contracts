@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8.8;
 
-import "./base/marketplace/V1/Exchange.sol";
+import "./V1/Exchange.sol";
 
 /**
  * @title SuperMarketplace
