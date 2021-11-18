@@ -6,12 +6,12 @@
 // 2. Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer in the documentation and/or other materials provided with the distribution.
 // 3. Neither the name of the copyright holder nor the names of its contributors may be used to endorse or promote products derived from this software without specific prior written permission.
 // THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-pragma solidity 0.6.12;
+pragma solidity ^0.8.8;
 
-import "./math/SafeMath.sol";
+// import "./math/SafeMath.sol";
 
 contract Timelock {
-  using SafeMath for uint;
+  // using SafeMath for uint;
 
   event NewAdmin(address indexed newAdmin);
   event NewPendingAdmin(address indexed newPendingAdmin);
@@ -67,7 +67,7 @@ contract Timelock {
 
   function queueTransaction(address target, uint value, string memory signature, bytes memory data, uint eta) public returns (bytes32) {
     require(msg.sender == admin, "Timelock::queueTransaction: Call must come from admin.");
-    require(eta >= getBlockTimestamp().add(delay), "Timelock::queueTransaction: Estimated execution block must satisfy delay.");
+    require(eta >= getBlockTimestamp() + delay, "Timelock::queueTransaction: Estimated execution block must satisfy delay.");
 
     bytes32 txHash = keccak256(abi.encode(target, value, signature, data, eta));
     queuedTransactions[txHash] = true;
@@ -102,7 +102,7 @@ contract Timelock {
     bytes32 txHash = keccak256(abi.encode(target, value, signature, data, eta));
     require(queuedTransactions[txHash], "Timelock::executeTransaction: Transaction hasn't been queued.");
     require(getBlockTimestamp() >= eta, "Timelock::executeTransaction: Transaction hasn't surpassed time lock.");
-    require(getBlockTimestamp() <= eta.add(GRACE_PERIOD), "Timelock::executeTransaction: Transaction is stale.");
+    require(getBlockTimestamp() <= eta + GRACE_PERIOD, "Timelock::executeTransaction: Transaction is stale.");
 
     queuedTransactions[txHash] = false;
 
