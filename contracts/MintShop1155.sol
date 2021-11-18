@@ -759,15 +759,17 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop, SuperMerkleAcces
 
     // Verify that the pool is respecting per-address global purchase limits.
     uint256 userGlobalPurchaseAmount =
-      _amount + globalPurchaseCounts[_msgSender()];
-    require(userGlobalPurchaseAmount <= globalPurchaseLimit,
-      "0x5B");
+        _amount + globalPurchaseCounts[_msgSender()];
+    
 
-    // Verify that the pool is respecting per-address pool purchase limits.
+    if (globalPurchaseLimit != 0) {
+      require(userGlobalPurchaseAmount <= globalPurchaseLimit,
+        "0x5B");
+
+      // Verify that the pool is respecting per-address pool purchase limits. 
+    }
     uint256 userPoolPurchaseAmount =
-      _amount + pools[_id].purchaseCounts[_msgSender()];
-    require(userPoolPurchaseAmount <= pools[_id].config.purchaseLimit,
-      "0x5B");
+        _amount + pools[_id].purchaseCounts[_msgSender()];
 
     // Verify that the pool is not depleted by the user's purchase.
     uint256 newCirculatingTotal = pools[_id].itemMinted[itemKey] + _amount;
