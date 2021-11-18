@@ -6,14 +6,13 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 
-import "./base/Sweepable.sol";
-import "./interfaces/ISuper1155.sol";
-import "./interfaces/IStaker.sol";
-import "./interfaces/IMintShop.sol";
-import "./merkle/SuperMerkleAccess.sol";
+import "../../base/Sweepable.sol";
+import "../../assets/erc1155/interfaces/ISuper1155.sol";
+import "../../interfaces/IStaker.sol";
+import "../../interfaces/IMintShop.sol";
+import "../../libraries/merkle/SuperMerkleAccess.sol";
+import "../../libraries/DFStorage.sol";
 
-
-import "./libraries/DFStorage.sol";
 /**
   @title A Shop contract for selling NFTs via direct minting through particular
     pools with specific participation requirements.

@@ -3,11 +3,11 @@ pragma solidity 0.8.8;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 
-import "./interfaces/ISuper1155.sol";
-import "./interfaces/IMintShop.sol";
-import "./libraries/DFStorage.sol";
-import "./interfaces/IHelper.sol";
-import "./IPermitControl.sol";
+import "../../assets/erc1155/interfaces/ISuper1155.sol";
+import "../../interfaces/IMintShop.sol";
+import "../../libraries/DFStorage.sol";
+import "../../interfaces/IHelper.sol";
+import "../../interfaces/IPermitControl.sol";
 
 
 /**

@@ -7,10 +7,11 @@ import "@openzeppelin/contracts/utils/introspection/ERC165Storage.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableMap.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
-import "./utils/LocalStrings.sol";
-import "./access/PermitControl.sol";
-import "./proxy/StubProxyRegistry.sol";
-import "./utils/LocalStrings.sol";
+
+import "../../utils/Utils.sol";
+import "../../access/PermitControl.sol";
+import "../../proxy/StubProxyRegistry.sol";
+import "./Super721IMXLock.sol";
 
 /**
   @title An ERC-721 item creation contract.
@@ -25,7 +26,7 @@ import "./utils/LocalStrings.sol";
   ideas inherited from the Super721 reference implementation.
   August 4th, 2021.
 */
-contract Super721 is PermitControl, ERC165Storage, IERC721 {
+contract Super721IMX is PermitControl, ERC165Storage, IERC721 {
   using Address for address;
   using Strings for string;
   using EnumerableSet for EnumerableSet.UintSet;
@@ -113,6 +114,12 @@ contract Super721 is PermitControl, ERC165Storage, IERC721 {
 
   /// A proxy registry address for supporting automatic delegated approval.
   address public proxyRegistryAddress;
+
+  /// The address of the IMX core contract for L2 minting.
+  address public imxCoreAddress;
+
+  /// The address of the global lock for all 721IMX instances.
+  address public super721IMXLock;
 
   /// @dev A mapping from each token ID to per-address balances.
   mapping (uint256 => mapping(address => uint256)) public balances;
@@ -249,8 +256,8 @@ contract Super721 is PermitControl, ERC165Storage, IERC721 {
   mapping (uint256 => string) public metadata;
 
   /// Whether or not the metadata URI has been locked to future changes.
-  bool public uriLocked;  
-  
+  bool public uriLocked;
+
   /// Whether or not the metadata URI has been locked to future changes.
   bool public contractUriLocked;
 
@@ -264,9 +271,8 @@ contract Super721 is PermitControl, ERC165Storage, IERC721 {
   */
   event ChangeURI(string indexed oldURI, string indexed newURI);
 
- /**
+  /**
     An event that gets emitted when the contract URI is changed.
-    
     @param oldURI The old metadata URI.
     @param newURI The new metadata URI.
   */
@@ -351,11 +357,12 @@ contract Super721 is PermitControl, ERC165Storage, IERC721 {
     @param _owner The address of the administrator governing this collection.
     @param _name The name to assign to this item collection contract.
     @param _metadataURI The metadata URI to perform later token ID substitution with.
-    @param _contractURI The contract URI.
+    @param _contractURI The contract URI. 
     @param _proxyRegistryAddress The address of a proxy registry contract.
+    @param _imxCoreAddress The address of the IMX core contract for L2 minting.
   */
-  constructor(address _owner, string memory _name, string memory _symbol,
-    string memory _metadataURI, string memory _contractURI, address _proxyRegistryAddress) {
+  constructor(address _owner, string memory _name, string memory _symbol, string memory _metadataURI,
+    string memory _contractURI, address _proxyRegistryAddress, address _imxCoreAddress, address _super721IMXLock) {
 
     // Do not perform a redundant ownership transfer if the deployer should
     // remain as the owner of the collection.
@@ -374,6 +381,8 @@ contract Super721 is PermitControl, ERC165Storage, IERC721 {
     metadataUri = _metadataURI;
     contractURI = _contractURI;
     proxyRegistryAddress = _proxyRegistryAddress;
+    imxCoreAddress = _imxCoreAddress;
+    super721IMXLock = _super721IMXLock;
   }
   /**
   */
@@ -441,7 +450,6 @@ contract Super721 is PermitControl, ERC165Storage, IERC721 {
     metadataUri = _uri;
     emit ChangeURI(oldURI, _uri);
   }
-
 
   /**
     Allow approved manager to update the contract URI. At the end of update, we 
@@ -766,17 +774,15 @@ contract Super721 is PermitControl, ERC165Storage, IERC721 {
     uint256 groupId = (_id & GROUP_MASK) >> 128;
     if (_msgSender() == owner()) {
       return true;
-    }
-    if (hasRight(_msgSender(), UNIVERSAL, _right)) {
+    } else if (hasRight(_msgSender(), UNIVERSAL, _right)) {
       return true;
-    }
-    if (hasRight(_msgSender(), bytes32(groupId), _right)) {
+    } else if (hasRight(_msgSender(), bytes32(groupId), _right)) {
       return true;
-    }
-    if (hasRight(_msgSender(), bytes32(_id), _right)) {
+    } else if (hasRight(_msgSender(), bytes32(_id), _right)) {
       return true;
-    }
+    } else {
       return false;
+    }
   }
 
   /**
@@ -828,11 +834,10 @@ contract Super721 is PermitControl, ERC165Storage, IERC721 {
     @param _data Any associated data to use on items minted in this transaction.
   */
 
-  function mintBatch(address _recipient, uint256[] calldata _ids,
+  function mintBatch(address _recipient, uint256[] memory _ids,
     bytes memory _data)
-    external virtual {
-    require(_recipient != address(0),
-      "Super721::mintBatch: mint to the zero address");
+    public virtual {
+    require(_recipient != address(0));
 
     // Validate and perform the mint.
     address operator = _msgSender();
@@ -864,13 +869,65 @@ contract Super721 is PermitControl, ERC165Storage, IERC721 {
       _holderTokens[_recipient].add(_ids[i]);
 
       _tokenOwners.set(_ids[i], _recipient);
+      
       // Emit event and handle the safety check.
       emit Transfer(address(0), _recipient, _ids[i]);
       _doSafeTransferAcceptanceCheck(operator, address(0), _recipient, _ids[i], _data);
     }
-
   }
 
+  /**
+    The special, IMX-privileged minting function for centralized L2 support.
+  */
+  function mintFor(address _to, uint256 quantity, bytes calldata _blueprint) external {
+    require(!Super721IMXLock(super721IMXLock).mintForLocked());
+    require(_msgSender() == imxCoreAddress);
+    require(quantity == 1);
+    uint256 id = split(_blueprint);
+    uint256[] memory ids = _asSingletonArray(id);
+    mintBatch(_to, ids, _blueprint);
+  }
+
+    function split(bytes calldata blob)
+        internal
+        pure
+        returns (uint256)
+    {
+        int256 index = indexOf(blob, ":", 0);
+        require(index >= 0);
+        // Trim the { and } from the parameters
+        uint256 tokenID = toUint(blob[1:uint256(index) - 1]);
+        return (tokenID);
+    }
+
+    function indexOf(
+        bytes memory _base,
+        string memory _value,
+        uint256 _offset
+    ) internal pure returns (int256) {
+        bytes memory _valueBytes = bytes(_value);
+
+        assert(_valueBytes.length == 1);
+
+        for (uint256 i = _offset; i < _base.length; i++) {
+            if (_base[i] == _valueBytes[0]) {
+                return int256(i);
+            }
+        }
+
+        return -1;
+    }
+    
+    function toUint(bytes memory b) internal pure returns (uint256) {
+        uint256 result = 0;
+        for (uint256 i = 0; i < b.length; i++) {
+            uint256 val = uint256(uint8(b[i]));
+            if (val >= 48 && val <= 57) {
+                result = result * 10 + (val - 48);
+            }
+        }
+        return result;
+    }
   /**
     This is a private helper function to verify, according to all of our various
     minting and burning rules, whether it would be valid to burn some `_amount`
@@ -952,8 +1009,7 @@ contract Super721 is PermitControl, ERC165Storage, IERC721 {
     @param _ids The item IDs to burn.
   */
   function burnBatch(address _burner, uint256[] memory _ids) external virtual {
-    require(_burner != address(0),
-      "Super721::burnBatch: burn from the zero address");
+    require(_burner != address(0));
 
     // Validate and perform the burn.
     address operator = _msgSender();
@@ -1005,8 +1061,7 @@ contract Super721 is PermitControl, ERC165Storage, IERC721 {
   function setMetadata(uint256 _id, string memory _metadata)
     external hasItemRight(_id, SET_METADATA) {
     uint groupId = _id >> 128;
-    require(!uriLocked && !metadataFrozen[_id] &&  !metadataFrozen[groupId],
-      "Super721::setMetadata: you cannot edit this metadata because it is frozen");
+    require(!uriLocked && !metadataFrozen[_id] &&  !metadataFrozen[groupId]);
     string memory oldMetadata = metadata[_id];
     metadata[_id] = _metadata;
     emit MetadataChanged(_msgSender(), _id, oldMetadata, _metadata);
@@ -1023,7 +1078,8 @@ contract Super721 is PermitControl, ERC165Storage, IERC721 {
   }
 
   /**
-    Allow the associated manager to forever lock the contract URI to future changes
+    Allow the associated manager to forever lock the contract URI to future 
+    changes
    */
   function lockContractUri() external
     hasValidPermit(UNIVERSAL, LOCK_URI) {

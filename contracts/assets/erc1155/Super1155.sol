@@ -7,11 +7,11 @@ import "@openzeppelin/contracts/token/ERC1155/extensions/IERC1155MetadataURI.sol
 import "@openzeppelin/contracts/token/ERC1155/IERC1155Receiver.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 
-import "./access/PermitControl.sol";
-import "./proxy/StubProxyRegistry.sol";
-import "./utils/LocalStrings.sol";
+import "../../access/PermitControl.sol";
+import "../../proxy/StubProxyRegistry.sol";
+import "../../utils/Utils.sol";
 
-import "./libraries/DFStorage.sol";
+import "../../libraries/DFStorage.sol";
 import "./interfaces/ISuper1155.sol";
 
 /**
@@ -413,8 +413,7 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
   */
   function isApprovedForAll(address _owner, address _operator) public
     view virtual returns (bool) {
-    StubProxyRegistry proxyRegistry = StubProxyRegistry(proxyRegistryAddress);
-    if (address(proxyRegistry.proxies(_owner)) == _operator) {
+    if (StubProxyRegistry(proxyRegistryAddress).proxies(_owner) == _operator) {
       return true;
     }
 

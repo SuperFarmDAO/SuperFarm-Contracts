@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8.7;
 
-import "./access/PermitControl.sol";
+import "../../access/PermitControl.sol";
 
 /**
   @title An ERC-721IMX item collections global lock contract.

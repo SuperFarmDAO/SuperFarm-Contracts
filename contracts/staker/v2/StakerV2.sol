@@ -7,8 +7,9 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 import "@openzeppelin/contracts/token/ERC1155/utils/ERC1155Holder.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
-import "./base/Sweepable.sol";
-import "./ISuperGeneric.sol";
+
+import "../../base/Sweepable.sol";
+import "../../interfaces/ISuperGeneric.sol";
 
 /**
   @title An asset staking contract.
