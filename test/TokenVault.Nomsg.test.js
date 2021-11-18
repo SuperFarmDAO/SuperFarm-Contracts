@@ -223,12 +223,12 @@ describe('TokenVault', function () {
                 [
                     {  
                         assetType: AssetType.Super721,
-                        amounts: [ethers.BigNumber.from('1')], 
+                        amounts: [ethers.BigNumber.from(1)], 
                         ids: [shiftedItemGroupId]
                     },
                     {  
                         assetType: AssetType.Super1155,
-                        amounts: [ethers.BigNumber.from('1')], 
+                        amounts: [ethers.BigNumber.from(1)], 
                         ids: [shiftedItemGroupId]
                     },  
                 ]
@@ -303,8 +303,12 @@ describe('TokenVault', function () {
             // TODO send ERC1155
             // TODO send multiple tokens 
         
-            it('should send tokens', async () => {
-                await tokenVault.sendTokens([alice.address], [ethers.utils.parseEther('1000')]);
+            it('should send tokensEC20', async () => {
+                await tokenVault.sendTokens([alice.address], [token.address], [{
+                    assetType: AssetType.ERC20,
+                    amounts: [ethers.utils.parseEther('1000')],
+                    ids: []
+                }]);
         
                 let balance = await token.balanceOf(alice.address);
         
