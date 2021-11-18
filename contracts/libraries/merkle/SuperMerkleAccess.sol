@@ -2,7 +2,7 @@
 pragma solidity ^0.8.7;
 
 import "./MerkleCore.sol";
-import "./IMerkle.sol";
+import "../../interfaces/IMerkle.sol";
 
 /**
   @title A merkle tree based access control.
