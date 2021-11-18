@@ -4,6 +4,7 @@ pragma solidity ^0.8.8;
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 
 import "./base/Sweepable.sol";
 import "./interfaces/ISuper1155.sol";
@@ -56,6 +57,10 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop, SuperMerkleAcces
 
   /// @dev A mask for isolating an item's group ID.
   uint256 constant GROUP_MASK = uint256(type(uint128).max) << 128;
+
+
+  /// The maximum amount that can be minted through all collections. 
+  uint256 public immutable maxAllocation;
 
   /// The item collection contract that minted items are sold from.
   ISuper1155[] public items;
@@ -379,7 +384,7 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop, SuperMerkleAcces
       single address may purchase across all item pools in the shop.
   */
   constructor(address _owner, address _paymentReceiver,
-    uint256 _globalPurchaseLimit) {
+    uint256 _globalPurchaseLimit, uint256 _maxAllocation) {
 
     if (_owner != owner()) {
       transferOwnership(_owner);
@@ -387,6 +392,7 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop, SuperMerkleAcces
     // Initialization.
     paymentReceiver = _paymentReceiver;
     globalPurchaseLimit = _globalPurchaseLimit;
+    maxAllocation = _maxAllocation;
   }
 
   /**
@@ -768,6 +774,8 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop, SuperMerkleAcces
     require(newCirculatingTotal <= pools[_id].itemCaps[itemKey],
       "0x7B");
 
+    require(maxAllocation >= checkTotalMinted() + _amount, "0x0D");
+
     // Verify that the user meets any requirements gating participation in this
     // pool. Verify that any possible ERC-20 requirements are met.
     DFStorage.PoolRequirement memory poolRequirement = pools[_id].config.requirement;
@@ -781,6 +789,12 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop, SuperMerkleAcces
     } else if (poolRequirement.requiredType == DFStorage.AccessType.ItemRequired) {
       ISuper1155 requiredItem = ISuper1155(poolRequirement.requiredAsset);
       require(requiredItem.totalBalances(_msgSender())
+        >= poolRequirement.requiredAmount,
+        "0x8B");
+    }    
+    else if (poolRequirement.requiredType == DFStorage.AccessType.ItemRequired721) {
+      IERC721 requiredItem = IERC721(poolRequirement.requiredAsset);
+      require(requiredItem.balanceOf(_msgSender())
         >= poolRequirement.requiredAmount,
         "0x8B");
 
@@ -865,6 +879,24 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop, SuperMerkleAcces
     items[_itemIndex].mintBatch(_msgSender(), itemIds, amounts, "");
 
     emit ItemPurchased(_msgSender(), _id, itemIds, amounts);
+  }
+
+
+
+  /**
+  * Private function for checking maxAllocation among all pools.
+  */
+  function checkTotalMinted() private view returns (uint256 result) {
+    for (uint256 i = 0; i < nextPoolId; i++) {
+        for (uint256 j = 0; j < pools[i].itemGroups.length; j++) {
+        uint256 itemGroupId = pools[i].itemGroups[j];
+
+        bytes32 itemKey = keccak256(abi.encodePacked(pools[i].config.collection,
+          pools[i].currentPoolVersion, itemGroupId));
+        result += pools[i].itemMinted[itemKey];
+      }
+    }
+    return result;
   }
 
 }
