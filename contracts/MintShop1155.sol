@@ -9,6 +9,8 @@ import "./base/Sweepable.sol";
 import "./interfaces/ISuper1155.sol";
 import "./interfaces/IStaker.sol";
 import "./interfaces/IMintShop.sol";
+import "./merkle/SuperMerkleAccess.sol";
+
 
 import "./libraries/DFStorage.sol";
 /**
@@ -23,7 +25,7 @@ import "./libraries/DFStorage.sol";
   This launchpad contract sells new items by minting them into existence. It
   cannot be used to sell items that already exist.
 */
-contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop {
+contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop, SuperMerkleAccess {
   using SafeERC20 for IERC20;
 
   uint256 MAX_UINT = type(uint256).max;
@@ -91,13 +93,13 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop {
     at one in order to reserve the zero-identifier for representing no whitelist
     at all, i.e. public.
   */
-  uint256 public nextWhitelistId = 1;
+  // uint256 public nextWhitelistId = 1;
 
   /**
     A mapping of whitelist IDs to specific Whitelist elements. Whitelists may be
     shared between pools via specifying their ID in a pool requirement.
   */
-  mapping (uint256 => Whitelist) public whitelists;
+  // mapping (uint256 => Whitelist) public whitelists;
 
   /// The next available ID to be assumed by the next pool added.
   uint256 public nextPoolId;
@@ -160,6 +162,7 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop {
     mapping (bytes32 => uint256) itemPricesLength;
     mapping (bytes32 => mapping (uint256 => DFStorage.Price)) itemPrices;
     uint256[] itemGroups;
+    uint256 whiteListId;
   }
 
   /**
@@ -172,11 +175,11 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop {
     @param addresses An array of addresses to whitelist for participation in a
       purchases guarded by a whitelist.
   */
-  struct WhitelistInput {
-    uint256 expiryTime;
-    bool isActive;
-    address[] addresses;
-  }
+  // struct WhitelistInput {
+  //   uint256 expiryTime;
+  //   bool isActive;
+  //   address[] addresses;
+  // }
 
   /**
     This struct tracks information about a single whitelist known to this shop.
@@ -191,11 +194,17 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop {
     @param addresses A mapping of hashed addresses to a flag indicating whether
       this whitelist allows the address to participate in a purchase.
   */
-  struct Whitelist {
-    uint256 expiryTime;
-    uint256 currentWhitelistVersion;
-    bool isActive;
-    mapping (bytes32 => bool) addresses;
+  // struct Whitelist {
+  //   uint256 expiryTime;
+  //   uint256 currentWhitelistVersion;
+  //   bool isActive;
+  //   mapping (bytes32 => bool) addresses;
+  // }
+
+  struct WhiteListInput {
+    uint256 index; 
+    bytes32 node; 
+    bytes32[] merkleProof;
   }
 
   /**
@@ -449,123 +458,19 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop {
     emit GlobalPurchaseLimitLocked(_msgSender());
   }
 
-  /**
-    Allow the owner or an approved manager to add a new whitelist.
 
-    @param _whitelist The WhitelistInput full of data defining the whitelist.
-  */
-  function addWhitelist(DFStorage.WhitelistInput memory _whitelist) external
-    hasValidPermit(UNIVERSAL, WHITELIST) {
-    updateWhitelist(nextWhitelistId, _whitelist);
+  function addWhiteList(uint256 _poolId, uint256 _accesslistId, bytes32 _merkleRoot, 
+  uint256 _startTime, uint256 _endTime) external hasValidPermit(UNIVERSAL, WHITELIST) {
 
-    // Increment the ID which will be used by the next whitelist added.
-    nextWhitelistId += 1;
+    super.setAccessRound(_accesslistId, _merkleRoot, _startTime, _endTime);
+    pools[_poolId].whiteListId = _accesslistId;
+    // console.log("ON CHAIN in whiteList");
+    // console.logBytes32(_merkleRoot);
   }
 
-  /**
-    Allow the owner or an approved manager to update a whitelist. This
-    completely replaces the existing content for that whitelist.
 
-    @param _id The whitelist ID to replace with the new whitelist.
-    @param _whitelist The WhitelistInput full of data defining the whitelist.
-  */
-  function updateWhitelist(uint256 _id, DFStorage.WhitelistInput memory _whitelist)
-    public hasValidPermit(UNIVERSAL, WHITELIST) {
-    uint256 newWhitelistVersion =
-      whitelists[_id].currentWhitelistVersion + 1;
-
-    // Immediately store some given information about this whitelist.
-    Whitelist storage whitelist = whitelists[_id];
-    whitelist.expiryTime = _whitelist.expiryTime;
-    whitelist.isActive = _whitelist.isActive;
-    whitelist.currentWhitelistVersion = newWhitelistVersion;
-
-    // Invalidate the old mapping and store the new address participation flags.
-    for (uint256 i = 0; i < _whitelist.addresses.length; i++) {
-      bytes32 addressKey = keccak256(abi.encode(newWhitelistVersion,
-        _whitelist.addresses[i]));
-      whitelists[_id].addresses[addressKey] = true;
-    }
-
-    // Emit an event to track the new, replaced state of the whitelist.
-    emit WhitelistUpdated(_msgSender(), _id, _whitelist.addresses);
-  }
-
-  /**
-    Allow the owner or an approved manager to add specified addresses to an
-    existing whitelist.
-
-    @param _id The ID of the whitelist to add users to.
-    @param _addresses The array of addresses to add.
-  */
-  function addToWhitelist(uint256 _id, address[] calldata _addresses) external
-    hasValidPermit(UNIVERSAL, WHITELIST) {
-    uint256 whitelistVersion = whitelists[_id].currentWhitelistVersion;
-    for (uint256 i = 0; i < _addresses.length; i++) {
-      bytes32 addressKey = keccak256(abi.encode(whitelistVersion,
-        _addresses[i]));
-      whitelists[_id].addresses[addressKey] = true;
-    }
-
-    // Emit an event to track the addition of new addresses to the whitelist.
-    emit WhitelistAddition(_msgSender(), _id, _addresses);
-  }
-
-  /**
-    Allow the owner or an approved manager to remove specified addresses from an
-    existing whitelist.
-
-    @param _id The ID of the whitelist to remove users from.
-    @param _addresses The array of addresses to remove.
-  */
-  function removeFromWhitelist(uint256 _id, address[] calldata _addresses)
-    external hasValidPermit(UNIVERSAL, WHITELIST) {
-    uint256 whitelistVersion = whitelists[_id].currentWhitelistVersion;
-    for (uint256 i = 0; i < _addresses.length; i++) {
-      bytes32 addressKey = keccak256(abi.encode(whitelistVersion,
-        _addresses[i]));
-      whitelists[_id].addresses[addressKey] = false;
-    }
-
-    // Emit an event to track the removal of addresses from the whitelist.
-    emit WhitelistRemoval(_msgSender(), _id, _addresses);
-  }
-
-  /**
-    Allow the owner or an approved manager to manually set the active status of
-    a specific whitelist.
-
-    @param _id The ID of the whitelist to update the active flag for.
-    @param _isActive The boolean flag to enable or disable the whitelist.
-  */
-  function setWhitelistActive(uint256 _id, bool _isActive) external
-    hasValidPermit(UNIVERSAL, WHITELIST) {
-    whitelists[_id].isActive = _isActive;
-
-    // Emit an event to track whitelist activation status changes.
-    emit WhitelistActiveUpdate(_msgSender(), _id, _isActive);
-  }
-
-  /**
-    A function which allows the caller to retrieve whether or not addresses can
-    participate in some given whitelists.
-
-    @param _ids The IDs of the whitelists to check for `_addresses`.
-    @param _addresses The addresses to check whitelist eligibility for.
-  */
-  function getWhitelistStatus(address[] calldata _addresses,
-  uint256[] calldata _ids) external view returns (bool[][] memory) {
-    bool[][] memory whitelistStatus = new bool[][](_addresses.length);
-    for (uint256 i = 0; i < _addresses.length; i++) {
-      whitelistStatus[i] = new bool[](_ids.length);
-      for (uint256 j = 0; j < _ids.length; j++) {
-        uint256 id = _ids[j];
-        uint256 whitelistVersion = whitelists[id].currentWhitelistVersion;
-        bytes32 addressKey = keccak256(abi.encode(whitelistVersion, _addresses[i]));
-        whitelistStatus[i][j] = whitelists[id].addresses[addressKey];
-      }
-    }
-    return whitelistStatus;
+  function updateWhiteList(uint256 _poolId, uint256 _accesslistId) external hasValidPermit(UNIVERSAL, WHITELIST) {
+    pools[_poolId].whiteListId = _accesslistId;
   }
 
 
@@ -679,16 +584,16 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop {
       }
 
       // Track the pool.
-      uint256 whitelistId = pools[id].config.requirement.whitelistId;
-      bytes32 addressKey = keccak256(
-        abi.encode(whitelists[whitelistId].currentWhitelistVersion, _address));
-      poolOutputs[i] = PoolAddressOutput({
-        config: pools[id].config,
-        itemMetadataUri: items[_itemIndex].metadataUri(),
-        items: poolItems,
-        purchaseCount: pools[id].purchaseCounts[_address],
-        whitelistStatus: whitelists[whitelistId].addresses[addressKey]
-      });
+      // uint256 whitelistId = pools[id].config.requirement.whitelistId;
+      // bytes32 addressKey = keccak256(
+      //   abi.encode(whitelists[whitelistId].currentWhitelistVersion, _address));
+      // poolOutputs[i] = PoolAddressOutput({
+      //   config: pools[id].config,
+      //   itemMetadataUri: items[_itemIndex].metadataUri(),
+      //   items: poolItems,
+      //   purchaseCount: pools[id].purchaseCounts[_address],
+      //   whitelistStatus: whitelists[whitelistId].addresses[addressKey]
+      // });
     }
 
     // Return the pools.
@@ -819,13 +724,19 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop {
     @param _amount The amount of item that the user would like to purchase.
   */
   function mintFromPool(uint256 _id, uint256 _groupId, uint256 _assetIndex,
-    uint256 _amount, uint256 _itemIndex) external nonReentrant payable {
+    uint256 _amount, uint256 _itemIndex, WhiteListInput calldata _whiteList) external nonReentrant payable {
     require(_amount > 0,
       "0x0B");
     require(_id < nextPoolId,
       "0x1B");
     require(pools[_id].config.singlePurchaseLimit >= _amount,
       "0x2B");
+
+    {
+      require(keccak256(abi.encodePacked(_whiteList.index, msg.sender)) == _whiteList.node);
+      uint256 accesslistId = pools[_id].whiteListId;
+      SuperMerkleAccess.verify(accesslistId, _whiteList.index, _whiteList.node, _whiteList.merkleProof);
+    }
 
     // Verify that the asset being used in the purchase is valid.
     // bytes32 itemKey = keccak256(abi.encode(pools[_id].currentPoolVersion,
@@ -851,22 +762,6 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop {
       _amount + pools[_id].purchaseCounts[_msgSender()];
     require(userPoolPurchaseAmount <= pools[_id].config.purchaseLimit,
       "0x5B");
-
-    // Verify that the pool is either public, inactive, time-expired,
-    // or the caller's address is whitelisted.
-    {
-      uint256 whitelistId = pools[_id].config.requirement.whitelistId;
-      uint256 whitelistVersion =
-        whitelists[whitelistId].currentWhitelistVersion;
-      bytes32 addressKey = keccak256(abi.encode(whitelistVersion,
-        _msgSender()));
-      bool addressWhitelisted = whitelists[whitelistId].addresses[addressKey];
-      require(whitelistId == 0
-        || !whitelists[whitelistId].isActive
-        || block.timestamp > whitelists[whitelistId].expiryTime
-        || addressWhitelisted,
-        "0x6B");
-    }
 
     // Verify that the pool is not depleted by the user's purchase.
     uint256 newCirculatingTotal = pools[_id].itemMinted[itemKey] + _amount;
