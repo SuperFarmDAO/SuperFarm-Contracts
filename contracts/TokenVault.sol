@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8.7;
 
-
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
@@ -10,8 +9,12 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Burnable.sol";
 import "./ISuper1155.sol"; // CHECK not that interface
 import "./interfaces/ISuper721.sol";
+import "@openzeppelin/contracts/token/ERC1155/utils/ERC1155Holder.sol";
+import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
+import "@openzeppelin/contracts/utils/introspection/ERC165Storage.sol";
 import "./Token.sol";
 import "hardhat/console.sol";       // ATTENTION only for testing
+
 /**
   @title A vault for securely holding tokens.
   @author Tim Clancy
@@ -26,7 +29,7 @@ import "hardhat/console.sol";       // ATTENTION only for testing
   and non-timelocked multisignature wallet, or finding some way to issue a new
   token entirely.
 */
-contract TokenVault is Ownable, ReentrancyGuard {
+contract TokenVault is Ownable, ReentrancyGuard, IERC721Receiver, ERC1155Holder {
     using SafeERC20 for IERC20;
     using EnumerableSet for EnumerableSet.AddressSet;
     /// A version number for this TokenVault contract's interface.
@@ -181,7 +184,7 @@ contract TokenVault is Ownable, ReentrancyGuard {
         @param _assets array of assets that added to contract  
      */
     function addTokens(address[] calldata _contrAddrs, Asset[] calldata _assets) external nonReentrant onlyOwner {
-      require(_contrAddrs.length == _assets.length, "Number of contracts and id should be the same");
+      require(_contrAddrs.length == _assets.length, "Number of contracts and assets should be the same");
  
       for (uint256 i = 0; i < _contrAddrs.length; i++) {
         require(super1155Addresses.contains(_contrAddrs[i]) || super721Addresses.contains(_contrAddrs[i]), "Address of token is not permited"); 
@@ -301,14 +304,16 @@ contract TokenVault is Ownable, ReentrancyGuard {
         for (uint256 i = 0; i < super1155Addresses.length(); i++) {
           ISuper1155(super721Addresses.at(i)).safeBatchTransferFrom(address(this), panicDestination, assets[super1155Addresses.at(i)].ids, assets[super1155Addresses.at(i)].amounts, "");
         }
+        panicCounter = panicCounter + 1;
         emit PanicTransfer(panicCounter, totalBalanceERC20, totalBalanceEth, totalAmountERC721, totalAmountERC1155, panicDestination);
       }
-      panicCounter = panicCounter + 1;
-    }
   }
 
-    /// function that allow contract to receive ether 
-    receive() external payable {
-        emit Receive(msg.sender, msg.value);
+  receive() external payable {
+    emit Receive(msg.sender, msg.value);
+  }
+
+  function onERC721Received(address, address, uint256, bytes memory) public virtual override returns (bytes4) {
+        return this.onERC721Received.selector;
     }
 }

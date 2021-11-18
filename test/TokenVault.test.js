@@ -17,7 +17,7 @@ const AssetType = Object.freeze({
 
 // Test the TokenVault with Timelock and MultiSigWallet functionality.
 describe("TokenVault", function () {
-    let alice, bob, carol, dev;
+    let admin, alice, bob, carol, dev;
     let Token,
         MultiSigWallet,
         Timelock,
@@ -100,13 +100,13 @@ describe("TokenVault", function () {
             proxyRegistry.address
         );
         await super1155.deployed();
-        super1155Additional = await super1155Additional.connect(admin).deploy(
+        super1155Additional = await Super1155.connect(admin).deploy(
             admin.address,
             "SUPER1155ADD",
             "URI_SUPER1155A",
             proxyRegistry.address
         );
-        await super1155.deployed();
+        await super1155Additional.deployed();
 
         await tokenVault.connect(admin).transferOwnership(timeLock.address);
         await token
@@ -123,7 +123,12 @@ describe("TokenVault", function () {
         let releaseTokenTransaction =
             await tokenVault.populateTransaction.sendTokens(
                 [dev.address],
-                [ethers.utils.parseEther("1000000")]
+                [],
+                [{
+                    assetType: AssetType.ERC20,
+                    amounts: [ethers.utils.parseEther("1000")], 
+                    ids: [] 
+                }]
             );
 
         // Generate the raw transaction for enqueuing token release with the time lock.
@@ -168,7 +173,7 @@ describe("TokenVault", function () {
             .confirmTransaction(0);
         let confirmationReceipt = await confirmationTransaction.wait();
         let executionEvent =
-            confirmationReceipt.events[confirmationReceipt.events.length - 1];
+            confirmationReceipt.events[confirmationReceipt.events.length -1];
         executionEvent.event.should.be.equal("Execution");
         transactionData = await multiSig.transactions(0);
         transactionData.destination.should.be.equal(timeLock.address);
@@ -573,7 +578,7 @@ describe("TokenVault", function () {
                 tokenVault.address, transValue, "", sendTokensERC721.data, eta
             )
 
-            let devBalanceBefore = ; // TODO balance check for 721
+             let devBalanceBefore = 22; // TODO balance check for 721
 
             await multiSig.connect(alice).submitTransaction(timeLock.address, transValue, executeSend.data);
             await multiSig.connect(bob).confirmTransaction(0);
@@ -584,7 +589,7 @@ describe("TokenVault", function () {
 
             await multiSig.connect(bob).executeTransaction(0);
 
-            let devBalanceAfter = ; // TODO balance check for 721
+            let devBalanceAfter = 21; // TODO balance check for 721
             // check dev balance after 
             expect(devBalanceAfter.sub(devBalanceBefore)).to.be.equal(ethers.utils.parseEther("1000"));
         });
@@ -595,7 +600,7 @@ describe("TokenVault", function () {
                 tokenVault.address, transValue, "", sendTokensERC1155.data, eta
             )
 
-            let devBalanceBefore = ; // TODO balance check for 1155
+            let devBalanceBefore = 22; // TODO balance check for 1155
 
             await multiSig.connect(alice).submitTransaction(timeLock.address, transValue, executeSend.data);
             await multiSig.connect(bob).confirmTransaction(0);
@@ -606,7 +611,7 @@ describe("TokenVault", function () {
 
             await multiSig.connect(bob).executeTransaction(0);
 
-            let devBalanceAfter = ; // TODO balance check for 1155
+            let devBalanceAfter = 42; // TODO balance check for 1155
             // check dev balance after 
             expect(devBalanceAfter.sub(devBalanceBefore)).to.be.equal(ethers.utils.parseEther("1000"))
         });
