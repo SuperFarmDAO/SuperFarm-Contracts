@@ -2,6 +2,7 @@
 pragma solidity ^0.8.7;
 
 import "../../access/PermitControl.sol";
+import "../../interfaces/ISuper721IMXLock.sol";
 
 /**
   @title An ERC-721IMX item collections global lock contract.
@@ -10,7 +11,7 @@ import "../../access/PermitControl.sol";
   deployed 721IMX instances. This prevents bad L2 minting if keys were
   compromised.
 */
-contract Super721IMXLock is PermitControl {
+contract Super721IMXLock is PermitControl, ISuper721IMXLock {
 
   /// The public identifier for the right to execute the toggleMintFor fucntion.
   bytes32 public constant TOGGLE_MINT_FOR = keccak256("TOGGLE_MINT_FOR");
