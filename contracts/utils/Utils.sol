@@ -188,7 +188,7 @@ library Utils {
         returns (uint256, bytes memory)
     {
         int256 index = indexOf(blob, ":", 0);
-        require(index >= 0, "Separator must exist");
+        require(index >= 0, "Ux01");
         // Trim the { and } from the parameters
         uint256 tokenID = toUint(blob[1:uint256(index) - 1]);
         uint256 blueprintLength = blob.length - uint256(index) - 3;
@@ -227,6 +227,21 @@ library Utils {
         }
         return result;
     }
+
+    function interpolate(string memory source, uint value) internal pure returns (string memory result){
+        Slice memory slice1 = toSlice(source);
+        Slice memory slice2 = toSlice(source);
+        string memory tokenFirst = "{";
+        string memory tokenLast = "}";
+        Slice memory firstSlice = toSlice(tokenFirst);
+        Slice memory secondSlice = toSlice(tokenLast);
+        firstSlice = beforeMatch(slice1, firstSlice);
+        secondSlice = afterMatch(slice2, secondSlice);
+        string memory first = toString(firstSlice);
+        string memory second = toString(secondSlice);
+        result = string(abi.encodePacked(first, Utils.uint2str(value), second));
+    return result;
+    }
 }
 
 /**
@@ -247,8 +262,8 @@ library ArrayUtils {
     function guardedArrayReplace(bytes memory array, bytes memory desired, bytes memory mask)
         internal pure
     {
-        require(array.length == desired.length);
-        require(array.length == mask.length);
+        require(array.length == desired.length, "Ux02");
+        require(array.length == mask.length, "Ux03");
 
         uint words = array.length / 0x20;
         uint index = words * 0x20;

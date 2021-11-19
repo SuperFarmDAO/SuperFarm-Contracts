@@ -27,7 +27,6 @@ import "../../utils/Utils.sol";
 */
 contract Super721 is PermitControl, ERC165Storage, IERC721 {
   using Address for address;
-  using Utils for string;
   using EnumerableSet for EnumerableSet.UintSet;
   using EnumerableMap for EnumerableMap.UintToAddressMap;
 
@@ -412,18 +411,10 @@ contract Super721 is PermitControl, ERC165Storage, IERC721 {
     @return The metadata URI string of the item with ID `_itemId`.
   */
   function tokenURI(uint256 id) external view returns (string memory) {
-    Utils.Slice memory slice1 = metadataUri.toSlice();
-    Utils.Slice memory slice2 = metadataUri.toSlice();
-    string memory tokenFirst = "{";
-    string memory tokenLast = "}";
-    Utils.Slice memory firstSlice = tokenFirst.toSlice();
-    Utils.Slice memory secondSlice = tokenLast.toSlice();
-    firstSlice = Utils.beforeMatch(slice1, firstSlice);
-    secondSlice = Utils.afterMatch(slice2, secondSlice);
-    string memory first = Utils.toString(firstSlice);
-    string memory second = Utils.toString(secondSlice);
-    string memory result = string(abi.encodePacked(first, Utils.uint2str(id), second));
-    return result;
+      if(bytes(metadataUri).length == 0){
+        return metadata[id];
+    }
+    return Utils.interpolate(metadataUri, id);
   }
 
   /**
