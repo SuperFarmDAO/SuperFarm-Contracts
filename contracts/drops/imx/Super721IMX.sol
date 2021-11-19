@@ -874,8 +874,12 @@ contract Super721IMX is PermitControl, ERC165Storage, IERC721 {
     require(quantity == 1, "Ix27");
     require(!ISuper721IMXLock(super721IMXLock).mintForLocked(), "Ix28");
     // read data
-    (uint256 id,) = Utils.split(_blueprint);
+    (uint256 id, bytes memory metadata_) = Utils.split(_blueprint);
     uint256[] memory ids = _asSingletonArray(id);
+    // effects
+    if(metadata_.length > 0){
+        blueprints[id] = string(metadata_);
+    }
     mintBatch(_to, ids, _blueprint);
   }
 
