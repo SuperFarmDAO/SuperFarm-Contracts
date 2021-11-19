@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.8;
 
-library Strings {
+library Utils {
 
     // this is struct for aligning function memory 
     struct Slice { 
@@ -179,6 +179,52 @@ library Strings {
         assembly { resultPointer := add(result, 32) }
 
         copyToMemory(resultPointer, input.pointer, input.length);
+        return result;
+    }
+
+    function split(bytes calldata blob)
+        internal
+        pure
+        returns (uint256, bytes memory)
+    {
+        int256 index = indexOf(blob, ":", 0);
+        require(index >= 0, "Separator must exist");
+        // Trim the { and } from the parameters
+        uint256 tokenID = toUint(blob[1:uint256(index) - 1]);
+        uint256 blueprintLength = blob.length - uint256(index) - 3;
+        if (blueprintLength == 0) {
+            return (tokenID, bytes(""));
+        }
+        bytes calldata blueprint = blob[uint256(index) + 2:blob.length - 1];
+        return (tokenID, blueprint);
+    }
+
+    function indexOf(
+        bytes memory _base,
+        string memory _value,
+        uint256 _offset
+    ) internal pure returns (int256) {
+        bytes memory _valueBytes = bytes(_value);
+
+        assert(_valueBytes.length == 1);
+
+        for (uint256 i = _offset; i < _base.length; i++) {
+            if (_base[i] == _valueBytes[0]) {
+                return int256(i);
+            }
+        }
+
+        return -1;
+    }
+    
+    function toUint(bytes memory b) internal pure returns (uint256) {
+        uint256 result = 0;
+        for (uint256 i = 0; i < b.length; i++) {
+            uint256 val = uint256(uint8(b[i]));
+            if (val >= 48 && val <= 57) {
+                result = result * 10 + (val - 48);
+            }
+        }
         return result;
     }
 }

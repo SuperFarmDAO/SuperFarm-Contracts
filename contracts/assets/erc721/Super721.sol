@@ -27,7 +27,7 @@ import "../../utils/Utils.sol";
 */
 contract Super721 is PermitControl, ERC165Storage, IERC721 {
   using Address for address;
-  using Strings for string;
+  using Utils for string;
   using EnumerableSet for EnumerableSet.UintSet;
   using EnumerableMap for EnumerableMap.UintToAddressMap;
 
@@ -412,17 +412,17 @@ contract Super721 is PermitControl, ERC165Storage, IERC721 {
     @return The metadata URI string of the item with ID `_itemId`.
   */
   function tokenURI(uint256 id) external view returns (string memory) {
-    Strings.Slice memory slice1 = metadataUri.toSlice();
-    Strings.Slice memory slice2 = metadataUri.toSlice();
+    Utils.Slice memory slice1 = metadataUri.toSlice();
+    Utils.Slice memory slice2 = metadataUri.toSlice();
     string memory tokenFirst = "{";
     string memory tokenLast = "}";
-    Strings.Slice memory firstSlice = tokenFirst.toSlice();
-    Strings.Slice memory secondSlice = tokenLast.toSlice();
-    firstSlice = Strings.beforeMatch(slice1, firstSlice);
-    secondSlice = Strings.afterMatch(slice2, secondSlice);
-    string memory first = Strings.toString(firstSlice);
-    string memory second = Strings.toString(secondSlice);
-    string memory result = string(abi.encodePacked(first, Strings.uint2str(id), second));
+    Utils.Slice memory firstSlice = tokenFirst.toSlice();
+    Utils.Slice memory secondSlice = tokenLast.toSlice();
+    firstSlice = Utils.beforeMatch(slice1, firstSlice);
+    secondSlice = Utils.afterMatch(slice2, secondSlice);
+    string memory first = Utils.toString(firstSlice);
+    string memory second = Utils.toString(secondSlice);
+    string memory result = string(abi.encodePacked(first, Utils.uint2str(id), second));
     return result;
   }
 
