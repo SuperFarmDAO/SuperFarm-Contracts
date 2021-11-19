@@ -1,6 +1,6 @@
 pragma solidity ^0.8.7;
 
-import '../Super721IMX.sol';
+import '../drops/imx/Super721IMX.sol';
 
 /**
     This contract pretends to be the IMX core, which calls the

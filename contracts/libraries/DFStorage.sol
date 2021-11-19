@@ -42,7 +42,8 @@ library DFStorage {
         Public,
         TokenRequired,
         ItemRequired,
-        PointRequired
+        PointRequired,
+        ItemRequired721
     }
 
     /**

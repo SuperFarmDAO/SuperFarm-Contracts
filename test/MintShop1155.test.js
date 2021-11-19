@@ -50,6 +50,8 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
     let shiftedItemGroupId = itemGroupId.shl(128);
     let itemGroupId2 = ethers.BigNumber.from(2);
     let shiftedItemGroupId2 = itemGroupId2.shl(128);
+    let item721, Item721;
+    let MINT721;
 
     before(async function () {
         this.MintShop1155 = await ethers.getContractFactory("MintShop1155");
@@ -57,6 +59,7 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
         this.Staker = await ethers.getContractFactory("Staker");
         this.ProxyRegistry = await ethers.getContractFactory("ProxyRegistry");
         this.Super1155 = await ethers.getContractFactory("Super1155");
+        // this.Item721 = await ethers.getContractFactory("Super721");
     });
 
     beforeEach(async function () {
@@ -88,7 +91,8 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
         mintShop1155 = await this.MintShop1155.deploy(
             owner.address,
             paymentReceiver.address,
-            "4"
+            "4",
+            200
         );
         await mintShop1155.deployed();
 
@@ -115,6 +119,7 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
         UNIVERSAL = await mintShop1155.UNIVERSAL();
         MANAGER = await mintShop1155.MANAGER();
         zeroRight = await mintShop1155.ZERO_RIGHT();
+        MINT721 = await item721.MINT();
 
         setSweepRight = await mintShop1155.SWEEP();
         setLockSweepRight = await mintShop1155.LOCK_SWEEP();
@@ -147,7 +152,8 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
             let mintShop1155v2 = await this.MintShop1155.deploy(
                 deployer.address,
                 paymentReceiver.address,
-                "4"
+                "4",
+                1
             );
             await super1155.deployed();
 

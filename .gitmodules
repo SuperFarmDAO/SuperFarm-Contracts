@@ -1,0 +1,3 @@
+[submodule "legacy"]
+	path = legacy
+	url = https://github.com/SuperFarmDAO/wip-contracts.git
