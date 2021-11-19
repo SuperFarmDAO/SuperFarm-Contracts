@@ -32,7 +32,7 @@ describe('===Super721IMX===', function () {
     let proxyRegistry;
     let mockIMXCore;
     let super721IMXLock;
-    const originalUri = "://ipfs/uri/{id}.json";
+    const originalUri = "://ipfs/uri/";
     let itemGroupId = ethers.BigNumber.from(1);
     let shiftedItemGroupId = itemGroupId.shl(128);
     let itemGroupId2 = ethers.BigNumber.from(2);
@@ -100,8 +100,10 @@ describe('===Super721IMX===', function () {
                 "Super721IMX",
                 "SIMX721",
                 originalUri,
+                originalUri,
                 proxyRegistry.address,
-                mockIMXCore.address
+                mockIMXCore.address,
+                super721IMXLock.address
             );
             expect(await super721IMXv2.owner()).to.equal(deployer.address);
             expect(await super721IMXv2.name()).to.equal('Super721IMX');
@@ -113,7 +115,7 @@ describe('===Super721IMX===', function () {
 
     describe("uri", function () {
         it('returns the metadataUri', async function () {
-            expect(await super721IMX.uri(1)).to.equal(originalUri);
+            expect(await super721IMX.metadataUri()).to.equal(originalUri);
         });
     });
 
@@ -121,18 +123,20 @@ describe('===Super721IMX===', function () {
         it('reverts when there is not a valid permit for sender', async function () {
             await expect(
                 super721IMX.setURI("://ipfs/newuri/{id}")
-            ).to.be.revertedWith('PermitControl: sender does not have a valid permit');
-            expect(await super721IMX.uri(1)).to.equal(originalUri);
+            ).to.be.revertedWith('P1');
+            expect(await super721IMX.contractURI()).to.equal(originalUri);
         });
 
         it('reverts when the collection has been locked', async function () {
-            await super721IMX.connect(owner).lockURI('hi');
+            await super721IMX.connect(owner).lockURI();
+
+            console.log(await super721IMX.uriLocked());
 
             await expect(
                 super721IMX.connect(owner).setURI("://ipfs/newuri/")
-            ).to.be.revertedWith("Super721::setURI: the collection URI has been permanently locked");
+            ).to.be.revertedWith("Ix05");
 
-            expect(await super721IMX.uri(1)).to.equal('hi');
+            expect(await super721IMX.contractURI()).to.equal('://ipfs/uri/');
         });
 
         it('sets the metadataUri when there is a valid permit', async function () {
@@ -142,8 +146,8 @@ describe('===Super721IMX===', function () {
                 setUriRight,
                 ethers.constants.MaxUint256
             );
-            await super721IMX.setURI("://ipfs/newuri/");
-            expect(await super721IMX.uri(1)).to.equal("://ipfs/newuri/");
+            await super721IMX.connect(deployer).setURI("://ipfs/newuri/");
+            expect(await super721IMX.metadataUri()).to.equal("://ipfs/newuri/");
             expect(await super721IMX.uriLocked()).to.equal(false);
         });
     });
@@ -151,20 +155,28 @@ describe('===Super721IMX===', function () {
     describe("lockURI", function () {
         it('reverts when there is not a valid permit for sender', async function () {
             await expect(
-                super721IMX.lockURI("://ipfs/lockeduri/{id}")
-            ).to.be.revertedWith('PermitControl: sender does not have a valid permit');
-            expect(await super721IMX.uri(1)).to.equal(originalUri);
+                super721IMX.lockURI()
+            ).to.be.revertedWith('P1');
+            expect(await super721IMX.metadataUri()).to.equal(originalUri);
         });
 
         it('sets the metadataUri and locks it when there is a valid permit', async function () {
             await super721IMX.connect(owner).setPermit(
                 deployer.address,
                 UNIVERSAL,
+                setUriRight,
+                ethers.constants.MaxUint256
+            );
+
+            await super721IMX.connect(owner).setPermit(
+                deployer.address,
+                UNIVERSAL,
                 lockUriRight,
                 ethers.constants.MaxUint256
             );
-            await super721IMX.lockURI("://ipfs/lockeduri/{id}");
-            expect(await super721IMX.uri(1)).to.equal("://ipfs/lockeduri/{id}");
+            await super721IMX.connect(deployer).setURI("://ipfs/lockeduri/{id}");
+            await super721IMX.connect(deployer).lockURI();
+            expect(await super721IMX.metadataUri()).to.equal("://ipfs/lockeduri/{id}");
             expect(await super721IMX.uriLocked()).to.equal(true);
         });
     });
@@ -173,8 +185,8 @@ describe('===Super721IMX===', function () {
         it('reverts when there is not a valid permit for sender', async function () {
             expect(await super721IMX.metadataFrozen(1)).to.equal(false);
             await expect(
-                super721IMX.lockItemGroupURI("://ipfs/lockeduri/{id}", 1)
-            ).to.be.revertedWith('Super721::hasItemRight: _msgSender does not have the right to perform that action');
+                super721IMX.lockItemURI("://ipfs/lockeduri/{id}", 1)
+            ).to.be.revertedWith('Ix01');
             expect(await super721IMX.metadataFrozen(1)).to.equal(false);
         });
 
@@ -186,9 +198,9 @@ describe('===Super721IMX===', function () {
                 ethers.constants.MaxUint256
             );
             expect(await super721IMX.metadataFrozen(1)).to.equal(false);
-            await super721IMX.lockItemGroupURI("://ipfs/lockeduri/", 1);
+            await super721IMX.lockItemURI("://ipfs/lockeduri/", 1);
             expect(await super721IMX.metadataFrozen(1)).to.equal(true);
-            expect(await super721IMX.uri(1)).to.equal("://ipfs/uri/");
+            expect(await super721IMX.metadataUri()).to.equal("://ipfs/uri/");
             expect(await super721IMX.uriLocked()).to.equal(false);
         });
     });
@@ -197,7 +209,7 @@ describe('===Super721IMX===', function () {
         it('Reverts: no setProxyRegistry permissions', async () => {
             await expect(
                 super721IMX.setProxyRegistry(signer1.address)
-            ).to.be.revertedWith("PermitControl: sender does not have a valid permit");
+            ).to.be.revertedWith("P1");
         });
 
         it('allows setProxyRegistry when permissions', async () => {
@@ -221,7 +233,7 @@ describe('===Super721IMX===', function () {
         it('Reverts: querying balance of address(0)', async () => {
             await expect(
                 super721IMX.balanceOfGroup(NULL_ADDRESS, 1)
-            ).to.be.revertedWith("Super721::balanceOf: balance query for the zero address");
+            ).to.be.revertedWith("Ix07");
         });
 
         it('returns the balanceOfGroup other addresses', async () => {
@@ -249,7 +261,7 @@ describe('===Super721IMX===', function () {
         it('Reverts: permit is not valid unless owner is sender', async () => {
             await expect(
                 super721IMX.lock()
-            ).to.be.revertedWith("PermitControl: sender does not have a valid permit");
+            ).to.be.revertedWith("P1");
 
             expect(await super721IMX.locked()).to.equal(false);
             await super721IMX.connect(owner).lock();
@@ -278,7 +290,7 @@ describe('===Super721IMX===', function () {
         it('Reverts: setting approval status for self', async () => {
             await expect(
                 super721IMX.setApprovalForAll(deployer.address, true)
-            ).to.be.revertedWith("Super721::balanceOf: setting approval status for self");
+            ).to.be.revertedWith("Ix09");
         });
 
         it('uses operatorApprovals except when the operator is registered in the proxyRegistry', async () => {
@@ -329,7 +341,7 @@ describe('===Super721IMX===', function () {
                     proxyRegistry.address,
                     [shiftedItemGroupIdTransferException],
                     ethers.utils.id(''))
-            ).to.be.revertedWith("Super721::_doSafeTransferAcceptanceCheck: transfer to non ERC721Receiver implementer");
+            ).to.be.revertedWith("Ix10");
 
             let MockERC721Receiver1 = await ethers.getContractFactory("MockERC721Receiver1");
             let mockERC721Receiver1 = await MockERC721Receiver1.deploy();
@@ -341,7 +353,7 @@ describe('===Super721IMX===', function () {
                     mockERC721Receiver1.address,
                     [shiftedItemGroupIdTransferException],
                     ethers.utils.id(''))
-            ).to.be.revertedWith("Super721::_doSafeTransferAcceptanceCheck: ERC721Receiver rejected tokens");
+            ).to.be.revertedWith("Ix09");
 
             expect(await super721IMX.balanceOfGroup(signer1.address, shiftedItemGroupIdTransferException)).to.equal(1);
 
@@ -382,18 +394,18 @@ describe('===Super721IMX===', function () {
                     mockERC721Receiver1.address,
                     [2],
                     ethers.utils.id('b'))
-            ).to.be.revertedWith("Super721::safeBatchTransferFrom: insufficient balance for transfer");
+            ).to.be.revertedWith("Ix16");
         });
         it('Reverts: transfer to the 0 address', async () => {
             await expect(
                 super721IMX.safeBatchTransferFrom(signer1.address, NULL_ADDRESS, [1], ethers.utils.id('a'))
-            ).to.be.revertedWith("Super721::safeBatchTransferFrom: transfer to the zero address");
+            ).to.be.revertedWith("Ix14");
         });
         it('Reverts: caller is not owner nor approved', async () => {
             // not owner or approved
             await expect(
                 super721IMX.connect(signer3).safeBatchTransferFrom(signer1.address, super721IMX.address, [1], ethers.utils.id('a'))
-            ).to.be.revertedWith("Super721::safeBatchTransferFrom: caller is not owner nor approved");
+            ).to.be.revertedWith("Ix15");
         });
         it('transfers in batches, safely', async () => {
             let MockERC721Receiver1 = await ethers.getContractFactory("MockERC721Receiver1");
@@ -419,7 +431,7 @@ describe('===Super721IMX===', function () {
 
             await expect(
                 super721IMX.connect(owner).burnBatch(signer1.address, [shiftedItemGroupId2])
-            ).to.be.revertedWith("Super721::burn: burn amount exceeds balance");
+            ).to.be.revertedWith("Ix33");
 
             // MINT
             await super721IMX.connect(owner).mintBatch(deployer.address, [shiftedItemGroupId, shiftedItemGroupId2], ethers.utils.id('a'));
@@ -526,7 +538,7 @@ describe('===Super721IMX===', function () {
                     signer1.address,
                     mockERC721Receiver1.address,
                     shiftedItemGroupIdTransferException)
-            ).to.be.revertedWith("Super721::_doSafeTransferAcceptanceCheck: ERC721Receiver rejected tokens");
+            ).to.be.revertedWith("Ix09");
 
             // Using the Overloaded variant which is without the bytes32 as parameter
             await expect(
@@ -534,25 +546,25 @@ describe('===Super721IMX===', function () {
                     signer1.address,
                     proxyRegistry.address,
                     shiftedItemGroupIdTransferException)
-            ).to.be.revertedWith("Super721::_doSafeTransferAcceptanceCheck: transfer to non ERC721Receiver implementer");
+            ).to.be.revertedWith("Ix10");
 
             expect(await super721IMX.balanceOfGroup(signer1.address, shiftedItemGroupIdTransferException)).to.equal(1);
         });
         it('Reverts: transfer to the 0 address', async () => {
             await expect(
                 super721IMX["safeTransferFrom(address,address,uint256)"](signer1.address, NULL_ADDRESS, 1)
-            ).to.be.revertedWith("Super721::_safeTransferFrom : transfer to the zero address");
+            ).to.be.revertedWith("Ix11");
         });
         it('Reverts: call is not owner nor approved', async () => {
             // not owner
             await expect(
                 super721IMX["safeTransferFrom(address,address,uint256)"](signer1.address, super721IMX.address, 1)
-            ).to.be.revertedWith("Super721::_safeTransferFrom : caller is not owner nor approved");
+            ).to.be.revertedWith("Ix12");
 
             // not approved
             await expect(
                 super721IMX.connect(signer3)["safeTransferFrom(address,address,uint256)"](signer1.address, super721IMX.address, 1)
-            ).to.be.revertedWith("Super721::_safeTransferFrom : caller is not owner nor approved");
+            ).to.be.revertedWith("Ix12");
         });
         it('should safeTransferFrom', async () => {
             await super721IMX.connect(owner).configureGroup(itemGroupId, {
@@ -574,7 +586,7 @@ describe('===Super721IMX===', function () {
 
             await expect(
                 super721IMX.connect(owner).burnBatch(signer1.address, [shiftedItemGroupId2])
-            ).to.be.revertedWith("Super721::burn: burn amount exceeds balance");
+            ).to.be.revertedWith("Ix33");
 
             // MINT
             await super721IMX.connect(owner).mintBatch(deployer.address, [shiftedItemGroupId, shiftedItemGroupId2], ethers.utils.id('a'));
@@ -669,14 +681,14 @@ describe('===Super721IMX===', function () {
                     deployer.address,
                     signer2.address,
                     shiftedItemGroupId,
-            )).to.be.revertedWith("Super721::transferForm: transfer caller is not owner nor approved");
+            )).to.be.revertedWith("Ix36");
 
             await expect(
                 super721IMX.transferFrom(
                     deployer.address,
                     signer2.address,
                     shiftedItemGroupId2,
-            )).to.be.revertedWith("Super721::getApproved: operator query for nonexistent token");
+            )).to.be.revertedWith("Ix35");
 
             await super721IMX.transferFrom(
                 deployer.address,
@@ -698,12 +710,12 @@ describe('===Super721IMX===', function () {
         it('Reverts: no right', async () => {
             await expect(
                 super721IMX.burnBatch(signer1.address, [1])
-            ).to.be.revertedWith("Super721::burnBatch: you do not have the right to burn that item");
+            ).to.be.revertedWith("Ix32");
         });
         it('Reverts: non-existent group', async () => {
             await expect(
                 super721IMX.connect(owner).burnBatch(signer1.address, [1])
-            ).to.be.revertedWith("Super721::_burnChecker: you cannot burn a non-existent item group");
+            ).to.be.revertedWith("Ix29");
         });
         it('Reverts: burn limit exceeded', async () => {
             await super721IMX.connect(owner).configureGroup(itemGroupId, {
@@ -716,7 +728,7 @@ describe('===Super721IMX===', function () {
 
             await expect(
                 super721IMX.connect(owner).burnBatch(signer1.address, [shiftedItemGroupId])
-            ).to.be.revertedWith("Super721::_burnChecker you may not exceed the burn limit on this item group");
+            ).to.be.revertedWith("Ix31");
         });
         it('Reverts: burn zero address', async () => {
             await expect(
@@ -739,7 +751,7 @@ describe('===Super721IMX===', function () {
             // Try burning a non burnable token
             await expect(
                 super721IMX.connect(owner).burnBatch(signer1.address, [shiftedItemGroupId2])
-            ).to.be.revertedWith("Super721::_burnChecker: you cannot burn a non-burnable item group");
+            ).to.be.revertedWith("Ix30");
         });
         it('burns in batches replenishable items', async () => {
             await super721IMX.connect(owner).configureGroup(itemGroupId, {
@@ -799,7 +811,7 @@ describe('===Super721IMX===', function () {
 
             await expect(
                 super721IMX.connect(owner).burnBatch(signer1.address, [shiftedItemGroupId, shiftedItemGroupId2])
-            ).to.be.revertedWith("Super721::burn: burn amount exceeds balance");
+            ).to.be.revertedWith("Ix33");
 
             // MINT
             await super721IMX.connect(owner).mintBatch(
@@ -860,7 +872,7 @@ describe('===Super721IMX===', function () {
                     burnType: 1,
                     burnData: 20000
                 })
-            ).to.be.revertedWith("Super721::configureGroup: group ID 0 is invalid");
+            ).to.be.revertedWith("Ix17");
         });
 
         it('Reverts: sender does not have the right', async () => {
@@ -872,7 +884,7 @@ describe('===Super721IMX===', function () {
                     burnType: 1,
                     burnData: 20000
                 })
-            ).to.be.revertedWith("Super721::hasItemRight: _msgSender does not have the right to perform that action");
+            ).to.be.revertedWith("Ix01");
         });
 
         it('Reverts: collection is locked', async () => {
@@ -886,7 +898,7 @@ describe('===Super721IMX===', function () {
                     burnType: 1,
                     burnData: 20000
                 })
-            ).to.be.revertedWith("Super721::configureGroup: the collection is locked so groups cannot be created");
+            ).to.be.revertedWith("Ix18");
         });
 
         it('Reverts: cannot change a capped to uncap', async () => {
@@ -906,7 +918,7 @@ describe('===Super721IMX===', function () {
                     burnType: 1,
                     burnData: 20000
                 })
-            ).to.be.revertedWith("Super721::configureGroup: you may not uncap a capped supply type");
+            ).to.be.revertedWith("Ix19");
         });
 
         it('Reverts: cannot increase supply of a capped group', async () => {
@@ -926,7 +938,7 @@ describe('===Super721IMX===', function () {
                     burnType: 1,
                     burnData: 20000
                 })
-            ).to.be.revertedWith("Super721::configureGroup: you may not increase the supply of a capped type");
+            ).to.be.revertedWith("Ix20");
         });
 
         it('Reverts: cannot decrease supply below circulating supply', async () => {
@@ -948,7 +960,7 @@ describe('===Super721IMX===', function () {
                     burnType: 1,
                     burnData: 20000
                 })
-            ).to.be.revertedWith("Super721::configureGroup: you may not decrease supply below the circulating amount");
+            ).to.be.revertedWith("Ix21");
         });
 
         it('allows configuring a group when there is permission for GROUP circumstance', async () => {
@@ -1122,7 +1134,7 @@ describe('===Super721IMX===', function () {
     describe("balanceOf", function () {
         it('Reverts: query for Zero address', async () => {
             await expect(super721IMX.balanceOf(NULL_ADDRESS)
-            ).to.be.revertedWith("Super721::balanceOf: balance query for the zero address");
+            ).to.be.revertedWith("Ix08");
         });
 
         it('returns the balanceOf of tokens for an address', async () => {
@@ -1165,7 +1177,7 @@ describe('===Super721IMX===', function () {
     describe("balanceOfBatch", function () {
         it('Reverts: accounts and ids mismatch', async () => {
             await expect(super721IMX.balanceOfBatch([signer2.address], [shiftedItemGroupId2, shiftedItemGroupId2.add(1)])
-            ).to.be.revertedWith("Super721::balanceOfBatch: accounts and ids length mismatch");
+            ).to.be.revertedWith("");
         });
         it('returns the balanceOf of tokens for arrays addresses and indexes', async () => {
             await super721IMX.connect(owner).configureGroup(itemGroupId, {
@@ -1226,19 +1238,19 @@ describe('===Super721IMX===', function () {
         it('Reverts: sender is not current owner', async () => {
             await expect(
                 super721IMX.approve(signer2.address, tokenId)
-            ).to.be.revertedWith("Super721::approve: approve caller is not owner nor approved for all");
+            ).to.be.revertedWith("Ix04");
         });
 
         it('Reverts: approving current owner', async () => {
             await expect(
                 super721IMX.connect(signer1).approve(signer1.address, tokenId)
-            ).to.be.revertedWith("Super721::approve: approval to current owner");
+            ).to.be.revertedWith("Ix03");
         });
 
         it('approves when owner approves another address', async () => {
             await expect(
                 super721IMX.getApproved(4)
-            ).to.be.revertedWith("Super721::getApproved: approved query for nonexistent token");
+            ).to.be.revertedWith("Ix34");
             expect(await super721IMX.getApproved(tokenId)).to.equal(NULL_ADDRESS);
             await super721IMX.connect(signer1).approve(signer2.address, tokenId);
             expect(await super721IMX.getApproved(tokenId)).to.equal(signer2.address);
@@ -1316,13 +1328,13 @@ describe('===Super721IMX===', function () {
 
             await expect(
                 super721IMX.connect(owner).mintBatch(signer1.address, [shiftedItemGroupId], ethers.utils.id('a'))
-            ).to.be.revertedWith("0x2A");
+            ).to.be.revertedWith("Ix23");
         });
 
         it('Reverts: mint to non existent group"', async () => {
             await expect(
                 super721IMX.connect(owner).mintBatch(signer1.address, [shiftedItemGroupId], ethers.utils.id('a'))
-            ).to.be.revertedWith("0x1A");
+            ).to.be.revertedWith("Ix22");
         });
 
         it('Reverts: cannot mint beyond cap', async () => {
@@ -1337,7 +1349,7 @@ describe('===Super721IMX===', function () {
             await super721IMX.connect(owner).mintBatch(signer1.address, [shiftedItemGroupId], ethers.utils.id('a'))
             await expect(
                 super721IMX.connect(owner).mintBatch(signer1.address, [shiftedItemGroupId.add(1)], ethers.utils.id('a'))
-                ).to.be.revertedWith("0x3A");
+                ).to.be.revertedWith("Ix24");
         });
         it('should mint if there is a persmission for the group of the item', async () => {
             let groupCirumstance = "0x0000000000000000000000000000000000000000000000000000000000000001"
@@ -1390,7 +1402,7 @@ describe('===Super721IMX===', function () {
 
             await expect(
                 super721IMX.connect(signer1).mintBatch(signer1.address, [shiftedItemGroupId], ethers.utils.id('a'))
-            ).to.be.revertedWith("Super721::mintBatch: you do not have the right to mint that item");
+            ).to.be.revertedWith("Ix25");
 
             await super721IMX.connect(owner).setPermit(
                 signer1.address,
@@ -1434,7 +1446,7 @@ describe('===Super721IMX===', function () {
 
             await expect(
                 super721IMX.connect(signer2).mintBatch(signer1.address, [shiftedItemGroupId2], ethers.utils.id('a'))
-            ).to.be.revertedWith("Super721::mintBatch: you do not have the right to mint that item");
+            ).to.be.revertedWith("Ix25");
 
             await super721IMX.connect(owner).setPermit(
                 signer2.address,
@@ -1463,15 +1475,15 @@ describe('===Super721IMX===', function () {
         it('Reverts: no setMetadata permissions', async () => {
             await expect(
                 super721IMX.setMetadata(1, 'mettaDatum')
-            ).to.be.revertedWith("Super721::hasItemRight: _msgSender does not have the right to perform that action");
+            ).to.be.revertedWith("Ix01");
         });
 
         it('Reverts: global lockURI', async () => {
-            await super721IMX.connect(owner).lockURI('lockedURI');
+            await super721IMX.connect(owner).lockURI();
 
             await expect(
                 super721IMX.connect(owner).setMetadata(1, 'mettaDatum')
-            ).to.be.revertedWith("Super721::setMetadata: you cannot edit this metadata because it is frozen");
+            ).to.be.revertedWith("");
         });
 
         it('allows setMetadata when there is permission to the GROUP circumstance', async () => {
@@ -1520,17 +1532,19 @@ describe('===Super721IMX===', function () {
 
     describe("tokenURI", function () {
         it('should return the tokenURI', async () => {
+            console.log(await super721IMX.metadataUri());
+            await super721IMX.connect(owner).setURI("://ipfs/uri/{id}.json");
             await expect(
-                await super721IMX.tokenURI(4)
-            ).to.be.equal("://ipfs/uri/4.json");
+                await super721IMX.tokenURI(3)
+            ).to.be.equal("://ipfs/uri/3.json");
         });
     });
 
     describe("mintFor", function () {
         it('Reverts: caller is not IMX core', async () => {
             await expect(
-                super721IMX.mintFor(signer1.address, 1, ethers.utils.id('a'))
-            ).to.be.revertedWith("SuperIMX721::mintFor::only IMX may call this mint function");
+                super721IMX.mintFor(signer1.address, shiftedItemGroupId, ethers.utils.id('a'))
+            ).to.be.revertedWith("Ix26");
         });
 
         it('Reverts: mintFor function is locked', async () => {
@@ -1538,13 +1552,13 @@ describe('===Super721IMX===', function () {
 
             await expect(
                 super721IMX.mintFor(signer1.address, shiftedItemGroupId, ethers.utils.id('a'))
-            ).to.be.revertedWith("SuperIMX721::mintFor::disabled");
+            ).to.be.revertedWith("Ix26");
 
             await super721IMXLock.connect(owner).toggleMintFor(); // UNLOCKED
 
             await expect(
                 super721IMX.mintFor(signer1.address, shiftedItemGroupId, ethers.utils.id('a'))
-            ).to.be.revertedWith("SuperIMX721::mintFor::only IMX may call this mint function");
+            ).to.be.revertedWith("Ix26");
         });
 
         it('IMX core should mint for an address', async () => {
@@ -1564,8 +1578,10 @@ describe('===Super721IMX===', function () {
                 burnType: 1,
                 burnData: 20000
             });
-
-            await mockIMXCore.mintFor(signer1.address, shiftedItemGroupId, ethers.utils.id('a'));
+            let blueprint = (itemGroupId + ":metadata");
+            let hex = ethers.utils.hexlify(blueprint);
+            let blueprintBytes = ethers.utils.arrayify(hex);
+            await mockIMXCore.mintFor(signer1.address, 1, blueprintBytes);
 
             await expect(
                 await super721IMX.balanceOf(signer1.address)
@@ -1601,13 +1617,13 @@ describe('===Super721IMX===', function () {
                 deployer.address,
                 [shiftedItemGroupId.add(1)],
                 ethers.utils.id('a')
-            )).to.be.revertedWith("0x3A");
+            )).to.be.revertedWith("Ix24");
 
             // Burning must fail
             await expect(
                 super721IMX.connect(owner).burnBatch(
                     await signer1.address, [shiftedItemGroupId])
-            ).to.be.revertedWith("Super721::_burnChecker: you cannot burn a non-burnable item group");
+            ).to.be.revertedWith("Ix30");
         });
 
         it('should test BurnType=Burnable group. can be minted | can be burned | can not be reminted', async () => {
@@ -1640,7 +1656,7 @@ describe('===Super721IMX===', function () {
                     deployer.address,
                     [shiftedItemGroupId.add(2)],
                     ethers.utils.id('a')
-            )).to.be.revertedWith("0x3A");
+            )).to.be.revertedWith("Ix24");
 
             // Check circulating supply, mintcount, burncount
             let group = await super721IMX.itemGroups(itemGroupId);
@@ -1663,7 +1679,7 @@ describe('===Super721IMX===', function () {
                     deployer.address,
                     [shiftedItemGroupId],
                     ethers.utils.id('a'))
-                ).to.be.revertedWith("0x2A");
+                ).to.be.revertedWith("Ix23");
 
             // Burn one more item
             await super721IMX.connect(owner).burnBatch(deployer.address, [shiftedItemGroupId.add(1)]);
@@ -1680,12 +1696,12 @@ describe('===Super721IMX===', function () {
                     deployer.address,
                     [shiftedItemGroupId.add(1)],
                     ethers.utils.id('a'))
-                ).to.be.revertedWith("0x2A");
+                ).to.be.revertedWith("Ix23");
 
             // Burning must fail since it reached the burnData limit
             await expect(
                 super721IMX.connect(owner).burnBatch(deployer.address, [shiftedItemGroupId])
-            ).to.be.revertedWith("Super721::_burnChecker you may not exceed the burn limit on this item group");
+            ).to.be.revertedWith("Ix31");
         });
         
         it('should test BurnType=Replenishable group. can be minted | can be burned | can be reminted', async () => {
@@ -1718,7 +1734,7 @@ describe('===Super721IMX===', function () {
                     deployer.address,
                     [shiftedItemGroupId.add(2)],
                     ethers.utils.id('a')
-            )).to.be.revertedWith("0x3A");
+            )).to.be.revertedWith("Ix24");
 
             // Check circulating supply, mintcount, burncount
             let group = await super721IMX.itemGroups(itemGroupId);
@@ -1753,7 +1769,7 @@ describe('===Super721IMX===', function () {
                     deployer.address,
                     [shiftedItemGroupId.add(2)],
                     ethers.utils.id('a')
-            )).to.be.revertedWith("0x3A");
+            )).to.be.revertedWith("Ix24");
 
             // Burn one more item
             await super721IMX.connect(owner).burnBatch(deployer.address, [shiftedItemGroupId.add(1)]);
@@ -1782,7 +1798,7 @@ describe('===Super721IMX===', function () {
                     deployer.address,
                     [shiftedItemGroupId.add(1)],
                     ethers.utils.id('a'))
-                ).to.be.revertedWith("0x2A");
+                ).to.be.revertedWith("Ix23");
         });
     });
     
