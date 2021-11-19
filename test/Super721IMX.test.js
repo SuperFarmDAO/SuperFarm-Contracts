@@ -1578,10 +1578,7 @@ describe('===Super721IMX===', function () {
                 burnType: 1,
                 burnData: 20000
             });
-            let blueprint = (itemGroupId + ":metadata");
-            let hex = ethers.utils.hexlify(blueprint);
-            let blueprintBytes = ethers.utils.arrayify(hex);
-            await mockIMXCore.mintFor(signer1.address, 1, blueprintBytes);
+            await mockIMXCore.mintFor(signer1.address, 1, "0x00000000000000000000000000000001000000000000000000000000000000013a73646a666273646a6c666273646a6c666273646a6c6662736a6c646a73");
 
             await expect(
                 await super721IMX.balanceOf(signer1.address)
