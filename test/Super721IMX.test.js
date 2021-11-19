@@ -1578,7 +1578,10 @@ describe('===Super721IMX===', function () {
                 burnType: 1,
                 burnData: 20000
             });
-            await mockIMXCore.mintFor(signer1.address, 1, "0x00000000000000000000000000000001000000000000000000000000000000013a73646a666273646a6c666273646a6c666273646a6c6662736a6c646a73");
+            const tokenID = '340282366920938463463374607431768211457';
+            const blueprint = 'asdasdasd';
+            const blob = toHex(`{${tokenID}}:{${blueprint}}`);
+            await mockIMXCore.mintFor(signer1.address, 1, blob);
 
             await expect(
                 await super721IMX.balanceOf(signer1.address)
@@ -1800,3 +1803,12 @@ describe('===Super721IMX===', function () {
     });
     
 });
+
+function toHex(str) {
+    let result = '';
+    for (let i=0; i < str.length; i++) {
+      result += str.charCodeAt(i).toString(16);
+    }
+    return '0x' + result;
+  }
+  
