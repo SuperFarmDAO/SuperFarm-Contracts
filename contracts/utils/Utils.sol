@@ -195,6 +195,7 @@ library Utils {
         return result;
     }
 
+<<<<<<< HEAD
    function split(bytes calldata blob)
         internal
         pure
@@ -211,6 +212,23 @@ library Utils {
         slice = blob[uint256(index)+1:blob.length];
         string memory metadata_ = string(abi.encodePacked(slice));
         return (id, metadata_);
+=======
+    function split(bytes calldata blob)
+        internal
+        pure
+        returns (uint256, bytes memory)
+    {
+        int256 index = indexOf(blob, ":", 0);
+        require(index >= 0, "Separator must exist");
+        // Trim the { and } from the parameters
+        uint256 tokenID = toUint(blob[1:uint256(index) - 1]);
+        uint256 blueprintLength = blob.length - uint256(index) - 3;
+        if (blueprintLength == 0) {
+            return (tokenID, bytes(""));
+        }
+        bytes calldata blueprint = blob[uint256(index) + 2:blob.length - 1];
+        return (tokenID, blueprint);
+>>>>>>> staging
     }
 
     /**
