@@ -28,7 +28,7 @@ import "./Super721IMXLock.sol";
 */
 contract Super721IMX is PermitControl, ERC165Storage, IERC721 {
   using Address for address;
-  using Strings for string;
+  using Utils for string;
   using EnumerableSet for EnumerableSet.UintSet;
   using EnumerableMap for EnumerableMap.UintToAddressMap;
 
@@ -421,17 +421,17 @@ contract Super721IMX is PermitControl, ERC165Storage, IERC721 {
     @return The metadata URI string of the item with ID `_itemId`.
   */
   function tokenURI(uint256 id) external view returns (string memory) {
-    Strings.Slice memory slice1 = metadataUri.toSlice();
-    Strings.Slice memory slice2 = metadataUri.toSlice();
+    Utils.Slice memory slice1 = metadataUri.toSlice();
+    Utils.Slice memory slice2 = metadataUri.toSlice();
     string memory tokenFirst = "{";
     string memory tokenLast = "}";
-    Strings.Slice memory firstSlice = tokenFirst.toSlice();
-    Strings.Slice memory secondSlice = tokenLast.toSlice();
-    firstSlice = Strings.beforeMatch(slice1, firstSlice);
-    secondSlice = Strings.afterMatch(slice2, secondSlice);
-    string memory first = Strings.toString(firstSlice);
-    string memory second = Strings.toString(secondSlice);
-    string memory result = string(abi.encodePacked(first, Strings.uint2str(id), second));
+    Utils.Slice memory firstSlice = tokenFirst.toSlice();
+    Utils.Slice memory secondSlice = tokenLast.toSlice();
+    firstSlice = Utils.beforeMatch(slice1, firstSlice);
+    secondSlice = Utils.afterMatch(slice2, secondSlice);
+    string memory first = Utils.toString(firstSlice);
+    string memory second = Utils.toString(secondSlice);
+    string memory result = string(abi.encodePacked(first, Utils.uint2str(id), second));
     return result;
   }
 
@@ -880,60 +880,20 @@ contract Super721IMX is PermitControl, ERC165Storage, IERC721 {
     The special, IMX-privileged minting function for centralized L2 support.
   */
   function mintFor(address _to, uint256 quantity, bytes calldata _blueprint) external {
+<<<<<<< HEAD
     require(!Super721IMXLock(super721IMXLock).mintForLocked(), "SuperIMX721::mintFor::disabled");
     require(_msgSender() == imxCoreAddress, "SuperIMX721::mintFor::only IMX may call this mint function");
+=======
+    require(_msgSender() == imxCoreAddress);
+>>>>>>> origin/develop
     require(quantity == 1);
-    (uint256 id, string memory metadata )= split(_blueprint);
-    blueprints[id] = metadata;
+    require(!Super721IMXLock(super721IMXLock).mintForLocked());
+    (uint256 id, bytes memory metadata )= Utils.split(_blueprint);
+    blueprints[id] = string(abi.encodePacked(metadata));
     uint256[] memory ids = _asSingletonArray(id);
     mintBatch(_to, ids, _blueprint);
   }
 
-    function split(bytes calldata blob)
-        internal
-        pure
-        returns (uint256, string memory)
-    {
-        int256 index = indexOf(blob, ":", 0);
-        require(index >= 0, "Separator must exist");
-        // Trim the { and } from the parameters
-        uint256 tokenID = toUint(blob[1:uint256(index) - 1]);
-        uint256 blueprintLength = blob.length - uint256(index) - 3;
-        if (blueprintLength == 0) {
-            return (tokenID, string(""));
-        }
-        string calldata blueprint = string(blob[uint256(index) + 2:blob.length - 1]);
-        return (tokenID, blueprint);
-    }
-
-    function indexOf(
-        bytes memory _base,
-        string memory _value,
-        uint256 _offset
-    ) internal pure returns (int256) {
-        bytes memory _valueBytes = bytes(_value);
-
-        assert(_valueBytes.length == 1);
-
-        for (uint256 i = _offset; i < _base.length; i++) {
-            if (_base[i] == _valueBytes[0]) {
-                return int256(i);
-            }
-        }
-
-        return -1;
-    }
-    
-    function toUint(bytes memory b) internal pure returns (uint256) {
-        uint256 result = 0;
-        for (uint256 i = 0; i < b.length; i++) {
-            uint256 val = uint256(uint8(b[i]));
-            if (val >= 48 && val <= 57) {
-                result = result * 10 + (val - 48);
-            }
-        }
-        return result;
-    }
   /**
     This is a private helper function to verify, according to all of our various
     minting and burning rules, whether it would be valid to burn some `_amount`

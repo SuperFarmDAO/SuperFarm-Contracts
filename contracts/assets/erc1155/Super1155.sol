@@ -33,7 +33,7 @@ import "./interfaces/ISuper1155.sol";
 */
 contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataURI {
   using Address for address;
-  using Strings for string;
+  using Utils for string;
 
   uint256 MAX_INT = type(uint256).max;
 
