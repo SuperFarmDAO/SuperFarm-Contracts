@@ -798,12 +798,12 @@ contract Super721IMX is PermitControl, ERC165Storage, IERC721 {
     uint256 shiftedGroupId = (_id & GROUP_MASK);
     uint256 groupId = shiftedGroupId >> 128;
     require(itemGroups[groupId].initialized,
-      "Super721::_mintChecker: you cannot mint a non-existent item group");
+      "0x1A");
 
     // If false, owned by address (or NULL_ADDRESS i.e, was burnable)
     // If true, never minted, (or was removed i.e, was replenishable)
     require(!_tokenOwners.contains(_id),
-      "Super721::_mintChecker: token already exists");
+      "0x2A");
 
     // If we can replenish burnt items, then only our currently-circulating
     // supply matters. Otherwise, historic mints are what determine the cap.
@@ -817,7 +817,7 @@ contract Super721IMX is PermitControl, ERC165Storage, IERC721 {
     // If we are subject to a cap on group size, ensure we don't exceed it.
     if (itemGroups[groupId].supplyType != SupplyType.Uncapped) {
       require(currentGroupSupply + 1 <= itemGroups[groupId].supplyData,
-        "Super721::_mintChecker: you cannot mint a group beyond its cap");
+        "0x3A");
     }
 
     return _id;
@@ -880,12 +880,8 @@ contract Super721IMX is PermitControl, ERC165Storage, IERC721 {
     The special, IMX-privileged minting function for centralized L2 support.
   */
   function mintFor(address _to, uint256 quantity, bytes calldata _blueprint) external {
-<<<<<<< HEAD
-    require(!Super721IMXLock(super721IMXLock).mintForLocked(), "SuperIMX721::mintFor::disabled");
-    require(_msgSender() == imxCoreAddress, "SuperIMX721::mintFor::only IMX may call this mint function");
-=======
-    require(_msgSender() == imxCoreAddress);
->>>>>>> origin/develop
+    require(!Super721IMXLock(super721IMXLock).mintForLocked());
+    require(_msgSender() == imxCoreAddress );
     require(quantity == 1);
     require(!Super721IMXLock(super721IMXLock).mintForLocked());
     (uint256 id, bytes memory metadata )= Utils.split(_blueprint);

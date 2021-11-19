@@ -62,6 +62,7 @@ describe('===Super721IMX===', function () {
             "Super721IMX",
             "SIMX721",
             originalUri,
+            originalUri,
             proxyRegistry.address,
             mockIMXCore.address,
             super721IMXLock.address
@@ -1315,13 +1316,13 @@ describe('===Super721IMX===', function () {
 
             await expect(
                 super721IMX.connect(owner).mintBatch(signer1.address, [shiftedItemGroupId], ethers.utils.id('a'))
-            ).to.be.revertedWith("Super721::_mintChecker: token already exists");
+            ).to.be.revertedWith("0x2A");
         });
 
         it('Reverts: mint to non existent group"', async () => {
             await expect(
                 super721IMX.connect(owner).mintBatch(signer1.address, [shiftedItemGroupId], ethers.utils.id('a'))
-            ).to.be.revertedWith("Super721::_mintChecker: you cannot mint a non-existent item group");
+            ).to.be.revertedWith("0x1A");
         });
 
         it('Reverts: cannot mint beyond cap', async () => {
@@ -1336,7 +1337,7 @@ describe('===Super721IMX===', function () {
             await super721IMX.connect(owner).mintBatch(signer1.address, [shiftedItemGroupId], ethers.utils.id('a'))
             await expect(
                 super721IMX.connect(owner).mintBatch(signer1.address, [shiftedItemGroupId.add(1)], ethers.utils.id('a'))
-                ).to.be.revertedWith("Super721::_mintChecker: you cannot mint a group beyond its cap");
+                ).to.be.revertedWith("0x3A");
         });
         it('should mint if there is a persmission for the group of the item', async () => {
             let groupCirumstance = "0x0000000000000000000000000000000000000000000000000000000000000001"
@@ -1600,7 +1601,7 @@ describe('===Super721IMX===', function () {
                 deployer.address,
                 [shiftedItemGroupId.add(1)],
                 ethers.utils.id('a')
-            )).to.be.revertedWith("Super721::_mintChecker: you cannot mint a group beyond its cap");
+            )).to.be.revertedWith("0x3A");
 
             // Burning must fail
             await expect(
@@ -1639,7 +1640,7 @@ describe('===Super721IMX===', function () {
                     deployer.address,
                     [shiftedItemGroupId.add(2)],
                     ethers.utils.id('a')
-            )).to.be.revertedWith("Super721::_mintChecker: you cannot mint a group beyond its cap");
+            )).to.be.revertedWith("0x3A");
 
             // Check circulating supply, mintcount, burncount
             let group = await super721IMX.itemGroups(itemGroupId);
@@ -1662,7 +1663,7 @@ describe('===Super721IMX===', function () {
                     deployer.address,
                     [shiftedItemGroupId],
                     ethers.utils.id('a'))
-                ).to.be.revertedWith("Super721::_mintChecker: token already exists");
+                ).to.be.revertedWith("0x2A");
 
             // Burn one more item
             await super721IMX.connect(owner).burnBatch(deployer.address, [shiftedItemGroupId.add(1)]);
@@ -1679,7 +1680,7 @@ describe('===Super721IMX===', function () {
                     deployer.address,
                     [shiftedItemGroupId.add(1)],
                     ethers.utils.id('a'))
-                ).to.be.revertedWith("Super721::_mintChecker: token already exists");
+                ).to.be.revertedWith("0x2A");
 
             // Burning must fail since it reached the burnData limit
             await expect(
@@ -1717,7 +1718,7 @@ describe('===Super721IMX===', function () {
                     deployer.address,
                     [shiftedItemGroupId.add(2)],
                     ethers.utils.id('a')
-            )).to.be.revertedWith("Super721::_mintChecker: you cannot mint a group beyond its cap");
+            )).to.be.revertedWith("0x3A");
 
             // Check circulating supply, mintcount, burncount
             let group = await super721IMX.itemGroups(itemGroupId);
@@ -1752,7 +1753,7 @@ describe('===Super721IMX===', function () {
                     deployer.address,
                     [shiftedItemGroupId.add(2)],
                     ethers.utils.id('a')
-            )).to.be.revertedWith("Super721::_mintChecker: you cannot mint a group beyond its cap");
+            )).to.be.revertedWith("0x3A");
 
             // Burn one more item
             await super721IMX.connect(owner).burnBatch(deployer.address, [shiftedItemGroupId.add(1)]);
@@ -1781,7 +1782,7 @@ describe('===Super721IMX===', function () {
                     deployer.address,
                     [shiftedItemGroupId.add(1)],
                     ethers.utils.id('a'))
-                ).to.be.revertedWith("Super721::_mintChecker: token already exists");
+                ).to.be.revertedWith("0x2A");
         });
     });
     
