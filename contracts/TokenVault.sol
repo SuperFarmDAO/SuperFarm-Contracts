@@ -5,7 +5,7 @@ pragma solidity ^0.8.7;
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
-import "./Token.sol";
+import "./assets/erc20/Token.sol";
 
 /**
   @title A vault for securely holding tokens.
