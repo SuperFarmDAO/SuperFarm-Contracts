@@ -1543,7 +1543,7 @@ describe('===Super721IMX===', function () {
     describe("mintFor", function () {
         it('Reverts: caller is not IMX core', async () => {
             await expect(
-                super721IMX.mintFor(signer1.address, shiftedItemGroupId, ethers.utils.id('a'))
+                super721IMX.mintFor(signer1.address, 1, ethers.utils.id('a'))
             ).to.be.revertedWith("SuperIMX721::mintFor::only IMX may call this mint function");
         });
 

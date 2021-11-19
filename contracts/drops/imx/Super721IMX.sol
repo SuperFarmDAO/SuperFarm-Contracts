@@ -837,7 +837,7 @@ contract Super721IMX is PermitControl, ERC165Storage, IERC721 {
   function mintBatch(address _recipient, uint256[] memory _ids,
     bytes memory _data)
     public virtual {
-    require(_recipient != address(0));
+    require(_recipient != address(0), "Super721::mintBatch: mint to the zero address");
 
     // Validate and perform the mint.
     address operator = _msgSender();
@@ -880,8 +880,8 @@ contract Super721IMX is PermitControl, ERC165Storage, IERC721 {
     The special, IMX-privileged minting function for centralized L2 support.
   */
   function mintFor(address _to, uint256 quantity, bytes calldata _blueprint) external {
-    require(!Super721IMXLock(super721IMXLock).mintForLocked());
-    require(_msgSender() == imxCoreAddress);
+    require(!Super721IMXLock(super721IMXLock).mintForLocked(), "SuperIMX721::mintFor::disabled");
+    require(_msgSender() == imxCoreAddress, "SuperIMX721::mintFor::only IMX may call this mint function");
     require(quantity == 1);
     uint256 id = split(_blueprint);
     uint256[] memory ids = _asSingletonArray(id);
@@ -1009,7 +1009,7 @@ contract Super721IMX is PermitControl, ERC165Storage, IERC721 {
     @param _ids The item IDs to burn.
   */
   function burnBatch(address _burner, uint256[] memory _ids) external virtual {
-    require(_burner != address(0));
+    require(_burner != address(0), "Super721::burnBatch: burn from the zero address");
 
     // Validate and perform the burn.
     address operator = _msgSender();
@@ -1061,7 +1061,7 @@ contract Super721IMX is PermitControl, ERC165Storage, IERC721 {
   function setMetadata(uint256 _id, string memory _metadata)
     external hasItemRight(_id, SET_METADATA) {
     uint groupId = _id >> 128;
-    require(!uriLocked && !metadataFrozen[_id] &&  !metadataFrozen[groupId]);
+    require(!uriLocked && !metadataFrozen[_id] &&  !metadataFrozen[groupId], "Super721::setMetadata: you cannot edit this metadata because it is frozen");
     string memory oldMetadata = metadata[_id];
     metadata[_id] = _metadata;
     emit MetadataChanged(_msgSender(), _id, oldMetadata, _metadata);
