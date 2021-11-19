@@ -195,24 +195,6 @@ library Utils {
         return result;
     }
 
-<<<<<<< HEAD
-   function split(bytes calldata blob)
-        internal
-        pure
-        returns (uint256, string memory)
-    {
-        int256 index = indexOf(blob, ":", 0);
-        require(index >= 0);
-        // Trim the { and } from the parameters
-        bytes memory slice = blob[0:uint256(index)];
-        uint256 id;
-        for(uint i=0;i<slice.length;i++){
-            id = id + uint256(uint8(slice[i]))*(2**(8*(slice.length-(i+1))));
-        }
-        slice = blob[uint256(index)+1:blob.length];
-        string memory metadata_ = string(abi.encodePacked(slice));
-        return (id, metadata_);
-=======
     function split(bytes calldata blob)
         internal
         pure
@@ -228,7 +210,6 @@ library Utils {
         }
         bytes calldata blueprint = blob[uint256(index) + 2:blob.length - 1];
         return (tokenID, blueprint);
->>>>>>> staging
     }
 
     /**
