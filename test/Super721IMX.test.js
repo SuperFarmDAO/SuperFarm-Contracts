@@ -32,7 +32,7 @@ describe('===Super721IMX===', function () {
     let proxyRegistry;
     let mockIMXCore;
     let super721IMXLock;
-    const originalUri = "://ipfs/uri/";
+    const originalUri = "://ipfs/uri/{id}.json";
     let itemGroupId = ethers.BigNumber.from(1);
     let shiftedItemGroupId = itemGroupId.shl(128);
     let itemGroupId2 = ethers.BigNumber.from(2);
@@ -62,6 +62,7 @@ describe('===Super721IMX===', function () {
             "Super721IMX",
             "SIMX721",
             originalUri,
+            "asdasdasdasdas",
             proxyRegistry.address,
             mockIMXCore.address,
             super721IMXLock.address
