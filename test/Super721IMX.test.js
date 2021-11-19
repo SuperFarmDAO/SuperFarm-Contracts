@@ -62,7 +62,6 @@ describe('===Super721IMX===', function () {
             "Super721IMX",
             "SIMX721",
             originalUri,
-            originalUri,
             proxyRegistry.address,
             mockIMXCore.address,
             super721IMXLock.address
@@ -100,10 +99,8 @@ describe('===Super721IMX===', function () {
                 "Super721IMX",
                 "SIMX721",
                 originalUri,
-                originalUri,
                 proxyRegistry.address,
-                mockIMXCore.address,
-                super721IMXLock.address
+                mockIMXCore.address
             );
             expect(await super721IMXv2.owner()).to.equal(deployer.address);
             expect(await super721IMXv2.name()).to.equal('Super721IMX');
@@ -115,7 +112,7 @@ describe('===Super721IMX===', function () {
 
     describe("uri", function () {
         it('returns the metadataUri', async function () {
-            expect(await super721IMX.metadataUri()).to.equal(originalUri);
+            expect(await super721IMX.uri(1)).to.equal(originalUri);
         });
     });
 
@@ -124,19 +121,17 @@ describe('===Super721IMX===', function () {
             await expect(
                 super721IMX.setURI("://ipfs/newuri/{id}")
             ).to.be.revertedWith('PermitControl: sender does not have a valid permit');
-            expect(await super721IMX.contractURI()).to.equal(originalUri);
+            expect(await super721IMX.uri(1)).to.equal(originalUri);
         });
 
         it('reverts when the collection has been locked', async function () {
-            await super721IMX.connect(owner).lockURI();
-
-            console.log(await super721IMX.uriLocked());
+            await super721IMX.connect(owner).lockURI('hi');
 
             await expect(
                 super721IMX.connect(owner).setURI("://ipfs/newuri/")
             ).to.be.revertedWith("Super721::setURI: the collection URI has been permanently locked");
 
-            expect(await super721IMX.contractURI()).to.equal('://ipfs/uri/');
+            expect(await super721IMX.uri(1)).to.equal('hi');
         });
 
         it('sets the metadataUri when there is a valid permit', async function () {
@@ -146,8 +141,8 @@ describe('===Super721IMX===', function () {
                 setUriRight,
                 ethers.constants.MaxUint256
             );
-            await super721IMX.connect(deployer).setURI("://ipfs/newuri/");
-            expect(await super721IMX.metadataUri()).to.equal("://ipfs/newuri/");
+            await super721IMX.setURI("://ipfs/newuri/");
+            expect(await super721IMX.uri(1)).to.equal("://ipfs/newuri/");
             expect(await super721IMX.uriLocked()).to.equal(false);
         });
     });
@@ -155,28 +150,20 @@ describe('===Super721IMX===', function () {
     describe("lockURI", function () {
         it('reverts when there is not a valid permit for sender', async function () {
             await expect(
-                super721IMX.lockURI()
+                super721IMX.lockURI("://ipfs/lockeduri/{id}")
             ).to.be.revertedWith('PermitControl: sender does not have a valid permit');
-            expect(await super721IMX.metadataUri()).to.equal(originalUri);
+            expect(await super721IMX.uri(1)).to.equal(originalUri);
         });
 
         it('sets the metadataUri and locks it when there is a valid permit', async function () {
             await super721IMX.connect(owner).setPermit(
                 deployer.address,
                 UNIVERSAL,
-                setUriRight,
-                ethers.constants.MaxUint256
-            );
-
-            await super721IMX.connect(owner).setPermit(
-                deployer.address,
-                UNIVERSAL,
                 lockUriRight,
                 ethers.constants.MaxUint256
             );
-            await super721IMX.connect(deployer).setURI("://ipfs/lockeduri/{id}");
-            await super721IMX.connect(deployer).lockURI();
-            expect(await super721IMX.metadataUri()).to.equal("://ipfs/lockeduri/{id}");
+            await super721IMX.lockURI("://ipfs/lockeduri/{id}");
+            expect(await super721IMX.uri(1)).to.equal("://ipfs/lockeduri/{id}");
             expect(await super721IMX.uriLocked()).to.equal(true);
         });
     });
@@ -185,7 +172,7 @@ describe('===Super721IMX===', function () {
         it('reverts when there is not a valid permit for sender', async function () {
             expect(await super721IMX.metadataFrozen(1)).to.equal(false);
             await expect(
-                super721IMX.lockItemURI("://ipfs/lockeduri/{id}", 1)
+                super721IMX.lockItemGroupURI("://ipfs/lockeduri/{id}", 1)
             ).to.be.revertedWith('Super721::hasItemRight: _msgSender does not have the right to perform that action');
             expect(await super721IMX.metadataFrozen(1)).to.equal(false);
         });
@@ -198,9 +185,9 @@ describe('===Super721IMX===', function () {
                 ethers.constants.MaxUint256
             );
             expect(await super721IMX.metadataFrozen(1)).to.equal(false);
-            await super721IMX.lockItemURI("://ipfs/lockeduri/", 1);
+            await super721IMX.lockItemGroupURI("://ipfs/lockeduri/", 1);
             expect(await super721IMX.metadataFrozen(1)).to.equal(true);
-            expect(await super721IMX.metadataUri()).to.equal("://ipfs/uri/");
+            expect(await super721IMX.uri(1)).to.equal("://ipfs/uri/");
             expect(await super721IMX.uriLocked()).to.equal(false);
         });
     });
@@ -1479,7 +1466,7 @@ describe('===Super721IMX===', function () {
         });
 
         it('Reverts: global lockURI', async () => {
-            await super721IMX.connect(owner).lockURI();
+            await super721IMX.connect(owner).lockURI('lockedURI');
 
             await expect(
                 super721IMX.connect(owner).setMetadata(1, 'mettaDatum')
@@ -1532,11 +1519,9 @@ describe('===Super721IMX===', function () {
 
     describe("tokenURI", function () {
         it('should return the tokenURI', async () => {
-            console.log(await super721IMX.metadataUri());
-            await super721IMX.connect(owner).setURI("://ipfs/uri/{id}.json");
             await expect(
-                await super721IMX.tokenURI(3)
-            ).to.be.equal("://ipfs/uri/3.json");
+                await super721IMX.tokenURI(4)
+            ).to.be.equal("://ipfs/uri/4.json");
         });
     });
 
