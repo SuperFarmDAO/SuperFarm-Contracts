@@ -253,7 +253,7 @@ contract Super721IMX is PermitControl, ERC165Storage, IERC721 {
     been permanently fixed or if the collection's metadata URI as a whole has
     been frozen.
   */
-  mapping (uint256 => string) public metadata;
+  mapping (uint256 => string) public blueprints;
 
   /// Whether or not the metadata URI has been locked to future changes.
   bool public uriLocked;
@@ -883,7 +883,8 @@ contract Super721IMX is PermitControl, ERC165Storage, IERC721 {
     require(!Super721IMXLock(super721IMXLock).mintForLocked(), "SuperIMX721::mintFor::disabled");
     require(_msgSender() == imxCoreAddress, "SuperIMX721::mintFor::only IMX may call this mint function");
     require(quantity == 1);
-    uint256 id = split(_blueprint);
+    (uint256 id, string memory metadata )= split(_blueprint);
+    blueprints[id] = metadata;
     uint256[] memory ids = _asSingletonArray(id);
     mintBatch(_to, ids, _blueprint);
   }
@@ -891,13 +892,18 @@ contract Super721IMX is PermitControl, ERC165Storage, IERC721 {
     function split(bytes calldata blob)
         internal
         pure
-        returns (uint256)
+        returns (uint256, string memory)
     {
         int256 index = indexOf(blob, ":", 0);
-        require(index >= 0);
+        require(index >= 0, "Separator must exist");
         // Trim the { and } from the parameters
         uint256 tokenID = toUint(blob[1:uint256(index) - 1]);
-        return (tokenID);
+        uint256 blueprintLength = blob.length - uint256(index) - 3;
+        if (blueprintLength == 0) {
+            return (tokenID, string(""));
+        }
+        string calldata blueprint = string(blob[uint256(index) + 2:blob.length - 1]);
+        return (tokenID, blueprint);
     }
 
     function indexOf(
@@ -1061,9 +1067,9 @@ contract Super721IMX is PermitControl, ERC165Storage, IERC721 {
   function setMetadata(uint256 _id, string memory _metadata)
     external hasItemRight(_id, SET_METADATA) {
     uint groupId = _id >> 128;
-    require(!uriLocked && !metadataFrozen[_id] &&  !metadataFrozen[groupId], "Super721::setMetadata: you cannot edit this metadata because it is frozen");
-    string memory oldMetadata = metadata[_id];
-    metadata[_id] = _metadata;
+    require(!uriLocked && !metadataFrozen[_id] &&  !metadataFrozen[groupId]);
+    string memory oldMetadata = blueprints[_id];
+    blueprints[_id] = _metadata;
     emit MetadataChanged(_msgSender(), _id, oldMetadata, _metadata);
   }
 
