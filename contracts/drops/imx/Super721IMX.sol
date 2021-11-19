@@ -786,6 +786,7 @@ contract Super721IMX is PermitControl, ERC165Storage, IERC721 {
     // Retrieve the item's group ID.
     uint256 shiftedGroupId = (_id & GROUP_MASK);
     uint256 groupId = shiftedGroupId >> 128;
+    // console.logUint(groupId);
     require(itemGroups[groupId].initialized,
       "Ix22");
 
@@ -826,8 +827,7 @@ contract Super721IMX is PermitControl, ERC165Storage, IERC721 {
   function mintBatch(address _recipient, uint256[] memory _ids,
     bytes memory _data)
     public virtual {
-    require(_recipient != address(0));
-
+    require(_recipient != address(0), "Super721::mintBatch: mint to the zero address");
     // Validate and perform the mint.
     address operator = _msgSender();
     _beforeTokenTransfer(operator, address(0), _recipient, _ids, _asSingletonArray(1),
@@ -874,10 +874,8 @@ contract Super721IMX is PermitControl, ERC165Storage, IERC721 {
     require(quantity == 1, "Ix27");
     require(!ISuper721IMXLock(super721IMXLock).mintForLocked(), "Ix28");
     // read data
-    (uint256 id_, bytes memory metadata_ )= Utils.split(_blueprint);
-    uint256[] memory ids = _asSingletonArray(id_);
-    // effects
-    blueprints[id_] = string(abi.encodePacked(metadata_));
+    (uint256 id,) = Utils.split(_blueprint);
+    uint256[] memory ids = _asSingletonArray(id);
     mintBatch(_to, ids, _blueprint);
   }
 
@@ -962,7 +960,7 @@ contract Super721IMX is PermitControl, ERC165Storage, IERC721 {
     @param _ids The item IDs to burn.
   */
   function burnBatch(address _burner, uint256[] memory _ids) external virtual {
-    require(_burner != address(0));
+    require(_burner != address(0), "Super721::burnBatch: burn from the zero address");
 
     // Validate and perform the burn.
     address operator = _msgSender();

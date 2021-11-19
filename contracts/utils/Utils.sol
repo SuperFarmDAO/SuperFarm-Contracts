@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.8;
-import "hardhat/console.sol";
+
 library Utils {
 
     // this is struct for aligning function memory 
@@ -195,23 +195,40 @@ library Utils {
         return result;
     }
 
-    function split(bytes calldata blob)
+   function split(bytes calldata blob)
         internal
         pure
-        returns (uint256, bytes memory)
+        returns (uint256, string memory)
     {
         int256 index = indexOf(blob, ":", 0);
-        require(index >= 0, "Ux01");
+        require(index >= 0);
         // Trim the { and } from the parameters
-        uint256 tokenID = toUint(blob[1:uint256(index) - 1]);
-        uint256 blueprintLength = blob.length - uint256(index) - 3;
-        if (blueprintLength == 0) {
-            return (tokenID, bytes(""));
+        bytes memory slice = blob[0:uint256(index)];
+        uint256 id;
+        for(uint i=0;i<slice.length;i++){
+            id = id + uint256(uint8(slice[i]))*(2**(8*(slice.length-(i+1))));
         }
-        bytes calldata blueprint = blob[uint256(index) + 2:blob.length - 1];
-        return (tokenID, blueprint);
+        slice = blob[uint256(index)+1:blob.length];
+        string memory metadata_ = string(abi.encodePacked(slice));
+        return (id, metadata_);
     }
 
+    /**
+     * Index Of
+     *
+     * Locates and returns the position of a character within a string starting
+     * from a defined offset
+     *
+     * @param _base When being used for a data type this is the extended object
+     *              otherwise this is the string acting as the haystack to be
+     *              searched
+     * @param _value The needle to search for, at present this is currently
+     *               limited to one character
+     * @param _offset The starting point to start searching from which can start
+     *                from 0, but must not exceed the length of the string
+     * @return int The position of the needle starting from 0 and returning -1
+     *             in the case of no matches found
+     */
     function indexOf(
         bytes memory _base,
         string memory _value,
@@ -229,7 +246,7 @@ library Utils {
 
         return -1;
     }
-    
+
     function toUint(bytes memory b) internal pure returns (uint256) {
         uint256 result = 0;
         for (uint256 i = 0; i < b.length; i++) {
