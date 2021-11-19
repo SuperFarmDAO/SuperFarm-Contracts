@@ -1579,13 +1579,13 @@ describe('===Super721IMX===', function () {
                 burnData: 20000
             });
             const tokenID = '340282366920938463463374607431768211457';
-            const blueprint = 'asdasdasd';
+            const blueprint = 'superfarm.smth.com';
             const blob = toHex(`{${tokenID}}:{${blueprint}}`);
             await mockIMXCore.mintFor(signer1.address, 1, blob);
-
-            await expect(
+            expect(
                 await super721IMX.balanceOf(signer1.address)
-            ).to.be.equal("1");
+                ).to.be.equal("1");
+            expect(await super721IMX.metadata( '340282366920938463463374607431768211457')).to.be.eq("superfarm.smth.com")
         });
     });
 
