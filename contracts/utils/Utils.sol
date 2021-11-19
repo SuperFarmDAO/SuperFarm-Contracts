@@ -73,11 +73,13 @@ library Strings {
         }
 
         // Copy remaining bytes
-        uint mask = 256 ** (32 - _length) - 1;
-        assembly {
-            let source := and(mload(_source), not(mask))
-            let destination := and(mload(_destination), mask)
-            mstore(_destination, or(destination, source))
+        if(_length >0){
+            uint mask = 256 ** (32 - _length) - 1;
+            assembly {
+                let source := and(mload(_source), not(mask))
+                let destination := and(mload(_destination), mask)
+                mstore(_destination, or(destination, source))
+            }
         }
     }
 
