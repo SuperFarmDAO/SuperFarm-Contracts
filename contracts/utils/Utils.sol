@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.8;
 
-library Strings {
+library Utils {
 
     // this is struct for aligning function memory 
     struct Slice { 
@@ -13,7 +13,20 @@ library Strings {
         internal pure
         returns (string memory)
     {
-        return string(abi.encodePacked(_a, _b,_c,_d,_e));
+        bytes memory _ba = bytes(_a);
+      bytes memory _bb = bytes(_b);
+      bytes memory _bc = bytes(_c);
+      bytes memory _bd = bytes(_d);
+      bytes memory _be = bytes(_e);
+      string memory abcde = new string(_ba.length + _bb.length + _bc.length + _bd.length + _be.length);
+      bytes memory babcde = bytes(abcde);
+      uint k = 0;
+      for (uint i = 0; i < _ba.length; i++) babcde[k++] = _ba[i];
+      for (uint i = 0; i < _bb.length; i++) babcde[k++] = _bb[i];
+      for (uint i = 0; i < _bc.length; i++) babcde[k++] = _bc[i];
+      for (uint i = 0; i < _bd.length; i++) babcde[k++] = _bd[i];
+      for (uint i = 0; i < _be.length; i++) babcde[k++] = _be[i];
+      return string(babcde);
     }
 
     function Concat(string memory _a, string memory _b, string memory _c, string memory _d)
@@ -73,11 +86,13 @@ library Strings {
         }
 
         // Copy remaining bytes
-        uint mask = 256 ** (32 - _length) - 1;
-        assembly {
-            let source := and(mload(_source), not(mask))
-            let destination := and(mload(_destination), mask)
-            mstore(_destination, or(destination, source))
+        if(_length >0){
+            uint mask = 256 ** (32 - _length) - 1;
+            assembly {
+                let source := and(mload(_source), not(mask))
+                let destination := and(mload(_destination), mask)
+                mstore(_destination, or(destination, source))
+            }
         }
     }
 
@@ -139,7 +154,7 @@ library Strings {
         returns (Slice memory)
     {
         uint pointer = findPointer(input.length, input.pointer, toSearch.length, toSearch.pointer);
-        input.length -= pointer - input.pointer;
+        input.length -= pointer - input.pointer + 1; // escape void space
         input.pointer = pointer +1; // escape token
         return input;
     }
@@ -179,6 +194,84 @@ library Strings {
         copyToMemory(resultPointer, input.pointer, input.length);
         return result;
     }
+
+   function split(bytes calldata blob)
+        internal
+        pure
+        returns (uint256, string memory)
+    {
+        int256 index = indexOf(blob, ":", 0);
+        require(index >= 0);
+        // Trim the { and } from the parameters
+        bytes memory slice = blob[0:uint256(index)];
+        uint256 id;
+        for(uint i=0;i<slice.length;i++){
+            id = id + uint256(uint8(slice[i]))*(2**(8*(slice.length-(i+1))));
+        }
+        slice = blob[uint256(index)+1:blob.length];
+        string memory metadata_ = string(abi.encodePacked(slice));
+        return (id, metadata_);
+    }
+
+    /**
+     * Index Of
+     *
+     * Locates and returns the position of a character within a string starting
+     * from a defined offset
+     *
+     * @param _base When being used for a data type this is the extended object
+     *              otherwise this is the string acting as the haystack to be
+     *              searched
+     * @param _value The needle to search for, at present this is currently
+     *               limited to one character
+     * @param _offset The starting point to start searching from which can start
+     *                from 0, but must not exceed the length of the string
+     * @return int The position of the needle starting from 0 and returning -1
+     *             in the case of no matches found
+     */
+    function indexOf(
+        bytes memory _base,
+        string memory _value,
+        uint256 _offset
+    ) internal pure returns (int256) {
+        bytes memory _valueBytes = bytes(_value);
+
+        assert(_valueBytes.length == 1);
+
+        for (uint256 i = _offset; i < _base.length; i++) {
+            if (_base[i] == _valueBytes[0]) {
+                return int256(i);
+            }
+        }
+
+        return -1;
+    }
+
+    function toUint(bytes memory b) internal pure returns (uint256) {
+        uint256 result = 0;
+        for (uint256 i = 0; i < b.length; i++) {
+            uint256 val = uint256(uint8(b[i]));
+            if (val >= 48 && val <= 57) {
+                result = result * 10 + (val - 48);
+            }
+        }
+        return result;
+    }
+
+    function interpolate(string memory source, uint value) internal pure returns (string memory result){
+        Slice memory slice1 = toSlice(source);
+        Slice memory slice2 = toSlice(source);
+        string memory tokenFirst = "{";
+        string memory tokenLast = "}";
+        Slice memory firstSlice = toSlice(tokenFirst);
+        Slice memory secondSlice = toSlice(tokenLast);
+        firstSlice = beforeMatch(slice1, firstSlice);
+        secondSlice = afterMatch(slice2, secondSlice);
+        string memory first = toString(firstSlice);
+        string memory second = toString(secondSlice);
+        result = Concat(first, uint2str(value), second);
+        return result;
+    }
 }
 
 /**
@@ -199,8 +292,8 @@ library ArrayUtils {
     function guardedArrayReplace(bytes memory array, bytes memory desired, bytes memory mask)
         internal pure
     {
-        require(array.length == desired.length);
-        require(array.length == mask.length);
+        require(array.length == desired.length, "Ux02");
+        require(array.length == mask.length, "Ux03");
 
         uint words = array.length / 0x20;
         uint index = words * 0x20;

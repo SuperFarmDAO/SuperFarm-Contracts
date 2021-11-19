@@ -9,7 +9,6 @@ import "@openzeppelin/contracts/utils/Address.sol";
 
 import "../../access/PermitControl.sol";
 import "../../proxy/StubProxyRegistry.sol";
-import "../../utils/Utils.sol";
 
 import "../../libraries/DFStorage.sol";
 import "./interfaces/ISuper1155.sol";
@@ -33,7 +32,6 @@ import "./interfaces/ISuper1155.sol";
 */
 contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataURI {
   using Address for address;
-  using Strings for string;
 
   uint256 MAX_INT = type(uint256).max;
 

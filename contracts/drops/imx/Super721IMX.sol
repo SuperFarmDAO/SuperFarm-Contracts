@@ -11,7 +11,7 @@ import "@openzeppelin/contracts/utils/Address.sol";
 import "../../utils/Utils.sol";
 import "../../access/PermitControl.sol";
 import "../../proxy/StubProxyRegistry.sol";
-import "./Super721IMXLock.sol";
+import "../../interfaces/ISuper721IMXLock.sol";
 
 /**
   @title An ERC-721 item creation contract.
@@ -28,7 +28,6 @@ import "./Super721IMXLock.sol";
 */
 contract Super721IMX is PermitControl, ERC165Storage, IERC721 {
   using Address for address;
-  using Strings for string;
   using EnumerableSet for EnumerableSet.UintSet;
   using EnumerableMap for EnumerableMap.UintToAddressMap;
 
@@ -253,7 +252,7 @@ contract Super721IMX is PermitControl, ERC165Storage, IERC721 {
     been permanently fixed or if the collection's metadata URI as a whole has
     been frozen.
   */
-  mapping (uint256 => string) public metadata;
+  mapping (uint256 => string) public blueprints;
 
   /// Whether or not the metadata URI has been locked to future changes.
   bool public uriLocked;
@@ -348,7 +347,7 @@ contract Super721IMX is PermitControl, ERC165Storage, IERC721 {
     } else if (hasRight(_msgSender(), bytes32(_id), _right)) {
       _;
     } else {
-      revert("Super721::hasItemRight: _msgSender does not have the right to perform that action");
+      revert("Ix01");
     }
   }
 
@@ -387,7 +386,7 @@ contract Super721IMX is PermitControl, ERC165Storage, IERC721 {
   /**
   */
   function ownerOf(uint256 tokenId) public view override returns (address) {
-      return _tokenOwners.get(tokenId, "Super721::ownerOf: owner query for nonexistent token");
+      return _tokenOwners.get(tokenId, "Ix02");
   }
 
   /**
@@ -395,10 +394,10 @@ contract Super721IMX is PermitControl, ERC165Storage, IERC721 {
    */
   function approve(address to, uint256 tokenId) public virtual override {
       address owner = ownerOf(tokenId);
-      require(to != owner, "Super721::approve: approval to current owner");
+      require(to != owner, "Ix03");
 
       require(_msgSender() == owner || isApprovedForAll(owner, _msgSender()),
-          "Super721::approve: approve caller is not owner nor approved for all"
+          "Ix04"
       );
 
       _tokenApprovals[tokenId] = to;
@@ -421,18 +420,10 @@ contract Super721IMX is PermitControl, ERC165Storage, IERC721 {
     @return The metadata URI string of the item with ID `_itemId`.
   */
   function tokenURI(uint256 id) external view returns (string memory) {
-    Strings.Slice memory slice1 = metadataUri.toSlice();
-    Strings.Slice memory slice2 = metadataUri.toSlice();
-    string memory tokenFirst = "{";
-    string memory tokenLast = "}";
-    Strings.Slice memory firstSlice = tokenFirst.toSlice();
-    Strings.Slice memory secondSlice = tokenLast.toSlice();
-    firstSlice = Strings.beforeMatch(slice1, firstSlice);
-    secondSlice = Strings.afterMatch(slice2, secondSlice);
-    string memory first = Strings.toString(firstSlice);
-    string memory second = Strings.toString(secondSlice);
-    string memory result = string(abi.encodePacked(first, Strings.uint2str(id), second));
-    return result;
+    if(bytes(metadataUri).length == 0){
+        return blueprints[id];
+    }
+    return Utils.interpolate(metadataUri, id);
   }
 
   /**
@@ -445,7 +436,7 @@ contract Super721IMX is PermitControl, ERC165Storage, IERC721 {
   function setURI(string calldata _uri) external virtual
     hasValidPermit(UNIVERSAL, SET_URI) {
     require(!uriLocked,
-      "Super721::setURI: the collection URI has been permanently locked");
+      "Ix05");
     string memory oldURI = metadataUri;
     metadataUri = _uri;
     emit ChangeURI(oldURI, _uri);
@@ -460,12 +451,11 @@ contract Super721IMX is PermitControl, ERC165Storage, IERC721 {
   function setContractURI(string calldata _uri) external virtual
     hasValidPermit(UNIVERSAL, SET_URI) {
       require(!contractUriLocked,
-        "Super721::setContractURI: the contract URI has been permanently locked");
+        "Ix06");
       string memory oldContractUri = contractURI;
       contractURI = _uri;
       emit ChangeContractURI(oldContractUri, _uri);
   }
-  // TODO: change all require messages
 
   /**
     Allow the item collection owner or an approved manager to update the proxy
@@ -491,14 +481,14 @@ contract Super721IMX is PermitControl, ERC165Storage, IERC721 {
   function balanceOfGroup(address _owner, uint256 _id) public view virtual
   returns (uint256) {
     require(_owner != address(0),
-      "Super721::balanceOf: balance query for the zero address");
+      "Ix07");
     return balances[_id][_owner];
   }
 
   function balanceOf(address _owner) public override view virtual
   returns (uint256) {
     require(_owner != address(0),
-      "Super721::balanceOf: balance query for the zero address");
+      "Ix08");
     return totalBalances[_owner];
   }
 
@@ -511,8 +501,7 @@ contract Super721IMX is PermitControl, ERC165Storage, IERC721 {
   */
   function balanceOfBatch(address[] calldata _owners, uint256[] calldata _ids)
     external view virtual returns (uint256[] memory) {
-    require(_owners.length == _ids.length,
-      "Super721::balanceOfBatch: accounts and ids length mismatch");
+    require(_owners.length == _ids.length, "");
 
     // Populate and return an array of balances.
     uint256[] memory batchBalances = new uint256[](_owners.length);
@@ -551,7 +540,7 @@ contract Super721IMX is PermitControl, ERC165Storage, IERC721 {
   function setApprovalForAll(address _operator, bool _approved) external
     override virtual {
     require(_msgSender() != _operator,
-      "Super721::balanceOf: setting approval status for self");
+      "Ix09");
     operatorApprovals[_msgSender()][_operator] = _approved;
     emit ApprovalForAll(_msgSender(), _operator, _approved);
   }
@@ -599,12 +588,12 @@ contract Super721IMX is PermitControl, ERC165Storage, IERC721 {
       try IERC721Receiver(_to).onERC721Received(_operator, _from, _id,
         _data) returns (bytes4 response) {
         if (response != IERC721Receiver(_to).onERC721Received.selector) {
-          revert("Super721::_doSafeTransferAcceptanceCheck: ERC721Receiver rejected tokens");
+          revert("Ix09");
         }
       } catch Error(string memory reason) {
         revert(reason);
       } catch {
-        revert("Super721::_doSafeTransferAcceptanceCheck: transfer to non ERC721Receiver implementer");
+        revert("Ix10");
       }
     }
   }
@@ -633,9 +622,9 @@ contract Super721IMX is PermitControl, ERC165Storage, IERC721 {
   function _safeTransferFrom(address _from, address _to, uint256 _id,
     bytes memory _data) internal  virtual {
     require(_to != address(0),
-      "Super721::_safeTransferFrom : transfer to the zero address");
+      "Ix11");
     require(_from == _msgSender() || isApprovedForAll(_from, _msgSender()),
-      "Super721::_safeTransferFrom : caller is not owner nor approved");
+      "Ix12");
 
     // Validate transfer safety and send tokens away.
     address operator = _msgSender();
@@ -647,7 +636,7 @@ contract Super721IMX is PermitControl, ERC165Storage, IERC721 {
     uint256 groupId = shiftedGroupId >> 128;
 
     // Update all specially-tracked group-specific balances.
-    require(balances[_id][_from] >= 1, "Super721::_safeTransferFrom: insufficient balance for transfer");
+    require(balances[_id][_from] >= 1, "Ix13");
     balances[_id][_from] = balances[_id][_from] - 1;
     balances[_id][_to] = balances[_id][_to] + 1;
     groupBalances[groupId][_from] = groupBalances[groupId][_from] - 1;
@@ -678,9 +667,9 @@ contract Super721IMX is PermitControl, ERC165Storage, IERC721 {
     uint256[] memory _ids, bytes memory _data)
     external virtual {
     require(_to != address(0),
-      "Super721::safeBatchTransferFrom: transfer to the zero address");
+      "Ix14");
     require(_from == _msgSender() || isApprovedForAll(_from, _msgSender()),
-      "Super721::safeBatchTransferFrom: caller is not owner nor approved");
+      "Ix15");
 
     // Validate transfer and perform all batch token sends.
     _beforeTokenTransfer(_msgSender(), _from, _to, _ids, _asSingletonArray(1), _data);
@@ -690,7 +679,7 @@ contract Super721IMX is PermitControl, ERC165Storage, IERC721 {
       uint256 groupId = (_ids[i] & GROUP_MASK) >> 128;
 
       // Update all specially-tracked group-specific balances.
-      require(balances[_ids[i]][_from] >= 1, "Super721::safeBatchTransferFrom: insufficient balance for transfer");
+      require(balances[_ids[i]][_from] >= 1, "Ix16");
       balances[_ids[i]][_from] = balances[_ids[i]][_from] - 1;
       balances[_ids[i]][_to] = balances[_ids[i]][_to] + 1;
       groupBalances[groupId][_from] = groupBalances[groupId][_from] - 1;
@@ -715,12 +704,12 @@ contract Super721IMX is PermitControl, ERC165Storage, IERC721 {
   function configureGroup(uint256 _groupId, ItemGroupInput memory _data)
     external virtual hasItemRight(_groupId, CONFIGURE_GROUP) {
     require(_groupId != 0,
-      "Super721::configureGroup: group ID 0 is invalid");
+      "Ix17");
 
     // If the collection is not locked, we may add a new item group.
     if (!itemGroups[_groupId].initialized) {
       require(!locked,
-        "Super721::configureGroup: the collection is locked so groups cannot be created");
+        "Ix18");
       itemGroups[_groupId] = ItemGroup({
         initialized: true,
         name: _data.name,
@@ -741,9 +730,9 @@ contract Super721IMX is PermitControl, ERC165Storage, IERC721 {
       // It may also not have its cap increased.
       if (itemGroups[_groupId].supplyType == SupplyType.Capped) {
         require(_data.supplyType == SupplyType.Capped,
-          "Super721::configureGroup: you may not uncap a capped supply type");
+          "Ix19");
         require(_data.supplyData <= itemGroups[_groupId].supplyData,
-          "Super721::configureGroup: you may not increase the supply of a capped type");
+          "Ix20");
 
       // The flexible and uncapped types may freely change.
       } else {
@@ -752,7 +741,7 @@ contract Super721IMX is PermitControl, ERC165Storage, IERC721 {
 
       // Item supply data may not be reduced below the circulating supply.
       require(_data.supplyData >= itemGroups[_groupId].circulatingSupply,
-        "Super721::configureGroup: you may not decrease supply below the circulating amount");
+        "Ix21");
       itemGroups[_groupId].supplyData = _data.supplyData;
       // do we want burnType to be updateable?
     }
@@ -797,13 +786,14 @@ contract Super721IMX is PermitControl, ERC165Storage, IERC721 {
     // Retrieve the item's group ID.
     uint256 shiftedGroupId = (_id & GROUP_MASK);
     uint256 groupId = shiftedGroupId >> 128;
+    // console.logUint(groupId);
     require(itemGroups[groupId].initialized,
-      "Super721::_mintChecker: you cannot mint a non-existent item group");
+      "Ix22");
 
     // If false, owned by address (or NULL_ADDRESS i.e, was burnable)
     // If true, never minted, (or was removed i.e, was replenishable)
     require(!_tokenOwners.contains(_id),
-      "Super721::_mintChecker: token already exists");
+      "Ix23");
 
     // If we can replenish burnt items, then only our currently-circulating
     // supply matters. Otherwise, historic mints are what determine the cap.
@@ -817,7 +807,7 @@ contract Super721IMX is PermitControl, ERC165Storage, IERC721 {
     // If we are subject to a cap on group size, ensure we don't exceed it.
     if (itemGroups[groupId].supplyType != SupplyType.Uncapped) {
       require(currentGroupSupply + 1 <= itemGroups[groupId].supplyData,
-        "Super721::_mintChecker: you cannot mint a group beyond its cap");
+        "Ix24");
     }
 
     return _id;
@@ -837,8 +827,7 @@ contract Super721IMX is PermitControl, ERC165Storage, IERC721 {
   function mintBatch(address _recipient, uint256[] memory _ids,
     bytes memory _data)
     public virtual {
-    require(_recipient != address(0));
-
+    require(_recipient != address(0), "Super721::mintBatch: mint to the zero address");
     // Validate and perform the mint.
     address operator = _msgSender();
     _beforeTokenTransfer(operator, address(0), _recipient, _ids, _asSingletonArray(1),
@@ -848,7 +837,7 @@ contract Super721IMX is PermitControl, ERC165Storage, IERC721 {
     // balances and circulation balances.
     for (uint256 i = 0; i < _ids.length; i++) {
       require(_hasItemRight(_ids[i], MINT),
-        "Super721::mintBatch: you do not have the right to mint that item");
+        "Ix25");
 
       // Retrieve the group ID from the given item `_id` and check mint.
       uint256 shiftedGroupId = (_ids[i] & GROUP_MASK);
@@ -880,54 +869,16 @@ contract Super721IMX is PermitControl, ERC165Storage, IERC721 {
     The special, IMX-privileged minting function for centralized L2 support.
   */
   function mintFor(address _to, uint256 quantity, bytes calldata _blueprint) external {
-    require(!Super721IMXLock(super721IMXLock).mintForLocked());
-    require(_msgSender() == imxCoreAddress);
-    require(quantity == 1);
-    uint256 id = split(_blueprint);
+      // check
+    require(_msgSender() == imxCoreAddress, "Ix26");
+    require(quantity == 1, "Ix27");
+    require(!ISuper721IMXLock(super721IMXLock).mintForLocked(), "Ix28");
+    // read data
+    (uint256 id,) = Utils.split(_blueprint);
     uint256[] memory ids = _asSingletonArray(id);
     mintBatch(_to, ids, _blueprint);
   }
 
-    function split(bytes calldata blob)
-        internal
-        pure
-        returns (uint256)
-    {
-        int256 index = indexOf(blob, ":", 0);
-        require(index >= 0);
-        // Trim the { and } from the parameters
-        uint256 tokenID = toUint(blob[1:uint256(index) - 1]);
-        return (tokenID);
-    }
-
-    function indexOf(
-        bytes memory _base,
-        string memory _value,
-        uint256 _offset
-    ) internal pure returns (int256) {
-        bytes memory _valueBytes = bytes(_value);
-
-        assert(_valueBytes.length == 1);
-
-        for (uint256 i = _offset; i < _base.length; i++) {
-            if (_base[i] == _valueBytes[0]) {
-                return int256(i);
-            }
-        }
-
-        return -1;
-    }
-    
-    function toUint(bytes memory b) internal pure returns (uint256) {
-        uint256 result = 0;
-        for (uint256 i = 0; i < b.length; i++) {
-            uint256 val = uint256(uint8(b[i]));
-            if (val >= 48 && val <= 57) {
-                result = result * 10 + (val - 48);
-            }
-        }
-        return result;
-    }
   /**
     This is a private helper function to verify, according to all of our various
     minting and burning rules, whether it would be valid to burn some `_amount`
@@ -942,18 +893,18 @@ contract Super721IMX is PermitControl, ERC165Storage, IERC721 {
     uint256 shiftedGroupId = (_id & GROUP_MASK);
     uint256 groupId = shiftedGroupId >> 128;
     require(itemGroups[groupId].initialized,
-      "Super721::_burnChecker: you cannot burn a non-existent item group");
+      "Ix29");
 
     // If the item group is non-burnable, then revert.
     if (itemGroups[groupId].burnType == BurnType.None) {
-      revert("Super721::_burnChecker: you cannot burn a non-burnable item group");
+      revert("Ix30");
     }
 
     // If we can burn items, then we must verify that we do not exceed the cap.
     else if (itemGroups[groupId].burnType == BurnType.Burnable) {
       require(itemGroups[groupId].burnCount + 1
         <= itemGroups[groupId].burnData,
-        "Super721::_burnChecker you may not exceed the burn limit on this item group");
+        "Ix31");
     }
 
     // If the item is replenishable, then ignore checks
@@ -1009,7 +960,7 @@ contract Super721IMX is PermitControl, ERC165Storage, IERC721 {
     @param _ids The item IDs to burn.
   */
   function burnBatch(address _burner, uint256[] memory _ids) external virtual {
-    require(_burner != address(0));
+    require(_burner != address(0), "Super721::burnBatch: burn from the zero address");
 
     // Validate and perform the burn.
     address operator = _msgSender();
@@ -1019,7 +970,7 @@ contract Super721IMX is PermitControl, ERC165Storage, IERC721 {
     // balances and circulation balances.
     for (uint i = 0; i < _ids.length; i++) {
       require(_hasItemRight(_ids[i], BURN),
-        "Super721::burnBatch: you do not have the right to burn that item");
+        "Ix32");
 
       // Retrieve the group ID from the given item `_id` and check burn.
       uint256 shiftedGroupId = (_ids[i] & GROUP_MASK);
@@ -1027,7 +978,7 @@ contract Super721IMX is PermitControl, ERC165Storage, IERC721 {
       uint256 burntItemId = _burnChecker(_ids[i]);
 
       // Update storage of special balances and circulating values.
-      require(balances[burntItemId][_burner] >= 1, "Super721::burn: burn amount exceeds balance");
+      require(balances[burntItemId][_burner] >= 1, "Ix33");
       balances[burntItemId][_burner] = balances[burntItemId][_burner] - 1;
       groupBalances[groupId][_burner] = groupBalances[groupId][_burner] - 1;
       totalBalances[_burner] = totalBalances[_burner] - 1;
@@ -1051,6 +1002,13 @@ contract Super721IMX is PermitControl, ERC165Storage, IERC721 {
     }
   }
 
+  function metadata(uint256 id) 
+    external view
+    returns(string memory)
+    {
+        return blueprints[id];
+    }
+
   /**
     Set the on-chain metadata attached to a specific token ID so long as the
     collection as a whole or the token specifically has not had metadata
@@ -1062,8 +1020,8 @@ contract Super721IMX is PermitControl, ERC165Storage, IERC721 {
     external hasItemRight(_id, SET_METADATA) {
     uint groupId = _id >> 128;
     require(!uriLocked && !metadataFrozen[_id] &&  !metadataFrozen[groupId]);
-    string memory oldMetadata = metadata[_id];
-    metadata[_id] = _metadata;
+    string memory oldMetadata = blueprints[_id];
+    blueprints[_id] = _metadata;
     emit MetadataChanged(_msgSender(), _id, oldMetadata, _metadata);
   }
 
@@ -1122,13 +1080,13 @@ contract Super721IMX is PermitControl, ERC165Storage, IERC721 {
   }
 
   function getApproved(uint256 tokenId) public view override returns (address) {
-      require(_tokenOwners.contains(tokenId), "Super721::getApproved: approved query for nonexistent token");
+      require(_tokenOwners.contains(tokenId), "Ix34");
 
       return _tokenApprovals[tokenId];
   }
 
   function _isApprovedOrOwner(address spender, uint256 tokenId) internal view returns (bool) {
-      require(_tokenOwners.contains(tokenId), "Super721::getApproved: operator query for nonexistent token");
+      require(_tokenOwners.contains(tokenId), "Ix35");
       address owner = ownerOf(tokenId);
       return (spender == owner || _tokenApprovals[tokenId] == spender || isApprovedForAll(owner, spender));
   }
@@ -1137,7 +1095,7 @@ contract Super721IMX is PermitControl, ERC165Storage, IERC721 {
    */
   function transferFrom(address from, address to, uint256 tokenId) public virtual override {
       // //solhint-disable-next-line max-line-length
-      require(_isApprovedOrOwner(_msgSender(), tokenId), "Super721::transferForm: transfer caller is not owner nor approved");
+      require(_isApprovedOrOwner(_msgSender(), tokenId), "Ix36");
       safeTransferFrom(from, to, tokenId);
       //
       // require(ownerOf(tokenId) == from, "Super721::transferForm: transfer of token that is not own");
