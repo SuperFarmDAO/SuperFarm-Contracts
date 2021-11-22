@@ -12,7 +12,7 @@ describe("SuperFarm Marketplace", function(){
 
     beforeEach(async function () {
         [owner, protocolFeeRecipient, creator, alice, bob, royaltyOwner1, royaltyOwner2] = await ethers.getSigners();
-        [marketplace, registry, transferProxy, erc1155, erc721, weth] =  await utils.withContracts(network.config.chainId, protocolFeeRecipient.address);
+        [marketplace, registry, transferProxy, erc1155, erc721, weth] =  await utils.withContracts(network.config.chainId, protocolFeeRecipient.address, 100);
         await weth.mint(alice.address, utils.mint.weth.alice)
         await weth.mint(bob.address, utils.mint.weth.bob)
         await erc721.mint(alice.address, utils.mint.erc721.alice)

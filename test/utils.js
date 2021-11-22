@@ -108,7 +108,7 @@ async function withProxies(){
     return [registry, transferProxy]
 }
 
-export const withContracts = async function(chainId){
+export const withContracts = async function(chainId, platformFeeAddress, minimumPlatformFee){
     const [erc1155, erc721, weth] = await withTestTokens();
     const[registry, transferProxy] = await withProxies();
 
@@ -119,6 +119,8 @@ export const withContracts = async function(chainId){
         [registry.address],
         ethers.utils.defaultAbiCoder.encode(["string"],["\x19Ethereum Signed Message:\n"]),
         transferProxy.address,
+        platformFeeAddress,
+        minimumPlatformFee
     );
     await marketplace.deployed()
 
