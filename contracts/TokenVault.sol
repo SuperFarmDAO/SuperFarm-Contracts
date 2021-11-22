@@ -404,7 +404,7 @@ contract TokenVault is
                 );
             }
             for (uint256 i = 0; i < super1155Addresses.length(); i++) {
-                ISuper1155(super721Addresses.at(i)).safeBatchTransferFrom(
+                ISuper1155(super1155Addresses.at(i)).safeBatchTransferFrom(
                     address(this),
                     panicDestination,
                     assets[super1155Addresses.at(i)].ids,
@@ -412,13 +412,13 @@ contract TokenVault is
                     ""
                 );
             }
-            panicCounter = panicCounter + 1;
+            panicCounter += 1;
             emit PanicTransfer(
                 panicCounter,
-                totalBalanceERC20,
-                totalBalanceEth,
-                totalAmountERC721,
-                totalAmountERC1155,
+                totalBalanceERC20, 
+                totalBalanceEth, 
+                totalAmountERC721, 
+                totalAmountERC1155, 
                 panicDestination
             );
         }
