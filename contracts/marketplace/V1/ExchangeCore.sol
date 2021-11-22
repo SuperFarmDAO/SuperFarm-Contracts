@@ -23,79 +23,82 @@ contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
 
     bytes internal personalSignPrefix = "\x19Ethereum Signed Message:\n";
 
-    // The public identifier for the right to set new items.
-  bytes32 public constant SET_FEES = keccak256("SET_FEES");
+    /**  The public identifier for the right to set new items. */
+    bytes32 public constant FEE_CONFIG = keccak256("FEE_CONFIG");
 
-    /* Token transfer proxy. */
+    /** Token transfer proxy. */
     address public tokenTransferProxy;
 
-    /* User registry. */
+    /** User registry. */
     address public registry;
 
-    /* Trusted proxy registry contracts. */
+    /** Trusted proxy registry contracts. */
     mapping(address => bool) public registries;
 
-    /* Cancelled / finalized orders, by hash. */
+    /** Cancelled / finalized orders, by hash. */
     mapping(bytes32 => bool) public cancelledOrFinalized;
 
-    /* Orders verified by on-chain approval (alternative to ECDSA signatures so that smart contracts can place orders directly). */
+    /** Orders verified by on-chain approval (alternative to ECDSA signatures so that smart contracts can place orders directly). */
     mapping(bytes32 => bool) public approvedOrders;
 
-    /* The royalty fee for this platform. */
+    /** The royalty fee for this platform. */
     uint public minimumPlatformFee; 
 
-    /* Inverse basis point. */
+    /** The royalty fee address of the platform */
+    address public platformFeeAddress;
+
+    /** Inverse basis point. */
     uint public constant INVERSE_BASIS_POINT = 10000;
 
-    /* An ECDSA signature. */ 
+    /** An ECDSA signature. */ 
     struct Sig {
-        /* v parameter */
+        /** v parameter */
         uint8 v;
-        /* r parameter */
+        /** r parameter */
         bytes32 r;
-        /* s parameter */
+        /** s parameter */
         bytes32 s;
     }
 
-    /* An order on the exchange. */
+    /** An order on the exchange. */
     struct Order {
-        /* Base price of the order (in paymentTokens). */
+        /** Base price of the order (in paymentTokens). */
         uint basePrice;
-        /* ending time + ending price.*/
+        /** ending time + ending price.*/
         uint[] extra;
-        /* Listing timestamp. */
+        /** Listing timestamp. */
         uint listingTime;
-        /* Expiration timestamp - 0 for no expiry. */
+        /** Expiration timestamp - 0 for no expiry. */
         uint expirationTime;
-        /* Order salt, used to prevent duplicate hashes. */
+        /** Order salt, used to prevent duplicate hashes. */
         uint salt;
-        /* Royalty fees per group */ 
+        /** Royalty fees*/ 
         uint[] fees;
-        /* Royalty fees receivers per group */ 
-        address[][] addresses; 
-        /* Exchange address, intended as a versioning mechanism. */
+        /** Royalty fees receivers*/ 
+        address[] addresses; 
+        /** Exchange address, intended as a versioning mechanism. */
         address exchange;
-        /* Order maker address. */
+        /** Order maker address. */
         address maker;
-        /* Side (buy/sell). */
+        /** Side (buy/sell). */
         Sales.Side side;
-        /* Order taker address, if specified. */
+        /** Order taker address, if specified. */
         address taker;
-        /* Kind of sale. */
+        /** Kind of sale. */
         Sales.SaleKind saleKind;
-        /* callType. */
+        /** callType. */
         AuthenticatedProxy.CallType callType;
-        /* Target. */
+        /** Target. */
         address target;
-        /* Static call target, zero-address for no static call. */
+        /** Static call target, zero-address for no static call. */
         address staticTarget;
-        /* Token used to pay for the order, or the zero-address as a sentinel value for Ether. */
+        /** Token used to pay for the order, or the zero-address as a sentinel value for Ether. */
         address paymentToken;
-        /* Calldata. */
+        /** Calldata. */
         bytes data;
-        /* Calldata replacement pattern, or an empty byte array for no replacement. */
+        /** Calldata replacement pattern, or an empty byte array for no replacement. */
         bytes replacementPattern;
-        /* Static call extra data. */
+        /** Static call extra data. */
         bytes staticExtradata;
     }
 
@@ -145,32 +148,6 @@ contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
     }
 
     /**
-     * Calculate size of an order struct when tightly packed
-     *
-     * @param order Order to calculate size of
-     * @return Size in bytes
-     */
-    function sizeOf(Order memory order)
-        private
-        pure
-        returns (uint)
-    {
-        return ((0x14 * 7) + (0x20 * 9) + 4 + order.data.length + order.replacementPattern.length + order.staticExtradata.length);
-    }
-
-    function exists(address what)
-        private
-        view
-        returns (bool)
-    {
-        uint size;
-        assembly {
-            size := extcodesize(what)
-        }
-        return size > 0;
-    }
-
-    /**
      * @dev Hash an order, returning the canonical order hash, without the message prefix
      * @param order Order to hash
      * @return hash Hash of order
@@ -179,8 +156,8 @@ contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
         internal
         pure
         returns (bytes32 hash){
-        /* Unfortunately abi.encodePacked doesn't work here, stack size constraints. */
-        uint size = sizeOf(order);
+        /** Unfortunately abi.encodePacked doesn't work here, stack size constraints. */
+        uint size =(0x14 * 7) + (0x20 * 9) + 4 + order.data.length + order.replacementPattern.length + order.staticExtradata.length;
         bytes memory array = new bytes(size);
         uint index;
         assembly {
@@ -192,7 +169,7 @@ contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
         index = ArrayUtils.unsafeWriteUint(index, order.expirationTime);
         index = ArrayUtils.unsafeWriteUint(index, order.salt);
         index = ArrayUtils.unsafeWriteUintArray(index, order.fees);
-        index = ArrayUtils.unsafeWriteAddressMap(index, order.addresses);
+        index = ArrayUtils.unsafeWriteAddressArray(index, order.addresses);
         index = ArrayUtils.unsafeWriteAddress(index, order.exchange);
         index = ArrayUtils.unsafeWriteAddress(index, order.maker);
         index = ArrayUtils.unsafeWriteUint8(index, uint8(order.side));
@@ -249,12 +226,12 @@ contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
         view
         returns (bool)
     {   // TODO (2) sell order must have fees as mandatory
-        /* Order must be targeted at this platform version (this Exchange contract). */
+        /** Order must be targeted at this platform version (this Exchange contract). */
         if (order.exchange != address(this)) {
             return false;
         }
 
-        /* Order must possess valid sale kind parameter combination. */
+        /** Order must possess valid sale kind parameter combination. */
         if (!Sales.validateParameters(order.saleKind, order.expirationTime)) {
             return false;
         }
@@ -273,22 +250,22 @@ contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
         view
         returns (bool)
     {
-        /* Not done in an if-conditional to prevent unnecessary ecrecover evaluation, which seems to happen even though it should short-circuit. */
+        /** Not done in an if-conditional to prevent unnecessary ecrecover evaluation, which seems to happen even though it should short-circuit. */
 
-        /* Order must have valid parameters. */
+        /** Order must have valid parameters. */
         if (!_validateOrderParameters(order)) {
             return false;
         }
-        /* Order must have not been canceled or already filled. */
+        /** Order must have not been canceled or already filled. */
         if (cancelledOrFinalized[hash]) {
             return false;
         }
-        /* Order authentication. Order must be either:
-        /* (a) previously approved */
+        /** Order authentication. Order must be either:
+        /** (a) previously approved */
         if (approvedOrders[hash]) {
             return true;
         }
-        /* or (b) ECDSA-signed by maker. */
+        /** or (b) ECDSA-signed by maker. */
         if (ecrecover(hash, sig.v, sig.r, sig.s) == order.maker) {
             return true;
         }
@@ -304,25 +281,25 @@ contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
     function _approveOrder(Order memory order, bool orderbookInclusionDesired)
         internal
     {
-        /* CHECKS */
+        /** CHECKS */
 
-        /* Assert sender is authorized to approve order. */
+        /** Assert sender is authorized to approve order. */
         require(msg.sender == order.maker);
 
-        /* Calculate order hash. */
+        /** Calculate order hash. */
         bytes32 hash = _hashToSign(order);
 
-        /* Assert order has not already been approved. */
+        /** Assert order has not already been approved. */
         require(!approvedOrders[hash]);
 
-        /* EFFECTS */
+        /** EFFECTS */
     
-        /* Mark order as approved. */
+        /** Mark order as approved. */
         approvedOrders[hash] = true;
   
-        /* Log approval event. Must be split in two due to Solidity stack size limitations. */
+        /** Log approval event. Must be split in two due to Solidity stack size limitations. */
         {
-            emit OrderApprovedPartOne(hash, order.exchange, order.maker, order.taker, order.fees[0], order.addresses[0][0], order.side, order.saleKind, order.target);
+            emit OrderApprovedPartOne(hash, order.exchange, order.maker, order.taker, order.fees[0], order.addresses[0], order.side, order.saleKind, order.target);
         }
         {   
             emit OrderApprovedPartTwo(hash, order.callType, order.data, order.replacementPattern, order.staticTarget, order.staticExtradata, order.paymentToken, order.basePrice, order.extra, order.listingTime, order.expirationTime, order.salt, orderbookInclusionDesired);
@@ -337,20 +314,20 @@ contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
     function _cancelOrder(Order memory order, Sig memory sig) 
         internal
     {
-        /* CHECKS */
-
-        /* Calculate order hash. */
-        bytes32 hash = requireValidOrder(order, sig);
-
-        /* Assert sender is authorized to cancel order. */
+        /** CHECKS */
+        
+        /** Assert sender is authorized to cancel order. */
         require(msg.sender == order.maker);
+
+        /** Calculate order hash. */
+        bytes32 hash = requireValidOrder(order, sig);
   
-        /* EFFECTS */
+        /** EFFECTS */
       
-        /* Mark order as cancelled, preventing it from being matched. */
+        /** Mark order as cancelled, preventing it from being matched. */
         cancelledOrFinalized[hash] = true;
 
-        /* Log cancel event. */
+        /** Log cancel event. */
         emit OrderCancelled(hash);
     }
 
@@ -378,16 +355,16 @@ contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
         internal
         returns (uint)
     {
-        /* Calculate sell price. */
+        /** Calculate sell price. */
         uint sellPrice = Sales.calculateFinalPrice(sell.saleKind, sell.basePrice, sell.extra, sell.listingTime);
 
-        /* Calculate buy price. */
+        /** Calculate buy price. */
         uint buyPrice = Sales.calculateFinalPrice(buy.saleKind, buy.basePrice, buy.extra, buy.listingTime);
 
-        /* Require price cross. */
+        /** Require price cross. */
         require(buyPrice >= sellPrice);
 
-        /* Maker/taker priority. */
+        /** Maker/taker priority. */
         if (sell.saleKind == Sales.SaleKind.Auction || sell.saleKind == Sales.SaleKind.Offer) {
             return buyPrice;
         } else {
@@ -400,39 +377,37 @@ contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
      * @param buy Buy-side order
      * @param sell Sell-side order
      */
+     //TODO
     function executeFundsTransfer(Order memory buy, Order memory sell)
         internal
         returns (uint)
     {
-        /* Calculate match price. */
+        /** Calculate match price. */
         uint requiredAmount = _calculateMatchPrice(buy, sell);
 
-        /* Calculate royalty fees */
-        (address[] memory addresses, uint[] memory fees) = Fees.chargeFee(sell.addresses, sell.fees, requiredAmount);
-        
-        /* Calculate amount for seller to receive */
+        /** Calculate amount for seller to receive */
         uint receiveAmount =  requiredAmount;
 
         if (requiredAmount > 0){
-            /* If paying using a token (not Ether), transfer tokens. */
+            /** If paying using a token (not Ether), transfer tokens. */
             if (sell.paymentToken != address(0)){
                 require(msg.value == 0);
-                for(uint256 i = 0; i < addresses.length; i++){
-                    receiveAmount -= fees[i];
-                    transferTokens(buy.paymentToken, buy.maker, addresses[i], fees[i]);
+                for(uint256 i = 0; i < sell.addresses.length; i++){
+                    receiveAmount -= sell.fees[i];
+                    transferTokens(buy.paymentToken, buy.maker, sell.addresses[i], sell.fees[i]);
                 }
                 transferTokens(sell.paymentToken, buy.maker, sell.maker, receiveAmount);
             } else {
-                /* Special-case Ether, order must be matched by buyer. */
+                /** Special-case Ether, order must be matched by buyer. */
                 require(msg.value >= requiredAmount);
-                /* transfer fees */
-                for(uint256 i = 0; i < addresses.length; i++){
-                    receiveAmount -= fees[i];
-                    payable(addresses[i]).transfer(fees[i]);
+                /** transfer fees */
+                for(uint256 i = 0; i < sell.addresses.length; i++){
+                    receiveAmount -= sell.fees[i];
+                    payable(sell.addresses[i]).transfer(sell.fees[i]);
                 }
                 payable(sell.maker).transfer(receiveAmount);
 
-                /* Allow overshoot for variable-price auctions, refund difference. */
+                /** Allow overshoot for variable-price auctions, refund difference. */
                 uint diff = msg.value - requiredAmount;
                 if (diff > 0) {
                     payable(buy.maker).transfer(diff);
@@ -455,24 +430,24 @@ contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
         returns (bool)
     {
         return (
-            /* Must be opposite-side. */
+            /** Must be opposite-side. */
             (buy.side == Sales.Side.Buy && sell.side == Sales.Side.Sell) &&     
-            /* Must use same payment token. */
+            /** Must use same payment token. */
             (buy.paymentToken == sell.paymentToken) &&
-            /* Must match maker/taker addresses. */
+            /** Must match maker/taker addresses. */
             (sell.taker == address(0) || sell.taker == buy.maker) &&
             (buy.taker == address(0) || buy.taker == sell.maker) &&
-            /* One must be maker and the other must be taker (no bool XOR in Solidity). */
-            sell.addresses[0][0] != address(0) &&
-            /* One must have platform fee on seller side */
+            /** Platform fees address is  */
+            sell.addresses[0] == platformFeeAddress &&
+            /** One must have platform fee on seller side */
             (sell.fees[0] >= minimumPlatformFee) &&
-            /* Must match target. */
+            /** Must match target. */
             (buy.target == sell.target) &&
-            /* Must match callType. */
+            /** Must match callType. */
             (buy.callType == sell.callType) &&
-            /* Buy-side order must be settleable. */
+            /** Buy-side order must be settleable. */
             Sales.canSettleOrder(buy.listingTime, buy.expirationTime) &&
-            /* Sell-side order must be settleable. */
+            /** Sell-side order must be settleable. */
             Sales.canSettleOrder(sell.listingTime, sell.expirationTime)
         );
     }
@@ -484,34 +459,35 @@ contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
      * @param sell Sell-side order
      * @param sellSig Sell-side order signature
      */
+     //TODO
     function _atomicMatch(Order memory buy, Sig calldata buySig, Order memory sell, Sig calldata sellSig, bytes32 metadata, Order[] calldata additionalSales, Sig[] calldata sigs )
         internal
     {
-        /* CHECKS */
+        /** CHECKS */
         bytes32 buyHash;
         bytes32 sellHash;
         AuthenticatedProxy proxy;
         {
-        /* Ensure buy order validity and calculate hash if necessary. */
+        /** Ensure buy order validity and calculate hash if necessary. */
         if (buy.maker == msg.sender) {
             require(_validateOrderParameters(buy));
         } else {
             buyHash = requireValidOrder(buy, buySig);
         }
 
-        /* Ensure sell order validity and calculate hash if necessary. */
+        /** Ensure sell order validity and calculate hash if necessary. */
         if (sell.maker == msg.sender) {
             require(_validateOrderParameters(sell));
         } else {
             sellHash = requireValidOrder(sell, sellSig);
         }
         
-        /* Must be matchable. */
+        /** Must be matchable. */
         require(_ordersCanMatch(buy, sell));
         
-        /* Target must exist (prevent malicious selfdestructs just prior to order settlement). */
-        require(exists(sell.target));
-        /* Must match calldata after replacement, if specified. */
+        /** Target must exist (prevent malicious selfdestructs just prior to order settlement). */
+        require(Address.isContract(sell.target));
+        /** Must match calldata after replacement, if specified. */
         if (buy.replacementPattern.length > 0) {
           ArrayUtils.guardedArrayReplace(buy.data, sell.data, buy.replacementPattern);
         }
@@ -520,49 +496,50 @@ contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
         }
         require(ArrayUtils.arrayEq(buy.data, sell.data));
         
-        /* Retrieve delegateProxy contract. */
+        /** Retrieve delegateProxy contract. */
         address delegateProxy = IProxyRegistry(registry).proxies(sell.maker);
 
-        /* Proxy must exist. */
-        require(exists(delegateProxy));
+        /** Proxy must exist. */
+        require(Address.isContract(delegateProxy));
 
-        /* Assert implementation. */
+        /** Assert implementation. */
         require(OwnableDelegateProxy(payable(delegateProxy)).implementation() == IProxyRegistry(registry).delegateProxyImplementation());
 
-        /* Access the passthrough AuthenticatedProxy. */
+        /** Access the passthrough AuthenticatedProxy. */
         proxy= AuthenticatedProxy(payable(delegateProxy));
         }
-        /* EFFECTS */
+        /** EFFECTS */
 
-        /* Mark previously signed or approved orders as finalized. */
+        /** Mark previously signed or approved orders as finalized. */
         if (msg.sender != buy.maker) {
             cancelledOrFinalized[buyHash] = true;
         }
         if (msg.sender != sell.maker) {
             cancelledOrFinalized[sellHash] = true;
         }
-        /* INTERACTIONS */
+        /** INTERACTIONS */
 
-        /* Execute funds transfer and pay fees. */
+        /** Execute funds transfer and pay fees. */
         uint price = executeFundsTransfer(buy, sell);
 
-        /* Execute specified call through proxy. */
+        /** Execute specified call through proxy. */
         require(proxy.call(sell.target, sell.callType, sell.data));
 
-        /* Static calls are intentionally done after the effectful call so they can check resulting state. */
+        /** Static calls are intentionally done after the effectful call so they can check resulting state. */
 
-        /* Handle buy-side static call if specified. */
+        /** Handle buy-side static call if specified. */
         if (buy.staticTarget != address(0)) {
             require(staticCall(buy.staticTarget, sell.data, buy.staticExtradata));
         }
 
-        /* Handle sell-side static call if specified. */
+        /** Handle sell-side static call if specified. */
         if (sell.staticTarget != address(0)) {
             require(staticCall(sell.staticTarget, sell.data, sell.staticExtradata));
         }
 
-        /* Log match event. */
-        emit OrdersMatched(buyHash, sellHash, sell.addresses[0][0] != address(0) ? sell.maker : buy.maker, sell.addresses[0][0] != address(0) ? buy.maker : sell.maker, price, metadata);
+        /** Log match event. */
+        //TODO
+        emit OrdersMatched(buyHash, sellHash, sell.addresses[0] != address(0) ? sell.maker : buy.maker, sell.addresses[0] != address(0) ? buy.maker : sell.maker, price, metadata);
     }
 
 }
