@@ -10,14 +10,25 @@ import "./ExchangeCore.sol";
 contract Exchange is ExchangeCore {
 
     /**
-     * @dev Change the minimum taker fee paid to the protocol
+     * @dev Change the minimum taker fee paid to the platform
      * @param newMinimumPlatformFee New fee to set in basis points
      */
     function changeMinimumPlatformFee(uint newMinimumPlatformFee)
         external
-        hasValidPermit(UNIVERSAL, SET_FEES)
+        hasValidPermit(UNIVERSAL, FEE_CONFIG)
     {
         minimumPlatformFee = newMinimumPlatformFee;
+    }
+
+      /**
+     * @dev Change the address of platform for royalty fees
+     * @param newPlatformFeeAddress New fee to set in basis points
+     */
+    function changePlatformFeeAddress(address newPlatformFeeAddress)
+        external
+        hasValidPermit(UNIVERSAL, FEE_CONFIG)
+    {
+        platformFeeAddress = newPlatformFeeAddress;
     }
 
     /**
