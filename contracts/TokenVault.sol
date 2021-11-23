@@ -287,7 +287,6 @@ contract TokenVault is
             _recipients.length == _assets.length,
             "Recipients length cannot be mismatched with assets length."
         );
-
         // Iterate through every specified recipient and send tokens.
         uint256 totalAmount = 0;
         uint256 totalEth = 0;
@@ -307,6 +306,7 @@ contract TokenVault is
             if (asset.assetType == AssetType.ERC20) {
                 IERC20(token).safeTransfer(recipient, amount);
                 totalAmount = totalAmount + amount;
+                console.log("ENTER");
             }
             if (asset.assetType == AssetType.ERC721) {
                 require(

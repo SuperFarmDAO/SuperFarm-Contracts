@@ -112,18 +112,23 @@ describe("TokenVault", function () {
         await token
             .connect(admin)
             .mint(tokenVault.address, ethers.utils.parseEther("1000000000"));
+        
+        let TimeNow = Math.floor(Date.now() / 1000);
+        await ethers.provider.send("evm_setNextBlockTimestamp", [TimeNow])
+        await ethers.provider.send("evm_mine") 
     });
-
+    
     // Verify that the multisignature wallet can send tokens from the vault.
     it("should allow the multisig to send tokens via timelock", async () => {
         let devBalance = await token.balanceOf(dev.address);
         devBalance.should.be.equal(0);
+        let eta = Math.floor(Date.now() / 1000) + 180000;
 
         // Generate the raw transaction for releasing tokens from the vault.
         let releaseTokenTransaction =
             await tokenVault.populateTransaction.sendTokens(
                 [dev.address],
-                [],
+                [token.address],
                 [{
                     assetType: AssetType.ERC20,
                     amounts: [ethers.utils.parseEther("1000")], 
@@ -138,7 +143,7 @@ describe("TokenVault", function () {
                 ethers.utils.parseEther("0"),
                 "",
                 releaseTokenTransaction.data,
-                Math.floor(Date.now() / 1000) + 180000
+                eta
             );
 
         // Generate the raw transaction for executing token release with the time lock.
@@ -148,7 +153,7 @@ describe("TokenVault", function () {
                 ethers.utils.parseEther("0"),
                 "",
                 releaseTokenTransaction.data,
-                Math.floor(Date.now() / 1000) + 180000
+                eta
             );
 
         // Submit the token release transaction with the first multisigner.
@@ -184,7 +189,7 @@ describe("TokenVault", function () {
         // Confirm that the tokens have not been sent yet.
         devBalance = await token.balanceOf(dev.address);
         devBalance.should.be.equal(0);
-
+ 
         // Submit the token release execution transaction with the first multisigner.
         await multiSig
             .connect(alice)
@@ -218,13 +223,15 @@ describe("TokenVault", function () {
         bobConfirmation.should.be.equal(true);
 
         // Wait for the time lock to mature.
-        let currentTime = Math.floor(Date.now() / 1000);
-        ethers.provider.send("evm_increaseTime", [currentTime + 190000]);
+        let currentTime = 200500;
+        ethers.provider.send("evm_increaseTime", [currentTime]);
         ethers.provider.send("evm_mine");
 
         // Reset the second multisig holder's confirmation.
         await multiSig.connect(bob).revokeConfirmation(1);
         console.log();
+        let confCount = await multiSig.getConfirmationCount(1);
+        console.log("Confirmations: " + confCount);
         let owners = await multiSig.getOwners();
         let transCount = await multiSig.getTransactionCount(true, true);
         console.log(owners.toString());
@@ -232,44 +239,20 @@ describe("TokenVault", function () {
 
         // Confirm that the time lock may now be executed.
         console.log(1);
-
         confirmationTransaction = await multiSig.connect(bob).confirmTransaction(1);
+
+        confCount = await multiSig.getConfirmationCount(1);
+        console.log("Confirmations: " + confCount);
+        
+        devBalance = await token.balanceOf(dev.address);
+        devBalance.should.be.equal(ethers.utils.parseEther("1000"));
+        
+        confirmationReceipt = await confirmationTransaction.wait();
         executionEvent =
             confirmationReceipt.events[confirmationReceipt.events.length - 1];
-        executionEvent.event.should.be.equal("ExecutionFailure");
+        executionEvent.event.should.be.equal("Execution");
+
         
-        console.log(2);
-
-        // confirmationTransaction = await multiSig.connect(alice).confirmTransaction(1);
-        console.log(3);
-
-        // confirmationTransaction = await multiSig.connect(carol).confirmTransaction(1);
-        console.log(4);
-        let confCount = await multiSig.getConfirmationCount(1);
-
-        console.log("Confirmations: " + confCount);
-        confirmationReceipt = await confirmationTransaction.wait();
-        
-        console.log(1);
-        console.log(confirmationTransaction);
-        console.log( confirmationReceipt.events.length);
-        // executionEvent =
-        //     confirmationReceipt.events[confirmationReceipt.events.length - 1];
-        // executionEvent.event.should.be.equal("Execution");
-        transactionData = await multiSig.transactions(1);
-        transactionData.destination.should.be.equal(timeLock.address);
-        transactionData.value.should.be.equal(ethers.utils.parseEther("0"));
-        transactionData.data.should.be.equal(executeTransaction.data);
-        // transactionData.executed.should.be.equal(true);
-
-        bobConfirmation = await multiSig.confirmations(1, bob.address);
-        bobConfirmation.should.be.equal(true);
-
-        // Confirm that the tokens have been sent.
-        let execute = await multiSig.connect(bob).executeTransaction(1, {gasLimit: 10000000});
-
-        devBalance = await token.balanceOf(dev.address);
-        devBalance.should.be.equal(ethers.utils.parseEther("1000000"));
     });
 
     it("should update panic data", async () => {

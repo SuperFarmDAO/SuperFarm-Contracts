@@ -9,6 +9,7 @@
 pragma solidity ^0.8.8;
 
 // import "./math/SafeMath.sol";
+import "hardhat/console.sol"; // ATTENTION only for testing
 
 contract Timelock {
     // using SafeMath for uint;
@@ -122,6 +123,8 @@ contract Timelock {
             "Timelock::queueTransaction: Estimated execution block must satisfy delay."
         );
 
+        console.log("QUEUE");
+
         bytes32 txHash = keccak256(
             abi.encode(target, value, signature, data, eta)
         );
@@ -178,6 +181,7 @@ contract Timelock {
             "Timelock::executeTransaction: Call must come from admin."
         );
 
+
         bytes32 txHash = keccak256(
             abi.encode(target, value, signature, data, eta)
         );
@@ -185,10 +189,19 @@ contract Timelock {
             queuedTransactions[txHash],
             "Timelock::executeTransaction: Transaction hasn't been queued."
         );
+        console.log("EXECUTE");
+        uint timeNow = getBlockTimestamp();
+        console.log("TIME NOW IS ", timeNow);
+        console.log("ETA IS ", eta);
+        
         require(
             getBlockTimestamp() >= eta,
             "Timelock::executeTransaction: Transaction hasn't surpassed time lock."
         );
+        uint shit = eta + GRACE_PERIOD;
+        console.log("TIME NOW IS ", timeNow);
+        console.log("SHIT TIME IS ", shit);
+
         require(
             getBlockTimestamp() <= eta + GRACE_PERIOD,
             "Timelock::executeTransaction: Transaction is stale."
@@ -215,6 +228,7 @@ contract Timelock {
             success,
             "Timelock::executeTransaction: Transaction execution reverted."
         );
+        console.log("END");
         emit ExecuteTransaction(txHash, target, value, signature, data, eta);
 
         return returnData;
