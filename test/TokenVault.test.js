@@ -168,9 +168,7 @@ describe("TokenVault", function () {
         aliceConfirmation.should.be.equal(true);
 
         // Confirm the token release transaction with the second multisigner.
-        let confirmationTransaction = await multiSig
-            .connect(bob)
-            .confirmTransaction(0);
+        let confirmationTransaction = await multiSig.connect(bob).confirmTransaction(0);
         let confirmationReceipt = await confirmationTransaction.wait();
         let executionEvent =
             confirmationReceipt.events[confirmationReceipt.events.length -1];
@@ -235,29 +233,29 @@ describe("TokenVault", function () {
         // Confirm that the time lock may now be executed.
         console.log(1);
 
-        confirmationTransaction = await multiSig
-            .connect(bob)
-            .confirmTransaction(1);
+        confirmationTransaction = await multiSig.connect(bob).confirmTransaction(1);
+        executionEvent =
+            confirmationReceipt.events[confirmationReceipt.events.length - 1];
+        executionEvent.event.should.be.equal("ExecutionFailure");
+        
         console.log(2);
 
         // confirmationTransaction = await multiSig.connect(alice).confirmTransaction(1);
         console.log(3);
 
-        confirmationTransaction = await multiSig
-            .connect(carol)
-            .confirmTransaction(1);
+        // confirmationTransaction = await multiSig.connect(carol).confirmTransaction(1);
         console.log(4);
         let confCount = await multiSig.getConfirmationCount(1);
 
-        // confirmationTransaction = await multiSig.connect(bob).confirmTransaction(2);
         console.log("Confirmations: " + confCount);
         confirmationReceipt = await confirmationTransaction.wait();
-        // await execute.wait();
+        
         console.log(1);
         console.log(confirmationTransaction);
-        executionEvent =
-            confirmationReceipt.events[confirmationReceipt.events.length - 1];
-        executionEvent.event.should.be.equal("Execution");
+        console.log( confirmationReceipt.events.length);
+        // executionEvent =
+        //     confirmationReceipt.events[confirmationReceipt.events.length - 1];
+        // executionEvent.event.should.be.equal("Execution");
         transactionData = await multiSig.transactions(1);
         transactionData.destination.should.be.equal(timeLock.address);
         transactionData.value.should.be.equal(ethers.utils.parseEther("0"));
@@ -268,7 +266,7 @@ describe("TokenVault", function () {
         bobConfirmation.should.be.equal(true);
 
         // Confirm that the tokens have been sent.
-        //  execute = await multiSig.connect(bob).executeTransaction(1, {gasLimit: 10000000});
+        let execute = await multiSig.connect(bob).executeTransaction(1, {gasLimit: 10000000});
 
         devBalance = await token.balanceOf(dev.address);
         devBalance.should.be.equal(ethers.utils.parseEther("1000000"));
@@ -286,7 +284,7 @@ describe("TokenVault", function () {
                 alice.address
             );
         let enqueueTransaction =
-            await timelock.populateTransaction.queueTransaction(
+            await timeLock.populateTransaction.queueTransaction(
                 tokenVault.address, // target
                 transactionValue, // value
                 signatureMSG, // signature
@@ -315,14 +313,19 @@ describe("TokenVault", function () {
         );
         await multiSig.connect(bob).confirmTransaction(1);
         
+        executionEvent =
+        confirmationReceipt.events[confirmationReceipt.events.length - 1];
+        executionEvent.event.should.be.equal("ExecutionFailure");
+   
+
         let currentTime = Math.floor(Date.now() / 1000);
         ethers.provider.send("evm_increaseTime", [currentTime + 190000]);
         ethers.provider.send("evm_mine");
 
         await multiSig.connect(bob).executeTransaction(1);
             
-        expect(tokenVault.panicOwner).to.be.equal(admin.address);
-        expect(tokenVault.panicDestination).to.be.equal(alice.address);
+        expect(await tokenVault.panicOwner()).to.be.equal();
+        expect(await tokenVault.panicDestination()).to.be.equal(alice.address);
     });
 
     it(" add Super1155 and Super721 contracts to TokenVault contract", async () => {

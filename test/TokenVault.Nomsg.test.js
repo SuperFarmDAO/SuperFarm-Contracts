@@ -76,6 +76,7 @@ describe('TokenVault', function () {
     let itemGroupId, itemGroupId2, shiftedItemGroupId, shiftedItemGroupId2;
     let prov = waffle.provider;
     let etherBalanceVault = ethers.utils.parseEther('500');
+    let UNIVERSAL;
 
     beforeEach(async () => {
         token = await Token.connect(dev).deploy('Token', 'TOK', ethers.utils.parseEther('10000000000'));
@@ -158,7 +159,7 @@ describe('TokenVault', function () {
                 itemType: ItemType1155.Fungible,
                 itemData: 0,
                 burnType: BurnType1155.Burnable,
-                burnData: 6
+                burnData: 10
             }
         );
         
@@ -170,14 +171,38 @@ describe('TokenVault', function () {
                 supplyData: 15,
                 itemType: ItemType1155.Nonfungible,
                 itemData: 0,
-                burnType: BurnType1155.Replenishable,
+                burnType: BurnType1155.Burnable,
                 burnData: 5
             }
         );
+        
+        let setUriRight = await super721.SET_URI();
+        UNIVERSAL = await super721.UNIVERSAL();
+        let BURN = await super721.BURN();
 
         // Mint fungible item
         await super1155.connect(dev).mintBatch(tokenVault.address, [shiftedItemGroupId], ["10"], DATA);
         await super1155.connect(dev).mintBatch(tokenVault.address, [shiftedItemGroupId2], ["1"], DATA);
+
+        // TODO burn right for super721 and super1155
+        await super721.connect(dev).setPermit(
+            tokenVault.address,
+            UNIVERSAL, 
+            BURN,
+            ethers.constants.MaxUint256
+        );
+
+        await super1155.connect(dev).setPermit(
+            tokenVault.address,
+            UNIVERSAL, 
+            BURN,
+            ethers.constants.MaxUint256
+        );
+
+        
+
+        let works = await super721.hasRight(tokenVault.address, UNIVERSAL, BURN);
+        console.log(`is it work ${works}`)
 
         await expect( dev.sendTransaction({
             to: tokenVault.address,
@@ -382,7 +407,10 @@ describe('TokenVault', function () {
             it('PANIC burn', async () => {
                 await tokenVault.connect(dev).changePanicDetails(bob.address, ZERO_ADDRESS);
                 
+
+
                 await tokenVault.connect(bob).panic();
+
 
                 // TODO both balances TokenVault and carol are zero 
                 // let panicBalance = await token.balanceOf(carol.address); 
