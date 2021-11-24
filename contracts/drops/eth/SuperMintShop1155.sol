@@ -777,35 +777,7 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop, SuperMerkleAcces
 
     require(maxAllocation >= checkTotalMinted() + _amount, "0x0D");
 
-    // Verify that the user meets any requirements gating participation in this
-    // pool. Verify that any possible ERC-20 requirements are met.
-    DFStorage.PoolRequirement memory poolRequirement = pools[_id].config.requirement;
-    if (poolRequirement.requiredType == DFStorage.AccessType.TokenRequired) {
-      IERC20 requiredToken = IERC20(poolRequirement.requiredAsset);
-      require(requiredToken.balanceOf(_msgSender())
-        >= poolRequirement.requiredAmount,
-        "0x8B");
-
-    // Verify that any possible ERC-1155 ownership requirements are met.
-    } else if (poolRequirement.requiredType == DFStorage.AccessType.ItemRequired) {
-      ISuper1155 requiredItem = ISuper1155(poolRequirement.requiredAsset);
-      require(requiredItem.totalBalances(_msgSender())
-        >= poolRequirement.requiredAmount,
-        "0x8B");
-    }    
-    else if (poolRequirement.requiredType == DFStorage.AccessType.ItemRequired721) {
-      IERC721 requiredItem = IERC721(poolRequirement.requiredAsset);
-      require(requiredItem.balanceOf(_msgSender())
-        >= poolRequirement.requiredAmount,
-        "0x8B");
-
-    // Verify that any possible Staker point threshold requirements are met.
-    } else if (poolRequirement.requiredType == DFStorage.AccessType.PointRequired) {
-      IStaker requiredStaker = IStaker(poolRequirement.requiredAsset);
-      require(requiredStaker.getAvailablePoints(_msgSender())
-        >= poolRequirement.requiredAmount,
-        "0x8B");
-    }
+    checkRequirments(_id);
 
     // Process payment for the user, checking to sell for Staker points.
     DFStorage.Price memory sellingPair = pools[_id].itemPrices[itemKey][_assetIndex];
@@ -840,6 +812,63 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop, SuperMerkleAcces
 
     // Emit an event indicating a successful purchase.
   }
+
+  function checkRequirments(uint256 _id) private view {
+    // Verify that the user meets any requirements gating participation in this
+    // pool. Verify that any possible ERC-20 requirements are met.
+    uint256 amount = 0;
+    DFStorage.PoolRequirement memory poolRequirement = pools[_id].config.requirement;
+    if (poolRequirement.requiredType == DFStorage.AccessType.TokenRequired) {
+      for (uint256 i = 0; i < poolRequirement.requiredAsset.length; i++) {
+        amount += IERC20(poolRequirement.requiredAsset[i]).balanceOf(_msgSender());
+      }
+      require(amount >= poolRequirement.requiredAmount, "0x8B");
+      return;
+      // Verify that any possible Staker point threshold requirements are met.
+    } else if (poolRequirement.requiredType == DFStorage.AccessType.PointRequired) {
+        // IStaker requiredStaker = IStaker(poolRequirement.requiredAsset[0]);
+        require(IStaker(poolRequirement.requiredAsset[0]).getAvailablePoints(_msgSender())
+          >= poolRequirement.requiredAmount,
+          "0x8B");
+        return;
+    }
+
+    // Verify that any possible ERC-1155 ownership requirements are met.
+    if (poolRequirement.requiredId.length != 0) {
+      if (poolRequirement.requiredType == DFStorage.AccessType.ItemRequired) {
+        for (uint256 i = 0; i < poolRequirement.requiredAsset.length; i++) {
+            amount += ISuper1155(poolRequirement.requiredAsset[i]).totalBalances(_msgSender());
+        }
+        require(amount >= poolRequirement.requiredAmount, "0x8B");
+        return;
+      }    
+      else if (poolRequirement.requiredType == DFStorage.AccessType.ItemRequired721) {
+        // IERC721 requiredItem = IERC721(poolRequirement.requiredAsset[0]);
+        require(IERC721(poolRequirement.requiredAsset[0]).balanceOf(_msgSender())
+          >= poolRequirement.requiredAmount,
+          "0x8B");
+        return;
+      } 
+    } else {
+      if (poolRequirement.requiredType == DFStorage.AccessType.ItemRequired) {
+        // ISuper1155 requiredItem = ISuper1155(poolRequirement.requiredAsset[0]);
+        for (uint256 i = 0; i < poolRequirement.requiredAsset.length; i++) {
+          for (uint256 j = 0; j < poolRequirement.requiredAsset.length; j++) {
+            amount += ISuper1155(poolRequirement.requiredAsset[i]).balanceOf(_msgSender(), poolRequirement.requiredId[j]);
+          }
+        }
+        require(amount >= poolRequirement.requiredAmount, "0x8B");
+        return;
+      }    
+      else if (poolRequirement.requiredType == DFStorage.AccessType.ItemRequired721) {
+        for (uint256 i = 0; i < poolRequirement.requiredAsset.length; i++) {
+            amount += IERC721(poolRequirement.requiredAsset[i]).balanceOf(_msgSender());
+        }
+        require(amount >= poolRequirement.requiredAmount, "0x8B");
+        return;
+    }
+  }
+}
 
 
 

@@ -70,9 +70,10 @@ library DFStorage {
   */
     struct PoolRequirement {
         AccessType requiredType;
-        address requiredAsset;
+        address[] requiredAsset;
         uint256 requiredAmount;
         uint256 whitelistId;
+        uint256[] requiredId;
     }
 
     /**
