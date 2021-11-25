@@ -190,17 +190,17 @@ contract Timelock {
             "Timelock::executeTransaction: Transaction hasn't been queued."
         );
         console.log("EXECUTE");
-        uint timeNow = getBlockTimestamp();
-        console.log("TIME NOW IS ", timeNow);
-        console.log("ETA IS ", eta);
+        // uint timeNow = getBlockTimestamp();
+        // console.log("TIME NOW IS ", timeNow);
+        // console.log("ETA IS ", eta);
         
         require(
             getBlockTimestamp() >= eta,
             "Timelock::executeTransaction: Transaction hasn't surpassed time lock."
         );
-        uint shit = eta + GRACE_PERIOD;
-        console.log("TIME NOW IS ", timeNow);
-        console.log("SHIT TIME IS ", shit);
+        // uint shit = eta + GRACE_PERIOD;
+        // console.log("TIME NOW IS ", timeNow);
+        // console.log("SHIT TIME IS ", shit);
 
         require(
             getBlockTimestamp() <= eta + GRACE_PERIOD,
