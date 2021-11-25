@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity 0.8.8;
 
-import "./ISuper1155.sol";
+import "../assets/erc1155/interfaces/ISuper1155.sol";
 
 interface IMintShop {
     function addPool(
@@ -13,7 +13,7 @@ interface IMintShop {
     ) external;
 
 
-    function addWhitelist(DFStorage.WhitelistInput memory _whitelist) external;
+    // function addWhitelist(DFStorage.WhitelistInput memory _whitelist) external;
 
     function setItems(ISuper1155[] memory _items) external;
 

@@ -42,7 +42,8 @@ library DFStorage {
         Public,
         TokenRequired,
         ItemRequired,
-        PointRequired
+        PointRequired,
+        ItemRequired721
     }
 
     /**
@@ -69,9 +70,10 @@ library DFStorage {
   */
     struct PoolRequirement {
         AccessType requiredType;
-        address requiredAsset;
+        address[] requiredAsset;
         uint256 requiredAmount;
         uint256 whitelistId;
+        uint256[] requiredId;
     }
 
     /**

@@ -106,7 +106,7 @@ abstract contract PermitControl is Ownable {
   ) {
     require(_msgSender() == owner()
       || hasRight(_msgSender(), _circumstance, _right),
-      "PermitControl: sender does not have a valid permit");
+      "P1");
     _;
   }
 
@@ -170,7 +170,7 @@ abstract contract PermitControl is Ownable {
     uint256 _expirationTime
   ) public virtual hasValidPermit(UNIVERSAL, managerRight[_right]) {
     require(_right != ZERO_RIGHT,
-      "PermitControl: you may not grant the zero right");
+      "P2");
     permissions[_address][_circumstance][_right] = _expirationTime;
     emit PermitUpdated(_msgSender(), _address, _circumstance, _right,
       _expirationTime);
@@ -190,7 +190,7 @@ abstract contract PermitControl is Ownable {
     bytes32 _managerRight
   ) external virtual hasValidPermit(UNIVERSAL, MANAGER) {
     require(_managedRight != ZERO_RIGHT,
-      "PermitControl: you may not specify a manager for the zero right");
+      "P3");
     managerRight[_managedRight] = _managerRight;
     emit ManagementUpdated(_msgSender(), _managedRight, _managerRight);
   }

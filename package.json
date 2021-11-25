@@ -56,7 +56,7 @@
     "eslint-plugin-promise": "^4.2.1",
     "eslint-plugin-standard": "^4.0.1",
     "ethereum-waffle": "^3.1.1",
-    "ethers": "^5.0.25",
+    "ethers": "^5.4.0",
     "hardhat": "^2.6.5",
     "hardhat-contract-sizer": "^2.1.1",
     "hardhat-gas-reporter": "^1.0.4",

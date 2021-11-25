@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity 0.8.7;
+pragma solidity ^0.8.7;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 
 import "./TokenRecipient.sol";
-import "./ProxyRegistry.sol";
+import "../interfaces/IProxyRegistry.sol";
 
 /**
   @title An ownable call-delegating proxy which can receive tokens and only make
@@ -24,7 +24,7 @@ contract AuthenticatedProxy is Ownable, TokenRecipient {
   bool public initialized = false;
 
   /// The associated `ProxyRegistry` contract with authentication information.
-  ProxyRegistry public registry;
+  address public registry;
 
   /// Whether or not access has been revoked.
   bool public revoked;
@@ -56,7 +56,7 @@ contract AuthenticatedProxy is Ownable, TokenRecipient {
 
     @param _registry The registry to create this proxy against.
   */
-  function initialize(ProxyRegistry _registry) external {
+  function initialize(address _registry) external {
     require(!initialized,
       "AuthenticatedProxy: this proxy may only be initialized once");
     initialized = true;
@@ -86,7 +86,7 @@ contract AuthenticatedProxy is Ownable, TokenRecipient {
   function call(address _target, CallType _type, bytes calldata _data) public
     returns (bool) {
     require(_msgSender() == owner()
-      || (!revoked && registry.authorizedCallers(_msgSender())),
+      || (!revoked && IProxyRegistry(registry).authorizedCallers(_msgSender())),
       "AuthenticatedProxy: not owner, not authorized by an unrevoked registry");
 
     // The call is authorized to be performed, now select a type and return.

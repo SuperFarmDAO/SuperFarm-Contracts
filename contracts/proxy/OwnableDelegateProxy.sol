@@ -9,6 +9,7 @@ import "./DelegateProxy.sol";
   @title A call-delegating proxy with an owner.
   @author Protinam, Project Wyvern
   @author Tim Clancy
+  @author Rostislav Khlebnikov
 
   This contract was originally developed by Project Wyvern
   (https://github.com/ProjectWyvern/) where it currently enjoys great success as
@@ -20,6 +21,10 @@ import "./DelegateProxy.sol";
 */
 abstract contract OwnableDelegateProxy is Ownable, DelegateProxy {
 
+  // Shows if user proxy was initialized
+  bool public initialized;
+  /// escape slot to match AuthenticatedProxy storage uint8(bool)+uint184 = 192 bits, so target (160 bits) can't be put in this storage slot
+  uint184 internal escape;
   /// The address of the proxy's current target.
   address public target;
 
