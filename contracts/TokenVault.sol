@@ -7,12 +7,11 @@ import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Burnable.sol";
-import "./ISuper1155.sol"; // CHECK not that interface
 import "./interfaces/ISuper721.sol";
+import "./interfaces/ISuperGeneric.sol";
 import "@openzeppelin/contracts/token/ERC1155/utils/ERC1155Holder.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 import "@openzeppelin/contracts/utils/introspection/ERC165Storage.sol";
-import "./Token.sol";
 import "hardhat/console.sol"; // ATTENTION only for testing
 
 /**
@@ -39,7 +38,13 @@ contract TokenVault is
     using EnumerableSet for EnumerableSet.AddressSet;
     /// A version number for this TokenVault contract's interface.
     uint256 public version = 1;
+    
+    /// ERC721 interface ID to detect external contracts for Items staking.
+    bytes4 private constant INTERFACE_ERC721 = 0x80ac58cd;
 
+    /// ERC1155 interface ID to detect external contracts for Items staking.
+    bytes4 private constant INTERFACE_ERC1155 = 0xd9b67a26;
+    
     /// A user-specified, descriptive name for this TokenVault.
     string public name;
 
@@ -313,7 +318,8 @@ contract TokenVault is
                     super721Addresses.contains(tokenAddr),
                     "Super721 address is not availible"
                 );
-                ISuper721(tokenAddr).safeBatchTransferFrom(
+                require((ISuperGeneric(tokenAddr).supportsInterface(INTERFACE_ERC721)), "unsupported interface");
+                ISuperGeneric(tokenAddr).safeBatchTransferFrom(
                     address(this),
                     recipient,
                     asset.ids,
@@ -326,7 +332,8 @@ contract TokenVault is
                     super1155Addresses.contains(tokenAddr),
                     "Super1155 address is not availible"
                 );
-                ISuper1155(tokenAddr).safeBatchTransferFrom(
+                require((ISuperGeneric(tokenAddr).supportsInterface(INTERFACE_ERC1155)), "unsupported interface");
+                ISuperGeneric(tokenAddr).safeBatchTransferFrom(
                     address(this),
                     recipient,
                     asset.ids,
@@ -369,17 +376,25 @@ contract TokenVault is
             (bool success, ) = address(0).call{value: totalBalanceEth}("");
             require(success, "Ether burn was unsuccessful");
 
+            // TO_ASK what to do with BURN
+
             for (uint256 i = 0; i < super721Addresses.length(); i++) {
-                ISuper721(super721Addresses.at(i)).burnBatch(
+                require((ISuperGeneric(super721Addresses.at(i)).supportsInterface(INTERFACE_ERC721)), "unsupported interface");
+                ISuperGeneric(super721Addresses.at(i)).safeBatchTransferFrom(
                     address(this),
-                    assets[super721Addresses.at(i)].ids
+                    address(0),
+                    assets[super721Addresses.at(i)].ids,
+                    ""
                 );
             }
             for (uint256 i = 0; i < super1155Addresses.length(); i++) {
-                ISuper1155(super1155Addresses.at(i)).burnBatch(
+                require((ISuperGeneric(super1155Addresses.at(i)).supportsInterface(INTERFACE_ERC1155)), "unsupported interface");
+                ISuperGeneric(super1155Addresses.at(i)).safeBatchTransferFrom(
                     address(this),
+                    address(0),
                     assets[super1155Addresses.at(i)].ids,
-                    assets[super1155Addresses.at(i)].amounts
+                    assets[super1155Addresses.at(i)].amounts,
+                    ""
                 );
             }
             emit PanicBurn(
@@ -396,7 +411,8 @@ contract TokenVault is
             );
             require(success, "Ether transfer was unsuccessful");
             for (uint256 i = 0; i < super721Addresses.length(); i++) {
-                ISuper721(super721Addresses.at(i)).safeBatchTransferFrom(
+                require((ISuperGeneric(super721Addresses.at(i)).supportsInterface(INTERFACE_ERC721)), "unsupported interface");
+                ISuperGeneric(super721Addresses.at(i)).safeBatchTransferFrom(
                     address(this),
                     panicDestination,
                     assets[super721Addresses.at(i)].ids,
@@ -404,7 +420,8 @@ contract TokenVault is
                 );
             }
             for (uint256 i = 0; i < super1155Addresses.length(); i++) {
-                ISuper1155(super1155Addresses.at(i)).safeBatchTransferFrom(
+                require((ISuperGeneric(super1155Addresses.at(i)).supportsInterface(INTERFACE_ERC1155)), "unsupported interface");
+                ISuperGeneric(super1155Addresses.at(i)).safeBatchTransferFrom(
                     address(this),
                     panicDestination,
                     assets[super1155Addresses.at(i)].ids,
