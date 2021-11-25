@@ -75,6 +75,7 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
             owner.address,
             "Super1155",
             originalUri,
+            originalUri,
             proxyRegistry.address
         );
 
@@ -82,6 +83,7 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
         super1155Second = await this.Super1155.deploy(
             owner.address,
             "Super1155142",
+            originalUri + "uri2",
             originalUri + "uri2",
             proxyRegistry.address
         );
@@ -91,7 +93,7 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
         mintShop1155 = await this.MintShop1155.deploy(
             owner.address,
             paymentReceiver.address,
-            "4",
+            4,
             200
         );
         await mintShop1155.deployed();
@@ -109,17 +111,17 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
 
         const root = computeRootHash(whiteListAddresses);
 
-        console.log("ROOT js ", root);
+        // console.log("ROOT js ", root);
 
         await mintShop1155.connect(owner).setItems([super1155.address, super1155Second.address]);
-        await mintShop1155.connect(owner).addWhiteList(0, 0, root, 0, ethers.constants.MaxUint256);
+        await mintShop1155.connect(owner).addWhiteList(0, 1, root, 0, ethers.constants.MaxUint256);
         
         await staker.transferOwnership(owner.address);
 
         UNIVERSAL = await mintShop1155.UNIVERSAL();
         MANAGER = await mintShop1155.MANAGER();
         zeroRight = await mintShop1155.ZERO_RIGHT();
-        MINT721 = await item721.MINT();
+        // MINT721 = await item721.MINT();
 
         setSweepRight = await mintShop1155.SWEEP();
         setLockSweepRight = await mintShop1155.LOCK_SWEEP();
@@ -183,7 +185,7 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
         it('Reverts: no valid permit', async function(){
             await expect(
                 mintShop1155.connect(deployer).updatePaymentReceiver(owner.address)
-            ).to.be.revertedWith("PermitControl: sender does not have a valid permit");
+            ).to.be.revertedWith("P1");
         });
 
         it('Reverts: setting manager for Zero address', async function(){
@@ -194,7 +196,7 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
 
             await expect(
                 mintShop1155.connect(owner).setManagerRight(zeroRight, ethers.utils.defaultAbiCoder.encode(input.types, input.values))
-            ).to.be.revertedWith("PermitControl: you may not specify a manager for the zero right");
+            ).to.be.revertedWith("P3");
         });
 
         it('should test PermitControl to set a manager who can further create permits to update payment receiver', async function(){
@@ -301,9 +303,10 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
                 singlePurchaseLimit: 2,
                 requirement: {
                     requiredType: 0,
-                    requiredAsset: NULL_ADDRESS,
+                    requiredAsset: [NULL_ADDRESS],
                     requiredAmount: 1,
-                    whitelistId: 1
+                    whitelistId: 1,
+                    requiredId: []
                 },
                 collection: super1155.address
             }, [1], [1], [1], [[{
@@ -324,9 +327,10 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
                 singlePurchaseLimit: 2,
                 requirement: {
                     requiredType: 0,
-                    requiredAsset: NULL_ADDRESS,
+                    requiredAsset: [NULL_ADDRESS],
                     requiredAmount: 1,
-                    whitelistId: 1
+                    whitelistId: 1,
+                    requiredId: []
                 },
                 collection: super1155.address
             }, [1], [1], [1], [[{
@@ -347,9 +351,10 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
                 singlePurchaseLimit: 2,
                 requirement: {
                     requiredType: 0,
-                    requiredAsset: NULL_ADDRESS,
+                    requiredAsset: [NULL_ADDRESS],
                     requiredAmount: 1,
-                    whitelistId: 1
+                    whitelistId: 1,
+                    requiredId: []
                 },
                 collection: super1155.address
             }, [], [1], [1], [[{
@@ -370,9 +375,10 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
                 singlePurchaseLimit: 2,
                 requirement: {
                     requiredType: 0,
-                    requiredAsset: NULL_ADDRESS,
+                    requiredAsset: [NULL_ADDRESS],
                     requiredAmount: 1,
-                    whitelistId: 1
+                    whitelistId: 1,
+                    requiredId: []
                 },
                 collection: super1155.address
             }, [1], [1, 2], [1], [[{
@@ -393,9 +399,10 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
                 singlePurchaseLimit: 2,
                 requirement: {
                     requiredType: 0,
-                    requiredAsset: NULL_ADDRESS,
+                    requiredAsset: [NULL_ADDRESS],
                     requiredAmount: 1,
-                    whitelistId: 1
+                    whitelistId: 1,
+                    requiredId: []
                 },
                 collection: super1155.address
             }, [1], [1], [1, 2], [[{
@@ -416,9 +423,10 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
                 singlePurchaseLimit: 2,
                 requirement: {
                     requiredType: 0,
-                    requiredAsset: NULL_ADDRESS,
+                    requiredAsset: [NULL_ADDRESS],
                     requiredAmount: 1,
-                    whitelistId: 1
+                    whitelistId: 1,
+                    requiredId: []
                 },
                 collection: super1155.address
             }, [1, 2], [1, 2], [1, 2], [[{
@@ -439,9 +447,10 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
                 singlePurchaseLimit: 2,
                 requirement: {
                     requiredType: 0,
-                    requiredAsset: NULL_ADDRESS,
+                    requiredAsset: [NULL_ADDRESS],
                     requiredAmount: 1,
-                    whitelistId: 1
+                    whitelistId: 1,
+                    requiredId: []
                 },
                 collection: super1155.address
             }, [1], [1], [0], [[{
@@ -462,9 +471,10 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
                 singlePurchaseLimit: 2,
                 requirement: {
                     requiredType: 0,
-                    requiredAsset: NULL_ADDRESS,
+                    requiredAsset: [NULL_ADDRESS],
                     requiredAmount: 1,
-                    whitelistId: 1
+                    whitelistId: 1,
+                    requiredId: []
                 },
                 collection: super1155.address
             }, [1, 2], [1, 1], [10, 1], [[{
@@ -487,9 +497,10 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
                 singlePurchaseLimit: 2,
                 requirement: {
                     requiredType: 0,
-                    requiredAsset: NULL_ADDRESS,
+                    requiredAsset: [NULL_ADDRESS],
                     requiredAmount: 1,
-                    whitelistId: 1
+                    whitelistId: 1,
+                    requiredId: []
                 },
                 collection: super1155.address
             }, [1, 2], [1, 1], [10, 1], [[{
@@ -552,9 +563,10 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
                 singlePurchaseLimit: 2,
                 requirement: {
                     requiredType: 0,
-                    requiredAsset: NULL_ADDRESS,
+                    requiredAsset: [NULL_ADDRESS],
                     requiredAmount: 1,
-                    whitelistId: 0
+                    whitelistId: 0,
+                    requiredId: []
                     },
                     collection: super1155.address
                 }, [1, 2], // Groups 1 = FT, 2 = NFT
@@ -599,9 +611,10 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
                 singlePurchaseLimit: 1,
                 requirement: {
                     requiredType: 0,
-                    requiredAsset: NULL_ADDRESS,
+                    requiredAsset: [NULL_ADDRESS],
                     requiredAmount: 1,
-                    whitelistId: 0
+                    whitelistId: 0,
+                    requiredId: []
                     },
                     collection: super1155.address
                 }, [3], // Group
@@ -667,7 +680,7 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
                 merkleProof: computeMerkleProof(0, whiteListAddresses)
             };
             await expect(
-                mintShop1155.connect(owner).mintFromPool(0, 2, 1, 3, 0, whiteListInput)
+                mintShop1155.connect(deployer).mintFromPool(0, 2, 1, 3, 0, whiteListInput)
             ).to.be.revertedWith("0x2B");
         });
 
@@ -683,7 +696,7 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
             // console.log(tree.leaves[1].proof);
 
             await expect(
-                mintShop1155.connect(owner).mintFromPool(0, 2, 5, 1, 0, whiteListInput)
+                mintShop1155.connect(signer1).mintFromPool(0, 2, 5, 1, 0, whiteListInput)
             ).to.be.revertedWith("0x3B");
         });
 
@@ -701,7 +714,7 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
 
             // Mint from pool
             await expect(
-                mintShop1155.connect(owner).mintFromPool(0, 2, 0, 1, 0, whiteListInput)
+                mintShop1155.connect(signer1).mintFromPool(0, 2, 0, 1, 0, whiteListInput)
             ).to.be.revertedWith("0x4B");
         });
 
@@ -721,13 +734,15 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
                 merkleProof: computeMerkleProof(0, whiteListAddresses)
             };
             // Mint three times
-            await mintShop1155.connect(owner).mintFromPool(0, 2, 0, 1, 0, whiteListInput, {value: ethers.utils.parseEther("1")})
-            await mintShop1155.connect(owner).mintFromPool(0, 2, 1, 1, 0, whiteListInput, {value: ethers.utils.parseEther("1")})
-            await mintShop1155.connect(owner).mintFromPool(0, 2, 2, 1, 0, whiteListInput, {value: ethers.utils.parseEther("1")})
+            await mintShop1155.connect(signer1).mintFromPool(0, 2, 0, 1, 0, whiteListInput, {value: ethers.utils.parseEther("1")})
+            await mintShop1155.connect(signer1).mintFromPool(0, 2, 1, 1, 0, whiteListInput, {value: ethers.utils.parseEther("1")})
+            await mintShop1155.connect(signer1).mintFromPool(0, 2, 2, 1, 0, whiteListInput, {value: ethers.utils.parseEther("1")})
+            await mintShop1155.connect(signer1).mintFromPool(0, 2, 2, 1, 0, whiteListInput, {value: ethers.utils.parseEther("1")})
+
 
             // Mint again surpassing the purchase limit of the pool
             await expect(
-                mintShop1155.connect(owner).mintFromPool(0, 2, 0, 1, 0,whiteListInput,  {value: ethers.utils.parseEther("1")})
+                mintShop1155.connect(signer1).mintFromPool(0, 2, 0, 1, 0, whiteListInput,  {value: ethers.utils.parseEther("1")})
             ).to.be.revertedWith("0x5B");
         });
 
@@ -747,14 +762,14 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
                 merkleProof: computeMerkleProof(0, whiteListAddresses)
             };
             // Mint four times
-            await mintShop1155.connect(owner).mintFromPool(0, 2, 0, 1, 0,whiteListInput, {value: ethers.utils.parseEther("1")})
-            await mintShop1155.connect(owner).mintFromPool(0, 2, 1, 1, 0,whiteListInput, {value: ethers.utils.parseEther("1")})
-            await mintShop1155.connect(owner).mintFromPool(0, 2, 2, 1, 0,whiteListInput, {value: ethers.utils.parseEther("1")})
-            await mintShop1155.connect(owner).mintFromPool(1, 3, 0, 1, 0,whiteListInput, {value: ethers.utils.parseEther("1")})
+            await mintShop1155.connect(signer1).mintFromPool(0, 2, 0, 1, 0,whiteListInput, {value: ethers.utils.parseEther("1")})
+            await mintShop1155.connect(signer1).mintFromPool(0, 2, 1, 1, 0,whiteListInput, {value: ethers.utils.parseEther("1")})
+            await mintShop1155.connect(signer1).mintFromPool(0, 2, 2, 1, 0,whiteListInput, {value: ethers.utils.parseEther("1")})
+            await mintShop1155.connect(signer1).mintFromPool(1, 3, 0, 1, 0,whiteListInput, {value: ethers.utils.parseEther("1")})
 
             // Mint again surpassing the global purchase limit
             await expect(
-                mintShop1155.connect(owner).mintFromPool(1, 3, 1, 1, 0,whiteListInput, {value: ethers.utils.parseEther("1")})
+                mintShop1155.connect(signer1).mintFromPool(1, 3, 1, 1, 0,whiteListInput, {value: ethers.utils.parseEther("1")})
             ).to.be.revertedWith("0x5B");
         });
 
@@ -766,6 +781,9 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
                 setMintRight,
                 ethers.constants.MaxUint256
             );
+
+        await mintShop1155.connect(owner).addWhiteList(1, 2, root, 0, ethers.constants.MaxUint256);
+
 
             // Create whitelist with deployer's address in it
             // await mintShop1155.connect(owner).addWhitelist({
@@ -787,9 +805,10 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
                 singlePurchaseLimit: 1,
                 requirement: {
                     requiredType: 0,
-                    requiredAsset: NULL_ADDRESS,
+                    requiredAsset: [NULL_ADDRESS],
                     requiredAmount: 1,
-                    whitelistId: 1
+                    whitelistId: 2,
+                    requiredId: []
                     },
                     collection: super1155.address
                 }, [3], // Group
@@ -815,7 +834,7 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
                 };
             // Mint
             await expect(
-                mintShop1155.connect(signer1).mintFromPool(1, 3, 0, 1, 0, whiteListInput, {value: ethers.utils.parseEther("1")})
+                mintShop1155.connect(owner).mintFromPool(1, 3, 0, 1, 0, whiteListInput, {value: ethers.utils.parseEther("1")})
             ).to.be.revertedWith("Invalid Proof.");
         });
 
@@ -844,9 +863,10 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
                 singlePurchaseLimit: 1,
                 requirement: {
                     requiredType: 0,
-                    requiredAsset: NULL_ADDRESS,
+                    requiredAsset: [NULL_ADDRESS],
                     requiredAmount: 1,
-                    whitelistId: 0
+                    whitelistId: 0,
+                    requiredId: []
                     },
                     collection: super1155.address
                 }, [3], // Group
@@ -883,9 +903,10 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
                 singlePurchaseLimit: 1,
                 requirement: {
                     requiredType: 0,
-                    requiredAsset: NULL_ADDRESS,
+                    requiredAsset: [NULL_ADDRESS],
                     requiredAmount: 1,
-                    whitelistId: 0
+                    whitelistId: 0,
+                    requiredId: []
                     },
                     collection: super1155.address
                 }, [3], // Group
@@ -918,7 +939,7 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
                 merkleProof: computeMerkleProof(0, whiteListAddresses)
             };
             await expect(
-                mintShop1155.connect(owner).mintFromPool(1, 3, 0, 1, 0, whiteListInput, {value: ethers.utils.parseEther("0.5")})
+                mintShop1155.connect(signer1).mintFromPool(1, 3, 0, 1, 0, whiteListInput, {value: ethers.utils.parseEther("0.5")})
             ).to.be.revertedWith("0x9B");
         });
 
@@ -941,9 +962,10 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
                 singlePurchaseLimit: 3,
                 requirement: {
                     requiredType: 1,
-                    requiredAsset: mockERC20.address,
+                    requiredAsset: [mockERC20.address],
                     requiredAmount: ethers.utils.parseEther("10"),
-                    whitelistId: 0
+                    whitelistId: 0,
+                    requiredId: []
                     },
                     collection: super1155.address
                 }, [3], // Group
@@ -1024,9 +1046,10 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
                 singlePurchaseLimit: 1,
                 requirement: {
                     requiredType: 0,
-                    requiredAsset: NULL_ADDRESS,
+                    requiredAsset: [NULL_ADDRESS],
                     requiredAmount: 1,
-                    whitelistId: 0
+                    whitelistId: 0,
+                    requiredId: []
                     },
                     collection: super1155.address
                 }, [3], // Group
@@ -1065,9 +1088,10 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
                 singlePurchaseLimit: 1,
                 requirement: {
                     requiredType: 2,
-                    requiredAsset: super1155.address,
+                    requiredAsset: [super1155.address],
                     requiredAmount: 1,
-                    whitelistId: 0
+                    whitelistId: 0,
+                    requiredId: []
                     },
                     collection: super1155.address
                 }, [3], // Group
@@ -1126,9 +1150,10 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
                 singlePurchaseLimit: 2,
                 requirement: {
                     requiredType: 3,
-                    requiredAsset: staker.address,
+                    requiredAsset: [staker.address],
                     requiredAmount: 1000, // Required amount of points
-                    whitelistId: 0
+                    whitelistId: 0,
+                    requiredId: []
                     },
                     collection: super1155.address
                 }, [1], // Groups 1 = FT, 2 = NFT
@@ -1242,13 +1267,15 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
             let mShop = await this.MintShop1155.deploy(
                 deployer.address,
                 paymentReceiver.address,
-                "4"
+                "4",
+                200
             );
 
 
             let sup = await this.Super1155.deploy(
                 owner.address,
                 "Super1155142",
+                originalUri + "uri2",
                 originalUri + "uri2",
                 proxyRegistry.address
             );
@@ -1283,9 +1310,10 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
                 singlePurchaseLimit: 1,
                 requirement: {
                     requiredType: 0,
-                    requiredAsset: NULL_ADDRESS,
+                    requiredAsset: [NULL_ADDRESS],
                     requiredAmount: 1,
-                    whitelistId: 0
+                    whitelistId: 0,
+                    requiredId: []
                     },
                     collection: sup.address
                 }, [1], // Groups 1 = FT, 2 = NFT

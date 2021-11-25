@@ -738,10 +738,12 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop, SuperMerkleAcces
     require(pools[_id].config.singlePurchaseLimit >= _amount,
       "0x2B");
 
+
+    if (pools[_id].whiteListId != 0)
     {
-      require(keccak256(abi.encodePacked(_whiteList.index, msg.sender)) == _whiteList.node);
       uint256 accesslistId = pools[_id].whiteListId;
       SuperMerkleAccess.verify(accesslistId, _whiteList.index, _whiteList.node, _whiteList.merkleProof);
+      require(keccak256(abi.encodePacked(_whiteList.index, msg.sender)) == _whiteList.node, "Invalid Proof.");
     }
 
     // Verify that the asset being used in the purchase is valid.
@@ -832,7 +834,7 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop, SuperMerkleAcces
     }
 
     // Verify that any possible ERC-1155 ownership requirements are met.
-    if (poolRequirement.requiredId.length != 0) {
+    if (poolRequirement.requiredId.length == 0) {
       if (poolRequirement.requiredType == DFStorage.AccessType.ItemRequired) {
         for (uint256 i = 0; i < poolRequirement.requiredAsset.length; i++) {
             amount += ISuper1155(poolRequirement.requiredAsset[i]).totalBalances(_msgSender());
@@ -865,6 +867,7 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop, SuperMerkleAcces
         return amount >= poolRequirement.requiredAmount;
     }
   }
+  return true;
 }
 
 
