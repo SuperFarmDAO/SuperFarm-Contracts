@@ -908,22 +908,35 @@ describe("TokenVault", function () {
             // TODO before panic send tokens to contract
             it('PANIC transfer', async () => {
                 // let panicOwner = await tokenVault.panicOwner();
+                let balanceERC20 = await token.balanceOf(tokenVault.address);
+                let balanceERC721 = await super721.balanceOf(tokenVault.address);
+                let balanceERC1155 = await super1155.balanceOf(tokenVault.address, shiftedItemGroupId.add(1));
+                let balanceEthBefore = await prov.getBalance(tokenVault.address);
+                let balanceEthMsg = await prov.getBalance(multiSig.address);
+
                 let panic = await tokenVault.populateTransaction.panic();
                 await multiSig.connect(alice).submitTransaction(timeLock.address, transactionValue, panic.data);
                 console.log("submited")
                 await multiSig.connect(bob).confirmTransaction(6);
-        
-
                 
-
+                let zero = ethers.utils.parseEther('0');
                 // TODO tokens after operation on carol address balance on vault is zero  
-                // let panicBalance = await token.balanceOf(carol.address);
-                // expect(panicBalance).to.equal(ethers.utils.parseEther('1000000000'));
+                // vault balances are zero 
+                expect(await token.balanceOf(tokenVault.address)).to.be.equal(zero);
+                expect(await super721.balanceOf(tokenVault.address)).to.be.equal(zero);
+                expect(await super1155.balanceOf(tokenVault.address, shiftedItemGroupId.add(1))).to.be.equal(zero);
+                expect(balanceEthAfter.sub(balanceEthBefore)).to.be.equal(zero); 
+                
+                expect(await token.balanceOf(multiSig.address)).to.be.equal(balanceERC20);
+                expect(await super721.balanceOf(multiSig.address)).to.be.equal(balanceERC721);
+                expect(await super1155.balanceOf(multiSig.address, shiftedItemGroupId.add(1))).to.be.equal(balanceERC1155);
+
             });
 
             it('PANIC burn', async () => {
                 let estimatesTimeOfArrival = await getTime() + 180000;
-
+                let balanceEthBefore = await prov.getBalance(tokenVault.address);
+                
                 // change pnic distination to zero to call burn 
                 let changePanicDetails = await tokenVault.populateTransaction.changePanicDetails(bob.address, ZERO_ADDRESS);
                 let enqueueTransaction = await timeLock.populateTransaction.queueTransaction(
@@ -953,10 +966,20 @@ describe("TokenVault", function () {
                 expect(await tokenVault.panicDestination()).to.be.equal(ZERO_ADDRESS);
 
                 await tokenVault.connect(bob).panic();
+                let balanceEthAfter = await prov.getBalance(tokenVault.address);
 
-                // TODO both balances TokenVault and carol are zero 
-                // let panicBalance = await token.balanceOf(carol.address); 
-                // expect(panicBalance.toString()).to.equal(ethers.utils.parseEther('1000000000'));
+                let zero = ethers.utils.parseEther('0');
+                // vault balances are zero 
+                expect(await token.balanceOf(tokenVault.address)).to.be.equal(zero);
+                expect(await super721.balanceOf(tokenVault.address)).to.be.equal(zero);
+                expect(await super1155.balanceOf(tokenVault.address, shiftedItemGroupId.add(1))).to.be.equal(zero);
+                expect(balanceEthAfter.sub(balanceEthBefore)).to.be.equal(zero); 
+                // bob's balance are zero 
+                expect(await token.balanceOf(bob.address)).to.be.equal(zero);
+                expect(await super721.balanceOf(bob.address)).to.be.equal(zero);
+                expect(await super1155.balanceOf(bob.address, shiftedItemGroupId.add(1))).to.be.equal(zero);
+                // expect(balanceEthAfter.sub(balanceEthBefore)).to.be.equal(zero); 
+
             });
 
             it('PANIC REVERT trying non panic owner call panic', async () => {

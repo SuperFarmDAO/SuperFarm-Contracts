@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: LGPL-3.0
 // Modified from https://github.com/gnosis/MultiSigWallet/blob/master/contracts/MultiSigWallet.sol
 pragma solidity ^0.8.8;
-import "hardhat/console.sol"; // ATTENTION only for testing
 
 
 /// @title Multisignature wallet - Allows multiple parties to agree on transactions before execution.
@@ -165,7 +164,6 @@ contract MultiSigWallet {
         notExecuted(transactionId)
     {
         if (isConfirmed(transactionId)) {
-            console.log("msg confirmed");
             Transaction storage txn = transactions[transactionId];
             if (
                 external_call(
