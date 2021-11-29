@@ -167,7 +167,7 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop, SuperMerkleAcces
     mapping (bytes32 => uint256) itemPricesLength;
     mapping (bytes32 => mapping (uint256 => DFStorage.Price)) itemPrices;
     uint256[] itemGroups;
-    uint256 whiteListId;
+    Whitelist[] whiteLists;
   }
 
   /**
@@ -199,17 +199,27 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop, SuperMerkleAcces
     @param addresses A mapping of hashed addresses to a flag indicating whether
       this whitelist allows the address to participate in a purchase.
   */
-  // struct Whitelist {
-  //   uint256 expiryTime;
-  //   uint256 currentWhitelistVersion;
-  //   bool isActive;
-  //   mapping (bytes32 => bool) addresses;
-  // }
+  struct Whitelist {
+    uint256 id;
+    mapping (address => bool) minted;
+    // uint256 price;
+  }
 
   struct WhiteListInput {
+    uint256 whiteListId;
     uint256 index; 
     bytes32 node; 
     bytes32[] merkleProof;
+  }
+
+
+  struct WhiteListCreate {
+    uint256 _accesslistId;
+    bytes32 _merkleRoot;
+    uint256 _startTime; 
+    uint256 _endTime; 
+    uint256 _price; 
+    address _token;
   }
 
   /**
@@ -465,19 +475,21 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop, SuperMerkleAcces
   }
 
 
-  function addWhiteList(uint256 _poolId, uint256 _accesslistId, bytes32 _merkleRoot, 
-  uint256 _startTime, uint256 _endTime) external hasValidPermit(UNIVERSAL, WHITELIST) {
-
-    super.setAccessRound(_accesslistId, _merkleRoot, _startTime, _endTime);
-    pools[_poolId].whiteListId = _accesslistId;
-    // console.log("ON CHAIN in whiteList");
-    // console.logBytes32(_merkleRoot);
+  function addWhiteList(uint256 _poolId, WhiteListCreate[] calldata whitelist) external hasValidPermit(UNIVERSAL, WHITELIST) {
+    for (uint256 i = 0; i < whitelist.length; i++) {
+      super.setAccessRound(whitelist[i]._accesslistId, whitelist[i]._merkleRoot, whitelist[i]._startTime, whitelist[i]._endTime, whitelist[i]._price, whitelist[i]._token);
+      // Whitelist storage wl;
+      pools[_poolId].whiteLists.push();
+      uint256 newIndex = pools[_poolId].whiteLists.length - 1;
+      pools[_poolId].whiteLists[newIndex].id = whitelist[i]._accesslistId;
+      // pools[_poolId].whiteLists.push(wl);
+    }
   }
 
 
-  function updateWhiteList(uint256 _poolId, uint256 _accesslistId) external hasValidPermit(UNIVERSAL, WHITELIST) {
-    pools[_poolId].whiteListId = _accesslistId;
-  }
+  // function updateWhiteList(uint256 _poolId, uint256 _accesslistId) external hasValidPermit(UNIVERSAL, WHITELIST) {
+  //   pools[_poolId].whiteListId = _accesslistId;
+  // }
 
 
   /**
@@ -739,12 +751,16 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop, SuperMerkleAcces
       "0x2B");
 
 
-    if (pools[_id].whiteListId != 0)
+    bool whiteListed;
+    if (pools[_id].whiteLists.length != 0)
     {
-      uint256 accesslistId = pools[_id].whiteListId;
-      SuperMerkleAccess.verify(accesslistId, _whiteList.index, _whiteList.node, _whiteList.merkleProof);
-      require(keccak256(abi.encodePacked(_whiteList.index, msg.sender)) == _whiteList.node, "Invalid Proof.");
+      whiteListed = userInWhiteList(_whiteList) && keccak256(abi.encodePacked(_whiteList.index, msg.sender)) == _whiteList.node;
+      require(!pools[_id].whiteLists[_whiteList.whiteListId].minted[_msgSender()]);
+      require(!whiteListed && block.timestamp >= pools[_id].config.startTime && block.timestamp <= pools[_id].config.endTime, "0x4B");
     }
+
+    require(block.timestamp >= pools[_id].config.startTime && block.timestamp <= pools[_id].config.endTime, "0x4B");
+
 
     // Verify that the asset being used in the purchase is valid.
     // bytes32 itemKey = keccak256(abi.encode(pools[_id].currentPoolVersion,
@@ -755,9 +771,7 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop, SuperMerkleAcces
       "0x3B");
 
     // Verify that the pool is running its sale.
-    require(block.timestamp >= pools[_id].config.startTime
-      && block.timestamp <= pools[_id].config.endTime,
-      "0x4B");
+    
 
     // Verify that the pool is respecting per-address global purchase limits.
     uint256 userGlobalPurchaseAmount =
@@ -782,39 +796,66 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop, SuperMerkleAcces
 
     require(checkRequirments(_id), "0x8B");
 
-    // Process payment for the user, checking to sell for Staker points.
-    DFStorage.Price memory sellingPair = pools[_id].itemPrices[itemKey][_assetIndex];
-    if (sellingPair.assetType == DFStorage.AssetType.Point) {
-      IStaker(sellingPair.asset).spendPoints(_msgSender(),
-        sellingPair.price * _amount);
-
-    // Process payment for the user with a check to sell for Ether.
-    } else if (sellingPair.assetType == DFStorage.AssetType.Ether) {
-      uint256 etherPrice = sellingPair.price * _amount;
-      require(msg.value >= etherPrice,
-        "0x9B");
-      (bool success, ) = payable(paymentReceiver).call{ value: msg.value }("");
-      require(success,
-        "0x0C");
-
-    // Process payment for the user with a check to sell for an ERC-20 token.
-    } else if (sellingPair.assetType == DFStorage.AssetType.Token) {
-      IERC20 sellingAsset = IERC20(sellingPair.asset);
-      uint256 tokenPrice = sellingPair.price * _amount;
-      require(sellingAsset.balanceOf(_msgSender()) >= tokenPrice,
-        "0x1C");
-      sellingAsset.safeTransferFrom(_msgSender(), paymentReceiver, tokenPrice);
-
-    // Otherwise, error out because the payment type is unrecognized.
-    } else {
-      revert("0x0");
-    }
+    sellingHelper(_id, itemKey, _assetIndex, _amount, whiteListed, _whiteList.whiteListId);
 
     
-    sellingHelper(_itemIndex, _groupId, _id, itemKey, _amount, newCirculatingTotal, userPoolPurchaseAmount, userGlobalPurchaseAmount);
+    mintingHelper(_itemIndex, _groupId, _id, itemKey, _amount, newCirculatingTotal, userPoolPurchaseAmount, userGlobalPurchaseAmount);
 
     // Emit an event indicating a successful purchase.
   }
+
+  function userInWhiteList(WhiteListInput calldata _whiteList) private view returns (bool) {
+    return SuperMerkleAccess.verify(_whiteList.whiteListId, _whiteList.index, _whiteList.node, _whiteList.merkleProof);
+  }
+
+  function sellingHelper(uint256 _id, bytes32 itemKey, uint256 _assetIndex, uint256 _amount, bool _whiteListPrice, uint256 _accesListId) private {
+        // Process payment for the user, checking to sell for Staker points.
+    if (_whiteListPrice) {
+      SuperMerkleAccess.AccessList memory accessList = SuperMerkleAccess.accessRoots[_accesListId];
+      uint256 price = accessList.price * _amount;
+      if (accessList.token == address(0)) {
+        require(msg.value >= price,
+          "0x9B");
+        (bool success, ) = payable(paymentReceiver).call{ value: msg.value }("");
+        require(success,
+          "0x0C");
+        pools[_id].whiteLists[_accesListId].minted[_msgSender()] = true;
+      } else {
+        require(IERC20(accessList.token).balanceOf(_msgSender()) >= price,
+          "0x1C");
+        IERC20(accessList.token).safeTransferFrom(_msgSender(), paymentReceiver, price);
+        pools[_id].whiteLists[_accesListId].minted[_msgSender()] = true;
+      }
+    } else {
+      DFStorage.Price memory sellingPair = pools[_id].itemPrices[itemKey][_assetIndex];
+      if (sellingPair.assetType == DFStorage.AssetType.Point) {
+        IStaker(sellingPair.asset).spendPoints(_msgSender(),
+          sellingPair.price * _amount);
+
+      // Process payment for the user with a check to sell for Ether.
+      } else if (sellingPair.assetType == DFStorage.AssetType.Ether) {
+        uint256 etherPrice = sellingPair.price * _amount;
+        require(msg.value >= etherPrice,
+          "0x9B");
+        (bool success, ) = payable(paymentReceiver).call{ value: msg.value }("");
+        require(success,
+          "0x0C");
+
+      // Process payment for the user with a check to sell for an ERC-20 token.
+      } else if (sellingPair.assetType == DFStorage.AssetType.Token) {
+        IERC20 sellingAsset = IERC20(sellingPair.asset);
+        uint256 tokenPrice = sellingPair.price * _amount;
+        require(sellingAsset.balanceOf(_msgSender()) >= tokenPrice,
+          "0x1C");
+        sellingAsset.safeTransferFrom(_msgSender(), paymentReceiver, tokenPrice);
+
+      // Otherwise, error out because the payment type is unrecognized.
+      } else {
+        revert("0x0");
+      }
+    }
+  }
+
 
   function checkRequirments(uint256 _id) private view returns (bool) {
     // Verify that the user meets any requirements gating participation in this
@@ -875,7 +916,7 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop, SuperMerkleAcces
   /**
   * Private function to avoid a stack-too-deep error.
   */
-  function sellingHelper(uint256 _itemIndex, uint256 _groupId, uint256 _id, bytes32 _itemKey, uint256 _amount, uint256 _newCirculatingTotal, uint256 _userPoolPurchaseAmount, uint256 _userGlobalPurchaseAmount) private {
+  function mintingHelper(uint256 _itemIndex, uint256 _groupId, uint256 _id, bytes32 _itemKey, uint256 _amount, uint256 _newCirculatingTotal, uint256 _userPoolPurchaseAmount, uint256 _userGlobalPurchaseAmount) private {
      // If payment is successful, mint each of the user's purchased items.
     uint256[] memory itemIds = new uint256[](_amount);
     uint256[] memory amounts = new uint256[](_amount);
