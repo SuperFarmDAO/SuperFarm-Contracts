@@ -44,6 +44,7 @@ describe('===SuperMerkleAccess SuperMerkleDistributor===', function () {
             deployer.address,
             "Super1155",
             "://ipfs/uri/{id}",
+            "://ipfs/uri/{id}",
             NULL_ADDRESS
         );
         await super1155.deployed();
