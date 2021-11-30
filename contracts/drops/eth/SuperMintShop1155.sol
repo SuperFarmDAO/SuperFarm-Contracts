@@ -208,6 +208,7 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop, SuperMerkleAcces
   struct WhiteListInput {
     uint256 whiteListId;
     uint256 index; 
+    uint256 allowance;
     bytes32 node; 
     bytes32[] merkleProof;
   }
@@ -408,9 +409,9 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop, SuperMerkleAcces
   /**
     Return a version number for this contract's interface.
   */
-  function version() external virtual override pure returns (uint256) {
-    return 1;
-  }
+  // function version() external virtual override pure returns (uint256) {
+  //   return 1;
+  // }
 
   /**
     Allow the shop owner or an approved manager to update the payment receiver
@@ -422,10 +423,11 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop, SuperMerkleAcces
     hasValidPermit(UNIVERSAL, SET_PAYMENT_RECEIVER) {
     require(!paymentReceiverLocked, "XXX"
       );
-    address oldPaymentReceiver = paymentReceiver;
-    paymentReceiver = _newPaymentReceiver;
-    emit PaymentReceiverUpdated(_msgSender(), oldPaymentReceiver,
+    emit PaymentReceiverUpdated(_msgSender(), paymentReceiver,
       _newPaymentReceiver);
+    // address oldPaymentReceiver = paymentReceiver;
+    paymentReceiver = _newPaymentReceiver;
+   
   }
 
 
@@ -458,10 +460,11 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop, SuperMerkleAcces
     hasValidPermit(UNIVERSAL, UPDATE_GLOBAL_LIMIT) {
     require(!globalPurchaseLimitLocked,
       "0x0A");
-    uint256 oldGlobalPurchaseLimit = globalPurchaseLimit;
-    globalPurchaseLimit = _newGlobalPurchaseLimit;
-    emit GlobalPurchaseLimitUpdated(_msgSender(), oldGlobalPurchaseLimit,
+    emit GlobalPurchaseLimitUpdated(_msgSender(), globalPurchaseLimit,
       _newGlobalPurchaseLimit);
+    // uint256 oldGlobalPurchaseLimit = globalPurchaseLimit;
+    globalPurchaseLimit = _newGlobalPurchaseLimit;
+
   }
 
   /**
@@ -568,10 +571,8 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop, SuperMerkleAcces
     and purchase count details for the provided address.
 
     @param _ids An array of pool IDs to retrieve information about.
-    @param _address An address which enables this function to support additional
-      relevant data lookups.
   */
-  function getPoolsWithAddress(uint256[] calldata _ids, address _address, uint256 _itemIndex)
+  function getPoolsWithAddress(uint256[] calldata _ids)
     external view returns (PoolAddressOutput[] memory) {
     PoolAddressOutput[] memory poolOutputs =
       new PoolAddressOutput[](_ids.length);
@@ -663,12 +664,8 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop, SuperMerkleAcces
     uint256[] calldata _groupIds, uint256[] calldata _issueNumberOffsets,
     uint256[] calldata _caps, DFStorage.Price[][] memory _prices) public
     hasValidPermit(UNIVERSAL, POOL) {
-    require(_id <= nextPoolId,
+    require(_id <= nextPoolId && _config.endTime >= _config.startTime && _groupIds.length > 0,
       "0x1A");
-    require(_config.endTime >= _config.startTime,
-      "0x2A");
-    require(_groupIds.length > 0,
-      "0x3A");
     require(_groupIds.length == _caps.length && _caps.length == _prices.length && _issueNumberOffsets.length == _prices.length,
       "0x4A");
 
@@ -724,10 +721,10 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop, SuperMerkleAcces
   }
 
   function updatePoolConfig(uint256 _id, DFStorage.PoolInput calldata _config) external hasValidPermit(UNIVERSAL, POOL){
-    require(_id <= nextPoolId,
+    require(_id <= nextPoolId && _config.endTime >= _config.startTime,
       "0x1A");
-    require(_config.endTime >= _config.startTime,
-      "0x6A");
+    // require(,
+    //   "0x6A");
     pools[_id].config = _config;
   }
 
@@ -745,16 +742,16 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop, SuperMerkleAcces
     uint256 _amount, uint256 _itemIndex, WhiteListInput calldata _whiteList) external nonReentrant payable {
     require(_amount > 0,
       "0x0B");
-    require(_id < nextPoolId,
+    require(_id < nextPoolId && pools[_id].config.singlePurchaseLimit >= _amount,
       "0x1B");
-    require(pools[_id].config.singlePurchaseLimit >= _amount,
-      "0x2B");
+    // require(pools[_id].config.singlePurchaseLimit >= _amount,
+    //   "0x2B");
 
 
     bool whiteListed;
     if (pools[_id].whiteLists.length != 0)
     {
-      whiteListed = userInWhiteList(_whiteList) && keccak256(abi.encodePacked(_whiteList.index, msg.sender)) == _whiteList.node;
+      whiteListed = userInWhiteList(_whiteList) && keccak256(abi.encodePacked(_whiteList.index, msg.sender, _whiteList.allowance)) == _whiteList.node;
       require(!pools[_id].whiteLists[_whiteList.whiteListId].minted[_msgSender()]);
       require(!whiteListed && block.timestamp >= pools[_id].config.startTime && block.timestamp <= pools[_id].config.endTime, "0x4B");
     }
@@ -805,7 +802,11 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop, SuperMerkleAcces
   }
 
   function userInWhiteList(WhiteListInput calldata _whiteList) private view returns (bool) {
-    return SuperMerkleAccess.verify(_whiteList.whiteListId, _whiteList.index, _whiteList.node, _whiteList.merkleProof);
+    // bytes32 node = keccak256(abi.encodePacked(_whiteList.index, _msgSender(), _whiteList.allowance));
+    // return SuperMerkleAccess.verify(_whiteList.whiteListId, _whiteList.index, node, _whiteList.merkleProof);
+
+    return SuperMerkleAccess.verify(_whiteList.whiteListId, _whiteList.index, keccak256(abi.encodePacked(_whiteList.index, _msgSender(), _whiteList.allowance)), _whiteList.merkleProof);
+
   }
 
   function sellingHelper(uint256 _id, bytes32 itemKey, uint256 _assetIndex, uint256 _amount, bool _whiteListPrice, uint256 _accesListId) private {
@@ -843,11 +844,10 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop, SuperMerkleAcces
 
       // Process payment for the user with a check to sell for an ERC-20 token.
       } else if (sellingPair.assetType == DFStorage.AssetType.Token) {
-        IERC20 sellingAsset = IERC20(sellingPair.asset);
         uint256 tokenPrice = sellingPair.price * _amount;
-        require(sellingAsset.balanceOf(_msgSender()) >= tokenPrice,
+        require(IERC20(sellingPair.asset).balanceOf(_msgSender()) >= tokenPrice,
           "0x1C");
-        sellingAsset.safeTransferFrom(_msgSender(), paymentReceiver, tokenPrice);
+        IERC20(sellingPair.asset).safeTransferFrom(_msgSender(), paymentReceiver, tokenPrice);
 
       // Otherwise, error out because the payment type is unrecognized.
       } else {
@@ -860,7 +860,7 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop, SuperMerkleAcces
   function checkRequirments(uint256 _id) private view returns (bool) {
     // Verify that the user meets any requirements gating participation in this
     // pool. Verify that any possible ERC-20 requirements are met.
-    uint256 amount = 0;
+    uint256 amount;
     DFStorage.PoolRequirement memory poolRequirement = pools[_id].config.requirement;
     if (poolRequirement.requiredType == DFStorage.AccessType.TokenRequired) {
       for (uint256 i = 0; i < poolRequirement.requiredAsset.length; i++) {
