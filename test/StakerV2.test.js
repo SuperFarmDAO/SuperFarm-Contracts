@@ -26,6 +26,8 @@ describe('===Stakerv2===', function () {
         super1155,
         proxyRegistry;
     const originalUri = "://ipfs/uri/";
+    const originalUri721 = "://ipfs/uri/";
+    const originalUri1155 = "://ipfs/uri/";
 
 
     before(async function () {
@@ -60,6 +62,7 @@ describe('===Stakerv2===', function () {
             "Super721",
             "SIMX721",
             originalUri,
+            originalUri721,
             proxyRegistry.address,
         );
         await super721.deployed();
@@ -68,6 +71,7 @@ describe('===Stakerv2===', function () {
             owner.address,
             "Super1155",
             originalUri,
+            originalUri1155,
             proxyRegistry.address
         );
         await super1155.deployed();
