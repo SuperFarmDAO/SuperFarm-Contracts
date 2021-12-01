@@ -518,6 +518,11 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
 
             expect(pools[0].config.name).to.be.equal("firstPool");
         });
+
+        it("CHECK REQ", async function() {
+            let res = await mintShop1155.checkRequirments("0");
+            console.log(res);
+        });
     });
 
     describe("mintFromPool, getPoolsWithAddress, getPurchaseCounts", function () {

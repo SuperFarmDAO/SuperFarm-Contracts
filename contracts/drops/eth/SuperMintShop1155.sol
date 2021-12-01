@@ -29,7 +29,6 @@ import "../../libraries/DFStorage.sol";
 contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop, SuperMerkleAccess {
   using SafeERC20 for IERC20;
 
-  uint256 MAX_UINT = type(uint256).max;
 
   /// The public identifier for the right to set the payment receiver.
   bytes32 public constant SET_PAYMENT_RECEIVER
@@ -857,12 +856,14 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop, SuperMerkleAcces
   }
 
 
-  function checkRequirments(uint256 _id) private view returns (bool) {
+  function checkRequirments(uint256 _id) public view returns (bool) {
     // Verify that the user meets any requirements gating participation in this
     // pool. Verify that any possible ERC-20 requirements are met.
     uint256 amount;
+    
     DFStorage.PoolRequirement memory poolRequirement = pools[_id].config.requirement;
     if (poolRequirement.requiredType == DFStorage.AccessType.TokenRequired) {
+      // bytes data 
       for (uint256 i = 0; i < poolRequirement.requiredAsset.length; i++) {
         amount += IERC20(poolRequirement.requiredAsset[i]).balanceOf(_msgSender());
       }
@@ -910,7 +911,6 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop, SuperMerkleAcces
   }
   return true;
 }
-
 
 
   /**
