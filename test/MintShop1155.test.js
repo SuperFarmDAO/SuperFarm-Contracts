@@ -106,10 +106,21 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
             mockERC20.address
         );
         let whiteListAddresses = [deployer.address, owner.address, paymentReceiver.address, proxyRegistryOwner.address, signer1.address, signer2.address];
-        
-        let tree = getMerkleTree(whiteListAddresses);
 
-        const root = computeRootHash(whiteListAddresses);
+        let whiteList =[];
+
+        whiteList[deployer.address] = 1;
+        whiteList[owner.address] = 1;
+        whiteList[paymentReceiver.address] = 1;
+        whiteList[proxyRegistryOwner.address] = 1;
+        whiteList[signer1.address] = 1;
+        whiteList[signer2.address] = 1;
+
+
+        
+        // let tree = getMerkleTree(whiteListAddresses);
+
+        const root = computeRootHash(whiteList);
 
         const whiteListCreate = {
             _accesslistId: 0,
@@ -651,68 +662,68 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
             expect(pools[0].config.name).to.be.equal("firstPool");
         });
 
-        it('Reverts: mintFromPool amount less than 0', async function(){
-            // Mint from pool
-            const whiteListAddresses = [owner.address, signer2.address, owner.address, signer1.address, signer2.address];
+        // it('Reverts: mintFromPool amount less than 0', async function(){
+        //     // Mint from pool
+        //     const whiteListAddresses = [owner.address, signer2.address, owner.address, signer1.address, signer2.address];
 
-            let tree =  getMerkleTree(whiteListAddresses);
-            let whiteListInput = {
-                index: tree.leaves[1].index,
-                node: hash(tree.leaves[1].index, tree.leaves[1].address),
-                merkleProof: tree.leaves[1].proof
+        //     let tree =  getMerkleTree(whiteListAddresses);
+        //     let whiteListInput = {
+        //         index: tree.leaves[1].index,
+        //         node: hash(tree.leaves[1].index, tree.leaves[1].address),
+        //         merkleProof: tree.leaves[1].proof
 
-            };
-            await expect(
-                mintShop1155.connect(owner).mintFromPool(0, 2, 1, 0, 0, whiteListInput)
-            ).to.be.revertedWith("0x0B");
-        });
+        //     };
+        //     await expect(
+        //         mintShop1155.connect(owner).mintFromPool(0, 2, 1, 0, 0, whiteListInput)
+        //     ).to.be.revertedWith("0x0B");
+        // });
 
-        it('Reverts: mintFromPool pool not active', async function(){
-            // Mint from pool
-            const whiteListAddresses = [owner.address, signer2.address, owner.address, signer1.address, signer2.address];
-            // let tree1 = this.tree;
+        // it('Reverts: mintFromPool pool not active', async function(){
+        //     // Mint from pool
+        //     const whiteListAddresses = [owner.address, signer2.address, owner.address, signer1.address, signer2.address];
+        //     // let tree1 = this.tree;
 
-            let tree =  getMerkleTree(whiteListAddresses);
-            let whiteListInput = {
-                index: tree.leaves[1].index,
-                node: hash(tree.leaves[1].index, tree.leaves[1].address),
-                merkleProof: tree.leaves[1].proof
+        //     let tree =  getMerkleTree(whiteListAddresses);
+        //     let whiteListInput = {
+        //         index: tree.leaves[1].index,
+        //         node: hash(tree.leaves[1].index, tree.leaves[1].address),
+        //         merkleProof: tree.leaves[1].proof
 
-            };
-            await expect(
-                mintShop1155.connect(owner).mintFromPool(2, 2, 1, 1, 0, whiteListInput)
-            ).to.be.revertedWith("0x1B");
-        });
+        //     };
+        //     await expect(
+        //         mintShop1155.connect(owner).mintFromPool(2, 2, 1, 1, 0, whiteListInput)
+        //     ).to.be.revertedWith("0x1B");
+        // });
 
-        it('Reverts: mintFromPool amount greater than singlePurchaseLimit', async function(){
-            // Mint from pool
-            let whiteListAddresses = [deployer.address, owner.address, paymentReceiver.address, proxyRegistryOwner.address,signer1.address, signer2.address];
+        // it('Reverts: mintFromPool amount greater than singlePurchaseLimit', async function(){
+        //     // Mint from pool
+        //     let whiteListAddresses = [deployer.address, owner.address, paymentReceiver.address, proxyRegistryOwner.address,signer1.address, signer2.address];
 
-            let whiteListInput = {
-                index: 0,
-                node: "0x66bec8af3e1db24c080f949a93ecca4f99c46c7afb08389d93b59e5f73514c75",
-                merkleProof: computeMerkleProof(0, whiteListAddresses)
-            };
-            await expect(
-                mintShop1155.connect(deployer).mintFromPool(0, 2, 1, 3, 0, whiteListInput)
-            ).to.be.revertedWith("0x2B");
-        });
+        //     let whiteListInput = {
+        //         index: 0,
+        //         node: "0x66bec8af3e1db24c080f949a93ecca4f99c46c7afb08389d93b59e5f73514c75",
+        //         merkleProof: computeMerkleProof(0, whiteListAddresses)
+        //     };
+        //     await expect(
+        //         mintShop1155.connect(deployer).mintFromPool(0, 2, 1, 3, 0, whiteListInput)
+        //     ).to.be.revertedWith("0x2B");
+        // });
 
-        it('Reverts: mintFromPool assetindex not valid', async function(){
-            // Mint from pool
-            let whiteListAddresses = [deployer.address, owner.address, paymentReceiver.address, proxyRegistryOwner.address,signer1.address, signer2.address];
+        // it('Reverts: mintFromPool assetindex not valid', async function(){
+        //     // Mint from pool
+        //     let whiteListAddresses = [deployer.address, owner.address, paymentReceiver.address, proxyRegistryOwner.address,signer1.address, signer2.address];
 
-            let whiteListInput = {
-                index: 0,
-                node: "0x66bec8af3e1db24c080f949a93ecca4f99c46c7afb08389d93b59e5f73514c75",
-                merkleProof: computeMerkleProof(0, whiteListAddresses)
-            };
-            // console.log(tree.leaves[1].proof);
+        //     let whiteListInput = {
+        //         index: 0,
+        //         node: "0x66bec8af3e1db24c080f949a93ecca4f99c46c7afb08389d93b59e5f73514c75",
+        //         merkleProof: computeMerkleProof(0, whiteListAddresses)
+        //     };
+        //     // console.log(tree.leaves[1].proof);
 
-            await expect(
-                mintShop1155.connect(signer1).mintFromPool(0, 2, 5, 1, 0, whiteListInput)
-            ).to.be.revertedWith("0x3B");
-        });
+        //     await expect(
+        //         mintShop1155.connect(signer1).mintFromPool(0, 2, 5, 1, 0, whiteListInput)
+        //     ).to.be.revertedWith("0x3B");
+        // });
 
         it('Reverts: mintFromPool pool is not running', async function(){
             // Jump forward in time more than the pool end time
@@ -720,11 +731,29 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
             await ethers.provider.send("evm_mine", []);
             let whiteListAddresses = [deployer.address, owner.address, paymentReceiver.address, proxyRegistryOwner.address,signer1.address, signer2.address];
 
+            let whiteList = [];
+
+            whiteList[deployer.address] = 1;
+            whiteList[owner.address] = 1;
+            whiteList[paymentReceiver.address] = 1;
+            whiteList[proxyRegistryOwner.address] = 1;
+            whiteList[signer1.address] = 1;
+            whiteList[signer2.address] = 1;
+
+
             let whiteListInput = {
-                index: 0,
-                node: "0x66bec8af3e1db24c080f949a93ecca4f99c46c7afb08389d93b59e5f73514c75",
-                merkleProof: computeMerkleProof(0, whiteListAddresses)
-            };
+                whiteListId: 0,
+                index: /*getIndex(whiteList, signer1.address)*/ 5,
+                allowance: whiteList[signer1.address],
+                node: hash(5, signer1.address, whiteList[signer1.address]),
+                merkleProof: computeMerkleProof(5, signer1.address),
+              }
+
+            // let whiteListInput = {
+            //     index: 0,
+            //     node: "0x66bec8af3e1db24c080f949a93ecca4f99c46c7afb08389d93b59e5f73514c75",
+            //     merkleProof: computeMerkleProof(0, whiteListAddresses)
+            // };
 
             // Mint from pool
             await expect(
@@ -1361,7 +1390,8 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
 
 
 
-const expandLeaves = function (addresses) {
+const expandLeaves = function (balances) {
+    var addresses = Object.keys(balances)
     addresses.sort(function(a, b) {
         var al = a.toLowerCase(), bl = b.toLowerCase();
         if (al < bl) { return -1; }
@@ -1369,32 +1399,12 @@ const expandLeaves = function (addresses) {
         return 0;
     });
 
-    return addresses.map(function(a, i) { return { address: a, index: i }; });
-}
-
-const getMerkleTree = function(addresses) {
-    // Gets ordered list of leaf nodes <=================================
-    var leaves = expandLeaves(addresses);
-
-    var proofs = [];
-    
-    for(let i = 0; i < leaves.length; i++){
-      //compute merkle proof for each address
-      leaves[i].proof = computeMerkleProof(i, addresses)
-    }
-
-    var tree = {
-      merkleRoot: 0,  //calculated later
-      amount: leaves.length,
-      leaves: leaves
-    };
-    return tree;
+    return addresses.map(function(a, i) { return { address: a, index: i, allowance: balances[a]}; });
 }
 
 
-
-const hash = function(index, address) {
-    return ethers.utils.solidityKeccak256(["uint256", "address"], [index, address]);
+const hash = function(index, address, allowance) {
+    return ethers.utils.solidityKeccak256(["uint256", "address", "uint256"], [index, address, allowance]);
 
 }
 
@@ -1403,7 +1413,8 @@ const getLeaves = function(balances) {
     var leaves = expandLeaves(balances);
     
     return leaves.map(function(leaf) {
-        return ethers.utils.solidityKeccak256(["uint256", "address"], [leaf.index, leaf.address]);
+        console.log(leaf)
+        return ethers.utils.solidityKeccak256(["uint256", "address", "uint256"], [leaf.index, leaf.address, leaf.allowance]);
     });
 }
 
@@ -1457,4 +1468,19 @@ const reduceMerkleBranches = function(leaves) {
     output.forEach(function(leaf) {
         leaves.push(leaf);
     });
+}
+
+
+const getIndex = function(balances, address) {
+    address = address.toLowerCase();
+
+    var leaves = expandLeaves(balances);
+
+    var index = null;
+    for (var i = 0; i < leaves.length; i++) {
+        if (i != leaves[i].index) { throw new Error('bad index mapping'); }
+        if (leaves[i].address === address) { return leaves[i].index; }
+    }
+
+    throw new Error('address not found');
 }
