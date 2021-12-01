@@ -111,10 +111,19 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
 
         const root = computeRootHash(whiteListAddresses);
 
+        const whiteListCreate = {
+            _accesslistId: 0,
+            _merkleRoot: root,
+            _startTime: 0,
+            _endTime: ethers.constants.MaxUint256,
+            _price: ethers.utils.parseEther("0.001"),
+            _token: NULL_ADDRESS
+        }
+
         // console.log("ROOT js ", root);
 
         await mintShop1155.connect(owner).setItems([super1155.address, super1155Second.address]);
-        await mintShop1155.connect(owner).addWhiteList(0, 1, root, 0, ethers.constants.MaxUint256);
+        await mintShop1155.connect(owner).addWhiteList(0, [whiteListCreate]);
         
         await staker.transferOwnership(owner.address);
 
@@ -519,10 +528,10 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
             expect(pools[0].config.name).to.be.equal("firstPool");
         });
 
-        it("CHECK REQ", async function() {
-            let res = await mintShop1155.checkRequirments("0");
-            console.log(res);
-        });
+        // it("CHECK REQ", async function() {
+        //     let res = await mintShop1155.checkRequirments("0");
+        //     console.log(res);
+        // });
     });
 
     describe("mintFromPool, getPoolsWithAddress, getPurchaseCounts", function () {

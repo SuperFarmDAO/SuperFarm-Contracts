@@ -170,22 +170,6 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop, SuperMerkleAcces
   }
 
   /**
-    This struct is a source of mapping-free input to the `addWhitelist`
-    function.
-    @param expiryTime A block timestamp after which this whitelist is
-      automatically considered inactive, no matter the value of `isActive`.
-    @param isActive Whether or not this whitelist is actively restricting
-      purchases in blocks ocurring before `expiryTime`.
-    @param addresses An array of addresses to whitelist for participation in a
-      purchases guarded by a whitelist.
-  */
-  // struct WhitelistInput {
-  //   uint256 expiryTime;
-  //   bool isActive;
-  //   address[] addresses;
-  // }
-
-  /**
     This struct tracks information about a single whitelist known to this shop.
     Whitelists may be shared across multiple different item pools.
     @param expiryTime A block timestamp after which this whitelist is
@@ -422,7 +406,7 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop, SuperMerkleAcces
     hasValidPermit(UNIVERSAL, SET_PAYMENT_RECEIVER) {
     require(!paymentReceiverLocked, "XXX"
       );
-    emit PaymentReceiverUpdated(_msgSender(), paymentReceiver,
+    emit PaymentReceiverUpdated(msg.sender, paymentReceiver,
       _newPaymentReceiver);
     // address oldPaymentReceiver = paymentReceiver;
     paymentReceiver = _newPaymentReceiver;
@@ -446,7 +430,7 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop, SuperMerkleAcces
   function lockPaymentReceiver() external
     hasValidPermit(UNIVERSAL, LOCK_PAYMENT_RECEIVER) {
     paymentReceiverLocked = true;
-    emit PaymentReceiverLocked(_msgSender());
+    emit PaymentReceiverLocked(msg.sender);
   }
 
   /**
@@ -459,7 +443,7 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop, SuperMerkleAcces
     hasValidPermit(UNIVERSAL, UPDATE_GLOBAL_LIMIT) {
     require(!globalPurchaseLimitLocked,
       "0x0A");
-    emit GlobalPurchaseLimitUpdated(_msgSender(), globalPurchaseLimit,
+    emit GlobalPurchaseLimitUpdated(msg.sender, globalPurchaseLimit,
       _newGlobalPurchaseLimit);
     // uint256 oldGlobalPurchaseLimit = globalPurchaseLimit;
     globalPurchaseLimit = _newGlobalPurchaseLimit;
@@ -473,7 +457,7 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop, SuperMerkleAcces
   function lockGlobalPurchaseLimit() external
     hasValidPermit(UNIVERSAL, LOCK_GLOBAL_LIMIT) {
     globalPurchaseLimitLocked = true;
-    emit GlobalPurchaseLimitLocked(_msgSender());
+    emit GlobalPurchaseLimitLocked(msg.sender);
   }
 
 
@@ -678,7 +662,7 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop, SuperMerkleAcces
     _updatePoolHelper(_id, _groupIds, _issueNumberOffsets, _caps, _prices);
 
     // Emit an event indicating that a pool has been updated.
-    emit PoolUpdated(_msgSender(), _id, _config, _groupIds, _caps, _prices);
+    emit PoolUpdated(msg.sender, _id, _config, _groupIds, _caps, _prices);
   }
 
   /**
@@ -751,7 +735,7 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop, SuperMerkleAcces
     if (pools[_id].whiteLists.length != 0)
     {
       whiteListed = userInWhiteList(_whiteList) && keccak256(abi.encodePacked(_whiteList.index, msg.sender, _whiteList.allowance)) == _whiteList.node;
-      require(!pools[_id].whiteLists[_whiteList.whiteListId].minted[_msgSender()]);
+      require(!pools[_id].whiteLists[_whiteList.whiteListId].minted[msg.sender]);
       require(!whiteListed && block.timestamp >= pools[_id].config.startTime && block.timestamp <= pools[_id].config.endTime, "0x4B");
     }
 
@@ -771,7 +755,7 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop, SuperMerkleAcces
 
     // Verify that the pool is respecting per-address global purchase limits.
     uint256 userGlobalPurchaseAmount =
-        _amount + globalPurchaseCounts[_msgSender()];
+        _amount + globalPurchaseCounts[msg.sender];
     
 
     if (globalPurchaseLimit != 0) {
@@ -781,14 +765,24 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop, SuperMerkleAcces
       // Verify that the pool is respecting per-address pool purchase limits. 
     }
     uint256 userPoolPurchaseAmount =
-        _amount + pools[_id].purchaseCounts[_msgSender()];
+        _amount + pools[_id].purchaseCounts[msg.sender];
 
     // Verify that the pool is not depleted by the user's purchase.
     uint256 newCirculatingTotal = pools[_id].itemMinted[itemKey] + _amount;
     require(newCirculatingTotal <= pools[_id].itemCaps[itemKey],
       "0x7B");
 
-    require(maxAllocation >= checkTotalMinted() + _amount, "0x0D");
+    {
+       uint256 result;
+       for (uint256 i = 0; i < nextPoolId; i++) {
+        for (uint256 j = 0; j < pools[i].itemGroups.length; j++) {
+        result += pools[i].itemMinted[itemKey];
+      }
+    }
+    require(maxAllocation >= result + _amount, "0x0D");
+
+    }
+    // require(maxAllocation >= checkTotalMinted() + _amount, "0x0D");
 
     require(checkRequirments(_id), "0x8B");
 
@@ -801,10 +795,10 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop, SuperMerkleAcces
   }
 
   function userInWhiteList(WhiteListInput calldata _whiteList) private view returns (bool) {
-    // bytes32 node = keccak256(abi.encodePacked(_whiteList.index, _msgSender(), _whiteList.allowance));
+    // bytes32 node = keccak256(abi.encodePacked(_whiteList.index, msg.sender, _whiteList.allowance));
     // return SuperMerkleAccess.verify(_whiteList.whiteListId, _whiteList.index, node, _whiteList.merkleProof);
 
-    return SuperMerkleAccess.verify(_whiteList.whiteListId, _whiteList.index, keccak256(abi.encodePacked(_whiteList.index, _msgSender(), _whiteList.allowance)), _whiteList.merkleProof);
+    return SuperMerkleAccess.verify(_whiteList.whiteListId, _whiteList.index, keccak256(abi.encodePacked(_whiteList.index, msg.sender, _whiteList.allowance)), _whiteList.merkleProof);
 
   }
 
@@ -819,17 +813,17 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop, SuperMerkleAcces
         (bool success, ) = payable(paymentReceiver).call{ value: msg.value }("");
         require(success,
           "0x0C");
-        pools[_id].whiteLists[_accesListId].minted[_msgSender()] = true;
+        pools[_id].whiteLists[_accesListId].minted[msg.sender] = true;
       } else {
-        require(IERC20(accessList.token).balanceOf(_msgSender()) >= price,
+        require(IERC20(accessList.token).balanceOf(msg.sender) >= price,
           "0x1C");
-        IERC20(accessList.token).safeTransferFrom(_msgSender(), paymentReceiver, price);
-        pools[_id].whiteLists[_accesListId].minted[_msgSender()] = true;
+        IERC20(accessList.token).safeTransferFrom(msg.sender, paymentReceiver, price);
+        pools[_id].whiteLists[_accesListId].minted[msg.sender] = true;
       }
     } else {
       DFStorage.Price memory sellingPair = pools[_id].itemPrices[itemKey][_assetIndex];
       if (sellingPair.assetType == DFStorage.AssetType.Point) {
-        IStaker(sellingPair.asset).spendPoints(_msgSender(),
+        IStaker(sellingPair.asset).spendPoints(msg.sender,
           sellingPair.price * _amount);
 
       // Process payment for the user with a check to sell for Ether.
@@ -844,9 +838,9 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop, SuperMerkleAcces
       // Process payment for the user with a check to sell for an ERC-20 token.
       } else if (sellingPair.assetType == DFStorage.AssetType.Token) {
         uint256 tokenPrice = sellingPair.price * _amount;
-        require(IERC20(sellingPair.asset).balanceOf(_msgSender()) >= tokenPrice,
+        require(IERC20(sellingPair.asset).balanceOf(msg.sender) >= tokenPrice,
           "0x1C");
-        IERC20(sellingPair.asset).safeTransferFrom(_msgSender(), paymentReceiver, tokenPrice);
+        IERC20(sellingPair.asset).safeTransferFrom(msg.sender, paymentReceiver, tokenPrice);
 
       // Otherwise, error out because the payment type is unrecognized.
       } else {
@@ -856,7 +850,7 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop, SuperMerkleAcces
   }
 
 
-  function checkRequirments(uint256 _id) public view returns (bool) {
+  function checkRequirments(uint256 _id) private view returns (bool) {
     // Verify that the user meets any requirements gating participation in this
     // pool. Verify that any possible ERC-20 requirements are met.
     uint256 amount;
@@ -865,13 +859,13 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop, SuperMerkleAcces
     if (poolRequirement.requiredType == DFStorage.AccessType.TokenRequired) {
       // bytes data 
       for (uint256 i = 0; i < poolRequirement.requiredAsset.length; i++) {
-        amount += IERC20(poolRequirement.requiredAsset[i]).balanceOf(_msgSender());
+        amount += IERC20(poolRequirement.requiredAsset[i]).balanceOf(msg.sender);
       }
       return amount >= poolRequirement.requiredAmount;
       // Verify that any possible Staker point threshold requirements are met.
     } else if (poolRequirement.requiredType == DFStorage.AccessType.PointRequired) {
         // IStaker requiredStaker = IStaker(poolRequirement.requiredAsset[0]);
-       return IStaker(poolRequirement.requiredAsset[0]).getAvailablePoints(_msgSender())
+       return IStaker(poolRequirement.requiredAsset[0]).getAvailablePoints(msg.sender)
           >= poolRequirement.requiredAmount;
     }
 
@@ -879,13 +873,13 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop, SuperMerkleAcces
     if (poolRequirement.requiredId.length == 0) {
       if (poolRequirement.requiredType == DFStorage.AccessType.ItemRequired) {
         for (uint256 i = 0; i < poolRequirement.requiredAsset.length; i++) {
-            amount += ISuper1155(poolRequirement.requiredAsset[i]).totalBalances(_msgSender());
+            amount += ISuper1155(poolRequirement.requiredAsset[i]).totalBalances(msg.sender);
         }
         return amount >= poolRequirement.requiredAmount;
       }    
       else if (poolRequirement.requiredType == DFStorage.AccessType.ItemRequired721) {
         for (uint256 i = 0; i < poolRequirement.requiredAsset.length; i++) {
-            amount += ISuper721(poolRequirement.requiredAsset[i]).balanceOf(_msgSender());
+            amount += ISuper721(poolRequirement.requiredAsset[i]).balanceOf(msg.sender);
         }
         // IERC721 requiredItem = IERC721(poolRequirement.requiredAsset[0]);
         return amount >= poolRequirement.requiredAmount;
@@ -895,7 +889,7 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop, SuperMerkleAcces
         // ISuper1155 requiredItem = ISuper1155(poolRequirement.requiredAsset[0]);
         for (uint256 i = 0; i < poolRequirement.requiredAsset.length; i++) {
           for (uint256 j = 0; j < poolRequirement.requiredAsset.length; j++) {
-            amount += ISuper1155(poolRequirement.requiredAsset[i]).balanceOf(_msgSender(), poolRequirement.requiredId[j]);
+            amount += ISuper1155(poolRequirement.requiredAsset[i]).balanceOf(msg.sender, poolRequirement.requiredId[j]);
           }
         }
         return amount >= poolRequirement.requiredAmount;
@@ -903,7 +897,7 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop, SuperMerkleAcces
       else if (poolRequirement.requiredType == DFStorage.AccessType.ItemRequired721) {
         for (uint256 i = 0; i < poolRequirement.requiredAsset.length; i++) {
             for (uint256 j = 0; j < poolRequirement.requiredAsset.length; j++) {
-              amount += ISuper721(poolRequirement.requiredAsset[i]).balanceOfGroup(_msgSender(), poolRequirement.requiredId[j]);
+              amount += ISuper721(poolRequirement.requiredAsset[i]).balanceOfGroup(msg.sender, poolRequirement.requiredId[j]);
             }
         }
         return amount >= poolRequirement.requiredAmount;
@@ -939,17 +933,17 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop, SuperMerkleAcces
     pools[_id].itemMinted[_itemKey] = _newCirculatingTotal;
 
     // Update the pool's count of items that a user has purchased.
-    pools[_id].purchaseCounts[_msgSender()] = _userPoolPurchaseAmount;
+    pools[_id].purchaseCounts[msg.sender] = _userPoolPurchaseAmount;
 
     // Update the global count of items that a user has purchased.
-    globalPurchaseCounts[_msgSender()] = _userGlobalPurchaseAmount;
+    globalPurchaseCounts[msg.sender] = _userGlobalPurchaseAmount;
 
    
 
     // Mint the items.
-    items[_itemIndex].mintBatch(_msgSender(), itemIds, amounts, "");
+    items[_itemIndex].mintBatch(msg.sender, itemIds, amounts, "");
 
-    emit ItemPurchased(_msgSender(), _id, itemIds, amounts);
+    emit ItemPurchased(msg.sender, _id, itemIds, amounts);
   }
 
 
@@ -957,17 +951,17 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop, SuperMerkleAcces
   /**
   * Private function for checking maxAllocation among all pools.
   */
-  function checkTotalMinted() private view returns (uint256 result) {
-    for (uint256 i = 0; i < nextPoolId; i++) {
-        for (uint256 j = 0; j < pools[i].itemGroups.length; j++) {
-        uint256 itemGroupId = pools[i].itemGroups[j];
+  // function checkTotalMinted() private view returns (uint256 result) {
+  //   for (uint256 i = 0; i < nextPoolId; i++) {
+  //       for (uint256 j = 0; j < pools[i].itemGroups.length; j++) {
+  //       uint256 itemGroupId = pools[i].itemGroups[j];
 
-        bytes32 itemKey = keccak256(abi.encodePacked(pools[i].config.collection,
-          pools[i].currentPoolVersion, itemGroupId));
-        result += pools[i].itemMinted[itemKey];
-      }
-    }
-    return result;
-  }
+  //       bytes32 itemKey = keccak256(abi.encodePacked(pools[i].config.collection,
+  //         pools[i].currentPoolVersion, itemGroupId));
+  //       result += pools[i].itemMinted[itemKey];
+  //     }
+  //   }
+  //   return result;
+  // }
 
 }
