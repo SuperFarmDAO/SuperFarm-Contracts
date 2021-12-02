@@ -187,23 +187,7 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop, SuperMerkleAcces
     // uint256 price;
   }
 
-  struct WhiteListInput {
-    uint256 whiteListId;
-    uint256 index; 
-    uint256 allowance;
-    bytes32 node; 
-    bytes32[] merkleProof;
-  }
 
-
-  struct WhiteListCreate {
-    uint256 _accesslistId;
-    bytes32 _merkleRoot;
-    uint256 _startTime; 
-    uint256 _endTime; 
-    uint256 _price; 
-    address _token;
-  }
 
   /**
     This struct tracks information about a single item being sold in a pool.
@@ -460,7 +444,7 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop, SuperMerkleAcces
   }
 
 
-  function addWhiteList(uint256 _poolId, WhiteListCreate[] calldata whitelist) external hasValidPermit(UNIVERSAL, WHITELIST) {
+  function addWhiteList(uint256 _poolId, DFStorage.WhiteListCreate[] calldata whitelist) external hasValidPermit(UNIVERSAL, WHITELIST) {
     for (uint256 i = 0; i < whitelist.length; i++) {
       super.setAccessRound(whitelist[i]._accesslistId, whitelist[i]._merkleRoot, whitelist[i]._startTime, whitelist[i]._endTime, whitelist[i]._price, whitelist[i]._token);
       // Whitelist storage wl;
@@ -721,7 +705,7 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop, SuperMerkleAcces
     @param _amount The amount of item that the user would like to purchase.
   */
   function mintFromPool(uint256 _id, uint256 _groupId, uint256 _assetIndex,
-    uint256 _amount, uint256 _itemIndex, WhiteListInput calldata _whiteList) external nonReentrant payable {
+    uint256 _amount, uint256 _itemIndex, DFStorage.WhiteListInput calldata _whiteList) external nonReentrant payable {
     require(_amount > 0,
       "0x0B");
     require(_id < nextPoolId && pools[_id].config.singlePurchaseLimit >= _amount,
@@ -793,7 +777,7 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop, SuperMerkleAcces
     // Emit an event indicating a successful purchase.
   }
 
-  function userInWhiteList(WhiteListInput calldata _whiteList) private view returns (bool) {
+  function userInWhiteList(DFStorage.WhiteListInput calldata _whiteList) private view returns (bool) {
     // bytes32 node = keccak256(abi.encodePacked(_whiteList.index, _msgSender(), _whiteList.allowance));
     // return SuperMerkleAccess.verify(_whiteList.whiteListId, _whiteList.index, node, _whiteList.merkleProof);
 
@@ -944,23 +928,5 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop, SuperMerkleAcces
 
     emit ItemPurchased(_msgSender(), _id, itemIds, amounts);
   }
-
-
-
-  /**
-  * Private function for checking maxAllocation among all pools.
-  */
-  // function checkTotalMinted() private view returns (uint256 result) {
-  //   for (uint256 i = 0; i < nextPoolId; i++) {
-  //       for (uint256 j = 0; j < pools[i].itemGroups.length; j++) {
-  //       uint256 itemGroupId = pools[i].itemGroups[j];
-
-  //       bytes32 itemKey = keccak256(abi.encodePacked(pools[i].config.collection,
-  //         pools[i].currentPoolVersion, itemGroupId));
-  //       result += pools[i].itemMinted[itemKey];
-  //     }
-  //   }
-  //   return result;
-  // }
 
 }

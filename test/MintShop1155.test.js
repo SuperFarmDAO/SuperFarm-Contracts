@@ -1689,7 +1689,7 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
                 _merkleRoot: root,
                 _startTime: 0,
                 _endTime: ethers.constants.MaxUint256,
-                _price: ethers.utils.parseEther("0.001"),
+                _price: ethers.utils.parseEther("100"),
                 _token: NULL_ADDRESS
             }
 
@@ -1717,9 +1717,9 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
                 node: hash(getIndex(whiteList, signer1.address), signer1.address, whiteList[signer1.address]),
                 merkleProof: computeMerkleProof(getIndex(whiteList, signer1.address), whiteList),
               }
-                mintShop1155.connect(signer1).mintFromPool(0, 2, 1, 1, 0, whiteListInput, {value: ethers.utils.parseEther("1")})
+                mintShop1155.connect(signer1).mintFromPool(0, 2, 1, 1, 0, whiteListInput, {value: ethers.utils.parseEther("100")})
             await expect(
-                mintShop1155.connect(signer1).mintFromPool(0, 2, 1, 1, 0, whiteListInput, {value: ethers.utils.parseEther("1")})
+                mintShop1155.connect(signer1).mintFromPool(0, 2, 1, 1, 0, whiteListInput, {value: ethers.utils.parseEther("100")})
             ).to.be.revertedWith("0x0G");
         })
 
@@ -1744,6 +1744,62 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
             await expect(
                 mintShop1155.connect(owner).mintFromPool(1, 2, 1, 1, 0, whiteListInput, {value: ethers.utils.parseEther("1")})
             ).to.be.revertedWith("0x4B");
+        })
+
+        it("Shoud revert: sent less than the value on the whitelist", async function() {
+            // await ethers.provider.send("evm_increaseTime", [80]);
+            // await ethers.provider.send("evm_mine", []);
+            let whiteList = {
+                "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266" : 1, 
+                "0x70997970C51812dc3A010C7d01b50e0d17dc79C8" : 1, 
+                "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC": 1, 
+                "0x90F79bf6EB2c4f870365E785982E1f101E93b906": 1, 
+                "0x15d34AAf54267DB7D7c367839AAf71A00a2C6A65": 1, 
+                "0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc": 1, 
+                "0x976EA74026E726554dB657fA54763abd0C3a0aa9": 1
+              }
+
+            let whiteListInput = {
+                whiteListId: 0,
+                index: getIndex(whiteList, signer1.address),
+                allowance: whiteList[signer1.address],
+                node: hash(getIndex(whiteList, signer1.address), signer1.address, whiteList[signer1.address]),
+                merkleProof: computeMerkleProof(getIndex(whiteList, signer1.address), whiteList),
+              }
+              await expect(
+                mintShop1155.connect(signer1).mintFromPool(0, 2, 1, 1, 0, whiteListInput, {value: ethers.utils.parseEther("99")})
+            ).to.be.revertedWith("0x9B");
+        })
+
+        it("Shoud buy for whitelist price", async function() {
+            await ethers.provider.send("evm_increaseTime", [70]);
+            await ethers.provider.send("evm_mine", []);
+            let whiteList = {
+                "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266" : 1, 
+                "0x70997970C51812dc3A010C7d01b50e0d17dc79C8" : 1, 
+                "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC": 1, 
+                "0x90F79bf6EB2c4f870365E785982E1f101E93b906": 1, 
+                "0x15d34AAf54267DB7D7c367839AAf71A00a2C6A65": 1, 
+                "0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc": 1, 
+                "0x976EA74026E726554dB657fA54763abd0C3a0aa9": 1
+              }
+
+            let whiteListInput = {
+                whiteListId: 0,
+                index: getIndex(whiteList, signer1.address),
+                allowance: whiteList[signer1.address],
+                node: hash(getIndex(whiteList, signer1.address), signer1.address, whiteList[signer1.address]),
+                merkleProof: computeMerkleProof(getIndex(whiteList, signer1.address), whiteList),
+              }
+            let provider = signer1.provider;
+            let balanceBefore = await provider.getBalance(signer1.address);
+            console.log(balanceBefore.toString())
+            await mintShop1155.connect(signer1).mintFromPool(1, 2, 1, 1, 0, whiteListInput, {value: ethers.utils.parseEther("100")})
+            let balanceAfter = await provider.getBalance(signer1.address);
+            console.log(balanceAfter.toString())
+
+
+            console.log(balanceBefore.toString() - balanceAfter.toString());
         })
     });
 });

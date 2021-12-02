@@ -12,7 +12,7 @@ interface IMintShop {
         DFStorage.Price[][] memory _prices
     ) external;
 
-
+    function addWhiteList(uint256 _poolId, DFStorage.WhiteListCreate[] calldata whitelist) external;
     // function addWhitelist(DFStorage.WhitelistInput memory _whitelist) external;
 
     function setItems(ISuper1155[] memory _items) external;

@@ -23,6 +23,8 @@ contract DropFactory is Ownable {
     address mintShopHelper;
     address super1155Helper;
 
+    event DropCreated(address indexed creator, address mintShop, address super1155, uint256 time);
+
     /**
      * @param owner Drop's owner.
      * @param mintShop1155 Address of MintShop contract.
@@ -67,7 +69,7 @@ contract DropFactory is Ownable {
      * @param _itemGroupInput Array of object of ItemGroupInput, description in {DFStorage}.
      * @param _poolInput Array of object of PoolInput, description in {DFStorage}.
      * @param _poolConfigurationData Array of object of ItemGroupInput, description above.
-     * @param _whiteListInput Array of whiteListInput, description in {DFStorage}
+     * @param _whiteListCreate Array of whiteListInput, description in {DFStorage}
 
      * @return super1155 Returns 2 addresses, new Super1155 and MintShop1155 contracts.
      * @return mintShop Returns 2 addresses, new Super1155 and MintShop1155 contracts.
@@ -83,7 +85,7 @@ contract DropFactory is Ownable {
         DFStorage.ItemGroupInput[] memory _itemGroupInput,
         DFStorage.PoolInput[] memory _poolInput,
         PoolConfigurationData[] memory _poolConfigurationData,
-        DFStorage.WhitelistInput[] memory _whiteListInput,
+        DFStorage.WhiteListCreate[] memory _whiteListCreate,
         bytes memory salt
     )
         external
@@ -106,7 +108,7 @@ contract DropFactory is Ownable {
             _globalPurchaseLimit,
             _poolInput,
             _poolConfigurationData,
-            _whiteListInput
+            _whiteListCreate
         );
 
         Drop storage drop = drops[salt];
@@ -114,7 +116,7 @@ contract DropFactory is Ownable {
         drop.owner = msg.sender;
         drop.super1155 = address(super1155);
 
-
+        emit DropCreated(msg.sender, address(mintShop), address(super1155), block.timestamp);
         return (address(super1155), address(mintShop));
     }
 
@@ -162,7 +164,7 @@ contract DropFactory is Ownable {
         uint256 _globalPurchaseLimit,
         DFStorage.PoolInput[] memory _poolInput,
         PoolConfigurationData[] memory _poolConfigurationData,
-        DFStorage.WhitelistInput[] memory _whiteListInput
+        DFStorage.WhiteListCreate[] memory _whiteListInput
     ) private returns (address mintShop) {
 
         bytes memory mintShopBytecode = IHelper(mintShopHelper).getByteCode();
@@ -197,11 +199,6 @@ contract DropFactory is Ownable {
         
 
         for (uint256 i = 0; i < _poolInput.length; i++) {
-            // _poolInput[i].collection = super1155;
-            // DFStorage.PoolRequirement memory req = _poolInput[i].requirement;
-            // if (req.whitelistId != 0) {
-            //     IMintShop(mintShop).addWhitelist(_whiteListInput[i]);
-            // }
             IMintShop(mintShop).addPool(
                 _poolInput[i],
                 _poolConfigurationData[i].groupIds,
@@ -209,7 +206,20 @@ contract DropFactory is Ownable {
                 _poolConfigurationData[i].caps,
                 _poolConfigurationData[i].prices
             );
+            for (uint256 j = 0; j < _whiteListInput.length; j++) {
+                IMintShop(mintShop).addWhiteList(i, _whiteListInput);
+            }
         }
+
+
+
+        // for (uint i = 0; i < _whiteListInput.length; i++) {
+        //     for (uint j = 0; j < _whiteListInput.length; i++) {
+        //         IMintShop(mintShop).addWhiteList(i, _whiteListInput[j]);
+        //     }
+        // }
+
+
 
         bytes32 UNIVERSAL = IPermitControl(super1155).UNIVERSAL();
 
