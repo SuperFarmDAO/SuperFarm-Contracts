@@ -4,7 +4,6 @@ pragma solidity ^0.8.8;
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-// import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 
 import "../../base/Sweepable.sol";
 import "../../assets/erc1155/interfaces/ISuper1155.sol";
@@ -735,8 +734,8 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop, SuperMerkleAcces
     if (pools[_id].whiteLists.length != 0)
     {
       whiteListed = userInWhiteList(_whiteList) && keccak256(abi.encodePacked(_whiteList.index, _msgSender(), _whiteList.allowance)) == _whiteList.node;
-      require(!pools[_id].whiteLists[_whiteList.whiteListId].minted[_msgSender()]);
-      require(!whiteListed && block.timestamp >= pools[_id].config.startTime && block.timestamp <= pools[_id].config.endTime, "0x4B");
+      require(!pools[_id].whiteLists[_whiteList.whiteListId].minted[_msgSender()], "0x0G");
+      require(whiteListed || (block.timestamp >= pools[_id].config.startTime && block.timestamp <= pools[_id].config.endTime), "0x4B");
     }
 
     require(block.timestamp >= pools[_id].config.startTime && block.timestamp <= pools[_id].config.endTime, "0x4B");
