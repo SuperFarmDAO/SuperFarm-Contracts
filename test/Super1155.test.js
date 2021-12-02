@@ -93,7 +93,7 @@ describe('===Super1155===', function () {
 
         it('should deploy a new instance where deployer is the owner', async function () {
             super1155 = await this.Super1155.deploy(
-                owner.address,
+                deployer.address,
                 "Super1155",
                 originalUri,
                 contractUri1155,
@@ -1373,8 +1373,8 @@ describe('===Super1155===', function () {
                 lockUriRight,
                 ethers.constants.MaxUint256
             );
-            await super1155.setURI("://ipfs/lockeduri/{id}");
-            await super1155.lockURI();
+            await super1155.connect(deployer.address).setURI("://ipfs/lockeduri/{id}");
+            await super1155.connect(deployer.address).lockURI();
             expect(await super1155.uri(1)).to.equal("://ipfs/lockeduri/{id}");
             expect(await super1155.uriLocked()).to.equal(true);
         });
