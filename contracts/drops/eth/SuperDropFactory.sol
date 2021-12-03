@@ -69,7 +69,6 @@ contract DropFactory is Ownable {
      * @param _itemGroupInput Array of object of ItemGroupInput, description in {DFStorage}.
      * @param _poolInput Array of object of PoolInput, description in {DFStorage}.
      * @param _poolConfigurationData Array of object of ItemGroupInput, description above.
-     * @param _whiteListCreate Array of whiteListInput, description in {DFStorage}
 
      * @return super1155 Returns 2 addresses, new Super1155 and MintShop1155 contracts.
      * @return mintShop Returns 2 addresses, new Super1155 and MintShop1155 contracts.
@@ -85,7 +84,7 @@ contract DropFactory is Ownable {
         DFStorage.ItemGroupInput[] memory _itemGroupInput,
         DFStorage.PoolInput[] memory _poolInput,
         PoolConfigurationData[] memory _poolConfigurationData,
-        DFStorage.WhiteListCreate[][] memory _whiteListCreate,
+        // DFStorage.WhiteListCreate[][] memory _whiteListCreate,
         bytes memory salt
     )
         external
@@ -107,8 +106,8 @@ contract DropFactory is Ownable {
             _paymentReceiver,
             _globalPurchaseLimit,
             _poolInput,
-            _poolConfigurationData,
-            _whiteListCreate
+            _poolConfigurationData
+            // _whiteListCreate
         );
 
         Drop storage drop = drops[salt];
@@ -163,8 +162,8 @@ contract DropFactory is Ownable {
         address _paymentReceiver,
         uint256 _globalPurchaseLimit,
         DFStorage.PoolInput[] memory _poolInput,
-        PoolConfigurationData[] memory _poolConfigurationData,
-        DFStorage.WhiteListCreate[][] memory _whiteListInput
+        PoolConfigurationData[] memory _poolConfigurationData
+        // DFStorage.WhiteListCreate[][] memory _whiteListInput
     ) private returns (address mintShop) {
 
         bytes memory mintShopBytecode = IHelper(mintShopHelper).getByteCode();
@@ -206,7 +205,7 @@ contract DropFactory is Ownable {
                 _poolConfigurationData[i].caps,
                 _poolConfigurationData[i].prices
             );
-            IMintShop(mintShop).addWhiteList(i, _whiteListInput[i]);
+            // IMintShop(mintShop).addWhiteList(i, _whiteListInput[i]);
             // for (uint256 j = 0; j < _whiteListInput.length; j++) {
             //     IMintShop(mintShop).addWhiteList(i, _whiteListInput);
             // }

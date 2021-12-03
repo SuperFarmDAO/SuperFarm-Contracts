@@ -136,7 +136,7 @@ describe("DropFactory test", function () {
             _merkleRoot: computeRootHash(whiteList2),
             _startTime: 0,
             _endTime: ethers.constants.MaxUint256,
-            _price: ethers.utils.parseEther("0.01"),
+            _price: ethers.utils.parseEther("1"),
             _token: NULL_ADDRESS
         }
         let whiteListCreate3 = {
@@ -144,7 +144,7 @@ describe("DropFactory test", function () {
             _merkleRoot: computeRootHash(whiteList3),
             _startTime: 0,
             _endTime: ethers.constants.MaxUint256,
-            _price: ethers.utils.parseEther("0.01"),
+            _price: ethers.utils.parseEther("1"),
             _token: NULL_ADDRESS
         }
         let wlData = [[whiteListCreate1, whiteListCreate2, whiteListCreate3]];
@@ -218,7 +218,7 @@ describe("DropFactory test", function () {
                     ]
                 ]
             ]],
-            wlData,
+            // wlData,
             salt
         );
         console.log(3)
