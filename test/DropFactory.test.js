@@ -1,11 +1,7 @@
 'use strict';
 const { expect } = require('chai');
-// Imports.
-// import { ethers } from 'hardhat';
 import 'chai/register-should';
-
-// import { ethers } from 'hardhat';
-let today = new Date() / 100;
+import {computeRootHash} from "./utils.js";
 let owner, user_one, user_two;
 const NULL_ADDRESS = '0x0000000000000000000000000000000000000000';
 describe("DropFactory test", function () {
@@ -41,61 +37,12 @@ describe("DropFactory test", function () {
     }).timeout(10000);
 
     it("Shoud try to create new drop", async function () {
-       
-         
-        let configGroup = {
-            name: 'PEPSI',
-            supplyType: 0,
-            supplyData: 10,
-            itemType: 1,
-            itemData: 0,
-            burnType: 1,
-            burnData: 6
-        };
-
-        let poolInput = {
-            name: "firstPool",
-            startTime: 1,
-            endTime: 1 + 60,
-            purchaseLimit: 5,
-            singlePurchaseLimit: 2,
-            requirement: {
-                requiredType: 0,
-                requiredAsset: NULL_ADDRESS,
-                requiredAmount: 1,
-                whitelistId: 0
-            },
-            collection: NULL_ADDRESS
-        };
-
-
-        let data2 = [[1, 2], [1, 1], [10,10], [[{
-            assetType: 1,
-            asset: NULL_ADDRESS,
-            price: 1
-        }], [{
-            assetType: 1,
-            asset: NULL_ADDRESS,
-            price: 1
-        }]]];
-
-
-        console.log(1);
-        // let data = [
-        //     [1, 2],
-        //     [1, 1],
-        //     [10, 1],
-        //     [[
-        //         1,
-        //         NULL_ADDRESS,
-        //         1
-        //     ], [
-        //         1,
-        //         NULL_ADDRESS,
-        //         1
-        //     ]]
-        // ];
-
+    
+        let mintShopCreateData = {
+            _paymentReceiver: '0x0656886450758213b1C2CDD73A4DcdeeC10d4D20',
+            _globalPurchaseLimit: 100,
+            _maxAllocation: 10
+        }
         let whiteList1 = {
             "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266" : 1, 
             "0x70997970C51812dc3A010C7d01b50e0d17dc79C8" : 1, 
@@ -149,17 +96,15 @@ describe("DropFactory test", function () {
         }
         let wlData = [[whiteListCreate1, whiteListCreate2, whiteListCreate3]];
 
-        console.log(wlData);
         let salt = ethers.utils.formatBytes32String("HelloWorld");
-        console.log(2)
 
         const drop = await factory.createDrop(
             '0x0656886450758213b1C2CDD73A4DcdeeC10d4D20',
             'Test ETH Collection',
             'https://d20l5i85b8vtpg.cloudfront.net/thumbnail/4c7c68ed-f446-4ca6-9e55-de65fa7aace2.png',
+            'https://d20l5i85b8vtpg.cloudfront.net/thumbnail/4c7c68ed-f446-4ca6-9e55-de65fa7aace2.png',
             '0xf57b2c51ded3a29e6891aba85459d600256cf317',
-            '0x0656886450758213b1C2CDD73A4DcdeeC10d4D20',
-            100,
+            mintShopCreateData,
             [
                 {
                     name: "TEST ETH NFT",
@@ -189,9 +134,10 @@ describe("DropFactory test", function () {
                     singlePurchaseLimit: 1,
                     requirement: {
                         requiredType: 0,
-                        requiredAsset: "0x0000000000000000000000000000000000000000",
+                        requiredAsset: ["0x0000000000000000000000000000000000000000"],
                         requiredAmount: 0,
-                        whitelistId: 0
+                        whitelistId: 0,
+                        requiredId: []
                     },
                     collection: "0x0000000000000000000000000000000000000000"
                 }
@@ -218,78 +164,16 @@ describe("DropFactory test", function () {
                     ]
                 ]
             ]],
-            // wlData,
+            wlData,
             salt
         );
-        console.log(3)
-       
-
-        // let drops = await factory.getDrops();
-
-        // let drops = await factory.getExactDrop(salt);
-
-
-        
-        // let MS =await  hre.ethers.getContractAt("MintShop1155", mintShopAddres);
         let addresses = await factory.getExactDrop(salt);
         let newMintShopAddress = addresses[1];
         let MSHOP = await hre.ethers.getContractAt("MintShop1155", newMintShopAddress);
-        // let signers = await hre.ethers.getSigners();
-        // console.log("signer1 ", signers[1]);
         console.log("newMintShopAddress ", newMintShopAddress);
-        let poolData = await MSHOP.getPools([0], 0);
-        // console.log(poolData);
-        // console.log(poolData.toString());
-
-        // console.log(transaction);
         
 
     }).timeout(10000);
 
 
 });
-
-
-const expandLeaves = function (balances) {
-    var addresses = Object.keys(balances)
-    addresses.sort(function(a, b) {
-        var al = a.toLowerCase(), bl = b.toLowerCase();
-        if (al < bl) { return -1; }
-        if (al > bl) { return 1; }
-        return 0;
-    });
-
-    return addresses.map(function(a, i) { return { address: a, index: i, allowance: balances[a]}; });
-}
-
-// Get hashes of leaf nodes
-const getLeaves = function(balances) {
-    var leaves = expandLeaves(balances);
-    
-    return leaves.map(function(leaf) {
-        return ethers.utils.solidityKeccak256(["uint256", "address", "uint256"], [leaf.index, leaf.address, leaf.allowance]);
-    });
-}
-
-const computeRootHash = function(balances) {
-    var leaves = getLeaves(balances);
-    // console.log(leaves)
-    while (leaves.length > 1) {
-        reduceMerkleBranches(leaves);
-    }
-
-    return leaves[0];
-}
-
-const reduceMerkleBranches = function(leaves) {
-    var output = [];
-
-    while (leaves.length) {
-        var left = leaves.shift();
-        var right = (leaves.length === 0) ? left: leaves.shift();
-        output.push(ethers.utils.solidityKeccak256(["bytes32", "bytes32"], [left, right]));
-    }
-    output.forEach(function(leaf) {
-        leaves.push(leaf);
-    });
-}

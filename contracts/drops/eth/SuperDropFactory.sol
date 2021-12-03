@@ -35,6 +35,12 @@ contract DropFactory is Ownable {
         address mintShop1155;
         address super1155;
     }
+
+    struct MintShopCreateData {
+        address _paymentReceiver;
+        uint256 _globalPurchaseLimit;
+        uint256 _maxAllocation;
+    }
     /**
      * @param groupIds Array of groupId's of 1155 contract
      * @param issueNumberOffsets Array of groupId's of 1155 contract
@@ -64,8 +70,9 @@ contract DropFactory is Ownable {
      * @param _owner Address of drop's owner
      * @param _collectionName New collectin's name
      * @param _uri URI of new drop
+     * @param _contractURI URI of contrqct drop
      * @param _proxyRegistry Address of proxy registy contract
-     * @param _globalPurchaseLimit Maximum quantity available for purchase.
+     * @param _mintShopCreateData Struct, which needs collets datat to create MintShop contract.
      * @param _itemGroupInput Array of object of ItemGroupInput, description in {DFStorage}.
      * @param _poolInput Array of object of PoolInput, description in {DFStorage}.
      * @param _poolConfigurationData Array of object of ItemGroupInput, description above.
@@ -78,13 +85,13 @@ contract DropFactory is Ownable {
         address _owner,
         string memory _collectionName,
         string memory _uri,
+        string memory _contractURI,
         address _proxyRegistry,
-        address _paymentReceiver,
-        uint256 _globalPurchaseLimit,
+        MintShopCreateData memory _mintShopCreateData,
         DFStorage.ItemGroupInput[] memory _itemGroupInput,
         DFStorage.PoolInput[] memory _poolInput,
         PoolConfigurationData[] memory _poolConfigurationData,
-        // DFStorage.WhiteListCreate[][] memory _whiteListCreate,
+        DFStorage.WhiteListCreate[][] memory _whiteListCreate,
         bytes memory salt
     )
         external
@@ -98,16 +105,15 @@ contract DropFactory is Ownable {
             "DropFactory: arrays of input parametres must be same length!"
         );
 
-        super1155 = createSuper1155(_collectionName, _uri, _proxyRegistry, _itemGroupInput);  
+        super1155 = createSuper1155(_collectionName, _uri, _proxyRegistry, _contractURI, _itemGroupInput);  
 
         mintShop = createMintShop(
             _owner,
             super1155,
-            _paymentReceiver,
-            _globalPurchaseLimit,
+            _mintShopCreateData,
             _poolInput,
-            _poolConfigurationData
-            // _whiteListCreate
+            _poolConfigurationData,
+            _whiteListCreate
         );
 
         Drop storage drop = drops[salt];
@@ -124,6 +130,7 @@ contract DropFactory is Ownable {
         string memory _collectionName,
         string memory _uri,
         address _proxyRegistry,
+        string memory _contractURI,
         DFStorage.ItemGroupInput[] memory _itemGroupInput
         ) private returns (address super1155) {
             
@@ -131,7 +138,7 @@ contract DropFactory is Ownable {
 
         bytes memory bytecodeSuper1155 = abi.encodePacked(
             super1155Bytecode,
-            abi.encode(address(this), _collectionName, _uri, _proxyRegistry)
+            abi.encode(address(this), _collectionName, _uri, _contractURI, _proxyRegistry)
         );
 
         bytes32 salt = keccak256(
@@ -159,11 +166,10 @@ contract DropFactory is Ownable {
     function createMintShop(
         address _owner,
         address super1155,
-        address _paymentReceiver,
-        uint256 _globalPurchaseLimit,
+        MintShopCreateData memory _mintShopCreateData,
         DFStorage.PoolInput[] memory _poolInput,
-        PoolConfigurationData[] memory _poolConfigurationData
-        // DFStorage.WhiteListCreate[][] memory _whiteListInput
+        PoolConfigurationData[] memory _poolConfigurationData,
+        DFStorage.WhiteListCreate[][] memory _whiteListInput
     ) private returns (address mintShop) {
 
         bytes memory mintShopBytecode = IHelper(mintShopHelper).getByteCode();
@@ -171,8 +177,9 @@ contract DropFactory is Ownable {
             mintShopBytecode,
             abi.encode(
                 address(this),
-                _paymentReceiver,
-                _globalPurchaseLimit
+                _mintShopCreateData._paymentReceiver,
+                _mintShopCreateData._globalPurchaseLimit,
+                _mintShopCreateData._maxAllocation
             )
         );
         bytes32 salt = keccak256(abi.encodePacked(block.timestamp, msg.sender));
@@ -205,10 +212,7 @@ contract DropFactory is Ownable {
                 _poolConfigurationData[i].caps,
                 _poolConfigurationData[i].prices
             );
-            // IMintShop(mintShop).addWhiteList(i, _whiteListInput[i]);
-            // for (uint256 j = 0; j < _whiteListInput.length; j++) {
-            //     IMintShop(mintShop).addWhiteList(i, _whiteListInput);
-            // }
+            IMintShop(mintShop).addWhiteList(i, _whiteListInput[i]);
         }
 
         bytes32 UNIVERSAL = IPermitControl(super1155).UNIVERSAL();

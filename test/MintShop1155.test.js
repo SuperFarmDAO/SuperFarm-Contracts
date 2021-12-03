@@ -1,12 +1,7 @@
 const { expect } = require('chai');
 const { BigNumber} = require('ethers');
-// const { getMerkleTree, hash, expandLeaves, getLeaves, computeRootHash, computeMerkleProof, reduceMerkleBranches} = require('./MerkleUtils');
-const { mnemonicToSeed, keccak256 } = require('ethers/lib/utils');
-// const { ethers } = require('hardhat');
-const Web3 = require('web3');
-const crypto = require('crypto')
-// const { MerkleTree } = require('merkletreejs')
-// const SHA256 = require('crypto-js/sha256')
+
+import {getIndex, computeMerkleProof, computeRootHash, hash} from "./utils.js";
 
 const NULL_ADDRESS = '0x0000000000000000000000000000000000000000';
 
@@ -1803,99 +1798,3 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
         })
     });
 });
-
-
-
-const expandLeaves = function (balances) {
-    var addresses = Object.keys(balances)
-    addresses.sort(function(a, b) {
-        var al = a.toLowerCase(), bl = b.toLowerCase();
-        if (al < bl) { return -1; }
-        if (al > bl) { return 1; }
-        return 0;
-    });
-
-    return addresses.map(function(a, i) { return { address: a, index: i, allowance: balances[a]}; });
-}
-
-
-const hash = function(index, address, allowance) {
-    return ethers.utils.solidityKeccak256(["uint256", "address", "uint256"], [index, address, allowance]);
-
-}
-
-// Get hashes of leaf nodes
-const getLeaves = function(balances) {
-    var leaves = expandLeaves(balances);
-    
-    return leaves.map(function(leaf) {
-        return ethers.utils.solidityKeccak256(["uint256", "address", "uint256"], [leaf.index, leaf.address, leaf.allowance]);
-    });
-}
-
-const computeRootHash = function(balances) {
-    var leaves = getLeaves(balances);
-    // console.log(leaves)
-    while (leaves.length > 1) {
-        reduceMerkleBranches(leaves);
-    }
-
-    return leaves[0];
-}
-
-
-const computeMerkleProof = function(index, address) {
-    var leaves = getLeaves(address);
-
-    if (index == null) { throw new Error('address not found'); }
-
-    var path = index;
-
-    var proof = [ ];
-    while (leaves.length > 1) {
-        if ((path % 2) == 1) {
-            proof.push(leaves[path - 1])
-        } else {
-            if (typeof leaves[path + 1] != "undefined")
-                proof.push(leaves[path + 1])
-            else
-                proof.push(leaves[path])
-        }
-
-        // Reduce the merkle tree one level
-        reduceMerkleBranches(leaves);
-
-        // Move up
-        path = parseInt(path / 2);
-    }
-    // console.log(proof)
-    return proof;
-}
-
-const reduceMerkleBranches = function(leaves) {
-    var output = [];
-
-    while (leaves.length) {
-        var left = leaves.shift();
-        var right = (leaves.length === 0) ? left: leaves.shift();
-        output.push(ethers.utils.solidityKeccak256(["bytes32", "bytes32"], [left, right]));
-    }
-    output.forEach(function(leaf) {
-        leaves.push(leaf);
-    });
-}
-
-
-const getIndex = function(balances, address) {
-    // address = address.toLowerCase();
-
-    var leaves = expandLeaves(balances);
-
-    var index = null;
-    for (var i = 0; i < leaves.length; i++) {
-        if (i != leaves[i].index) { throw new Error('bad index mapping'); }
-        if (leaves[i].address === address) { return leaves[i].index; }
-    }
-
-    throw new Error('address not found');
-}

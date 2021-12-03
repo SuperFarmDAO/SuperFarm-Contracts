@@ -91,19 +91,6 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop, SuperMerkleAcces
   /// A mapping of addresses to the number of items each has purchased globally.
   mapping (address => uint256) public globalPurchaseCounts;
 
-  /**
-    The ID which should be taken by the next whitelist added. This value begins
-    at one in order to reserve the zero-identifier for representing no whitelist
-    at all, i.e. public.
-  */
-  // uint256 public nextWhitelistId = 1;
-
-  /**
-    A mapping of whitelist IDs to specific Whitelist elements. Whitelists may be
-    shared between pools via specifying their ID in a pool requirement.
-  */
-  // mapping (uint256 => Whitelist) public whitelists;
-
   /// The next available ID to be assumed by the next pool added.
   uint256 public nextPoolId;
 
@@ -115,29 +102,6 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop, SuperMerkleAcces
     group which should be issued, minus one.
   */
   mapping (bytes32 => uint256) public nextItemIssues;
-
-  // /**
-  //   This struct is a source of mapping-free input to the `addPool` function.
-
-  //   @param name A name for the pool.
-  //   @param startTime The timestamp when this pool begins allowing purchases.
-  //   @param endTime The timestamp after which this pool disallows purchases.
-  //   @param purchaseLimit The maximum number of items a single address may
-  //     purchase from this pool.
-  //   @param singlePurchaseLimit The maximum number of items a single address may
-  //     purchase from this pool in a single transaction.
-  //   @param requirement A PoolRequirement requisite for users who want to
-  //     participate in this pool.
-  // */
-  // struct PoolInput {
-  //   uint256 startTime;
-  //   uint256 endTime;
-  //   uint256 purchaseLimit;
-  //   uint256 singlePurchaseLimit;
-  //   PoolRequirement requirement;
-  //   address collection;
-  //   string name;
-  // }
 
   /**
     This struct tracks information about a single item pool in the Shop.
@@ -184,7 +148,6 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop, SuperMerkleAcces
   struct Whitelist {
     uint256 id;
     mapping (address => bool) minted;
-    // uint256 price;
   }
 
 
@@ -372,7 +335,7 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop, SuperMerkleAcces
     maxAllocation = _maxAllocation;
   }
 
-  /**
+  /** Commented due contract bytecode size limit.
     Return a version number for this contract's interface.
   */
   // function version() external virtual override pure returns (uint256) {
@@ -447,18 +410,12 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop, SuperMerkleAcces
   function addWhiteList(uint256 _poolId, DFStorage.WhiteListCreate[] calldata whitelist) external hasValidPermit(UNIVERSAL, WHITELIST) {
     for (uint256 i = 0; i < whitelist.length; i++) {
       super.setAccessRound(whitelist[i]._accesslistId, whitelist[i]._merkleRoot, whitelist[i]._startTime, whitelist[i]._endTime, whitelist[i]._price, whitelist[i]._token);
-      // Whitelist storage wl;
       pools[_poolId].whiteLists.push();
       uint256 newIndex = pools[_poolId].whiteLists.length - 1;
       pools[_poolId].whiteLists[newIndex].id = whitelist[i]._accesslistId;
-      // pools[_poolId].whiteLists.push(wl);
+
     }
   }
-
-
-  // function updateWhiteList(uint256 _poolId, uint256 _accesslistId) external hasValidPermit(UNIVERSAL, WHITELIST) {
-  //   pools[_poolId].whiteListId = _accesslistId;
-  // }
 
 
   /**
@@ -689,8 +646,6 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop, SuperMerkleAcces
   function updatePoolConfig(uint256 _id, DFStorage.PoolInput calldata _config) external hasValidPermit(UNIVERSAL, POOL){
     require(_id <= nextPoolId && _config.endTime >= _config.startTime,
       "0x1A");
-    // require(,
-    //   "0x6A");
     pools[_id].config = _config;
   }
 
@@ -710,9 +665,6 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop, SuperMerkleAcces
       "0x0B");
     require(_id < nextPoolId && pools[_id].config.singlePurchaseLimit >= _amount,
       "0x1B");
-    // require(pools[_id].config.singlePurchaseLimit >= _amount,
-    //   "0x2B");
-
 
     bool whiteListed;
     if (pools[_id].whiteLists.length != 0)
@@ -724,10 +676,6 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop, SuperMerkleAcces
 
     require(block.timestamp >= pools[_id].config.startTime && block.timestamp <= pools[_id].config.endTime, "0x4B");
 
-
-    // Verify that the asset being used in the purchase is valid.
-    // bytes32 itemKey = keccak256(abi.encode(pools[_id].currentPoolVersion,
-    //   _groupId));
     bytes32 itemKey = keccak256(abi.encodePacked(pools[_id].config.collection, 
        pools[_id].currentPoolVersion, _groupId));
     require(_assetIndex < pools[_id].itemPricesLength[itemKey],
@@ -778,9 +726,6 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop, SuperMerkleAcces
   }
 
   function userInWhiteList(DFStorage.WhiteListInput calldata _whiteList) private view returns (bool) {
-    // bytes32 node = keccak256(abi.encodePacked(_whiteList.index, _msgSender(), _whiteList.allowance));
-    // return SuperMerkleAccess.verify(_whiteList.whiteListId, _whiteList.index, node, _whiteList.merkleProof);
-
     return SuperMerkleAccess.verify(_whiteList.whiteListId, _whiteList.index, keccak256(abi.encodePacked(_whiteList.index, _msgSender(), _whiteList.allowance)), _whiteList.merkleProof);
 
   }
