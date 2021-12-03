@@ -85,7 +85,7 @@ contract DropFactory is Ownable {
         DFStorage.ItemGroupInput[] memory _itemGroupInput,
         DFStorage.PoolInput[] memory _poolInput,
         PoolConfigurationData[] memory _poolConfigurationData,
-        DFStorage.WhiteListCreate[] memory _whiteListCreate,
+        DFStorage.WhiteListCreate[][] memory _whiteListCreate,
         bytes memory salt
     )
         external
@@ -164,7 +164,7 @@ contract DropFactory is Ownable {
         uint256 _globalPurchaseLimit,
         DFStorage.PoolInput[] memory _poolInput,
         PoolConfigurationData[] memory _poolConfigurationData,
-        DFStorage.WhiteListCreate[] memory _whiteListInput
+        DFStorage.WhiteListCreate[][] memory _whiteListInput
     ) private returns (address mintShop) {
 
         bytes memory mintShopBytecode = IHelper(mintShopHelper).getByteCode();
@@ -206,20 +206,11 @@ contract DropFactory is Ownable {
                 _poolConfigurationData[i].caps,
                 _poolConfigurationData[i].prices
             );
-            for (uint256 j = 0; j < _whiteListInput.length; j++) {
-                IMintShop(mintShop).addWhiteList(i, _whiteListInput);
-            }
+            IMintShop(mintShop).addWhiteList(i, _whiteListInput[i]);
+            // for (uint256 j = 0; j < _whiteListInput.length; j++) {
+            //     IMintShop(mintShop).addWhiteList(i, _whiteListInput);
+            // }
         }
-
-
-
-        // for (uint i = 0; i < _whiteListInput.length; i++) {
-        //     for (uint j = 0; j < _whiteListInput.length; i++) {
-        //         IMintShop(mintShop).addWhiteList(i, _whiteListInput[j]);
-        //     }
-        // }
-
-
 
         bytes32 UNIVERSAL = IPermitControl(super1155).UNIVERSAL();
 

@@ -81,55 +81,77 @@ describe("DropFactory test", function () {
 
 
         console.log(1);
-        let data = [
-            [1, 2],
-            [1, 1],
-            [10, 1],
-            [[
-                1,
-                NULL_ADDRESS,
-                1
-            ], [
-                1,
-                NULL_ADDRESS,
-                1
-            ]]
-        ];
-        // let salt = "0x60eb971ba5cc65e981c8b3a0fff625736ce28dc2ee9a1b10f749ac1828c4aded";
-        // // console.log(2);
-        // // console.log([data2]);
-        // // console.log(poolInput);
-        // console.log("DROPFACTORY ADDRESS: ", factory.address);
-        // console.log("OWNER v TESTE: ", owner.address);
+        // let data = [
+        //     [1, 2],
+        //     [1, 1],
+        //     [10, 1],
+        //     [[
+        //         1,
+        //         NULL_ADDRESS,
+        //         1
+        //     ], [
+        //         1,
+        //         NULL_ADDRESS,
+        //         1
+        //     ]]
+        // ];
 
-        // let address = await factory.computeAddress(salt, bytecode);
-        // let splitted = mintShopBytecode.split()
+        let whiteList1 = {
+            "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266" : 1, 
+            "0x70997970C51812dc3A010C7d01b50e0d17dc79C8" : 1, 
+            "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC": 1, 
+            "0x90F79bf6EB2c4f870365E785982E1f101E93b906": 1, 
+            "0x15d34AAf54267DB7D7c367839AAf71A00a2C6A65": 1, 
+            "0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc": 1, 
+            "0x976EA74026E726554dB657fA54763abd0C3a0aa9": 1
+        }
 
-        // var chuncks = [];
+        let whiteList2 = {
+            "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266" : 1, 
+            "0x70997970C51812dc3A010C7d01b50e0d17dc79C8" : 1, 
+            "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC": 1, 
+            "0x90F79bf6EB2c4f870365E785982E1f101E93b906": 1, 
+            "0x15d34AAf54267DB7D7c367839AAf71A00a2C6A65": 1
+        }
 
-        // for (var i = 0, charsLength = mintShopBytecode.length; i < charsLength; i += 66) {
-        //     chuncks.push(mintShopBytecode.substring(i, i + 66));
-        // }
-        // fs.writeFile('mintShopByteCode.txt', chuncks);
-        // console.log(chuncks);
+        let whiteList3 = {
+            "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266" : 1, 
+            "0x70997970C51812dc3A010C7d01b50e0d17dc79C8" : 1, 
+            "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC": 1, 
+            "0x90F79bf6EB2c4f870365E785982E1f101E93b906": 1,
+            "0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc": 1, 
+            "0x976EA74026E726554dB657fA54763abd0C3a0aa9": 1
+        }
 
-        // fs.writeFile('mintShopByteCode.txt', chuncks.join('\n'), function (err) {
-        //     if (err) return console.log(err);
-        //     // console.log('Hello World > helloworld.txt');
-        //   });
+        let whiteListCreate1 = {
+            _accesslistId: 0,
+            _merkleRoot: computeRootHash(whiteList1),
+            _startTime: 0,
+            _endTime: ethers.constants.MaxUint256,
+            _price: ethers.utils.parseEther("1"),
+            _token: NULL_ADDRESS
+        }
+        let whiteListCreate2 = {
+            _accesslistId: 1,
+            _merkleRoot: computeRootHash(whiteList2),
+            _startTime: 0,
+            _endTime: ethers.constants.MaxUint256,
+            _price: ethers.utils.parseEther("0.01"),
+            _token: NULL_ADDRESS
+        }
+        let whiteListCreate3 = {
+            _accesslistId: 2,
+            _merkleRoot: computeRootHash(whiteList3),
+            _startTime: 0,
+            _endTime: ethers.constants.MaxUint256,
+            _price: ethers.utils.parseEther("0.01"),
+            _token: NULL_ADDRESS
+        }
+        let wlData = [[whiteListCreate1, whiteListCreate2, whiteListCreate3]];
 
-    //     fs.writeFile(
-    //         'mintShopByteCode.txt',
-    //         chuncks.map(function(v){ return v.join(' ') }).join('\n'),
-    //         function (err) { console.log(err ? 'Error :'+err : 'ok') }
-    //    );
-        // await factory.sendData(chuncks);
-
-        // let bytecodeInContract = await factory.getData();
-        // console.log(bytecodeInContract);
-        // console.log(address.toString());
-
+        console.log(wlData);
         let salt = ethers.utils.formatBytes32String("HelloWorld");
+        console.log(2)
 
         const drop = await factory.createDrop(
             '0x0656886450758213b1C2CDD73A4DcdeeC10d4D20',
@@ -196,21 +218,10 @@ describe("DropFactory test", function () {
                     ]
                 ]
             ]],
-            [
-                {
-                    expiryTime:{
-                        type:"BigNumber",
-                        hex:"0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
-                    },
-                    isActive:true,
-                    addresses:[
-                        "0x0000000000000000000000000000000000000000"
-                    ]
-                }
-            ],
+            wlData,
             salt
         );
-
+        console.log(3)
        
 
         // let drops = await factory.getDrops();
@@ -230,26 +241,55 @@ describe("DropFactory test", function () {
         // console.log(poolData);
         // console.log(poolData.toString());
 
-            const id = 0; // In MVP there is only 1 pool in the drop, i.e. 1 collection, and there is no need to find it out of many others.
-            const assetIndex = 0; // Hardcoded value only ETH
-            const amount = 1; // In MVP in a single transaction, the user can buy only 1 instance of NFT.
-            const itemIndex = 0; // In MVP only one contract address is used, for this reason it is hardcoded 0.
-            const transactionData = {
-                gasLimit: '0xe4e1c0',
-                value: ethers.utils.parseEther("0.5")
-            }
-
-        let transaction = await MSHOP.mintFromPool( id,
-            1,
-            assetIndex,
-            amount,
-            itemIndex,
-            transactionData);
-
-        console.log(transaction);
+        // console.log(transaction);
         
 
     }).timeout(10000);
 
 
 });
+
+
+const expandLeaves = function (balances) {
+    var addresses = Object.keys(balances)
+    addresses.sort(function(a, b) {
+        var al = a.toLowerCase(), bl = b.toLowerCase();
+        if (al < bl) { return -1; }
+        if (al > bl) { return 1; }
+        return 0;
+    });
+
+    return addresses.map(function(a, i) { return { address: a, index: i, allowance: balances[a]}; });
+}
+
+// Get hashes of leaf nodes
+const getLeaves = function(balances) {
+    var leaves = expandLeaves(balances);
+    
+    return leaves.map(function(leaf) {
+        return ethers.utils.solidityKeccak256(["uint256", "address", "uint256"], [leaf.index, leaf.address, leaf.allowance]);
+    });
+}
+
+const computeRootHash = function(balances) {
+    var leaves = getLeaves(balances);
+    // console.log(leaves)
+    while (leaves.length > 1) {
+        reduceMerkleBranches(leaves);
+    }
+
+    return leaves[0];
+}
+
+const reduceMerkleBranches = function(leaves) {
+    var output = [];
+
+    while (leaves.length) {
+        var left = leaves.shift();
+        var right = (leaves.length === 0) ? left: leaves.shift();
+        output.push(ethers.utils.solidityKeccak256(["bytes32", "bytes32"], [left, right]));
+    }
+    output.forEach(function(leaf) {
+        leaves.push(leaf);
+    });
+}
