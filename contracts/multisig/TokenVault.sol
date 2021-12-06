@@ -7,12 +7,12 @@ import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Burnable.sol";
-import "./interfaces/ISuper721.sol";
-import "./interfaces/ISuperGeneric.sol";
 import "@openzeppelin/contracts/token/ERC1155/utils/ERC1155Holder.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 import "@openzeppelin/contracts/utils/introspection/ERC165Storage.sol";
-import "hardhat/console.sol"; // ATTENTION only for testing
+
+import "../interfaces/ISuper721.sol";
+import "../interfaces/ISuperGeneric.sol";
 
 /**
   @title A vault for securely holding tokens.
@@ -311,7 +311,6 @@ contract TokenVault is
             if (asset.assetType == AssetType.ERC20) {
                 IERC20(token).safeTransfer(recipient, amount);
                 totalAmount = totalAmount + amount;
-                console.log("ENTER");
             }
             if (asset.assetType == AssetType.ERC721) {
                 require(
