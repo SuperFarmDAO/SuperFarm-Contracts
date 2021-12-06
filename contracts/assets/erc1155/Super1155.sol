@@ -244,31 +244,6 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
   */
   event PermanentContractURI(string _value, uint256 indexed _id);
 
-//     Commented due to excessive instruction bytecode size
-//   /**
-//     A modifier which allows only the super-administrative owner or addresses
-//     with a specified valid right to perform a call on some specific item. Rights
-//     can be applied to the universal circumstance, the item-group-level
-//     circumstance, or to the circumstance of the item ID itself.
-
-//     @param _id The item ID on which we check for the validity of the specified
-//       `right`.
-//     @param _right The right to validate for the calling address. It must be
-//       non-expired and exist within the specified `_itemId`.
-//   */
-//   modifier hasItemRight(uint256 _id, bytes32 _right) {
-//     uint256 groupId = (_id & GROUP_MASK) >> 128;
-//     if (_msgSender() == owner()) {
-//       _;
-//     } else if (hasRight(_msgSender(), UNIVERSAL, _right)) {
-//       _;
-//     } else if (hasRight(_msgSender(), bytes32(groupId), _right)) {
-//       _;
-//     } else if (hasRight(_msgSender(), bytes32(_id), _right)) {
-//       _;
-//     }
-//   }
-
   /**
     Construct a new ERC-1155 item collection.
 
