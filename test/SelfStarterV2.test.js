@@ -115,7 +115,7 @@ describe("SelfStarterV2", function () {
         }
 
         try {
-            await starter.swap(ethers.utils.parseUnits('1', decimalPlaces), [Number({value: ethers.utils.parseUnits('1', decimalPlaces)})]);
+            await starter.swap(ethers.utils.parseEther('1'), ethers.utils.parseEther('0'));
         } catch (error) {
             expect(error.message).to.include("Amount should not be zero")
         }

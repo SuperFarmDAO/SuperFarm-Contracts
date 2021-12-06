@@ -669,7 +669,7 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
               }
 
             let whiteListInput = {
-                
+                whiteListId: 0,
                 index: getIndex(whiteList, signer1.address),
                 allowance: whiteList[signer1.address],
                 node: hash(getIndex(whiteList, signer1.address), signer1.address, whiteList[signer1.address]),
@@ -700,7 +700,7 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
               }
 
             let whiteListInput = {
-                
+                whiteListId: 0,
                 index: getIndex(whiteList, signer1.address),
                 allowance: whiteList[signer1.address],
                 node: hash(getIndex(whiteList, signer1.address), signer1.address, whiteList[signer1.address]),
@@ -724,7 +724,7 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
               }
 
             let whiteListInput = {
-                
+                whiteListId: 0,
                 index: getIndex(whiteList, signer1.address),
                 allowance: whiteList[signer1.address],
                 node: hash(getIndex(whiteList, signer1.address), signer1.address, whiteList[signer1.address]),
@@ -749,7 +749,7 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
               }
 
             let whiteListInput = {
-                
+                whiteListId: 0,
                 index: getIndex(whiteList, signer1.address),
                 allowance: whiteList[signer1.address],
                 node: hash(getIndex(whiteList, signer1.address), signer1.address, whiteList[signer1.address]),
@@ -785,7 +785,7 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
               }
 
             let whiteListInput = {
-                
+                whiteListId: 0,
                 index: getIndex(whiteList, signer1.address),
                 allowance: whiteList[signer1.address],
                 node: hash(getIndex(whiteList, signer1.address), signer1.address, whiteList[signer1.address]),
@@ -818,7 +818,7 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
               }
 
             let whiteListInput = {
-                
+                whiteListId: 0,
                 index: getIndex(whiteList, signer1.address),
                 allowance: whiteList[signer1.address],
                 node: hash(getIndex(whiteList, signer1.address), signer1.address, whiteList[signer1.address]),
@@ -860,7 +860,7 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
               }
 
             let whiteListInput = {
-                
+                whiteListId: 0,
                 index: getIndex(whiteList, signer1.address),
                 allowance: whiteList[signer1.address],
                 node: hash(getIndex(whiteList, signer1.address), signer1.address, whiteList[signer1.address]),
@@ -966,7 +966,7 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
               }
 
             let whiteListInput = {
-                
+                whiteListId: 0,
                 index: getIndex(whiteList, signer1.address),
                 allowance: whiteList[signer1.address],
                 node: hash(getIndex(whiteList, signer1.address), signer1.address, whiteList[signer1.address]),
@@ -1061,7 +1061,7 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
               }
 
             let whiteListInput = {
-                
+                whiteListId: 0,
                 index: getIndex(whiteList, signer1.address),
                 allowance: whiteList[signer1.address],
                 node: hash(getIndex(whiteList, signer1.address), signer1.address, whiteList[signer1.address]),
@@ -1122,7 +1122,7 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
                   }
     
                 let whiteListInput = {
-                    
+                    whiteListId: 0,
                     index: getIndex(whiteList, signer1.address),
                     allowance: whiteList[signer1.address],
                     node: hash(getIndex(whiteList, signer1.address), signer1.address, whiteList[signer1.address]),
@@ -1178,7 +1178,7 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
               }
 
             let whiteListInput = {
-                
+                whiteListId: 0,
                 index: getIndex(whiteList, signer1.address),
                 allowance: whiteList[signer1.address],
                 node: hash(getIndex(whiteList, signer1.address), signer1.address, whiteList[signer1.address]),
@@ -1268,7 +1268,7 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
                   }
     
                 let whiteListInput = {
-                    
+                    whiteListId: 0,
                     index: getIndex(whiteList, signer1.address),
                     allowance: whiteList[signer1.address],
                     node: hash(getIndex(whiteList, signer1.address), signer1.address, whiteList[signer1.address]),
@@ -1370,7 +1370,7 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
     //           }
 
     //         let whiteListInput = {
-    //             
+    //             whiteListId: 0,
     //             index: getIndex(whiteList, signer1.address),
     //             allowance: whiteList[signer1.address],
     //             node: hash(getIndex(whiteList, signer1.address), signer1.address, whiteList[signer1.address]),
@@ -1507,7 +1507,7 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
               }
 
             let whiteListInput = {
-                
+                whiteListId: 0,
                 index: getIndex(whiteList, signer1.address),
                 allowance: whiteList[signer1.address],
                 node: hash(getIndex(whiteList, signer1.address), signer1.address, whiteList[signer1.address]),
@@ -1706,7 +1706,7 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
               }
 
             let whiteListInput = {
-                
+                whiteListId: 0,
                 index: getIndex(whiteList, signer1.address),
                 allowance: whiteList[signer1.address],
                 node: hash(getIndex(whiteList, signer1.address), signer1.address, whiteList[signer1.address]),
@@ -1730,7 +1730,7 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
               }
 
             let whiteListInput = {
-                
+                whiteListId: 0,
                 index: getIndex(whiteList, signer1.address),
                 allowance: whiteList[signer1.address],
                 node: hash(getIndex(whiteList, signer1.address), signer1.address, whiteList[signer1.address]),
@@ -1755,7 +1755,7 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
               }
 
             let whiteListInput = {
-                
+                whiteListId: 0,
                 index: getIndex(whiteList, signer1.address),
                 allowance: whiteList[signer1.address],
                 node: hash(getIndex(whiteList, signer1.address), signer1.address, whiteList[signer1.address]),
@@ -1780,7 +1780,7 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
               }
 
             let whiteListInput = {
-                
+                whiteListId: 0,
                 index: getIndex(whiteList, signer1.address),
                 allowance: whiteList[signer1.address],
                 node: hash(getIndex(whiteList, signer1.address), signer1.address, whiteList[signer1.address]),

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0
-import "../../../libraries/DFStorage.sol";
 pragma solidity ^0.8.8;
+
+import "../../../libraries/DFStorage.sol";
 
 /**
   @title An interface for the `Super1155` ERC-1155 item collection contract.

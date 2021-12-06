@@ -105,7 +105,7 @@ describe("SuperStarter", function () {
         }
 
         try {
-            await starter.swap(ethers.utils.parseUnits('1', decimalPlaces), [Number({value: ethers.utils.parseUnits('1', decimalPlaces)})]);
+            await starter.swap(ethers.utils.parseUnits('1', decimalPlaces), ethers.utils.parseUnits('0', decimalPlaces));
         } catch (error) {
             expect(error.message).to.include("Amount should not be zero")
         }

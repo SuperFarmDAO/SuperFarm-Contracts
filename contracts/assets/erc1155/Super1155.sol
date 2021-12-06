@@ -9,7 +9,6 @@ import "@openzeppelin/contracts/utils/Address.sol";
 
 import "../../access/PermitControl.sol";
 import "../../proxy/StubProxyRegistry.sol";
-
 import "../../libraries/DFStorage.sol";
 import "./interfaces/ISuper1155.sol";
 

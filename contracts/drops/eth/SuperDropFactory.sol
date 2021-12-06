@@ -37,7 +37,7 @@ contract DropFactory is Ownable {
     }
 
     /**
-       This structure is used at the moment of MintShop deplotting by DropFactory contract.
+       This structure is used at the moment of MintShop deployng by DropFactory contract.
      */
 
     struct MintShopCreateData {
