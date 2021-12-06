@@ -150,6 +150,12 @@ describe('===Super721===', function () {
                 lockUriRight,
                 ethers.constants.MaxUint256
             );
+            await super721.connect(owner).setPermit(
+                deployer.address,
+                UNIVERSAL,
+                setUriRight,
+                ethers.constants.MaxUint256
+            );
             await super721.connect(deployer).setURI("://ipfs/lockeduri/{id}");
             await super721.connect(deployer).lockURI();
             expect(await super721.metadataUri()).to.equal("://ipfs/lockeduri/{id}");
@@ -1510,7 +1516,7 @@ describe('===Super721===', function () {
         it('should return the tokenURI', async () => {
             await expect(
                 await super721.tokenURI(4)
-            ).to.be.equal("://ipfs/uri/4.json");
+            ).to.be.equal("://ipfs/uri/4");
         });
     });
 
