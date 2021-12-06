@@ -36,6 +36,10 @@ contract DropFactory is Ownable {
         address super1155;
     }
 
+    /**
+       This structure is used at the moment of MintShop deplotting by DropFactory contract.
+     */
+
     struct MintShopCreateData {
         address _paymentReceiver;
         uint256 _globalPurchaseLimit;

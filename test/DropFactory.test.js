@@ -136,7 +136,6 @@ describe("DropFactory test", function () {
                         requiredType: 0,
                         requiredAsset: ["0x0000000000000000000000000000000000000000"],
                         requiredAmount: 0,
-                        whitelistId: 0,
                         requiredId: []
                     },
                     collection: "0x0000000000000000000000000000000000000000"

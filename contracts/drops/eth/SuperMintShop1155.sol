@@ -135,15 +135,8 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop, SuperMerkleAcces
   /**
     This struct tracks information about a single whitelist known to this shop.
     Whitelists may be shared across multiple different item pools.
-    @param expiryTime A block timestamp after which this whitelist is
-      automatically considered inactive, no matter the value of `isActive`.
-    @param currentWhitelistVersion A version number hashed with item group IDs
-      before being used as keys to other mappings. This supports efficient
-      invalidation of stale mappings to easily clear the whitelist.
-    @param isActive Whether or not this whitelist is actively restricting
-      purchases in blocks ocurring before `expiryTime`.
-    @param addresses A mapping of hashed addresses to a flag indicating whether
-      this whitelist allows the address to participate in a purchase.
+    @param id Id of the whiteList.
+    @param minted Mapping, which is needed to keep track of whether a user bought an nft or not.
   */
   struct Whitelist {
     uint256 id;
@@ -248,44 +241,10 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop, SuperMerkleAcces
 
     @param updater The calling address which updated this whitelist.
     @param whitelistId The ID of the whitelist being updated.
-    @param addresses The addresses that are now whitelisted with this update.
+    @param timestamp Timestamp of whiteList update.
   */
-  event WhitelistUpdated(address indexed updater, uint256 indexed whitelistId,
-    address[] indexed addresses);
-
-  /**
-    An event to track the addition of addresses to a specific whitelist. When
-    emitted this event indicates that a specific whitelist has had `addresses`
-    added to it.
-
-    @param adder The calling address which added to this whitelist.
-    @param whitelistId The ID of the whitelist being added to.
-    @param addresses The addresses that were added in this update.
-  */
-  event WhitelistAddition(address indexed adder, uint256 indexed whitelistId,
-    address[] indexed addresses);
-
-  /**
-    An event to track the removal of addresses to a specific whitelist. When
-    emitted this event indicates that a specific whitelist has had `addresses`
-    removed from it.
-
-    @param remover The calling address which removed from this whitelist.
-    @param whitelistId The ID of the whitelist being removed from.
-    @param addresses The addresses that were removed in this update.
-  */
-  event WhitelistRemoval(address indexed remover, uint256 indexed whitelistId,
-    address[] indexed addresses);
-
-  /**
-    An event to track activating or deactivating a whitelist.
-
-    @param updater The calling address which updated this whitelist.
-    @param whitelistId The ID of the whitelist being removed from.
-    @param isActive The flag for whitelist activation.
-  */
-  event WhitelistActiveUpdate(address indexed updater,
-    uint256 indexed whitelistId, bool indexed isActive);
+  event WhitelistUpdated(address indexed updater, uint256 whitelistId,
+    uint256 timestamp);
 
   /**
     An event to track an item pool's data being updated. When emitted this event
@@ -334,13 +293,6 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop, SuperMerkleAcces
     globalPurchaseLimit = _globalPurchaseLimit;
     maxAllocation = _maxAllocation;
   }
-
-  /** Commented due contract bytecode size limit.
-    Return a version number for this contract's interface.
-  */
-  // function version() external virtual override pure returns (uint256) {
-  //   return 1;
-  // }
 
   /**
     Allow the shop owner or an approved manager to update the payment receiver
@@ -391,7 +343,6 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop, SuperMerkleAcces
       "0x0A");
     emit GlobalPurchaseLimitUpdated(_msgSender(), globalPurchaseLimit,
       _newGlobalPurchaseLimit);
-    // uint256 oldGlobalPurchaseLimit = globalPurchaseLimit;
     globalPurchaseLimit = _newGlobalPurchaseLimit;
 
   }
@@ -407,13 +358,16 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop, SuperMerkleAcces
   }
 
 
+  /**
+    Allow the shop owner or an approved manager to create new whitelist.
+   */
   function addWhiteList(uint256 _poolId, DFStorage.WhiteListCreate[] calldata whitelist) external hasValidPermit(UNIVERSAL, WHITELIST) {
     for (uint256 i = 0; i < whitelist.length; i++) {
       super.setAccessRound(whitelist[i]._accesslistId, whitelist[i]._merkleRoot, whitelist[i]._startTime, whitelist[i]._endTime, whitelist[i]._price, whitelist[i]._token);
       pools[_poolId].whiteLists.push();
       uint256 newIndex = pools[_poolId].whiteLists.length - 1;
       pools[_poolId].whiteLists[newIndex].id = whitelist[i]._accesslistId;
-
+      emit WhitelistUpdated(_msgSender(), whitelist[i]._accesslistId, block.timestamp);
     }
   }
 
@@ -713,7 +667,6 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop, SuperMerkleAcces
     require(maxAllocation >= result + _amount, "0x0D");
 
     }
-    // require(maxAllocation >= checkTotalMinted() + _amount, "0x0D");
 
     require(checkRequirments(_id), "0x8B");
 
@@ -777,7 +730,9 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop, SuperMerkleAcces
     }
   }
 
-
+  /**
+  * Private function to avoid a stack-too-deep error.
+  */
   function checkRequirments(uint256 _id) private view returns (bool) {
     // Verify that the user meets any requirements gating participation in this
     // pool. Verify that any possible ERC-20 requirements are met.

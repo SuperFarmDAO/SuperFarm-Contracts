@@ -63,7 +63,7 @@ library DFStorage {
       Staker must have approved this shop as a point spender.
     @param requiredAmount The amount of the specified `requiredAsset` required
       for the buyer to purchase from this pool.
-    @param whitelistId The ID of an address whitelist to restrict participants
+    @param requiredId The ID of an address whitelist to restrict participants
       in this pool. To participate, a purchaser must have their address present
       in the corresponding whitelist. Other requirements from `requiredType`
       also apply. An ID of 0 is a sentinel value for no whitelist required.
@@ -72,7 +72,6 @@ library DFStorage {
         AccessType requiredType;
         address[] requiredAsset;
         uint256 requiredAmount;
-        uint256 whitelistId;
         uint256[] requiredId;
     }
 
@@ -194,16 +193,13 @@ library DFStorage {
   }
 
 
-    /**
-    This struct is a source of mapping-free input to the `addWhitelist`
-    function.
-
-    @param expiryTime A block timestamp after which this whitelist is
-      automatically considered inactive, no matter the value of `isActive`.
-    @param isActive Whether or not this whitelist is actively restricting
-      purchases in blocks ocurring before `expiryTime`.
-    @param addresses An array of addresses to whitelist for participation in a
-      purchases guarded by a whitelist.
+  /**
+    This structure is used at the moment of NFT purchase.
+    @param whiteListId Id of a whiteList.
+    @param index Element index in the original array
+    @param allowance The quantity is available to the user for purchase.
+    @param node Base hash of the element.
+    @param merkleProof Proof that the user is on the whitelist.
   */
   struct WhiteListInput {
     uint256 whiteListId;
@@ -213,6 +209,16 @@ library DFStorage {
     bytes32[] merkleProof;
   }
 
+
+  /**
+    This structure is used at the moment of NFT purchase.
+    @param _accesslistId Id of a whiteList.
+    @param _merkleRoot Hash root of merkle tree.
+    @param _startTime The start date of the whitelist
+    @param _endTime The end date of the whitelist
+    @param _price The price that applies to the whitelist
+    @param _token Token with which the purchase will be made
+  */
   struct WhiteListCreate {
     uint256 _accesslistId;
     bytes32 _merkleRoot;
