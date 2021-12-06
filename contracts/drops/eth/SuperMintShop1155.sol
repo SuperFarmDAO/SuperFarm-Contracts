@@ -666,6 +666,7 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop, SuperMerkleAcces
     require(_id < nextPoolId && pools[_id].config.singlePurchaseLimit >= _amount,
       "0x1B");
 
+
     bool whiteListed;
     if (pools[_id].whiteLists.length != 0)
     {
@@ -831,6 +832,7 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop, SuperMerkleAcces
         return amount >= poolRequirement.requiredAmount;
     }
   }
+
   return true;
 }
 

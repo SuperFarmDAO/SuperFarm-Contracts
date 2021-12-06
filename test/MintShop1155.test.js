@@ -732,8 +732,7 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
               }
 
             await expect(
-                mintShop1155.connect(deployer).mintFromPool(0, 2, 1, 3, 0, whiteListInput)
-            ).to.be.revertedWith("0x1B");
+                mintShop1155.connect(deployer).mintFromPool(0, 2, 1, 3, 0, whiteListInput)).to.be.revertedWith("0x1B");
         });
 
         it('Reverts: mintFromPool assetindex not valid', async function(){
@@ -825,6 +824,7 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
                 merkleProof: computeMerkleProof(getIndex(whiteList, signer1.address), whiteList),
               }
             // Mint three times
+
             mintShop1155.connect(signer1).mintFromPool(0, 2, 0, 1, 0, whiteListInput, {value: ethers.utils.parseEther("1")})
             mintShop1155.connect(signer1).mintFromPool(0, 2, 0, 1, 0, whiteListInput, {value: ethers.utils.parseEther("1")})
             mintShop1155.connect(signer1).mintFromPool(0, 2, 0, 1, 0, whiteListInput, {value: ethers.utils.parseEther("1")})
@@ -833,6 +833,7 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
             // await mintShop1155.connect(signer1).mintFromPool(1, 3, 1, 1, 0, whiteListInput, {value: ethers.utils.parseEther("1")})
             // await mintShop1155.connect(signer1).mintFromPool(1, 3, 1, 1, 0, whiteListInput, {value: ethers.utils.parseEther("1")})
             // await mintShop1155.connect(signer1).mintFromPool(1, 2, 0, 1, 0, whiteListInput, {value: ethers.utils.parseEther("1")})
+
 
 
             // Mint again surpassing the purchase limit of the pool
@@ -1285,6 +1286,7 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
                 await mintShop1155.connect(signer1).mintFromPool(1, 3, 0, 1, 0, whiteListInput, {value: ethers.utils.parseEther("1")});
         });
     });
+
 
     // describe("mintFromPool for staker contract for a specific Super1155 group", function () {
     //     it('should purchase using staking points', async function(){

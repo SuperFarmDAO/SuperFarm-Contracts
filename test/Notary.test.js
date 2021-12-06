@@ -23,6 +23,7 @@ describe('===Notary===', function () {
         super1155,
         notary;
     const originalUri = "://ipfs/uri/{id}";
+    const contractUri = "://ipfs/uri/{id}";
     let itemGroupId = ethers.BigNumber.from(1);
     let shiftedItemGroupId = itemGroupId.shl(128);
     let itemGroupId2 = ethers.BigNumber.from(2);
@@ -46,6 +47,7 @@ describe('===Notary===', function () {
             owner.address,
             "Super1155",
             originalUri,
+            contractUri,
             proxyRegistry.address
         );
         await super1155.deployed();
