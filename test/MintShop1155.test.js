@@ -583,7 +583,7 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
                     requiredType: 0,
                     requiredAsset: [NULL_ADDRESS],
                     requiredAmount: 1,
-                    whitelistId: 0,
+                    
                     requiredId: []
                     },
                     collection: super1155.address
@@ -631,7 +631,7 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
                     requiredType: 0,
                     requiredAsset: [NULL_ADDRESS],
                     requiredAmount: 0,
-                    whitelistId: 0,
+                    
                     requiredId: []
                     },
                     collection: super1155.address
@@ -732,7 +732,8 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
               }
 
             await expect(
-                mintShop1155.connect(deployer).mintFromPool(0, 2, 1, 3, 0, whiteListInput)).to.be.revertedWith("0x1B");
+                mintShop1155.connect(deployer).mintFromPool(0, 2, 1, 3, 0, whiteListInput)
+            ).to.be.revertedWith("0x1B");
         });
 
         it('Reverts: mintFromPool assetindex not valid', async function(){
@@ -824,7 +825,6 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
                 merkleProof: computeMerkleProof(getIndex(whiteList, signer1.address), whiteList),
               }
             // Mint three times
-
             mintShop1155.connect(signer1).mintFromPool(0, 2, 0, 1, 0, whiteListInput, {value: ethers.utils.parseEther("1")})
             mintShop1155.connect(signer1).mintFromPool(0, 2, 0, 1, 0, whiteListInput, {value: ethers.utils.parseEther("1")})
             mintShop1155.connect(signer1).mintFromPool(0, 2, 0, 1, 0, whiteListInput, {value: ethers.utils.parseEther("1")})
@@ -833,7 +833,6 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
             // await mintShop1155.connect(signer1).mintFromPool(1, 3, 1, 1, 0, whiteListInput, {value: ethers.utils.parseEther("1")})
             // await mintShop1155.connect(signer1).mintFromPool(1, 3, 1, 1, 0, whiteListInput, {value: ethers.utils.parseEther("1")})
             // await mintShop1155.connect(signer1).mintFromPool(1, 2, 0, 1, 0, whiteListInput, {value: ethers.utils.parseEther("1")})
-
 
 
             // Mint again surpassing the purchase limit of the pool
@@ -985,7 +984,7 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
                     requiredType: 0,
                     requiredAsset: [NULL_ADDRESS],
                     requiredAmount: 1,
-                    whitelistId: 0,
+                    
                     requiredId: []
                     },
                     collection: super1155.address
@@ -1025,7 +1024,7 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
                     requiredType: 0,
                     requiredAsset: [NULL_ADDRESS],
                     requiredAmount: 1,
-                    whitelistId: 0,
+                    
                     requiredId: []
                     },
                     collection: super1155.address
@@ -1094,7 +1093,7 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
                     requiredType: 1,
                     requiredAsset: [mockERC20.address],
                     requiredAmount: ethers.utils.parseEther("10"),
-                    whitelistId: 0,
+                    
                     requiredId: []
                     },
                     collection: super1155.address
@@ -1198,7 +1197,7 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
                     requiredType: 0,
                     requiredAsset: [NULL_ADDRESS],
                     requiredAmount: 1,
-                    whitelistId: 0,
+                    
                     requiredId: []
                     },
                     collection: super1155.address
@@ -1240,7 +1239,7 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
                     requiredType: 2,
                     requiredAsset: [super1155.address],
                     requiredAmount: 1,
-                    whitelistId: 0,
+                    
                     requiredId: []
                     },
                     collection: super1155.address
@@ -1287,7 +1286,6 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
         });
     });
 
-
     // describe("mintFromPool for staker contract for a specific Super1155 group", function () {
     //     it('should purchase using staking points', async function(){
     //         // Configure token group
@@ -1313,7 +1311,7 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
     //                 requiredType: 3,
     //                 requiredAsset: [staker.address],
     //                 requiredAmount: 1000, // Required amount of points
-    //                 whitelistId: 0,
+    //                 
     //                 requiredId: []
     //                 },
     //                 collection: super1155.address
@@ -1484,7 +1482,7 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
                     requiredType: 0,
                     requiredAsset: [NULL_ADDRESS],
                     requiredAmount: 1,
-                    whitelistId: 0,
+                    
                     requiredId: []
                     },
                     collection: sup.address
@@ -1580,7 +1578,7 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
                     requiredType: 0,
                     requiredAsset: [NULL_ADDRESS],
                     requiredAmount: 1,
-                    whitelistId: 0,
+                    
                     requiredId: []
                     },
                     collection: super1155.address
@@ -1628,7 +1626,7 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
                     requiredType: 0,
                     requiredAsset: [NULL_ADDRESS],
                     requiredAmount: 0,
-                    whitelistId: 0,
+                    
                     requiredId: []
                     },
                     collection: super1155.address
