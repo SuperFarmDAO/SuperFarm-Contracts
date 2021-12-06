@@ -70,9 +70,10 @@ library DFStorage {
   */
     struct PoolRequirement {
         AccessType requiredType;
-        address requiredAsset;
+        address[] requiredAsset;
         uint256 requiredAmount;
         uint256 whitelistId;
+        uint256[] requiredId;
     }
 
     /**
@@ -204,9 +205,20 @@ library DFStorage {
     @param addresses An array of addresses to whitelist for participation in a
       purchases guarded by a whitelist.
   */
-  struct WhitelistInput {
-    uint256 expiryTime;
-    bool isActive;
-    address[] addresses;
+  struct WhiteListInput {
+    uint256 whiteListId;
+    uint256 index; 
+    uint256 allowance;
+    bytes32 node; 
+    bytes32[] merkleProof;
+  }
+
+  struct WhiteListCreate {
+    uint256 _accesslistId;
+    bytes32 _merkleRoot;
+    uint256 _startTime; 
+    uint256 _endTime; 
+    uint256 _price; 
+    address _token;
   }
 }
