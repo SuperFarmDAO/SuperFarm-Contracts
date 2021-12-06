@@ -362,7 +362,6 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop, SuperMerkleAcces
 
    /**
     Allow the shop owner or an approved manager to set the array of items known to this shop.
-
     @param _items The array of Super1155 addresses.
   */
   function setItems(ISuper1155[] calldata _items) external hasValidPermit(UNIVERSAL, SET_ITEMS) {
@@ -406,14 +405,17 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop, SuperMerkleAcces
     emit GlobalPurchaseLimitLocked(_msgSender());
   }
 
-
+  /**
+    Adds new whiteList restriction for the pool by `_poolId`.
+    @param _poolId id of the pool, where new white list is added.
+    @param whitelist struct for creating a new whitelist.
+   */
   function addWhiteList(uint256 _poolId, DFStorage.WhiteListCreate[] calldata whitelist) external hasValidPermit(UNIVERSAL, WHITELIST) {
     for (uint256 i = 0; i < whitelist.length; i++) {
       super.setAccessRound(whitelist[i]._accesslistId, whitelist[i]._merkleRoot, whitelist[i]._startTime, whitelist[i]._endTime, whitelist[i]._price, whitelist[i]._token);
       pools[_poolId].whiteLists.push();
       uint256 newIndex = pools[_poolId].whiteLists.length - 1;
       pools[_poolId].whiteLists[newIndex].id = whitelist[i]._accesslistId;
-
     }
   }
 

@@ -123,14 +123,13 @@ contract VestStream is Ownable, ReentrancyGuard {
       require(_totalAmount > 0, "You may not create a zero-token claim.");
 
       // Establish a claim for this particular beneficiary.
-      Claim memory claim = Claim({
+      claims[_beneficiary] = Claim({
         totalAmount: _totalAmount,
         startTime: _startTime,
         endTime: _endTime,
         lastClaimTime: _startTime,
         amountClaimed: 0
       });
-      claims[_beneficiary] = claim;
       emit ClaimCreated(msg.sender, _beneficiary);
     }
   }

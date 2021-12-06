@@ -11,7 +11,7 @@ import "@openzeppelin/contracts/token/ERC1155/utils/ERC1155Holder.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 import "@openzeppelin/contracts/utils/introspection/ERC165Storage.sol";
 
-import "../interfaces/ISuper721.sol";
+import "../assets/erc721/interfaces/ISuper721.sol";
 import "../interfaces/ISuperGeneric.sol";
 
 /**
