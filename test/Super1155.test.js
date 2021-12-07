@@ -130,7 +130,7 @@ describe('===Super1155===', function () {
         });
 
         it('Reverts: collection has been locked', async function () {
-            await super1155.connect(owner).lockURI();
+            await super1155.connect(owner)["lockURI()"]();
             await expect(
                 super1155.connect(owner).setURI("://ipfs/newuri/{id}")
             ).to.be.revertedWith("Super1155: the collection URI has been permanently locked");
@@ -412,7 +412,7 @@ describe('===Super1155===', function () {
 
         it('Reverts: sender does not have the right', async () => {
             await expect(
-                super1155.connect(deployer).configureGroup(itemGroupId, {
+                super1155.connect(signer1).configureGroup(itemGroupId, {
                     name: 'KFC',
                     supplyType: 0,
                     supplyData: 20000,
@@ -1360,8 +1360,8 @@ describe('===Super1155===', function () {
     describe("lockURI", function () {
         it('Reverts: no valid permit', async function () {
             await expect(
-                super1155.lockURI()
-            ).to.be.revertedWith('PermitControl: sender does not have a valid permit');
+                super1155["lockURI()"]()
+            ).to.be.revertedWith('P1');
             expect(await super1155.uri(1)).to.equal(originalUri);
         });
 
@@ -1373,8 +1373,14 @@ describe('===Super1155===', function () {
                 lockUriRight,
                 ethers.constants.MaxUint256
             );
-            await super1155.connect(deployer.address).setURI("://ipfs/lockeduri/{id}");
-            await super1155.connect(deployer.address).lockURI();
+            await super1155.connect(owner).setPermit(
+                deployer.address,
+                UNIVERSAL,
+                setUriRight,
+                ethers.constants.MaxUint256
+            );
+            await super1155.connect(deployer).setURI("://ipfs/lockeduri/{id}");
+            await super1155.connect(deployer)["lockURI()"]();
             expect(await super1155.uri(1)).to.equal("://ipfs/lockeduri/{id}");
             expect(await super1155.uriLocked()).to.equal(true);
         });
@@ -1973,10 +1979,6 @@ describe('===Super1155===', function () {
                 [1],
                 ethers.utils.id('a'))
             ).to.be.revertedWith("Super1155: you cannot mint more than the alloted semifungible items");
-
-
-            let types = await super1155.getGroupTypes(shiftedItemGroupId.add(1));
-            console.log(types);
         });
     });
     
