@@ -206,6 +206,8 @@ abstract contract ExchangeCore is ReentrancyGuard, ERC1271, EIP712, PermitContro
         if (order.exchange != address(this)) {
             return false;
         }
+        /** Target must exist (prevent malicious selfdestructs just prior to order settlement). */
+            require(Address.isContract(order.target));
 
         /** Order must possess valid sale kind parameter combination. */
         if (!Sales.validateParameters(order.saleKind, order.expirationTime)) {
@@ -460,10 +462,14 @@ abstract contract ExchangeCore is ReentrancyGuard, ERC1271, EIP712, PermitContro
      */
     function _atomicMatch(Order memory buy, bytes calldata signatureBuy, Order memory sell, bytes calldata signatureSell, bytes32 metadata, Order[] calldata additionalSales, bytes calldata signatures )
         internal
-    {
+    {   
+        /// calculate buy order hash
         bytes32 buyHash = _hashOrder(buy);
+        ///calcylate sell order hash
         bytes32 sellHash = _hashOrder(sell);
-        AuthenticatedProxy proxy;
+
+        /** Must be matchable. */
+        require(_ordersCanMatch(buy, sell));
 
         /** CHECKS */
         {   
@@ -481,11 +487,8 @@ abstract contract ExchangeCore is ReentrancyGuard, ERC1271, EIP712, PermitContro
                 sellHash = requireValidOrder(sell, signatureSell);
             }
         
-            /** Must be matchable. */
-            require(_ordersCanMatch(buy, sell));
         
-            /** Target must exist (prevent malicious selfdestructs just prior to order settlement). */
-            require(Address.isContract(sell.target));
+            
             /** Must match calldata after replacement, if specified. */
             if (buy.replacementPattern.length > 0) {
                 ArrayUtils.guardedArrayReplace(buy.data, sell.data, buy.replacementPattern);
@@ -494,7 +497,7 @@ abstract contract ExchangeCore is ReentrancyGuard, ERC1271, EIP712, PermitContro
                 ArrayUtils.guardedArrayReplace(sell.data, buy.data, sell.replacementPattern);
             }
             require(ArrayUtils.arrayEq(buy.data, sell.data));
-        
+        }
             /** Retrieve delegateProxy contract. */
             address delegateProxy = IProxyRegistry(registry).proxies(sell.maker);
 
@@ -503,10 +506,10 @@ abstract contract ExchangeCore is ReentrancyGuard, ERC1271, EIP712, PermitContro
 
             /** Assert implementation. */
             require(OwnableDelegateProxy(payable(delegateProxy)).implementation() == IProxyRegistry(registry).delegateProxyImplementation());
-
-            /** Access the passthrough AuthenticatedProxy. */
-            proxy= AuthenticatedProxy(payable(delegateProxy));
-        }
+        
+        /** Access the passthrough AuthenticatedProxy. */
+        AuthenticatedProxy proxy= AuthenticatedProxy(payable(delegateProxy));
+        
         /** EFFECTS */
 
         /** Mark previously signed or approved orders as finalized. */
