@@ -50,7 +50,7 @@ const BurnType1155 = Object.freeze({
 
 
 // Test the TokenVault without Timelock and MultiSigWallet functionality.
-describe('TokenVault', function () {
+describe('===TokenVault w/o Timelock and MultiSig===', function () {
     let alice, bob, carol, dev;
     let Token, Super721, Super1155, ProxyRegistry, TokenVault;
     before(async () => {
@@ -91,6 +91,7 @@ describe('TokenVault', function () {
             "SUPER721",
             "S721",
             "URI_SUPER721",
+            "URI_SUPER721",
             proxyRegistry.address
         );
         await super721.deployed();
@@ -99,6 +100,7 @@ describe('TokenVault', function () {
             "SUPER721ADD",
             "S721A",
             "URI_SUPER721A",
+            "URI_SUPER721A",
             proxyRegistry.address
         );
         await super721Additional.deployed();
@@ -106,12 +108,14 @@ describe('TokenVault', function () {
             dev.address,
             "SUPER1155",
             "URI_SUPER1155",
+            "URI_SUPER1155",
             proxyRegistry.address
         );
         await super1155.deployed();
         super1155Additional = await Super1155.connect(dev).deploy(
             dev.address,
             "SUPER1155ADD",
+            "URI_SUPER1155A",
             "URI_SUPER1155A",
             proxyRegistry.address
         );
@@ -184,7 +188,6 @@ describe('TokenVault', function () {
         await super1155.connect(dev).mintBatch(tokenVault.address, [shiftedItemGroupId], ["10"], DATA);
         await super1155.connect(dev).mintBatch(tokenVault.address, [shiftedItemGroupId2], ["1"], DATA);
 
-        // TODO burn right for super721 and super1155
         await super721.connect(dev).setPermit(
             tokenVault.address,
             UNIVERSAL, 
@@ -199,10 +202,8 @@ describe('TokenVault', function () {
             ethers.constants.MaxUint256
         );
 
-        
-
         let works = await super721.hasRight(tokenVault.address, UNIVERSAL, BURN);
-        console.log(`is it work ${works}`)
+        
 
         await expect( dev.sendTransaction({
             to: tokenVault.address,
@@ -273,7 +274,7 @@ describe('TokenVault', function () {
                 [super721.address, super1155.address],
                 [asset721, asset1155]
             );
-            // TODO check that everything is ok after
+
         }); 
     
         it('addTokens REVERTs', async ()=> {
@@ -307,7 +308,6 @@ describe('TokenVault', function () {
             }; 
 
             beforeEach(async () => {
-                // TODO add tokens to contract 
                 await tokenVault.connect(dev).addTokens(
                     [super721.address, super1155.address],
                     [asset721, asset1155]
@@ -322,22 +322,22 @@ describe('TokenVault', function () {
 
             it('should sendTokens ERC721', async () => {
                 let balance721 = await super721.balanceOf(tokenVault.address);
-                console.log(`vault balance of 721 before: ${balance721}`);
+                // console.log(`vault balance of 721 before: ${balance721}`);
                 await tokenVault.sendTokens([alice.address], [super721.address], [asset721]);
                 
                 balance721 = await super721.balanceOf(tokenVault.address);
-                console.log(`vault balance of 721 after: ${balance721}`);
+                // console.log(`vault balance of 721 after: ${balance721}`);
                 expect(await super721.balanceOf(alice.address)).to.be.equal(ethers.BigNumber.from('1'));
             });
 
             it('should sendTokens ERC1155', async () => {
                 
                 let balance1155 = await super1155.balanceOf(tokenVault.address, shiftedItemGroupId.add(1));
-                console.log(`vault balance of 1155 before: ${balance1155}`);
+                // console.log(`vault balance of 1155 before: ${balance1155}`);
                 
                 await tokenVault.sendTokens([alice.address], [super1155.address], [asset1155]);
                 balance1155 = await super1155.balanceOf(tokenVault.address, shiftedItemGroupId.add(1));
-                console.log(`vault balance of 1155 after: ${balance1155}`);
+                // console.log(`vault balance of 1155 after: ${balance1155}`);
                 expect(await super1155.balanceOf(alice.address, shiftedItemGroupId.add(1))).to.be.equal(ethers.BigNumber.from('10')) 
             });
 
@@ -391,30 +391,50 @@ describe('TokenVault', function () {
                 ).to.be.revertedWith("send Eth failed");
             });
 
-            // TODO sending tokens failings 
 
 
-            // TODO before panic send tokens to contract
             it('PANIC transfer', async () => {
                 // let panicOwner = await tokenVault.panicOwner();
+                let zero = ethers.utils.parseEther('0');
+                
+                let balanceERC20 = await token.balanceOf(tokenVault.address);
+                let balanceERC721 = await super721.balanceOf(tokenVault.address);
+                let balanceERC1155 = await super1155.balanceOf(tokenVault.address, shiftedItemGroupId.add(1));
+                let balanceEthBefore = await prov.getBalance(tokenVault.address);
+                let carolEthBefore = await prov.getBalance(carol.address);
+                
                 await tokenVault.connect(bob).panic();
         
-                // TODO tokens after operation on carol address balance on vault is zero  
-                // let panicBalance = await token.balanceOf(carol.address);
-                // expect(panicBalance).to.equal(ethers.utils.parseEther('1000000000'));
+                let balanceEthAfter = await prov.getBalance(tokenVault.address);
+                let carolEthAfter = await prov.getBalance(carol.address);
+
+                expect(await token.balanceOf(carol.address)).to.be.equal(balanceERC20);
+                expect(await super721.balanceOf(carol.address)).to.be.equal(balanceERC721);
+                expect(await super1155.balanceOf(carol.address, shiftedItemGroupId.add(1))).to.be.equal(balanceERC1155);
+                expect(carolEthAfter.sub(carolEthBefore)).to.be.equal(zero); 
+                
+                expect(await token.balanceOf(tokenVault.address)).to.be.equal(zero);
+                expect(await super721.balanceOf(tokenVault.address)).to.be.equal(zero);
+                expect(await super1155.balanceOf(tokenVault.address, shiftedItemGroupId.add(1))).to.be.equal(zero);
+                expect(balanceEthAfter.sub(balanceEthBefore)).to.be.equal(zero); 
+               
             });
 
             it('PANIC burn', async () => {
+                let zero = ethers.utils.parseEther('0');
+                
                 await tokenVault.connect(dev).changePanicDetails(bob.address, ZERO_ADDRESS);
                 
-
-
                 await tokenVault.connect(bob).panic();
 
-
-                // TODO both balances TokenVault and carol are zero 
-                // let panicBalance = await token.balanceOf(carol.address); 
-                // expect(panicBalance.toString()).to.equal(ethers.utils.parseEther('1000000000'));
+                expect(await token.balanceOf(tokenVault.address)).to.be.equal(zero);
+                expect(await super721.balanceOf(tokenVault.address)).to.be.equal(zero);
+                expect(await super1155.balanceOf(tokenVault.address, shiftedItemGroupId.add(1))).to.be.equal(zero);
+                expect(balanceEthAfter.sub(balanceEthBefore)).to.be.equal(zero); 
+                // bob's balance are zero 
+                expect(await token.balanceOf(bob.address)).to.be.equal(zero);
+                expect(await super721.balanceOf(bob.address)).to.be.equal(zero);
+                expect(await super1155.balanceOf(bob.address, shiftedItemGroupId.add(1))).to.be.equal(zero);
             });
 
             it('PANIC REVERT trying non panic owner call panic', async () => {
