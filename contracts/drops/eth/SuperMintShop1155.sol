@@ -178,27 +178,27 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop, SuperMerkleAcces
     PoolItem[] items;
   }
 
-  /**
-    This struct contains the information gleaned from the `getPool` and
-    `getPools` functions; it represents a single pool's data. It also includes
-    additional information relevant to a user's address lookup.
-    @param purchaseCount The amount of items purchased from this pool by the
-      specified address.
-    @param config configuration struct PoolInput.
-    @param whitelistStatus Whether or not the specified address is whitelisted
-      for this pool.
-    @param itemMetadataUri The metadata URI of the item collection being sold by
-      this launchpad.
-    @param items An array of PoolItems representing each item for sale in the
-      pool.
-  */
-  struct PoolAddressOutput {
-    uint256 purchaseCount;
-    DFStorage.PoolInput config;
-    bool whitelistStatus;
-    string itemMetadataUri;
-    PoolItem[] items;
-  }
+//   /**
+//     This struct contains the information gleaned from the `getPool` and
+//     `getPools` functions; it represents a single pool's data. It also includes
+//     additional information relevant to a user's address lookup.
+//     @param purchaseCount The amount of items purchased from this pool by the
+//       specified address.
+//     @param config configuration struct PoolInput.
+//     @param whitelistStatus Whether or not the specified address is whitelisted
+//       for this pool.
+//     @param itemMetadataUri The metadata URI of the item collection being sold by
+//       this launchpad.
+//     @param items An array of PoolItems representing each item for sale in the
+//       pool.
+//   */
+//   struct PoolAddressOutput {
+//     uint256 purchaseCount;
+//     DFStorage.PoolInput config;
+//     bool whitelistStatus;
+//     string itemMetadataUri;
+//     PoolItem[] items;
+//   }
 
   /**
     An event to track an update to this shop's `paymentReceiver`.
@@ -440,61 +440,61 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop, SuperMerkleAcces
     return purchaseCounts;
   }
 
-  /**
-    A function which allows the caller to retrieve information about specific
-    pools, the items for sale within, and the collection this launchpad uses.
-    A provided address differentiates this function from `getPools`; the added
-    address enables this function to retrieve pool data as well as whitelisting
-    and purchase count details for the provided address.
+//   /**
+//     A function which allows the caller to retrieve information about specific
+//     pools, the items for sale within, and the collection this launchpad uses.
+//     A provided address differentiates this function from `getPools`; the added
+//     address enables this function to retrieve pool data as well as whitelisting
+//     and purchase count details for the provided address.
 
-    @param _ids An array of pool IDs to retrieve information about.
-  */
-  function getPoolsWithAddress(uint256[] calldata _ids)
-    external view returns (PoolAddressOutput[] memory) {
-    PoolAddressOutput[] memory poolOutputs =
-      new PoolAddressOutput[](_ids.length);
-    for (uint256 i = 0; i < _ids.length; i++) {
-      uint256 id = _ids[i];
+//     @param _ids An array of pool IDs to retrieve information about.
+//   */
+//   function getPoolsWithAddress(uint256[] calldata _ids)
+//     external view returns (PoolAddressOutput[] memory) {
+//     PoolAddressOutput[] memory poolOutputs =
+//       new PoolAddressOutput[](_ids.length);
+//     for (uint256 i = 0; i < _ids.length; i++) {
+//       uint256 id = _ids[i];
 
-      // Process output for each pool.
-      PoolItem[] memory poolItems = new PoolItem[](pools[id].itemGroups.length);
-      for (uint256 j = 0; j < pools[id].itemGroups.length; j++) {
-        uint256 itemGroupId = pools[id].itemGroups[j];
-        bytes32 itemKey = keccak256(abi.encodePacked(pools[id].config.collection,
-          pools[id].currentPoolVersion, itemGroupId));
+//       // Process output for each pool.
+//       PoolItem[] memory poolItems = new PoolItem[](pools[id].itemGroups.length);
+//       for (uint256 j = 0; j < pools[id].itemGroups.length; j++) {
+//         uint256 itemGroupId = pools[id].itemGroups[j];
+//         bytes32 itemKey = keccak256(abi.encodePacked(pools[id].config.collection,
+//           pools[id].currentPoolVersion, itemGroupId));
 
-        // Parse each price the item is sold at.
-        DFStorage.Price[] memory itemPrices =
-          new DFStorage.Price[](pools[id].itemPricesLength[itemKey]);
-        for (uint256 k = 0; k < pools[id].itemPricesLength[itemKey]; k++) {
-          itemPrices[k] = pools[id].itemPrices[itemKey][k];
-        }
+//         // Parse each price the item is sold at.
+//         DFStorage.Price[] memory itemPrices =
+//           new DFStorage.Price[](pools[id].itemPricesLength[itemKey]);
+//         for (uint256 k = 0; k < pools[id].itemPricesLength[itemKey]; k++) {
+//           itemPrices[k] = pools[id].itemPrices[itemKey][k];
+//         }
 
-        // Track the item.
-        poolItems[j] = PoolItem({
-          groupId: itemGroupId,
-          cap: pools[id].itemCaps[itemKey],
-          minted: pools[id].itemMinted[itemKey],
-          prices: itemPrices
-        });
-      }
+//         // Track the item.
+//         poolItems[j] = PoolItem({
+//           groupId: itemGroupId,
+//           cap: pools[id].itemCaps[itemKey],
+//           minted: pools[id].itemMinted[itemKey],
+//           prices: itemPrices
+//         });
+//       }
 
-      // Track the pool.
-      // uint256 whitelistId = pools[id].config.requirement.whitelistId;
-      // bytes32 addressKey = keccak256(
-      //   abi.encode(whitelists[whitelistId].currentWhitelistVersion, _address));
-      // poolOutputs[i] = PoolAddressOutput({
-      //   config: pools[id].config,
-      //   itemMetadataUri: items[_itemIndex].metadataUri(),
-      //   items: poolItems,
-      //   purchaseCount: pools[id].purchaseCounts[_address],
-      //   whitelistStatus: whitelists[whitelistId].addresses[addressKey]
-      // });
-    }
+//       // Track the pool.
+//       // uint256 whitelistId = pools[id].config.requirement.whitelistId;
+//       // bytes32 addressKey = keccak256(
+//       //   abi.encode(whitelists[whitelistId].currentWhitelistVersion, _address));
+//       // poolOutputs[i] = PoolAddressOutput({
+//       //   config: pools[id].config,
+//       //   itemMetadataUri: items[_itemIndex].metadataUri(),
+//       //   items: poolItems,
+//       //   purchaseCount: pools[id].purchaseCounts[_address],
+//       //   whitelistStatus: whitelists[whitelistId].addresses[addressKey]
+//       // });
+//     }
 
-    // Return the pools.
-    return poolOutputs;
-  }
+//     // Return the pools.
+//     return poolOutputs;
+//   }
 
   /**
     Allow the owner of the shop or an approved manager to add a new pool of
@@ -623,11 +623,12 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop, SuperMerkleAcces
     bool whiteListed;
     if (pools[_id].whiteLists.length != 0)
     {
-      whiteListed = isEligible(_whiteList, _id) && keccak256(abi.encodePacked(_whiteList.index, _msgSender(), _whiteList.allowance)) == _whiteList.node;
-      require(whiteListed, "0x4B");
+      whiteListed = super.verify(_whiteList.whiteListId, _whiteList.index, keccak256(abi.encodePacked(_whiteList.index, _msgSender(), _whiteList.allowance)), _whiteList.merkleProof) &&
+                                keccak256(abi.encodePacked(_whiteList.index, _msgSender(), _whiteList.allowance)) == _whiteList.node &&
+                                !pools[_id].whiteLists[_whiteList.whiteListId].minted[_msgSender()];
     }
 
-    require(block.timestamp >= pools[_id].config.startTime && block.timestamp <= pools[_id].config.endTime, "0x4B");
+    require(block.timestamp >= pools[_id].config.startTime && block.timestamp <= pools[_id].config.endTime || whiteListed, "0x4B");
 
     bytes32 itemKey = keccak256(abi.encodePacked(pools[_id].config.collection, 
        pools[_id].currentPoolVersion, _groupId));
