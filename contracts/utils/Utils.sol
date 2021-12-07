@@ -154,6 +154,11 @@ library Utils {
         returns (Slice memory)
     {
         uint pointer = findPointer(input.length, input.pointer, toSearch.length, toSearch.pointer);
+        if (pointer == input.pointer + input.length) {
+            // Not found
+            input.length = 0;
+            return input;
+        } 
         input.length -= pointer - input.pointer + 1; // escape void space
         input.pointer = pointer +1; // escape token
         return input;

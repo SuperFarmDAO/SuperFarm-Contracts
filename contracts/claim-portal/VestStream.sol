@@ -5,7 +5,6 @@ import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "hardhat/console.sol";
 
 /**
   @title A token vesting contract for streaming claims.
@@ -124,14 +123,13 @@ contract VestStream is Ownable, ReentrancyGuard {
       require(_totalAmount > 0, "You may not create a zero-token claim.");
 
       // Establish a claim for this particular beneficiary.
-      Claim memory claim = Claim({
+      claims[_beneficiary] = Claim({
         totalAmount: _totalAmount,
         startTime: _startTime,
         endTime: _endTime,
         lastClaimTime: _startTime,
         amountClaimed: 0
       });
-      claims[_beneficiary] = claim;
       emit ClaimCreated(msg.sender, _beneficiary);
     }
   }

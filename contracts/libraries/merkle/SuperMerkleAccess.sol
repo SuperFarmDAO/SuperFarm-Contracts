@@ -17,7 +17,7 @@ import "../../interfaces/IMerkle.sol";
 
   October 12th, 2021.
 */
-contract SuperMerkleAccess is MerkleCore {
+abstract contract SuperMerkleAccess is MerkleCore {
 
   /// The public identifier for the right to set a root for a round.
   bytes32 public constant SET_ACCESS_ROUND = keccak256("SET_ACCESS_ROUND");
@@ -28,12 +28,17 @@ contract SuperMerkleAccess is MerkleCore {
     @param startTime the start time of validity for the accesslist.
     @param endTime the end time of validity for the accesslist.
     @param round the number times the accesslist has been set.
+    @param price the amount of ether/token required for the access.
+    @param token the address of the token, paid as a price. A price 
+      with zero token address is ether.
   */ 
   struct AccessList {
     bytes32 merkleRoot;
     uint256 startTime;
     uint256 endTime;
     uint256 round;
+    uint256 price;
+    address token;
   }
   
   /// MerkleRootId to 'Accesslist', each containing a merkleRoot.
@@ -45,16 +50,20 @@ contract SuperMerkleAccess is MerkleCore {
     @param _merkleRoot the new merkleRoot for the round.
     @param _startTime the start time of the new round.
     @param _endTime the end time of the new round.
+    @param _price the access price.
+    @param _token the token address for access price.
   */
   function setAccessRound(uint256 _accesslistId, bytes32 _merkleRoot, 
-  uint256 _startTime, uint256 _endTime) public virtual
+  uint256 _startTime, uint256 _endTime, uint256 _price, address _token) public virtual
   hasValidPermit(UNIVERSAL, SET_ACCESS_ROUND) {
 
     AccessList memory accesslist = AccessList({
       merkleRoot: _merkleRoot,
       startTime: _startTime,
       endTime: _endTime,
-      round: accessRoots[_accesslistId].round + 1
+      round: accessRoots[_accesslistId].round + 1,
+      price: _price,
+      token: _token
     });
     accessRoots[_accesslistId] = accesslist;
   }
@@ -67,18 +76,17 @@ contract SuperMerkleAccess is MerkleCore {
     @param _merkleProof required merkle hashes from off-chain merkle tree.
    */
   function verify(uint256 _accesslistId, uint256 _index, bytes32 _node, 
-  bytes32[] calldata _merkleProof) public view returns(bool) {
-
-    require(accessRoots[_accesslistId].merkleRoot != 0, 
-      "Inactive.");
-    require(block.timestamp > accessRoots[_accesslistId].startTime,
-      "Early.");
-    require(block.timestamp < accessRoots[_accesslistId].endTime , 
-      "Late.");
-    require(getRootHash(_index, _node, _merkleProof) == 
-      accessRoots[_accesslistId].merkleRoot, 
-      "Invalid Proof.");
-
+  bytes32[] calldata _merkleProof) public virtual view returns(bool) {
+    
+    if (accessRoots[_accesslistId].merkleRoot == 0) {
+      return false;
+    } else if (block.timestamp < accessRoots[_accesslistId].startTime) {
+      return false;
+    } else if (block.timestamp > accessRoots[_accesslistId].endTime) {
+      return false;
+    } else if (getRootHash(_index, _node, _merkleProof) != accessRoots[_accesslistId].merkleRoot) {
+      return false;
+    }
     return true;
   }
 }
