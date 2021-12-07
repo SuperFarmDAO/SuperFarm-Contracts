@@ -126,6 +126,88 @@ export const withContracts = async function(chainId, platformFeeAddress, minimum
 
     return [marketplace, registry, transferProxy, erc1155, erc721, weth]
 }
+
+export const OrderTypes = {
+    Order:  [
+        {
+            name: "basePrice",
+            type: "uint256"
+        },
+        {
+            name: "extra",
+            type: "uint256[]"
+        },
+        {
+            name: "listingTime",
+            type: "uint256"
+        },
+        {
+            name: "expirationTime",
+            type: "uint256"
+        },
+        {
+            name: "salt",
+            type: "uint256"
+        },
+        {
+            name: "fees",
+            type: "uint256[]"
+        },
+        {
+            name: "addresses",
+            type: "address[]"
+        },
+        {
+            name: "exchange",
+            type: "address"
+        },
+        {
+            name: "maker",
+            type: "address"
+        },
+        {
+            name: "side",
+            type: "uint8"
+        },
+        {
+            name: "taker",
+            type: "address"
+        },
+        {
+            name: "saleKind",
+            type: "uint8"
+        },
+        {
+            name: "callType",
+            type: "uint8"
+        },
+        {
+            name: "target",
+            type: "address"
+        },
+        {
+            name: "staticTarget",
+            type: "address"
+        },
+        {
+            name: "paymentToken",
+            type: "address"
+        },
+        {
+            name: "data",
+            type: "bytes"
+        },
+        {
+            name: "replacementPattern",
+            type: "bytes"
+        },
+        {
+            name: "staticExtradata",
+            type: "bytes"
+        }
+    ]
+}
+
 /*=======================MARKETPLACE===========================*/
 
 /*=======================MERKLE UTILS (with allowances)===========================*/

@@ -460,4 +460,49 @@ describe("SuperFarm Marketplace", function(){
         expect(await erc721.balanceOf(alice.address)).to.be.eq("2")
         expect(await erc721.balanceOf(bob.address)).to.be.eq("0")
     });
+    it("EIP712 test", async function() {
+        // let owner = await ethers.getSigners()
+
+
+        let salt = 1;
+        let abi = ["function transferFrom(address from,address to,uint256 tokenId)"]
+        let iface = new ethers.utils.Interface(abi)
+        let dataSell = iface.encodeFunctionData("transferFrom", [bob.address, utils.NULL_ADDRESS, 1]);
+        let time = await utils.getCurrentTime()
+
+    const order = utils.makeOrder(
+        0, // Not needed since buyer is offering
+        [],
+        time, 
+        time + 1000, 
+        salt, 
+        [100, 200, 300, 400], // 100 = 1% in basis points
+        [protocolFeeRecipient.address, creator.address, royaltyOwner2.address, royaltyOwner1.address],
+        marketplace.address, 
+        bob.address, // Seller
+        1, 
+        utils.NULL_ADDRESS, 
+        3,
+        0,
+        erc721.address, 
+        utils.NULL_ADDRESS, 
+        utils.NULL_ADDRESS, 
+        dataSell, 
+        utils.replacementPatternSell, 
+        0x0 
+    )
+    let domain = {
+        name: "Super Marketplace",
+        version: "1",
+        chainId: network.config.chainId,
+        verifyingContract: marketplace.address
+    }
+
+    let signature = await owner._signTypedData(domain, utils.OrderTypes, order);
+    console.log("Sign offchain " + signature);
+    let signOffchain = await marketplace.hashOrder(order);
+    console.log("Sign onchain " + signOffchain);
+
+    });
+
 });

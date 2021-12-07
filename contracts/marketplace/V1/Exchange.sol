@@ -45,7 +45,7 @@ contract Exchange is ExchangeCore {
      * @dev Call hashOrder
      */
     function hashOrder(Order calldata order)
-        external pure
+        external view
         returns (bytes32)
     {
         return _hashOrder(order);
@@ -54,7 +54,7 @@ contract Exchange is ExchangeCore {
     /**
      * @dev Call hashToSign
      */
-    function hashToSign(Order calldata order) external pure returns (bytes32)
+    function hashToSign(Order calldata order) external view returns (bytes32)
     { 
         return _hashToSign(order);
     }
