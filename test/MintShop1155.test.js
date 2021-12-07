@@ -1570,7 +1570,7 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
             let latestBlock = await ethers.provider.getBlock(await ethers.provider.getBlockNumber());
             await mintShop1155.connect(owner).addPool({
                 name: "firstPool",
-                startTime: latestBlock.timestamp,
+                startTime: latestBlock.timestamp + 10,
                 endTime: latestBlock.timestamp + 60,
                 purchaseLimit: 3,
                 singlePurchaseLimit: 2,
@@ -1712,11 +1712,11 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
                 node: hash(getIndex(whiteList, signer1.address), signer1.address, whiteList[signer1.address]),
                 merkleProof: computeMerkleProof(getIndex(whiteList, signer1.address), whiteList),
               }
-                mintShop1155.connect(signer1).mintFromPool(0, 2, 1, 1, 0, whiteListInput, {value: ethers.utils.parseEther("100")})
+                await mintShop1155.connect(signer1).mintFromPool(0, 2, 1, 1, 0, whiteListInput, {value: ethers.utils.parseEther("100")})
             await expect(
                 mintShop1155.connect(signer1).mintFromPool(0, 2, 1, 1, 0, whiteListInput, {value: ethers.utils.parseEther("100")})
-            ).to.be.revertedWith("0x0G");
-        })
+            ).to.be.revertedWith("0x4B");
+        });
 
         it("Shoud revert, user not in whiteList", async function() {
             let whiteList = {
@@ -1742,8 +1742,6 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
         })
 
         it("Shoud revert: sent less than the value on the whitelist", async function() {
-            // await ethers.provider.send("evm_increaseTime", [80]);
-            // await ethers.provider.send("evm_mine", []);
             let whiteList = {
                 "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266" : 1, 
                 "0x70997970C51812dc3A010C7d01b50e0d17dc79C8" : 1, 
@@ -1796,5 +1794,7 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
 
             console.log(balanceBefore.toString() - balanceAfter.toString());
         })
+
+        
     });
 });
