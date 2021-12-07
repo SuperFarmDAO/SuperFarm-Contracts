@@ -23,6 +23,10 @@ contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
 
     bytes internal personalSignPrefix = "\x19Ethereum Signed Message:\n";
 
+    bytes32 public ORDER_TYPEHASH = keccak256(
+      "Order(uint256 basePrice,uint256[] extra,uint256 listingTime,uint256 salt,uint256[] fees,address[] addresses,address exchange,address maker,uint8 side,address taker,uint8 saleKind,uint8 callType,address target,address staticTarget,address paymentToken,bytes data,bytes replacementPattern,bytes staticExtradata)"
+      );
+
     /**  The public identifier for the right to set new items. */
     bytes32 public constant FEE_CONFIG = keccak256("FEE_CONFIG");
 
@@ -154,38 +158,12 @@ contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
      */
     function _hashOrder(Order memory order)
         internal
-        pure
-        returns (bytes32 hash){
-        /** Unfortunately abi.encodePacked doesn't work here, stack size constraints. */
-        uint size =(0x14 * 7) + (0x20 * 9) + 4 + order.data.length + order.replacementPattern.length + order.staticExtradata.length;
-        bytes memory array = new bytes(size);
-        uint index;
-        assembly {
-            index := add(array, 0x20)
-        }
-        index = ArrayUtils.unsafeWriteUint(index, order.basePrice);
-        index = ArrayUtils.unsafeWriteUintArray(index, order.extra);
-        index = ArrayUtils.unsafeWriteUint(index, order.listingTime);
-        index = ArrayUtils.unsafeWriteUint(index, order.expirationTime);
-        index = ArrayUtils.unsafeWriteUint(index, order.salt);
-        index = ArrayUtils.unsafeWriteUintArray(index, order.fees);
-        index = ArrayUtils.unsafeWriteAddressArray(index, order.addresses);
-        index = ArrayUtils.unsafeWriteAddress(index, order.exchange);
-        index = ArrayUtils.unsafeWriteAddress(index, order.maker);
-        index = ArrayUtils.unsafeWriteUint8(index, uint8(order.side));
-        index = ArrayUtils.unsafeWriteAddress(index, order.taker);
-        index = ArrayUtils.unsafeWriteUint8(index, uint8(order.saleKind));
-        index = ArrayUtils.unsafeWriteUint8(index, uint8(order.callType));
-        index = ArrayUtils.unsafeWriteAddress(index, order.target);
-        index = ArrayUtils.unsafeWriteAddress(index, order.staticTarget);
-        index = ArrayUtils.unsafeWriteAddress(index, order.paymentToken);
-        index = ArrayUtils.unsafeWriteBytes(index, order.data);
-        index = ArrayUtils.unsafeWriteBytes(index, order.replacementPattern);
-        index = ArrayUtils.unsafeWriteBytes(index, order.staticExtradata);
-        assembly {
-            hash := keccak256(add(array, 0x20), size)
-        }
-        return hash;
+        view
+        returns (bytes32){
+        return  keccak256(abi.encode(
+            ORDER_TYPEHASH,
+            order
+        ));
     }
     
 
@@ -196,10 +174,14 @@ contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
      */
     function _hashToSign(Order memory order)
         internal
-        pure
+        view
         returns (bytes32)
     {
-        return keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", _hashOrder(order)));
+       return keccak256(abi.encodePacked(
+            "\x19\x01",
+            DOMAIN_SEPARATOR,
+            _hashOrder(order)
+        ));
     }
 
     /**
@@ -250,28 +232,43 @@ contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
         view
         returns (bool)
     {
-        /** Not done in an if-conditional to prevent unnecessary ecrecover evaluation, which seems to happen even though it should short-circuit. */
+        /* Not done in an if-conditional to prevent unnecessary ecrecover evaluation, which seems to happen even though it should short-circuit. */
 
-        /** Order must have valid parameters. */
+        /* Order must have valid parameters. */
         if (!_validateOrderParameters(order)) {
             return false;
         }
-        /** Order must have not been canceled or already filled. */
+        /* Order must have not been canceled or already filled. */
         if (cancelledOrFinalized[hash]) {
             return false;
         }
-        /** Order authentication. Order must be either:
-        /** (a) previously approved */
+        /* Order authentication. Order must be either:
+        /* (a) previously approved */
         if (approvedOrders[hash]) {
             return true;
         }
-        /** or (b) ECDSA-signed by maker. */
-        if (ecrecover(hash, sig.v, sig.r, sig.s) == order.maker) {
+
+        // bool isContract = exists(order.maker);
+
+        // /* (c): Contract-only authentication: EIP/ERC 1271. */
+        // if (isContract) {
+        //     if (ERC1271(order.maker).isValidSignature(abi.encodePacked(_hashToSign(order)), signature) == EIP_1271_MAGICVALUE) {
+        //         return true;
+        //     }
+        //     return false;
+        // }
+        
+        /* (d.1): Old way: order hash signed by maker using the prefixed personal_sign */
+        if (ecrecover(keccak256(abi.encodePacked(personalSignPrefix,"32", _hashToSign(order))), sig.v, sig.r, sig.s) == order.maker) {
             return true;
         }
-
+        /* (d.2): New way: order hash signed by maker using sign_typed_data */
+        else if (ecrecover(_hashToSign(order), sig.v, sig.r, sig.s) == order.maker) {
+            return true;
+        }
         return false;
     }
+
 
     /**
      * @dev Approve an order and optionally mark it for orderbook inclusion. Must be called by the maker of the order
