@@ -678,8 +678,9 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop, SuperMerkleAcces
   }
 
   function isEligible(DFStorage.WhiteListInput calldata _whiteList, uint256 _id) public view returns (bool) {
-    require(!pools[_id].whiteLists[_whiteList.whiteListId].minted[_msgSender()], "0x0G");
-    return  super.verify(_whiteList.whiteListId, _whiteList.index, keccak256(abi.encodePacked(_whiteList.index, _msgSender(), _whiteList.allowance)), _whiteList.merkleProof) || (block.timestamp >= pools[_id].config.startTime && block.timestamp <= pools[_id].config.endTime);
+    return  (super.verify(_whiteList.whiteListId, _whiteList.index, keccak256(abi.encodePacked(_whiteList.index, _msgSender(), _whiteList.allowance)), _whiteList.merkleProof)) && 
+                    !pools[_id].whiteLists[_whiteList.whiteListId].minted[_msgSender()] || 
+                    (block.timestamp >= pools[_id].config.startTime && block.timestamp <= pools[_id].config.endTime);
   }
 
   function sellingHelper(uint256 _id, bytes32 itemKey, uint256 _assetIndex, uint256 _amount, bool _whiteListPrice, uint256 _accesListId) private {
