@@ -17,15 +17,7 @@ import "../../libraries/EIP1271.sol";
     @author Project Wyvern Developers
     @author Rostislav Khlebnikov
  */
-contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
-
-    bytes4 constant internal EIP_1271_MAGICVALUE = 0x20c13b0b;
-
-    bytes internal personalSignPrefix = "\x19Ethereum Signed Message:\n";
-
-    bytes32 public ORDER_TYPEHASH = keccak256(
-      "Order(uint256 basePrice,uint256[] extra,uint256 listingTime,uint256 salt,uint256[] fees,address[] addresses,address exchange,address maker,uint8 side,address taker,uint8 saleKind,uint8 callType,address target,address staticTarget,address paymentToken,bytes data,bytes replacementPattern,bytes staticExtradata)"
-      );
+abstract contract ExchangeCore is ReentrancyGuard, ERC1271, EIP712, PermitControl {
 
     /**  The public identifier for the right to set new items. */
     bytes32 public constant FEE_CONFIG = keccak256("FEE_CONFIG");
@@ -53,16 +45,6 @@ contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
 
     /** Inverse basis point. */
     uint public constant INVERSE_BASIS_POINT = 10000;
-
-    /** An ECDSA signature. */ 
-    struct Sig {
-        /** v parameter */
-        uint8 v;
-        /** r parameter */
-        bytes32 r;
-        /** s parameter */
-        bytes32 s;
-    }
 
     /** An order on the exchange. */
     struct Order {
@@ -111,6 +93,8 @@ contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
     event OrderCancelled                    (bytes32 indexed hash);
     event OrdersMatched                    (bytes32 buyHash, bytes32 sellHash, address indexed maker, address indexed taker, uint price, bytes32 indexed metadata);
     
+    constructor(string memory name, string memory version, uint chainId) EIP712(name, version, chainId){}
+
     /**
      * @dev Transfer tokens
      * @param token Token to transfer
@@ -125,6 +109,16 @@ contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
             require(TokenTransferProxy(tokenTransferProxy).transferFrom(token, from, to, amount));
         }
     }
+
+    function isValidSignature(
+      bytes memory _data,
+      bytes memory _signature)
+      override
+      public
+      view
+      returns (bytes4 magicValue){
+          return magicValue;
+      }
 
     /**
      * @dev Execute a STATICCALL (introduced with Ethereum Metropolis, non-state-modifying external call)
@@ -158,7 +152,7 @@ contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
      */
     function _hashOrder(Order memory order)
         internal
-        view
+        pure
         returns (bytes32){
         return  keccak256(abi.encode(
             ORDER_TYPEHASH,
@@ -187,15 +181,15 @@ contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
     /**
      * @dev Assert an order is valid and return its hash
      * @param order Order to validate
-     * @param sig ECDSA signature
+     * @param signature ECDSA signature
      */
-    function requireValidOrder(Order memory order, Sig memory sig)
+    function requireValidOrder(Order memory order, bytes calldata signature)
         internal
         view
         returns (bytes32)
     {
         bytes32 hash = _hashToSign(order);
-        require(_validateOrder(hash, order, sig));
+        require(_validateOrder(hash, order, signature));
         return hash;
     }
 
@@ -225,9 +219,9 @@ contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
      * @dev Validate a provided previously approved / signed order, hash, and signature.
      * @param hash Order hash (already calculated, passed to avoid recalculation)
      * @param order Order to validate
-     * @param sig ECDSA signature
+     * @param signature ECDSA signature
      */
-    function _validateOrder(bytes32 hash, Order memory order, Sig memory sig) 
+    function _validateOrder(bytes32 hash, Order memory order, bytes calldata signature) 
         internal
         view
         returns (bool)
@@ -248,22 +242,30 @@ contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
             return true;
         }
 
-        // bool isContract = exists(order.maker);
+        /* Calculate hash which must be signed. */
+        bytes32 calculatedHashToSign = _hashToSign(order);
 
-        // /* (c): Contract-only authentication: EIP/ERC 1271. */
-        // if (isContract) {
-        //     if (ERC1271(order.maker).isValidSignature(abi.encodePacked(_hashToSign(order)), signature) == EIP_1271_MAGICVALUE) {
-        //         return true;
-        //     }
-        //     return false;
-        // }
+        bool isContract = Address.isContract(order.maker);
+
+        /* (c): Contract-only authentication: EIP/ERC 1271. */
+        if (isContract) {
+            if (ERC1271(order.maker).isValidSignature(abi.encodePacked(_hashToSign(order)), signature) == EIP_1271_MAGICVALUE) {
+                return true;
+            }
+            return false;
+        }
+
+        /* (d): Account-only authentication: ECDSA-signed by maker. */
+        (uint8 v, bytes32 r, bytes32 s) = abi.decode(signature, (uint8, bytes32, bytes32));
         
-        /* (d.1): Old way: order hash signed by maker using the prefixed personal_sign */
-        if (ecrecover(keccak256(abi.encodePacked(personalSignPrefix,"32", _hashToSign(order))), sig.v, sig.r, sig.s) == order.maker) {
-            return true;
+        if (signature.length > 65 && signature[signature.length-1] == 0x03) { // EthSign byte
+            /* (d.1): Old way: order hash signed by maker using the prefixed personal_sign */
+            if (ecrecover(keccak256(abi.encodePacked(personalSignPrefix,"32",calculatedHashToSign)), v, r, s) == order.maker) {
+                return true;
+            }
         }
         /* (d.2): New way: order hash signed by maker using sign_typed_data */
-        else if (ecrecover(_hashToSign(order), sig.v, sig.r, sig.s) == order.maker) {
+        else if (ecrecover(calculatedHashToSign, v, r, s) == order.maker) {
             return true;
         }
         return false;
@@ -306,9 +308,9 @@ contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
     /**
      * @dev Cancel an order, preventing it from being matched. Must be called by the maker of the order
      * @param order Order to cancel
-     * @param sig ECDSA signature
+     * @param signature ECDSA signature
      */
-    function _cancelOrder(Order memory order, Sig memory sig) 
+    function _cancelOrder(Order memory order, bytes calldata signature) 
         internal
     {
         /** CHECKS */
@@ -317,7 +319,7 @@ contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
         require(msg.sender == order.maker);
 
         /** Calculate order hash. */
-        bytes32 hash = requireValidOrder(order, sig);
+        bytes32 hash = requireValidOrder(order, signature);
   
         /** EFFECTS */
       
@@ -452,58 +454,58 @@ contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
     /**
      * @dev Atomically match two orders, ensuring validity of the match, and execute all associated state transitions. Protected against reentrancy by a contract-global lock.
      * @param buy Buy-side order
-     * @param buySig Buy-side order signature
+     * @param signatureBuy Buy-side order signature
      * @param sell Sell-side order
-     * @param sellSig Sell-side order signature
+     * @param signatureSell Sell-side order signature
      */
-     //TODO
-    function _atomicMatch(Order memory buy, Sig calldata buySig, Order memory sell, Sig calldata sellSig, bytes32 metadata, Order[] calldata additionalSales, Sig[] calldata sigs )
+    function _atomicMatch(Order memory buy, bytes calldata signatureBuy, Order memory sell, bytes calldata signatureSell, bytes32 metadata, Order[] calldata additionalSales, bytes calldata signatures )
         internal
     {
-        /** CHECKS */
-        bytes32 buyHash;
-        bytes32 sellHash;
+        bytes32 buyHash = _hashOrder(buy);
+        bytes32 sellHash = _hashOrder(sell);
         AuthenticatedProxy proxy;
-        {
-        /** Ensure buy order validity and calculate hash if necessary. */
-        if (buy.maker == msg.sender) {
-            require(_validateOrderParameters(buy));
-        } else {
-            buyHash = requireValidOrder(buy, buySig);
-        }
 
-        /** Ensure sell order validity and calculate hash if necessary. */
-        if (sell.maker == msg.sender) {
-            require(_validateOrderParameters(sell));
-        } else {
-            sellHash = requireValidOrder(sell, sellSig);
-        }
+        /** CHECKS */
+        {   
+            /** Ensure buy order validity and calculate hash if necessary. */
+            if (buy.maker == msg.sender) {
+                require(_validateOrderParameters(buy));
+            } else {
+                buyHash = requireValidOrder(buy, signatureBuy);
+            }
+
+            /** Ensure sell order validity and calculate hash if necessary. */
+            if (sell.maker == msg.sender) {
+                require(_validateOrderParameters(sell));
+            } else {
+                sellHash = requireValidOrder(sell, signatureSell);
+            }
         
-        /** Must be matchable. */
-        require(_ordersCanMatch(buy, sell));
+            /** Must be matchable. */
+            require(_ordersCanMatch(buy, sell));
         
-        /** Target must exist (prevent malicious selfdestructs just prior to order settlement). */
-        require(Address.isContract(sell.target));
-        /** Must match calldata after replacement, if specified. */
-        if (buy.replacementPattern.length > 0) {
-          ArrayUtils.guardedArrayReplace(buy.data, sell.data, buy.replacementPattern);
-        }
-        if (sell.replacementPattern.length > 0) {
-          ArrayUtils.guardedArrayReplace(sell.data, buy.data, sell.replacementPattern);
-        }
-        require(ArrayUtils.arrayEq(buy.data, sell.data));
+            /** Target must exist (prevent malicious selfdestructs just prior to order settlement). */
+            require(Address.isContract(sell.target));
+            /** Must match calldata after replacement, if specified. */
+            if (buy.replacementPattern.length > 0) {
+                ArrayUtils.guardedArrayReplace(buy.data, sell.data, buy.replacementPattern);
+            }
+            if (sell.replacementPattern.length > 0) {
+                ArrayUtils.guardedArrayReplace(sell.data, buy.data, sell.replacementPattern);
+            }
+            require(ArrayUtils.arrayEq(buy.data, sell.data));
         
-        /** Retrieve delegateProxy contract. */
-        address delegateProxy = IProxyRegistry(registry).proxies(sell.maker);
+            /** Retrieve delegateProxy contract. */
+            address delegateProxy = IProxyRegistry(registry).proxies(sell.maker);
 
-        /** Proxy must exist. */
-        require(Address.isContract(delegateProxy));
+            /** Proxy must exist. */
+            require(Address.isContract(delegateProxy));
 
-        /** Assert implementation. */
-        require(OwnableDelegateProxy(payable(delegateProxy)).implementation() == IProxyRegistry(registry).delegateProxyImplementation());
+            /** Assert implementation. */
+            require(OwnableDelegateProxy(payable(delegateProxy)).implementation() == IProxyRegistry(registry).delegateProxyImplementation());
 
-        /** Access the passthrough AuthenticatedProxy. */
-        proxy= AuthenticatedProxy(payable(delegateProxy));
+            /** Access the passthrough AuthenticatedProxy. */
+            proxy= AuthenticatedProxy(payable(delegateProxy));
         }
         /** EFFECTS */
 

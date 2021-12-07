@@ -18,13 +18,7 @@ contract SuperMarketplace is Exchange {
     * @param _registries array of existing registry addresses
     * @param _personalSignPrefix  "\x19Ethereum Signed Message:\n"
     */
-    constructor (uint chainId, address[] memory _registries, bytes memory _personalSignPrefix, address _tokenTransferProxy, address _platformFeeAddress, uint _minimumPlatformFee) {
-        DOMAIN_SEPARATOR = hash(EIP712Domain({
-            name              : name,
-            version           : marketplaceVersion,
-            chainId           : chainId,
-            verifyingContract : address(this)
-        }));
+    constructor (uint chainId, address[] memory _registries, bytes memory _personalSignPrefix, address _tokenTransferProxy, address _platformFeeAddress, uint _minimumPlatformFee) ExchangeCore(name, marketplaceVersion, chainId){
         registry = _registries[0];
         tokenTransferProxy = _tokenTransferProxy;
         platformFeeAddress = _platformFeeAddress;

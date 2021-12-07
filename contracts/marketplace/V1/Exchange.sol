@@ -7,7 +7,7 @@ import "./ExchangeCore.sol";
  * @author Project Wyvern Developers
  * @author Rostislav Khlebnikov
  */
-contract Exchange is ExchangeCore {
+abstract contract Exchange is ExchangeCore {
 
     /**
      * @dev Change the minimum taker fee paid to the platform
@@ -45,7 +45,7 @@ contract Exchange is ExchangeCore {
      * @dev Call hashOrder
      */
     function hashOrder(Order calldata order)
-        external pure
+        external view
         returns (bytes32)
     {
         return _hashOrder(order);
@@ -54,7 +54,7 @@ contract Exchange is ExchangeCore {
     /**
      * @dev Call hashToSign
      */
-    function hashToSign(Order calldata order) external pure returns (bytes32)
+    function hashToSign(Order calldata order) external view returns (bytes32)
     { 
         return _hashToSign(order);
     }
@@ -72,11 +72,11 @@ contract Exchange is ExchangeCore {
     /**
      * @dev Call validateOrder
      */
-    function validateOrder(Order calldata order, Sig calldata sig)
+    function validateOrder(Order calldata order, bytes calldata signature)
         external view
         returns (bool)
     {
-        return _validateOrder(_hashToSign(order), order,sig);
+        return _validateOrder(_hashToSign(order), order, signature);
     }
 
     /**
@@ -91,10 +91,10 @@ contract Exchange is ExchangeCore {
     /**
      * @dev Call cancelOrder
      */
-    function cancelOrder_(Order calldata order, Sig calldata sig)
+    function cancelOrder_(Order calldata order,bytes calldata signature)
         external
     {
-        return _cancelOrder(order, sig);
+        return _cancelOrder(order, signature);
     }
 
     /**
@@ -153,18 +153,18 @@ contract Exchange is ExchangeCore {
      */
     function atomicMatch_(
         Order calldata buy,
-        Sig calldata buySig,
+        bytes calldata signatureBuy,
         Order calldata sell,
-        Sig calldata sellSig,
+        bytes calldata signatureSell,
         bytes32 metadata,
         Order[] calldata toInvalidate,
-        Sig[] calldata sigs
+        bytes calldata signatures
         )
         external payable
         nonReentrant
     {
 
-        return _atomicMatch(buy, buySig, sell, sellSig, metadata, toInvalidate, sigs);
+        return _atomicMatch(buy, signatureBuy, sell, signatureSell, metadata, toInvalidate, signatures);
     }
 
 }
