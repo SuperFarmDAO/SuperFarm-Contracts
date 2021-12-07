@@ -623,9 +623,8 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop, SuperMerkleAcces
     bool whiteListed;
     if (pools[_id].whiteLists.length != 0)
     {
-      whiteListed = userInWhiteList(_whiteList) && keccak256(abi.encodePacked(_whiteList.index, _msgSender(), _whiteList.allowance)) == _whiteList.node;
-      require(!pools[_id].whiteLists[_whiteList.whiteListId].minted[_msgSender()], "0x0G");
-      require(whiteListed || (block.timestamp >= pools[_id].config.startTime && block.timestamp <= pools[_id].config.endTime), "0x4B");
+      whiteListed = isEligible(_whiteList, _id) && keccak256(abi.encodePacked(_whiteList.index, _msgSender(), _whiteList.allowance)) == _whiteList.node;
+      require(whiteListed, "0x4B");
     }
 
     require(block.timestamp >= pools[_id].config.startTime && block.timestamp <= pools[_id].config.endTime, "0x4B");
@@ -678,9 +677,9 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop, SuperMerkleAcces
     // Emit an event indicating a successful purchase.
   }
 
-  function userInWhiteList(DFStorage.WhiteListInput calldata _whiteList) private view returns (bool) {
-    return SuperMerkleAccess.verify(_whiteList.whiteListId, _whiteList.index, keccak256(abi.encodePacked(_whiteList.index, _msgSender(), _whiteList.allowance)), _whiteList.merkleProof);
-
+  function isEligible(DFStorage.WhiteListInput calldata _whiteList, uint256 _id) public view returns (bool) {
+    require(!pools[_id].whiteLists[_whiteList.whiteListId].minted[_msgSender()], "0x0G");
+    return  super.verify(_whiteList.whiteListId, _whiteList.index, keccak256(abi.encodePacked(_whiteList.index, _msgSender(), _whiteList.allowance)), _whiteList.merkleProof) || (block.timestamp >= pools[_id].config.startTime && block.timestamp <= pools[_id].config.endTime);
   }
 
   function sellingHelper(uint256 _id, bytes32 itemKey, uint256 _assetIndex, uint256 _amount, bool _whiteListPrice, uint256 _accesListId) private {

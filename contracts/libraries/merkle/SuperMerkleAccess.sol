@@ -17,7 +17,7 @@ import "../../interfaces/IMerkle.sol";
 
   October 12th, 2021.
 */
-contract SuperMerkleAccess is MerkleCore {
+abstract contract SuperMerkleAccess is MerkleCore {
 
   /// The public identifier for the right to set a root for a round.
   bytes32 public constant SET_ACCESS_ROUND = keccak256("SET_ACCESS_ROUND");
@@ -76,7 +76,7 @@ contract SuperMerkleAccess is MerkleCore {
     @param _merkleProof required merkle hashes from off-chain merkle tree.
    */
   function verify(uint256 _accesslistId, uint256 _index, bytes32 _node, 
-  bytes32[] calldata _merkleProof) public view returns(bool) {
+  bytes32[] calldata _merkleProof) public virtual view returns(bool) {
     
     if (accessRoots[_accesslistId].merkleRoot == 0) {
       return false;
