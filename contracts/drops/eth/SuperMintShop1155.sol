@@ -623,8 +623,9 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop, SuperMerkleAcces
     bool whiteListed;
     if (pools[_id].whiteLists.length != 0)
     {
-      whiteListed = super.verify(_whiteList.whiteListId, _whiteList.index, keccak256(abi.encodePacked(_whiteList.index, _msgSender(), _whiteList.allowance)), _whiteList.merkleProof) &&
-                                keccak256(abi.encodePacked(_whiteList.index, _msgSender(), _whiteList.allowance)) == _whiteList.node &&
+        bytes32 root = keccak256(abi.encodePacked(_whiteList.index, _msgSender(), _whiteList.allowance));
+        whiteListed = super.verify(_whiteList.whiteListId, _whiteList.index, root, _whiteList.merkleProof) &&
+                                root == _whiteList.node &&
                                 !pools[_id].whiteLists[_whiteList.whiteListId].minted[_msgSender()];
     }
 

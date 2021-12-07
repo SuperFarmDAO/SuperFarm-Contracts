@@ -26,7 +26,7 @@ describe('===SuperMerkleAccess SuperMerkleDistributor===', function () {
     let itemGroupId2 = ethers.BigNumber.from(2);
     let shiftedItemGroupId2 = itemGroupId2.shl(128);
     before(async function () {
-        this.SuperMerkleAccess = await ethers.getContractFactory("SuperMerkleAccess");
+        this.SuperMerkleAccess = await ethers.getContractFactory("SuperMerkleAccessMock");
         this.SuperMerkleDistributor = await ethers.getContractFactory("SuperMerkleDistributor");
         this.Super1155 = await ethers.getContractFactory("Super1155");
     });
@@ -75,7 +75,7 @@ describe('===SuperMerkleAccess SuperMerkleDistributor===', function () {
             */
 
             let block = await ethers.provider.getBlock()
-            sma.connect(deployer).setAccessRound(0, "0x7a07e10e49b7f7330d828cc83d25bfd22120da182f934c64b2e425d5ddfc8d70", block.timestamp, block.timestamp + 60);
+            sma.connect(deployer).setAccessRound(0, "0x7a07e10e49b7f7330d828cc83d25bfd22120da182f934c64b2e425d5ddfc8d70", block.timestamp, block.timestamp + 60, 0, NULL_ADDRESS);
             let merkleRoot = await sma.connect(deployer).accessRoots(0);
             await expect(
                 merkleRoot.merkleRoot)
