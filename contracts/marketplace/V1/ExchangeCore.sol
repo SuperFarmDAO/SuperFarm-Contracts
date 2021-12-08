@@ -12,6 +12,8 @@ import "../../libraries/Fees.sol";
 import "../../libraries/EIP712.sol";
 import "../../libraries/EIP1271.sol";
 
+import "hardhat/console.sol";
+
 /**
     @title modified ExchangeCore of ProjectWyvernV2
     @author Project Wyvern Developers
@@ -88,6 +90,16 @@ abstract contract ExchangeCore is ReentrancyGuard, ERC1271, EIP712, PermitContro
         bytes staticExtradata;
     }
 
+     /* An ECDSA signature. */ 
+    struct Sig {
+        /* v parameter */
+        uint8 v;
+        /* r parameter */
+        bytes32 r;
+        /* s parameter */
+        bytes32 s;
+    }
+
     event OrderApprovedPartOne    (bytes32 indexed hash, address exchange, address indexed maker, address taker, uint platformFee, address indexed feeRecipient, Sales.Side side, Sales.SaleKind saleKind, address target);
     event OrderApprovedPartTwo    (bytes32 indexed hash, AuthenticatedProxy.CallType callType, bytes data, bytes replacementPattern, address staticTarget, bytes staticExtradata, address paymentToken, uint basePrice, uint[] extra, uint listingTime, uint expirationTime, uint salt, bool orderbookInclusionDesired);
     event OrderCancelled                    (bytes32 indexed hash);
@@ -109,16 +121,6 @@ abstract contract ExchangeCore is ReentrancyGuard, ERC1271, EIP712, PermitContro
             require(TokenTransferProxy(tokenTransferProxy).transferFrom(token, from, to, amount));
         }
     }
-
-    function isValidSignature(
-      bytes memory _data,
-      bytes memory _signature)
-      override
-      public
-      view
-      returns (bytes4 magicValue){
-          return magicValue;
-      }
 
     /**
      * @dev Execute a STATICCALL (introduced with Ethereum Metropolis, non-state-modifying external call)
@@ -145,6 +147,9 @@ abstract contract ExchangeCore is ReentrancyGuard, ERC1271, EIP712, PermitContro
         return result;
     }
 
+    function isValidSignature(bytes memory _data, bytes memory _signature) public view override returns (bytes4){
+
+    }
     /**
      * @dev Hash an order, returning the canonical order hash, without the message prefix
      * @param order Order to hash
@@ -154,6 +159,32 @@ abstract contract ExchangeCore is ReentrancyGuard, ERC1271, EIP712, PermitContro
         internal
         pure
         returns (bytes32){
+            /** avoiding stack too deep */
+            uint size = (0x14 * 6) + (order.addresses.length * 0x14) + order.data.length + order.replacementPattern.length + order.staticExtradata.length + 3 + (0x20 * 4) + (order.fees.length * 0x20) + (2 * 0x20);
+            bytes memory array = new bytes(size);
+            uint index;
+            assembly {
+                index := add(array, 0x20)
+            }
+            index = ArrayUtils.unsafeWriteUint(index, order.basePrice);
+            index = ArrayUtils.unsafeWriteUintArray(index, order.extra); //
+            index = ArrayUtils.unsafeWriteUint(index,  order.listingTime);
+            index = ArrayUtils.unsafeWriteUint(index, order.expirationTime);
+            index = ArrayUtils.unsafeWriteUint(index, order.salt);
+            index = ArrayUtils.unsafeWriteUintArray(index, order.fees); ///
+            index = ArrayUtils.unsafeWriteAddressArray(index, order.addresses); ////
+            index = ArrayUtils.unsafeWriteAddress(index, order.exchange);
+            index = ArrayUtils.unsafeWriteAddress(index, order.maker);
+            index = ArrayUtils.unsafeWriteUint8(index, uint8(order.side));
+            index = ArrayUtils.unsafeWriteAddress(index, order.taker);
+            index = ArrayUtils.unsafeWriteUint8(index, uint8(order.saleKind));
+            index = ArrayUtils.unsafeWriteUint8(index, uint8(order.callType));
+            index = ArrayUtils.unsafeWriteAddress(index, order.target);
+            index = ArrayUtils.unsafeWriteAddress(index, order.staticTarget);
+            index = ArrayUtils.unsafeWriteAddress(index, order.paymentToken);
+            index = ArrayUtils.unsafeWriteBytes(index, order.data);//
+            index = ArrayUtils.unsafeWriteBytes(index, order.replacementPattern);//
+            index = ArrayUtils.unsafeWriteBytes(index, order.staticExtradata);//
         return  keccak256(abi.encode(
             ORDER_TYPEHASH,
             order
@@ -176,6 +207,12 @@ abstract contract ExchangeCore is ReentrancyGuard, ERC1271, EIP712, PermitContro
             DOMAIN_SEPARATOR,
             _hashOrder(order)
         ));
+    }
+
+    function recover(Order memory order, Sig memory sig) external view returns(address result){
+        result = ecrecover(_hashToSign(order), sig.v, sig.r, sig.s);
+        console.logAddress(result);
+        return result;
     }
 
     /**
