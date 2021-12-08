@@ -498,14 +498,23 @@ abstract contract ExchangeCore is ReentrancyGuard, ERC1271, EIP712, PermitContro
             }
             require(ArrayUtils.arrayEq(buy.data, sell.data));
         }
+
+        helper(buy, sell, buyHash, sellHash, metadata);
             /** Retrieve delegateProxy contract. */
-            address delegateProxy = IProxyRegistry(registry).proxies(sell.maker);
 
-            /** Proxy must exist. */
-            require(Address.isContract(delegateProxy));
+    }
 
-            /** Assert implementation. */
-            require(OwnableDelegateProxy(payable(delegateProxy)).implementation() == IProxyRegistry(registry).delegateProxyImplementation());
+    /**
+    * Private function to avoid stack-too-deep error.
+     */
+    function helper(Order memory buy, Order memory sell, bytes32 buyHash, bytes32 sellHash, bytes32 metadata) private {
+        address delegateProxy = IProxyRegistry(registry).proxies(sell.maker);
+
+        /** Proxy must exist. */
+        require(Address.isContract(delegateProxy));
+
+        /** Assert implementation. */
+        require(OwnableDelegateProxy(payable(delegateProxy)).implementation() == IProxyRegistry(registry).delegateProxyImplementation());
         
         /** Access the passthrough AuthenticatedProxy. */
         AuthenticatedProxy proxy= AuthenticatedProxy(payable(delegateProxy));
