@@ -430,10 +430,12 @@ library ArrayUtils {
         pure
         returns (uint)
     {   
-        bytes32 store = keccak256(abi.encodePacked(source));
-        assembly {
-            mstore(index, store)
-            index := add(index, 0x20)
+        for (uint i = 0; i < source.length; i++){
+            uint conv = source[i];
+            assembly {
+                mstore(index, conv)
+                index := add(index, 0x20)
+            }
         }
         return index;
     }
@@ -449,10 +451,13 @@ library ArrayUtils {
         internal 
         pure
         returns (uint)
-    {   bytes32 store = keccak256(abi.encodePacked(source));
-        assembly {
-            mstore(index, store)
-            index := add(index, 0x20)
+    {   
+        for (uint i = 0; i < source.length; i++){
+            uint conv = uint(uint160(source[i])) << 0x60;
+            assembly {
+                    mstore(index, conv)
+                    index := add(index, 0x14)
+            }
         }
         return index;
     }
