@@ -497,8 +497,11 @@ describe("SuperFarm Marketplace", function(){
         chainId: network.config.chainId,
         verifyingContract: marketplace.address
     }
-
+    
     let signature = await owner._signTypedData(domain, utils.OrderTypes, order);
+    let hash = ethers.utils._TypedDataEncoder.hash(domain, utils.OrderTypes, order)
+    let mkhash = await marketplace.hashOrder(order);
+    console.log(hash, mkhash)
     let test = ethers.utils.splitSignature(signature);
     await marketplace.recover(order, {v: test.v, s: test.s, r: test.r});
     console.log(owner.address);

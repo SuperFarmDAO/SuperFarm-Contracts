@@ -48,9 +48,8 @@ abstract contract ExchangeCore is ReentrancyGuard, ERC1271, EIP712, PermitContro
     /** Inverse basis point. */
     uint public constant INVERSE_BASIS_POINT = 10000;
 
-    /** An order on the exchange. */
-    struct Order {
-        /** Base price of the order (in paymentTokens). */
+    struct TTT{
+          /** Base price of the order (in paymentTokens). */
         uint basePrice;
         /** ending time + ending price.*/
         uint[] extra;
@@ -68,7 +67,10 @@ abstract contract ExchangeCore is ReentrancyGuard, ERC1271, EIP712, PermitContro
         address exchange;
         /** Order maker address. */
         address maker;
-        /** Side (buy/sell). */
+    }
+
+    struct AAA{
+          /** Side (buy/sell). */
         Sales.Side side;
         /** Order taker address, if specified. */
         address taker;
@@ -88,6 +90,11 @@ abstract contract ExchangeCore is ReentrancyGuard, ERC1271, EIP712, PermitContro
         bytes replacementPattern;
         /** Static call extra data. */
         bytes staticExtradata;
+    }
+    /** An order on the exchange. */
+    struct Order {
+        TTT ttt;
+        AAA aaa;
     }
 
      /* An ECDSA signature. */ 
