@@ -141,7 +141,18 @@ module.exports = {
 			gasPrice: "auto",
 			accounts: [ `0x${DEPLOYER_PRIVATE_KEY}` ]
 		}, 
-
+		fantom_testnet:{
+			url: "https://rpc.testnet.fantom.network/",
+			chainId: 4002,
+			gasPrice: "auto",
+			accounts: [ `0x${DEPLOYER_PRIVATE_KEY}` ]
+		}, 
+		fantom:{
+			url: "https://rpc.ftm.tools/",
+			chainId: 250,
+			gasPrice: "auto",
+			accounts: [ `0x${DEPLOYER_PRIVATE_KEY}` ]
+		}
 	},
 	etherscan: {
 		apiKey: process.env.ETHERSCAN_API_KEY
