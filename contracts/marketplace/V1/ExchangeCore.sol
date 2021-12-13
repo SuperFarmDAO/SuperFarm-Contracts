@@ -24,6 +24,10 @@ abstract contract ExchangeCore is ReentrancyGuard, ERC1271, EIP712, PermitContro
     /**  The public identifier for the right to set new items. */
     bytes32 public constant FEE_CONFIG = keccak256("FEE_CONFIG");
 
+    bytes32 constant public ORDER_TYPEHASH = keccak256(
+      "Order(uint256 basePrice,uint256[] extra,uint256 listingTime,uint256 salt,uint256[] fees,address[] addresses,address exchange,address maker,uint8 side,address taker,uint8 saleKind,uint8 callType,address target,address staticTarget,address paymentToken,bytes data,bytes replacementPattern,bytes staticExtradata)"
+      );
+
     /** Token transfer proxy. */
     address public tokenTransferProxy;
 
@@ -48,53 +52,52 @@ abstract contract ExchangeCore is ReentrancyGuard, ERC1271, EIP712, PermitContro
     /** Inverse basis point. */
     uint public constant INVERSE_BASIS_POINT = 10000;
 
-    struct TTT{
-          /** Base price of the order (in paymentTokens). */
+    /** supporting struct for order to avoid stack too deep */
+    struct Outline{
+        /** Base price of the order (in paymentTokens). */
         uint basePrice;
-        /** ending time + ending price.*/
-        uint[] extra;
         /** Listing timestamp. */
         uint listingTime;
         /** Expiration timestamp - 0 for no expiry. */
         uint expirationTime;
+        /** Exchange address, intended as a versioning mechanism. */
+        address exchange;
+        /** Order maker address. */
+        address maker;
+        /** Side (buy/sell). */
+        Sales.Side side;
+        /** Order taker address, if specified. */
+        address taker;
+        /** Kind of sale. */
+        Sales.SaleKind saleKind;
+        /** Target. */
+        address target;
+        /** callType. */
+        AuthenticatedProxy.CallType callType;
+        /** Token used to pay for the order, or the zero-address as a sentinel value for Ether. */
+        address paymentToken;
+    }
+
+    /** An order on the exchange. */
+    struct Order {
+        /** order essentials */
+        Outline outline;
+        /** ending time + ending price.*/
+        uint[] extra;
         /** Order salt, used to prevent duplicate hashes. */
         uint salt;
         /** Royalty fees*/ 
         uint[] fees;
         /** Royalty fees receivers*/ 
         address[] addresses; 
-        /** Exchange address, intended as a versioning mechanism. */
-        address exchange;
-        /** Order maker address. */
-        address maker;
-    }
-
-    struct AAA{
-          /** Side (buy/sell). */
-        Sales.Side side;
-        /** Order taker address, if specified. */
-        address taker;
-        /** Kind of sale. */
-        Sales.SaleKind saleKind;
-        /** callType. */
-        AuthenticatedProxy.CallType callType;
-        /** Target. */
-        address target;
         /** Static call target, zero-address for no static call. */
         address staticTarget;
-        /** Token used to pay for the order, or the zero-address as a sentinel value for Ether. */
-        address paymentToken;
         /** Calldata. */
         bytes data;
         /** Calldata replacement pattern, or an empty byte array for no replacement. */
         bytes replacementPattern;
         /** Static call extra data. */
         bytes staticExtradata;
-    }
-    /** An order on the exchange. */
-    struct Order {
-        TTT ttt;
-        AAA aaa;
     }
 
      /* An ECDSA signature. */ 
@@ -112,7 +115,7 @@ abstract contract ExchangeCore is ReentrancyGuard, ERC1271, EIP712, PermitContro
     event OrderCancelled                    (bytes32 indexed hash);
     event OrdersMatched                    (bytes32 buyHash, bytes32 sellHash, address indexed maker, address indexed taker, uint price, bytes32 indexed metadata);
     
-    constructor(string memory name, string memory version, uint chainId) EIP712(name, version, chainId){}
+    constructor(string memory name, string memory version) EIP712(name, version){}
 
     /**
      * @dev Transfer tokens
@@ -165,37 +168,9 @@ abstract contract ExchangeCore is ReentrancyGuard, ERC1271, EIP712, PermitContro
     function _hashOrder(Order memory order)
         internal
         pure
-        returns (bytes32){
-            /** avoiding stack too deep */
-            uint size = (0x14 * 6) + (order.addresses.length * 0x14) + order.data.length + order.replacementPattern.length + order.staticExtradata.length + 3 + (0x20 * 4) + (order.fees.length * 0x20) + (2 * 0x20);
-            bytes memory array = new bytes(size);
-            uint index;
-            assembly {
-                index := add(array, 0x20)
-            }
-            index = ArrayUtils.unsafeWriteUint(index, order.basePrice);
-            index = ArrayUtils.unsafeWriteUintArray(index, order.extra); //
-            index = ArrayUtils.unsafeWriteUint(index,  order.listingTime);
-            index = ArrayUtils.unsafeWriteUint(index, order.expirationTime);
-            index = ArrayUtils.unsafeWriteUint(index, order.salt);
-            index = ArrayUtils.unsafeWriteUintArray(index, order.fees); ///
-            index = ArrayUtils.unsafeWriteAddressArray(index, order.addresses); ////
-            index = ArrayUtils.unsafeWriteAddress(index, order.exchange);
-            index = ArrayUtils.unsafeWriteAddress(index, order.maker);
-            index = ArrayUtils.unsafeWriteUint8(index, uint8(order.side));
-            index = ArrayUtils.unsafeWriteAddress(index, order.taker);
-            index = ArrayUtils.unsafeWriteUint8(index, uint8(order.saleKind));
-            index = ArrayUtils.unsafeWriteUint8(index, uint8(order.callType));
-            index = ArrayUtils.unsafeWriteAddress(index, order.target);
-            index = ArrayUtils.unsafeWriteAddress(index, order.staticTarget);
-            index = ArrayUtils.unsafeWriteAddress(index, order.paymentToken);
-            index = ArrayUtils.unsafeWriteBytes(index, order.data);//
-            index = ArrayUtils.unsafeWriteBytes(index, order.replacementPattern);//
-            index = ArrayUtils.unsafeWriteBytes(index, order.staticExtradata);//
-        return  keccak256(abi.encode(
-            ORDER_TYPEHASH,
-            order
-        ));
+        returns (bytes32 hash){
+            
+        return  hash;
     }
     
 
@@ -247,14 +222,14 @@ abstract contract ExchangeCore is ReentrancyGuard, ERC1271, EIP712, PermitContro
         returns (bool)
     {   // TODO (2) sell order must have fees as mandatory
         /** Order must be targeted at this platform version (this Exchange contract). */
-        if (order.exchange != address(this)) {
+        if (order.outline.exchange != address(this)) {
             return false;
         }
         /** Target must exist (prevent malicious selfdestructs just prior to order settlement). */
-            require(Address.isContract(order.target));
+            require(Address.isContract(order.outline.target));
 
         /** Order must possess valid sale kind parameter combination. */
-        if (!Sales.validateParameters(order.saleKind, order.expirationTime)) {
+        if (!Sales.validateParameters(order.outline.saleKind, order.expirationTime)) {
             return false;
         }
 

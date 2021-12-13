@@ -14,11 +14,10 @@ contract SuperMarketplace is Exchange {
     string public constant marketplaceVersion = "1";
 
     /**
-    * @param chainId id of the chain
     * @param _registries array of existing registry addresses
     * @param _personalSignPrefix  "\x19Ethereum Signed Message:\n"
     */
-    constructor (uint chainId, address[] memory _registries, bytes memory _personalSignPrefix, address _tokenTransferProxy, address _platformFeeAddress, uint _minimumPlatformFee) ExchangeCore(name, marketplaceVersion, chainId){
+    constructor (address[] memory _registries, bytes memory _personalSignPrefix, address _tokenTransferProxy, address _platformFeeAddress, uint _minimumPlatformFee) ExchangeCore(name, marketplaceVersion){
         registry = _registries[0];
         tokenTransferProxy = _tokenTransferProxy;
         platformFeeAddress = _platformFeeAddress;

@@ -15,17 +15,17 @@ abstract contract EIP712 {
 
     bytes internal personalSignPrefix = "\x19Ethereum Signed Message:\n";
 
-    bytes32 constant public ORDER_TYPEHASH = keccak256(
-      "Order(uint256 basePrice,uint256[] extra,uint256 listingTime,uint256 salt,uint256[] fees,address[] addresses,address exchange,address maker,uint8 side,address taker,uint8 saleKind,uint8 callType,address target,address staticTarget,address paymentToken,bytes data,bytes replacementPattern,bytes staticExtradata)"
-      );
-
     bytes32 immutable public DOMAIN_SEPARATOR;
     
-    constructor(string memory name, string memory version, uint chainId){
+    constructor(string memory name, string memory version){
+        uint chainId_;
+        assembly{
+            chainId_ := chainid()
+        }
         DOMAIN_SEPARATOR = hash(EIP712Domain({
             name              : name,
             version           : version,
-            chainId           : chainId,
+            chainId           : chainId_,
             verifyingContract : address(this)
         }));
     }
