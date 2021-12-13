@@ -167,14 +167,14 @@ abstract contract ExchangeCore is ReentrancyGuard, ERC1271, EIP712, PermitContro
      * @param order Order to hash
      * @return hash Hash of order
      */
-    function _hashOrder(Order memory order)
+    function _hash(Order memory order)
         internal
         pure
         returns (bytes32){
         return keccak256(
             abi.encode(
                 ORDER_TYPEHASH,
-                _hashOutline(order.outline),
+                _hash(order.outline),
                 keccak256(abi.encodePacked(order.extra)),
                 order.salt,
                 keccak256(abi.encodePacked(order.fees)),
@@ -186,7 +186,7 @@ abstract contract ExchangeCore is ReentrancyGuard, ERC1271, EIP712, PermitContro
             ));
     }
 
-    function _hashOutline(Outline memory outline)
+    function _hash(Outline memory outline)
         private
         pure
         returns (bytes32)
@@ -224,7 +224,7 @@ abstract contract ExchangeCore is ReentrancyGuard, ERC1271, EIP712, PermitContro
        return keccak256(abi.encodePacked(
             "\x19\x01",
             DOMAIN_SEPARATOR,
-            _hashOrder(order)
+            _hash(order)
         ));
     }
 
@@ -351,7 +351,7 @@ abstract contract ExchangeCore is ReentrancyGuard, ERC1271, EIP712, PermitContro
         /** EFFECTS */
     
 //         /** Mark order as approved. */
-//         approvedOrders[hash] = true;
+        approvedOrders[hash] = true;
   
         /** Log approval event. Must be split in two due to Solidity stack size limitations. */
         {
@@ -519,9 +519,9 @@ abstract contract ExchangeCore is ReentrancyGuard, ERC1271, EIP712, PermitContro
         internal
     {   
         /// calculate buy order hash
-        bytes32 buyHash = _hashOrder(buy);
+        bytes32 buyHash = _hash(buy);
         ///calcylate sell order hash
-        bytes32 sellHash = _hashOrder(sell);
+        bytes32 sellHash = _hash(sell);
 
         /** Must be matchable. */
         require(_ordersCanMatch(buy, sell));
@@ -572,7 +572,7 @@ abstract contract ExchangeCore is ReentrancyGuard, ERC1271, EIP712, PermitContro
         require(OwnableDelegateProxy(payable(delegateProxy)).implementation() == IProxyRegistry(registry).delegateProxyImplementation());
         
 //         /** Access the passthrough AuthenticatedProxy. */
-//         AuthenticatedProxy proxy= AuthenticatedProxy(payable(delegateProxy));
+        AuthenticatedProxy proxy= AuthenticatedProxy(payable(delegateProxy));
         
         /** EFFECTS */
 
@@ -589,7 +589,7 @@ abstract contract ExchangeCore is ReentrancyGuard, ERC1271, EIP712, PermitContro
         uint price = executeFundsTransfer(buy, sell);
 
         /** Execute specified call through proxy. */
-        // require(payable(delegateProxy).call(sell.outline.target, sell.outline.callType, sell.data));
+        require(proxy.call(sell.outline.target, sell.outline.callType, sell.data));
 
         /** Static calls are intentionally done after the effectful call so they can check resulting state. */
 
