@@ -28,6 +28,10 @@ abstract contract ExchangeCore is ReentrancyGuard, ERC1271, EIP712, PermitContro
       "Order(uint256 basePrice,uint256[] extra,uint256 listingTime,uint256 salt,uint256[] fees,address[] addresses,address exchange,address maker,uint8 side,address taker,uint8 saleKind,uint8 callType,address target,address staticTarget,address paymentToken,bytes data,bytes replacementPattern,bytes staticExtradata)"
       );
 
+    bytes32 constant public OUTILINE_TYPEHASH = keccak256(
+        "Outline(uint256 basePrice,uint256 listingTime,uint256 expirationTime,address exchange,address maker,uint8 side,address)"
+    );
+
     /** Token transfer proxy. */
     address public tokenTransferProxy;
 
@@ -55,11 +59,11 @@ abstract contract ExchangeCore is ReentrancyGuard, ERC1271, EIP712, PermitContro
     /** supporting struct for order to avoid stack too deep */
     struct Outline{
         /** Base price of the order (in paymentTokens). */
-        uint basePrice;
+        uint256 basePrice;
         /** Listing timestamp. */
-        uint listingTime;
+        uint256 listingTime;
         /** Expiration timestamp - 0 for no expiry. */
-        uint expirationTime;
+        uint256 expirationTime;
         /** Exchange address, intended as a versioning mechanism. */
         address exchange;
         /** Order maker address. */
@@ -83,11 +87,11 @@ abstract contract ExchangeCore is ReentrancyGuard, ERC1271, EIP712, PermitContro
         /** order essentials */
         Outline outline;
         /** ending time + ending price.*/
-        uint[] extra;
+        uint256[] extra;
         /** Order salt, used to prevent duplicate hashes. */
-        uint salt;
+        uint256 salt;
         /** Royalty fees*/ 
-        uint[] fees;
+        uint256[] fees;
         /** Royalty fees receivers*/ 
         address[] addresses; 
         /** Static call target, zero-address for no static call. */
@@ -229,7 +233,7 @@ abstract contract ExchangeCore is ReentrancyGuard, ERC1271, EIP712, PermitContro
             require(Address.isContract(order.outline.target));
 
         /** Order must possess valid sale kind parameter combination. */
-        if (!Sales.validateParameters(order.outline.saleKind, order.expirationTime)) {
+        if (!Sales.validateParameters(order.outline.saleKind, order.outline.expirationTime)) {
             return false;
         }
 
@@ -266,11 +270,11 @@ abstract contract ExchangeCore is ReentrancyGuard, ERC1271, EIP712, PermitContro
         /* Calculate hash which must be signed. */
         bytes32 calculatedHashToSign = _hashToSign(order);
 
-        bool isContract = Address.isContract(order.maker);
+        bool isContract = Address.isContract(order.outline.maker);
 
         /* (c): Contract-only authentication: EIP/ERC 1271. */
         if (isContract) {
-            if (ERC1271(order.maker).isValidSignature(abi.encodePacked(_hashToSign(order)), signature) == EIP_1271_MAGICVALUE) {
+            if (ERC1271(order.outline.maker).isValidSignature(abi.encodePacked(_hashToSign(order)), signature) == EIP_1271_MAGICVALUE) {
                 return true;
             }
             return false;
@@ -281,12 +285,12 @@ abstract contract ExchangeCore is ReentrancyGuard, ERC1271, EIP712, PermitContro
         
         if (signature.length > 65 && signature[signature.length-1] == 0x03) { // EthSign byte
             /* (d.1): Old way: order hash signed by maker using the prefixed personal_sign */
-            if (ecrecover(keccak256(abi.encodePacked(personalSignPrefix,"32",calculatedHashToSign)), v, r, s) == order.maker) {
+            if (ecrecover(keccak256(abi.encodePacked(personalSignPrefix,"32",calculatedHashToSign)), v, r, s) == order.outline.maker) {
                 return true;
             }
         }
         /* (d.2): New way: order hash signed by maker using sign_typed_data */
-        else if (ecrecover(calculatedHashToSign, v, r, s) == order.maker) {
+        else if (ecrecover(calculatedHashToSign, v, r, s) == order.outline.maker) {
             return true;
         }
         return false;
@@ -304,7 +308,7 @@ abstract contract ExchangeCore is ReentrancyGuard, ERC1271, EIP712, PermitContro
         /** CHECKS */
 
         /** Assert sender is authorized to approve order. */
-        require(msg.sender == order.maker);
+        require(msg.sender == order.outline.maker);
 
         /** Calculate order hash. */
         bytes32 hash = _hashToSign(order);
@@ -319,10 +323,10 @@ abstract contract ExchangeCore is ReentrancyGuard, ERC1271, EIP712, PermitContro
   
         /** Log approval event. Must be split in two due to Solidity stack size limitations. */
         {
-            emit OrderApprovedPartOne(hash, order.exchange, order.maker, order.taker, order.fees[0], order.addresses[0], order.side, order.saleKind, order.target);
+            emit OrderApprovedPartOne(hash, order.outline.exchange, order.outline.maker, order.outline.taker, order.fees[0], order.addresses[0], order.outline.side, order.outline.saleKind, order.outline.target);
         }
         {   
-            emit OrderApprovedPartTwo(hash, order.callType, order.data, order.replacementPattern, order.staticTarget, order.staticExtradata, order.paymentToken, order.basePrice, order.extra, order.listingTime, order.expirationTime, order.salt, orderbookInclusionDesired);
+            emit OrderApprovedPartTwo(hash, order.outline.callType, order.data, order.replacementPattern, order.staticTarget, order.staticExtradata, order.outline.paymentToken, order.outline.basePrice, order.extra, order.outline.listingTime, order.outline.expirationTime, order.salt, orderbookInclusionDesired);
         }
     }
 
@@ -337,7 +341,7 @@ abstract contract ExchangeCore is ReentrancyGuard, ERC1271, EIP712, PermitContro
         /** CHECKS */
         
         /** Assert sender is authorized to cancel order. */
-        require(msg.sender == order.maker);
+        require(msg.sender == order.outline.maker);
 
         /** Calculate order hash. */
         bytes32 hash = requireValidOrder(order, signature);
@@ -361,7 +365,7 @@ abstract contract ExchangeCore is ReentrancyGuard, ERC1271, EIP712, PermitContro
         view
         returns (uint)
     {
-        return Sales.calculateFinalPrice(order.saleKind, order.basePrice, order.extra, order.listingTime);
+        return Sales.calculateFinalPrice(order.outline.saleKind, order.outline.basePrice, order.extra, order.outline.listingTime);
     }
 
    /**
@@ -376,16 +380,16 @@ abstract contract ExchangeCore is ReentrancyGuard, ERC1271, EIP712, PermitContro
         returns (uint)
     {
         /** Calculate sell price. */
-        uint sellPrice = Sales.calculateFinalPrice(sell.saleKind, sell.basePrice, sell.extra, sell.listingTime);
+        uint sellPrice = Sales.calculateFinalPrice(sell.outline.saleKind, sell.outline.basePrice, sell.extra, sell.outline.listingTime);
 
         /** Calculate buy price. */
-        uint buyPrice = Sales.calculateFinalPrice(buy.saleKind, buy.basePrice, buy.extra, buy.listingTime);
+        uint buyPrice = Sales.calculateFinalPrice(buy.outline.saleKind, buy.outline.basePrice, buy.extra, buy.outline.listingTime);
 
         /** Require price cross. */
         require(buyPrice >= sellPrice);
 
         /** Maker/taker priority. */
-        if (sell.saleKind == Sales.SaleKind.Auction || sell.saleKind == Sales.SaleKind.Offer) {
+        if (sell.outline.saleKind == Sales.SaleKind.Auction || sell.outline.saleKind == Sales.SaleKind.Offer) {
             return buyPrice;
         } else {
             return sellPrice;
@@ -410,13 +414,13 @@ abstract contract ExchangeCore is ReentrancyGuard, ERC1271, EIP712, PermitContro
 
         if (requiredAmount > 0){
             /** If paying using a token (not Ether), transfer tokens. */
-            if (sell.paymentToken != address(0)){
+            if (sell.outline.paymentToken != address(0)){
                 require(msg.value == 0);
                 for(uint256 i = 0; i < sell.addresses.length; i++){
                     receiveAmount -= sell.fees[i];
-                    transferTokens(buy.paymentToken, buy.maker, sell.addresses[i], sell.fees[i]);
+                    transferTokens(buy.outline.paymentToken, buy.outline.maker, sell.addresses[i], sell.fees[i]);
                 }
-                transferTokens(sell.paymentToken, buy.maker, sell.maker, receiveAmount);
+                transferTokens(sell.outline.paymentToken, buy.outline.maker, sell.outline.maker, receiveAmount);
             } else {
                 /** Special-case Ether, order must be matched by buyer. */
                 require(msg.value >= requiredAmount);
@@ -425,12 +429,12 @@ abstract contract ExchangeCore is ReentrancyGuard, ERC1271, EIP712, PermitContro
                     receiveAmount -= sell.fees[i];
                     payable(sell.addresses[i]).transfer(sell.fees[i]);
                 }
-                payable(sell.maker).transfer(receiveAmount);
+                payable(sell.outline.maker).transfer(receiveAmount);
 
                 /** Allow overshoot for variable-price auctions, refund difference. */
                 uint diff = msg.value - requiredAmount;
                 if (diff > 0) {
-                    payable(buy.maker).transfer(diff);
+                    payable(buy.outline.maker).transfer(diff);
                 }
             }
         }   
@@ -451,24 +455,24 @@ abstract contract ExchangeCore is ReentrancyGuard, ERC1271, EIP712, PermitContro
     {
         return (
             /** Must be opposite-side. */
-            (buy.side == Sales.Side.Buy && sell.side == Sales.Side.Sell) &&     
+            (buy.outline.side == Sales.Side.Buy && sell.outline.side == Sales.Side.Sell) &&     
             /** Must use same payment token. */
-            (buy.paymentToken == sell.paymentToken) &&
+            (buy.outline.paymentToken == sell.outline.paymentToken) &&
             /** Must match maker/taker addresses. */
-            (sell.taker == address(0) || sell.taker == buy.maker) &&
-            (buy.taker == address(0) || buy.taker == sell.maker) &&
+            (sell.outline.taker == address(0) || sell.outline.taker == buy.outline.maker) &&
+            (buy.outline.taker == address(0) || buy.outline.taker == sell.outline.maker) &&
             /** Platform fees address is  */
             sell.addresses[0] == platformFeeAddress &&
             /** One must have platform fee on seller side */
             (sell.fees[0] >= minimumPlatformFee) &&
             /** Must match target. */
-            (buy.target == sell.target) &&
+            (buy.outline.target == sell.outline.target) &&
             /** Must match callType. */
-            (buy.callType == sell.callType) &&
+            (buy.outline.callType == sell.outline.callType) &&
             /** Buy-side order must be settleable. */
-            Sales.canSettleOrder(buy.listingTime, buy.expirationTime) &&
+            Sales.canSettleOrder(buy.outline.listingTime, buy.outline.expirationTime) &&
             /** Sell-side order must be settleable. */
-            Sales.canSettleOrder(sell.listingTime, sell.expirationTime)
+            Sales.canSettleOrder(sell.outline.listingTime, sell.outline.expirationTime)
         );
     }
 
@@ -493,14 +497,14 @@ abstract contract ExchangeCore is ReentrancyGuard, ERC1271, EIP712, PermitContro
         /** CHECKS */
         {   
             /** Ensure buy order validity and calculate hash if necessary. */
-            if (buy.maker == msg.sender) {
+            if (buy.outline.maker == msg.sender) {
                 require(_validateOrderParameters(buy));
             } else {
                 buyHash = requireValidOrder(buy, signatureBuy);
             }
 
             /** Ensure sell order validity and calculate hash if necessary. */
-            if (sell.maker == msg.sender) {
+            if (sell.outline.maker == msg.sender) {
                 require(_validateOrderParameters(sell));
             } else {
                 sellHash = requireValidOrder(sell, signatureSell);
@@ -527,7 +531,7 @@ abstract contract ExchangeCore is ReentrancyGuard, ERC1271, EIP712, PermitContro
     * Private function to avoid stack-too-deep error.
      */
     function helper(Order memory buy, Order memory sell, bytes32 buyHash, bytes32 sellHash, bytes32 metadata) private {
-        address delegateProxy = IProxyRegistry(registry).proxies(sell.maker);
+        address delegateProxy = IProxyRegistry(registry).proxies(sell.outline.maker);
 
         /** Proxy must exist. */
         require(Address.isContract(delegateProxy));
@@ -541,10 +545,10 @@ abstract contract ExchangeCore is ReentrancyGuard, ERC1271, EIP712, PermitContro
         /** EFFECTS */
 
         /** Mark previously signed or approved orders as finalized. */
-        if (msg.sender != buy.maker) {
+        if (msg.sender != buy.outline.maker) {
             cancelledOrFinalized[buyHash] = true;
         }
-        if (msg.sender != sell.maker) {
+        if (msg.sender != sell.outline.maker) {
             cancelledOrFinalized[sellHash] = true;
         }
         /** INTERACTIONS */
@@ -553,7 +557,7 @@ abstract contract ExchangeCore is ReentrancyGuard, ERC1271, EIP712, PermitContro
         uint price = executeFundsTransfer(buy, sell);
 
         /** Execute specified call through proxy. */
-        require(proxy.call(sell.target, sell.callType, sell.data));
+        require(proxy.call(sell.outline.target, sell.outline.callType, sell.data));
 
         /** Static calls are intentionally done after the effectful call so they can check resulting state. */
 
@@ -569,7 +573,7 @@ abstract contract ExchangeCore is ReentrancyGuard, ERC1271, EIP712, PermitContro
 
         /** Log match event. */
         //TODO
-        emit OrdersMatched(buyHash, sellHash, sell.addresses[0] != address(0) ? sell.maker : buy.maker, sell.addresses[0] != address(0) ? buy.maker : sell.maker, price, metadata);
+        emit OrdersMatched(buyHash, sellHash, sell.addresses[0] != address(0) ? sell.outline.maker : buy.outline.maker, sell.addresses[0] != address(0) ? buy.outline.maker : sell.outline.maker, price, metadata);
     }
 
 }
