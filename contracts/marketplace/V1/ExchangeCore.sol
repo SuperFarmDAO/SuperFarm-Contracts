@@ -318,8 +318,8 @@ abstract contract ExchangeCore is ReentrancyGuard, ERC1271, EIP712, PermitContro
 
         /** EFFECTS */
     
-        /** Mark order as approved. */
-        approvedOrders[hash] = true;
+//         /** Mark order as approved. */
+//         approvedOrders[hash] = true;
   
         /** Log approval event. Must be split in two due to Solidity stack size limitations. */
         {
@@ -539,8 +539,8 @@ abstract contract ExchangeCore is ReentrancyGuard, ERC1271, EIP712, PermitContro
         /** Assert implementation. */
         require(OwnableDelegateProxy(payable(delegateProxy)).implementation() == IProxyRegistry(registry).delegateProxyImplementation());
         
-        /** Access the passthrough AuthenticatedProxy. */
-        AuthenticatedProxy proxy= AuthenticatedProxy(payable(delegateProxy));
+//         /** Access the passthrough AuthenticatedProxy. */
+//         AuthenticatedProxy proxy= AuthenticatedProxy(payable(delegateProxy));
         
         /** EFFECTS */
 
@@ -557,7 +557,7 @@ abstract contract ExchangeCore is ReentrancyGuard, ERC1271, EIP712, PermitContro
         uint price = executeFundsTransfer(buy, sell);
 
         /** Execute specified call through proxy. */
-        require(proxy.call(sell.outline.target, sell.outline.callType, sell.data));
+        // require(payable(delegateProxy).call(sell.outline.target, sell.outline.callType, sell.data));
 
         /** Static calls are intentionally done after the effectful call so they can check resulting state. */
 
