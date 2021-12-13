@@ -8,11 +8,8 @@ import "../../proxy/TokenTransferProxy.sol";
 import "../../proxy/AuthenticatedProxy.sol";
 import "../../utils/Utils.sol";
 import "../../libraries/Sales.sol";
-import "../../libraries/Fees.sol";
 import "../../libraries/EIP712.sol";
 import "../../libraries/EIP1271.sol";
-
-import "hardhat/console.sol";
 
 /**
     @title modified ExchangeCore of ProjectWyvernV2
@@ -24,13 +21,14 @@ abstract contract ExchangeCore is ReentrancyGuard, ERC1271, EIP712, PermitContro
     /**  The public identifier for the right to set new items. */
     bytes32 public constant FEE_CONFIG = keccak256("FEE_CONFIG");
 
-    bytes32 constant public ORDER_TYPEHASH = keccak256(
-      "Order(uint256 basePrice,uint256[] extra,uint256 listingTime,uint256 salt,uint256[] fees,address[] addresses,address exchange,address maker,uint8 side,address taker,uint8 saleKind,uint8 callType,address target,address staticTarget,address paymentToken,bytes data,bytes replacementPattern,bytes staticExtradata)"
-      );
-
-    bytes32 constant public OUTILINE_TYPEHASH = keccak256(
-        "Outline(uint256 basePrice,uint256 listingTime,uint256 expirationTime,address exchange,address maker,uint8 side,address)"
-    );
+    bytes32 public constant OUTLINE_TYPEHASH =
+        keccak256(
+            "Outline(uint256 basePrice,uint256 listingTime,uint256 expirationTime,address exchange,address maker,uint8 side,address taker,uint8 saleKind,address target,uint8 callType,address paymentToken)"
+        );
+    bytes32 public constant ORDER_TYPEHASH =
+        keccak256(
+            "Order(Outline outline,uint256[] extra,uint256 salt,uint256[] fees,address[] addresses,address staticTarget,bytes data,bytes replacementPattern,bytes staticExtradata)Outline(uint256 basePrice,uint256 listingTime,uint256 expirationTime,address exchange,address maker,uint8 side,address taker,uint8 saleKind,address target,uint8 callType,address paymentToken)"
+        );
 
     /** Token transfer proxy. */
     address public tokenTransferProxy;
@@ -172,9 +170,44 @@ abstract contract ExchangeCore is ReentrancyGuard, ERC1271, EIP712, PermitContro
     function _hashOrder(Order memory order)
         internal
         pure
-        returns (bytes32 hash){
-            
-        return  hash;
+        returns (bytes32){
+        return keccak256(
+            abi.encode(
+                ORDER_TYPEHASH,
+                _hashOutline(order.outline),
+                keccak256(abi.encodePacked(order.extra)),
+                order.salt,
+                keccak256(abi.encodePacked(order.fees)),
+                keccak256(abi.encodePacked(order.addresses)),
+                order.staticTarget,
+                keccak256(order.data),
+                keccak256(order.replacementPattern),
+                keccak256(order.staticExtradata)
+            ));
+    }
+
+    function _hashOutline(Outline memory outline)
+        private
+        pure
+        returns (bytes32)
+    {
+        return
+            keccak256(
+                abi.encode(
+                    OUTLINE_TYPEHASH,
+                    outline.basePrice,
+                    outline.listingTime,
+                    outline.expirationTime,
+                    outline.exchange,
+                    outline.maker,
+                    outline.side,
+                    outline.taker,
+                    outline.saleKind,
+                    outline.target,
+                    outline.callType,
+                    outline.paymentToken
+                )
+            );
     }
     
 
@@ -197,7 +230,6 @@ abstract contract ExchangeCore is ReentrancyGuard, ERC1271, EIP712, PermitContro
 
     function recover(Order memory order, Sig memory sig) external view returns(address result){
         result = ecrecover(_hashToSign(order), sig.v, sig.r, sig.s);
-        console.logAddress(result);
         return result;
     }
 

@@ -51,19 +51,7 @@ describe("Testing EIP712 standard", function(){
             staticExtradata: dataBytes
         };
     
-        const mes = {
-            extra: [0, 10],
-            salt: 0,
-            fees: [10, 10, 10],
-            addresses: [NULL_ADDRESS],
-            staticTarget: NULL_ADDRESS,
-            data: dataBytes,
-            replacementPattern: dataBytes,
-            staticExtradata: dataBytes
-        }
-
         let sig = ethers.utils.splitSignature(await owner._signTypedData(domain, OrderType, message))
-        console.log(owner.address)
         expect(await eip712.connect(owner).recoverAddress(sig.v, sig.r, sig.s, message)).to.be.true
         // let sig = ethers.utils.splitSignature(await owner._signTypedData(domain, types, message));
         // console.log(owner.address)
