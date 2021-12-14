@@ -45,10 +45,10 @@ abstract contract Exchange is ExchangeCore {
      * @dev Call hashOrder
      */
     function hashOrder(Order calldata order)
-        external view
+        external pure
         returns (bytes32)
     {
-        return _hashOrder(order);
+        return _hash(order);
     }
 
     /**

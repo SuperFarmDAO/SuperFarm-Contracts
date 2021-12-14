@@ -28,33 +28,39 @@ describe("Testing EIP712 standard", function(){
         const dataBytes = ethers.utils.id("hi");
         
         const message = {
-            outline: {
-                basePrice: 0,
+            conditions: {
+                give:{
+                    assetsType: 2,
+                    target: NULL_ADDRESS,
+                    staticTarget: NULL_ADDRESS,
+                    data: dataBytes,
+                    replacementPattern: dataBytes,
+                    staticExtradata: dataBytes
+                },
+                take:{
+                    assetsType: 2,
+                    target: NULL_ADDRESS,
+                    staticTarget: NULL_ADDRESS,
+                    data: dataBytes,
+                    replacementPattern: dataBytes,
+                    staticExtradata: dataBytes
+                },
                 listingTime: 0,
                 expirationTime: 100,
-                exchange: NULL_ADDRESS,
                 maker: NULL_ADDRESS,
-                side: 0,
                 taker: NULL_ADDRESS,
-                saleKind: 0,
-                target: NULL_ADDRESS,
-                callType: 0,
-                paymentToken: NULL_ADDRESS
+                saleKind: 0
             },
-            extra: [0, 10],
-            salt: 0,
-            fees: [10, 10, 10],
-            addresses: [NULL_ADDRESS],
-            staticTarget: NULL_ADDRESS,
-            data: dataBytes,
-            replacementPattern: dataBytes,
-            staticExtradata: dataBytes
+            // exchange: NULL_ADDRESS,
+            // side: 0,
+            // callType: 0,
+            // salt: 0,
+            // fees: [10, 10, 10],
+            // feeReceivers: [NULL_ADDRESS]
         };
-    
-        let sig = ethers.utils.splitSignature(await owner._signTypedData(domain, OrderType, message))
-        expect(await eip712.connect(owner).recoverAddress(sig.v, sig.r, sig.s, message)).to.be.true
-        // let sig = ethers.utils.splitSignature(await owner._signTypedData(domain, types, message));
-        // console.log(owner.address)
-        // expect(await eip712.connect(owner).checkOutline(sig.v, sig.r, sig.s, message.outline)).to.be.true
+        console.log(ethers.utils._TypedDataEncoder.getPrimaryType(types))
+        console.log(owner.address)
+        let signature = await owner._signTypedData(domain, types, message)
+        expect(await eip712.connect(owner).recoverAddress(signature, message)).to.be.true
     })
 })

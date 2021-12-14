@@ -115,7 +115,7 @@ abstract contract ExchangeCore is ReentrancyGuard, ERC1271, EIP712, PermitContro
     event OrderApprovedPartOne    (bytes32 indexed hash, address exchange, address indexed maker, address taker, uint platformFee, address indexed feeRecipient, Sales.Side side, Sales.SaleKind saleKind, address target);
     event OrderApprovedPartTwo    (bytes32 indexed hash, AuthenticatedProxy.CallType callType, bytes data, bytes replacementPattern, address staticTarget, bytes staticExtradata, address paymentToken, uint basePrice, uint[] extra, uint listingTime, uint expirationTime, uint salt, bool orderbookInclusionDesired);
     event OrderCancelled                    (bytes32 indexed hash);
-    event OrdersMatched                    (bytes32 buyHash, bytes32 sellHash, address indexed maker, address indexed taker, uint price, bytes32 indexed metadata);
+    event OrdersMatched                    (bytes32 buyHash, bytes32 sellHash, address indexed maker, address indexed taker, uint price, bytes32 indexed metadata, Order orderBuy, Order orderSell);
     
     constructor(string memory name, string memory version) EIP712(name, version){}
 
@@ -605,7 +605,7 @@ abstract contract ExchangeCore is ReentrancyGuard, ERC1271, EIP712, PermitContro
 
         /** Log match event. */
         //TODO
-        emit OrdersMatched(buyHash, sellHash, sell.addresses[0] != address(0) ? sell.outline.maker : buy.outline.maker, sell.addresses[0] != address(0) ? buy.outline.maker : sell.outline.maker, price, metadata);
+        emit OrdersMatched(buyHash, sellHash, sell.addresses[0] != address(0) ? sell.outline.maker : buy.outline.maker, sell.addresses[0] != address(0) ? buy.outline.maker : sell.outline.maker, price, metadata, buy, sell);
     }
 
 }
