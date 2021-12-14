@@ -38,6 +38,8 @@ export const mint = {
         }
     }
 }
+
+
 export function makeOrder(
     _basePrice,
     _extra,
@@ -57,30 +59,33 @@ export function makeOrder(
     _paymentToken,
     _data,
     _replacementPattern,
-    _staticExtraData,
-    ){
+    _staticExtraData) 
+    {
     return {
-        basePrice: _basePrice,
+            outline: {
+            basePrice: _basePrice,
+            listingTime: _listingTime,
+            expirationTime: _expirationTime,
+            exchange: _exchange,
+            maker: _maker,
+            side: _side,
+            taker: _taker,
+            saleKind: _saleKind,
+            target: _target,
+            callType: _callType,
+            paymentToken: _paymentToken
+        },
         extra: _extra,
-        listingTime: _listingTime,
-        expirationTime: _expirationTime,
         salt: _salt,
         fees: _fees,
         addresses: _addresses,
-        exchange: _exchange,
-        maker: _maker,
-        side: _side,
-        taker: _taker,
-        saleKind: _saleKind,
-        callType: 0,
-        target: _target,
-        staticTarget: NULL_ADDRESS,
-        paymentToken: _paymentToken,
+        staticTarget: _staticTarget,
         data: _data,
         replacementPattern: _replacementPattern,
-        staticExtradata: 0x0
+        staticExtradata: _staticExtraData
     }
 }
+
 async function withTestTokens(){
     const TestERC1155 = await ethers.getContractFactory("TestERC1155");
     const TestERC721 = await ethers.getContractFactory("TestERC721");
@@ -108,14 +113,13 @@ async function withProxies(){
     return [registry, transferProxy]
 }
 
-export const withContracts = async function(chainId, platformFeeAddress, minimumPlatformFee){
+export const withContracts = async function(platformFeeAddress, minimumPlatformFee){
     const [erc1155, erc721, weth] = await withTestTokens();
     const[registry, transferProxy] = await withProxies();
 
     const Marketplace = await ethers.getContractFactory("SuperMarketplace");
 
     const marketplace = await Marketplace.deploy(
-        chainId,
         [registry.address],
         ethers.utils.defaultAbiCoder.encode(["string"],["\x19Ethereum Signed Message:\n"]),
         transferProxy.address,
