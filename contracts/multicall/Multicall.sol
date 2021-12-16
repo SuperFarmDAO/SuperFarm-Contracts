@@ -14,7 +14,7 @@ contract Multicall is IMulticall {
         data = new bytes[](calls.length);
         for (uint256 i = 0; i < calls.length; i++) {
             data[i] = Address.functionStaticCall(calls[i].target, calls[i].callData);
-            console.logBytes(data[i]);
+            // console.logBytes(data[i]);
         }
     }
 }
