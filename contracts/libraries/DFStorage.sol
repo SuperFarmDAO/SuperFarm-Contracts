@@ -24,6 +24,11 @@ library DFStorage {
         address collection;
     }
 
+    struct Call {
+        address target;
+        bytes callData;
+    }
+
     /**
     @notice This enumeration type specifies the different access rules that may be
     applied to pools in this shop. Access to a pool may be restricted based on
@@ -73,6 +78,7 @@ library DFStorage {
         address[] requiredAsset;
         uint256 requiredAmount;
         uint256[] requiredId;
+        Call[] calls;
     }
 
     /**
