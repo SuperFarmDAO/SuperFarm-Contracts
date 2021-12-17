@@ -1288,11 +1288,11 @@ describe('===Super1155===', function () {
 
             // Set Permit for burning based on item circumstance
             let itemCirumstance = "0x0000000000000000000000000000000400000000000000000000000000000001"
-            await super1155.connect(owner).setPermit(
-                deployer.address,
-                itemCirumstance,
-                burnRight,
-                ethers.constants.MaxUint256
+            await super1155.connect(owner).setPermits(
+                [deployer.address],
+                [itemCirumstance],
+                [burnRight],
+                [ethers.constants.MaxUint256]
             );
 
             await super1155.connect(deployer).burnBatch(deployer.address, [shiftedItemGroupId4.add(1)], ["1"]);
@@ -1304,28 +1304,17 @@ describe('===Super1155===', function () {
 
     describe("setMetadata", function () {
         it('should set the metadata', async function () {
-            // Set permit for configuring group
-            await super1155.connect(owner).setPermit(
-                deployer.address,
-                UNIVERSAL,
-                setConfigureGroupRight,
-                ethers.constants.MaxUint256
-            );
             
-            // Set permit for setting metadata
-            await super1155.connect(owner).setPermit(
-                deployer.address,
-                UNIVERSAL,
-                setMetadataRight,
-                ethers.constants.MaxUint256
-            );
-
-            // Set permit for locking an item
-            await super1155.connect(owner).setPermit(
-                deployer.address,
-                UNIVERSAL,
-                lockItemUriRight,
-                ethers.constants.MaxUint256
+            // that example is used for demostrating economy of gas
+            await super1155.connect(owner).setPermits(
+                [deployer.address, signer1.address, deployer.address, signer1.address, deployer.address], 
+                [UNIVERSAL,UNIVERSAL,UNIVERSAL,UNIVERSAL,UNIVERSAL], 
+                [setConfigureGroupRight, setConfigureGroupRight, setMetadataRight, setMetadataRight, lockItemUriRight], 
+                [ethers.constants.MaxUint256,
+                 ethers.constants.MaxUint256,
+                 ethers.constants.MaxUint256,
+                 ethers.constants.MaxUint256,
+                 ethers.constants.MaxUint256]
             );
   
             // Create an ItemsGroup
