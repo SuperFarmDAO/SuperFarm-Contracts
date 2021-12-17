@@ -4,6 +4,8 @@ pragma solidity ^0.8.7;
 import "@openzeppelin/contracts/utils/introspection/ERC165Storage.sol";
 import "@openzeppelin/contracts/token/ERC1155/IERC1155.sol";
 import "@openzeppelin/contracts/token/ERC1155/extensions/IERC1155MetadataURI.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC1155/IERC1155Receiver.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 
@@ -31,6 +33,7 @@ import "./interfaces/ISuper1155.sol";
 */
 contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataURI {
   using Address for address;
+  using SafeERC20 for IERC20;
 
   uint256 MAX_INT = type(uint256).max;
 
@@ -127,15 +130,21 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
     uint256 burnCount;
     uint256 supplyData;
     uint256 itemData;
-    bool initialized;
     DFStorage.SupplyType supplyType;
     DFStorage.ItemType itemType;
     DFStorage.BurnType burnType;
+    bool initialized;
     string name;
   }
 
   /// A mapping of data for each item group.
   mapping (uint256 => ItemGroup) public itemGroups;
+
+  /// A mapping of data for each item group's transfer information.
+  mapping (uint256 => DFStorage.ItemGroupsTransfer) public itemGroupsTransfer;
+
+  /// A mapping of data for each item's intrinsic information.
+  mapping (uint256 => DFStorage.ItemGroupIntrinsicInput) public intrinsicGroups;
 
   /// A mapping of circulating supplies for each individual token.
   mapping (uint256 => uint256) public circulatingSupply;
@@ -513,21 +522,63 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
     require(_from == _msgSender() || isApprovedForAll(_from, _msgSender()),
       "ERC1155: caller is not owner nor approved");
 
+    // An array to keep track of paidGroups for PerTransfer transfer Type.
+    uint256[] memory paidGroup;
+
     // Validate transfer and perform all batch token sends.
     _beforeTokenTransfer(_msgSender(), _from, _to, _ids, _amounts, _data);
     for (uint256 i = 0; i < _ids.length; ++i) {
 
       // Retrieve the item's group ID.
       uint256 groupId = (_ids[i] & GROUP_MASK) >> 128;
+      uint256 ratioCut; uint256 ratioExtra;
+
+      // Check transfer type.
+      if (itemGroupsTransfer[groupId].transferType == DFStorage.TransferType.BoundToAddress) {
+        revert("Bound to Address");
+      } else if (itemGroupsTransfer[groupId].transferType == DFStorage.TransferType.TemporaryTransfer) {
+        require(block.timestamp <= itemGroupsTransfer[groupId].transferTime, "Transfer time is over");
+      }
+
+      // Check transfer fee type.
+      if (itemGroupsTransfer[groupId].transferFeeType == DFStorage.TransferFeeType.PerTransfer) {
+        bool paid;
+        for (uint256 i = 0; i < paidGroup.length; i++) {
+          if (paidGroup[i] == groupId) {
+            paid = true;
+            break;
+          }
+        }
+        if (!paid) {
+          uint256[] memory temp = paidGroup;
+          paidGroup = new uint256[](temp.length + 1);
+          for (uint256 i = 0; i < temp.length; i++) {
+            paidGroup[i] = temp[i];
+          }
+          paidGroup[paidGroup.length - 1] = groupId;
+          IERC20(itemGroupsTransfer[groupId].transferToken).safeTransferFrom(_from, owner(), itemGroupsTransfer[groupId].transferFeeAmount);
+        }
+      } else if (itemGroupsTransfer[groupId].transferFeeType == DFStorage.TransferFeeType.PerItem) {
+        IERC20(itemGroupsTransfer[groupId].transferToken).safeTransferFrom(_from, owner(), itemGroupsTransfer[groupId].transferFeeAmount);
+      } else if (itemGroupsTransfer[groupId].transferFeeType == DFStorage.TransferFeeType.RatioCut) {
+          ratioCut = (_amounts[i] * itemGroupsTransfer[groupId].transferFeeAmount) / 10000; // From amounts
+      } else if (itemGroupsTransfer[groupId].transferFeeType == DFStorage.TransferFeeType.RatioExtra) {
+          ratioExtra = (_amounts[i] * itemGroupsTransfer[groupId].transferFeeAmount) / 10000; // From balance
+      }
 
       // Update all specially-tracked group-specific balances.
-      require(balances[_ids[i]][_from] >= _amounts[i], "ERC1155: insufficient balance for transfer");
-      balances[_ids[i]][_from] = balances[_ids[i]][_from] - _amounts[i];
-      balances[_ids[i]][_to] = balances[_ids[i]][_to] + _amounts[i];
-      groupBalances[groupId][_from] = groupBalances[groupId][_from] - _amounts[i];
-      groupBalances[groupId][_to] = groupBalances[groupId][_to] + _amounts[i];
-      totalBalances[_from] = totalBalances[_from] - _amounts[i];
-      totalBalances[_to] = totalBalances[_to] + _amounts[i];
+      require(balances[_ids[i]][_from] >= _amounts[i] + ratioExtra, "ERC1155: insufficient balance for transfer");
+      balances[_ids[i]][_from] = balances[_ids[i]][_from] - (_amounts[i] + ratioExtra);
+      balances[_ids[i]][_to] = balances[_ids[i]][_to] + _amounts[i] - ratioCut;
+      groupBalances[groupId][_from] = groupBalances[groupId][_from] - (_amounts[i] + ratioExtra);
+      groupBalances[groupId][_to] = groupBalances[groupId][_to] + _amounts[i] - ratioCut;
+      totalBalances[_from] = totalBalances[_from] - (_amounts[i] + ratioExtra);
+      totalBalances[_to] = totalBalances[_to] + _amounts[i] - ratioCut;
+
+      // Update RatioCut and RatioExtra fees.
+      balances[_ids[i]][owner()] = balances[_ids[i]][owner()] + ratioExtra + ratioCut;
+      groupBalances[groupId][owner()] = groupBalances[groupId][owner()] + ratioExtra + ratioCut;
+      totalBalances[owner()] = totalBalances[owner()] + ratioExtra + ratioCut;
     }
 
     // Emit the transfer event and perform the safety check.
@@ -561,7 +612,7 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
     @param _groupId The ID of the item group to create or configure.
     @param _data The `ItemGroup` data input.
   */
-  function configureGroup(uint256 _groupId, DFStorage.ItemGroupInput calldata _data) external  {
+  function configureGroup(uint256 _groupId, DFStorage.ItemGroupInput calldata _data, DFStorage.ItemGroupsTransfer calldata _transferData, DFStorage.ItemGroupIntrinsicInput calldata _intrinsicData) external payable {
     require(_groupId != 0,
       "Super1155: group ID 0 is invalid");
     require(_hasItemRight(_groupId, CONFIGURE_GROUP), "Super1155: you don't have rights to configure group");
@@ -582,6 +633,14 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
         circulatingSupply: 0,
         mintCount: 0,
         burnCount: 0
+      });
+
+      itemGroupsTransfer[_groupId] = DFStorage.ItemGroupsTransfer({
+        transferTime: _transferData.transferTime,
+        transferFeeAmount: _transferData.transferFeeAmount,
+        transferToken: _transferData.transferToken,
+        transferType: _transferData.transferType,
+        transferFeeType: _transferData.transferFeeType
       });
 
     // Edit an existing item group. The name may always be updated.
@@ -631,6 +690,34 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
           itemGroups[_groupId].itemData = _data.itemData;
         }
       }
+    }
+
+    // Store/update information on intrinsic data.
+    if (!itemGroups[_groupId].initialized) { // This will never be false TODO
+      intrinsicGroups[_groupId] = DFStorage.ItemGroupIntrinsicInput({
+        rate: _intrinsicData.rate,
+        burnShare: _intrinsicData.burnShare,
+        prefund: 0,
+        totalLocked: 0,
+        intrinsicToken: _intrinsicData.intrinsicToken,
+        intrinsic: _intrinsicData.intrinsic
+      });
+    } else if (itemGroups[_groupId].circulatingSupply == 0) {
+        intrinsicGroups[_groupId].rate = _intrinsicData.rate;
+        intrinsicGroups[_groupId].burnShare = _intrinsicData.burnShare;
+    } else {
+        intrinsicGroups[_groupId].burnShare = _intrinsicData.burnShare;
+
+    }
+
+    // Transfer prefund tokens or ether if any.
+    if(_intrinsicData.intrinsicToken != address(0) && _intrinsicData.prefund > 0) { // If the intrinsic token is ERC20
+      intrinsicGroups[_groupId].prefund += _intrinsicData.prefund;
+      intrinsicGroups[_groupId].totalLocked += _intrinsicData.prefund;
+      IERC20(_intrinsicData.intrinsicToken).safeTransferFrom(_msgSender(), address(this), _intrinsicData.prefund);
+    } else if (_intrinsicData.intrinsicToken == address(0) && msg.value > 0) { // If the intrinsic token is in Ether
+      intrinsicGroups[_groupId].prefund += msg.value;
+      intrinsicGroups[_groupId].totalLocked += msg.value;
     }
 
     // Emit the configuration event.
@@ -730,7 +817,7 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
   */
   function mintBatch(address _recipient, uint256[] calldata _ids,
     uint256[] calldata _amounts, bytes calldata _data)
-    external  {
+    external payable {
     require(_recipient != address(0),
       "ERC1155: mint to the zero address");
     require(_ids.length == _amounts.length,
@@ -743,6 +830,7 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
 
     // Loop through each of the batched IDs to update storage of special
     // balances and circulation balances.
+    uint256 etherValue = msg.value;
     for (uint256 i = 0; i < _ids.length; i++) {
       require(_hasItemRight(_ids[i], MINT),
         "Super1155: you do not have the right to mint that item");
@@ -750,6 +838,31 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
       // Retrieve the group ID from the given item `_id` and check mint.
       uint256 groupId = _ids[i] >> 128;
       uint256 mintedItemId = _mintChecker(_ids[i], _amounts[i]);
+
+      // Put intrinsic value in the token if intrinsic mint.
+      if (intrinsicGroups[groupId].intrinsic) {
+        uint256 requiredAmount = _amounts[i] * intrinsicGroups[groupId].rate;
+        address intrinsicToken = intrinsicGroups[groupId].intrinsicToken;
+
+        // If sufficient prefund is available.
+        if (requiredAmount <= intrinsicGroups[groupId].prefund) {
+          intrinsicGroups[groupId].prefund -= requiredAmount;
+
+        // If minter locks new ERC20 tokens.
+        } else if (intrinsicToken != address(0)) {
+          intrinsicGroups[groupId].totalLocked += requiredAmount;
+          IERC20(intrinsicToken).safeTransferFrom(_msgSender(), address(this), requiredAmount);
+
+        // If minter locks new Ether.
+        } else if (requiredAmount <= etherValue) {
+          etherValue -= requiredAmount;
+          intrinsicGroups[groupId].totalLocked += requiredAmount;
+
+        // If insufficient intrinsic or extrinsic funds.
+        } else {
+          revert("Insufficient intrinsic value or prefund");
+        }
+      }
 
       // Update storage of special balances and circulating values.
       balances[mintedItemId][_recipient] = balances[mintedItemId][_recipient] + _amounts[i];
@@ -845,6 +958,26 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
       itemGroups[groupId].burnCount = itemGroups[groupId].burnCount + _amounts[i];
       itemGroups[groupId].circulatingSupply =
         itemGroups[groupId].circulatingSupply - _amounts[i];
+
+      // If the token has intrinsic value.
+      if (intrinsicGroups[groupId].intrinsic) {
+        uint256 burnAmount = _amounts[i] * intrinsicGroups[groupId].rate;
+        uint256 burnShare = (burnAmount * intrinsicGroups[groupId].rate) / 10000;
+        address intrinsicToken = intrinsicGroups[groupId].intrinsicToken;
+
+        // If the intrinsic value is ERC20.
+        if (intrinsicToken != address(0)) {
+          intrinsicGroups[groupId].totalLocked -= burnAmount;
+          IERC20(intrinsicToken).safeTransfer(owner(), burnShare);
+          IERC20(intrinsicToken).safeTransfer(_burner, burnAmount - burnShare);
+
+        // If the intrinsic value is Ether.
+        } else {
+          intrinsicGroups[groupId].totalLocked -= burnAmount;
+          payable(owner()).send(burnShare);
+          payable(_burner).send(burnAmount - burnShare);
+        }
+      }
     }
 
     // Emit the burn event.

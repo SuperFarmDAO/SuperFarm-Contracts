@@ -227,4 +227,35 @@ library DFStorage {
     uint256 _price; 
     address _token;
   }
+
+  struct ItemGroupIntrinsicInput {
+    uint256 rate;
+    uint256 burnShare;
+    uint256 prefund;
+    uint256 totalLocked;
+    address intrinsicToken;
+    bool intrinsic;
+  }
+
+  struct ItemGroupsTransfer {
+    uint256 transferTime;
+    uint256 transferFeeAmount;
+    address transferToken;
+    DFStorage.TransferType transferType;
+    DFStorage.TransferFeeType transferFeeType;
+  }
+  
+  enum TransferType {
+    Transferable,
+    TemporaryTransfer,
+    BoundToAddress
+  }
+
+  enum TransferFeeType {
+    None,
+    PerTransfer,
+    PerItem,
+    RatioCut,
+    RatioExtra
+  }
 }
