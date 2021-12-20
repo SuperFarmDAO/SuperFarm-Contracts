@@ -54,6 +54,16 @@ abstract contract ExchangeCore is ReentrancyGuard, ERC1271, EIP712, PermitContro
     /** Inverse basis point. */
     uint public constant INVERSE_BASIS_POINT = 10000;
 
+     /* An ECDSA signature. */ 
+    struct Sig {
+        /* v parameter */
+        uint8 v;
+        /* r parameter */
+        bytes32 r;
+        /* s parameter */
+        bytes32 s;
+    }
+
     /** supporting struct for order to avoid stack too deep */
     struct Outline{
         /** Base price of the order (in paymentTokens). */
@@ -102,20 +112,10 @@ abstract contract ExchangeCore is ReentrancyGuard, ERC1271, EIP712, PermitContro
         bytes staticExtradata;
     }
 
-     /* An ECDSA signature. */ 
-    struct Sig {
-        /* v parameter */
-        uint8 v;
-        /* r parameter */
-        bytes32 r;
-        /* s parameter */
-        bytes32 s;
-    }
-
     event OrderApprovedPartOne    (bytes32 indexed hash, address exchange, address indexed maker, address taker, uint platformFee, address indexed feeRecipient, Sales.Side side, Sales.SaleKind saleKind, address target);
     event OrderApprovedPartTwo    (bytes32 indexed hash, AuthenticatedProxy.CallType callType, bytes data, bytes replacementPattern, address staticTarget, bytes staticExtradata, address paymentToken, uint basePrice, uint[] extra, uint listingTime, uint expirationTime, uint salt, bool orderbookInclusionDesired);
     event OrderCancelled                    (bytes32 indexed hash);
-    event OrdersMatched                    (bytes32 buyHash, bytes32 sellHash, address indexed maker, address indexed taker, uint price, bytes32 indexed metadata, Order orderBuy, Order orderSell);
+    event OrdersMatched                    (bytes32 buyHash, bytes32 sellHash, address indexed maker, address indexed taker, uint price, bytes32 indexed metadata);
     
     constructor(string memory name, string memory version) EIP712(name, version){}
 
@@ -236,15 +236,15 @@ abstract contract ExchangeCore is ReentrancyGuard, ERC1271, EIP712, PermitContro
     /**
      * @dev Assert an order is valid and return its hash
      * @param order Order to validate
-     * @param signature ECDSA signature
+     * @param sig ECDSA signature
      */
-    function requireValidOrder(Order memory order, bytes calldata signature)
+    function requireValidOrder(Order memory order,Sig memory sig)
         internal
         view
         returns (bytes32)
     {
         bytes32 hash = _hashToSign(order);
-        require(_validateOrder(hash, order, signature));
+        require(_validateOrder(hash, order, sig));
         return hash;
     }
 
@@ -276,9 +276,9 @@ abstract contract ExchangeCore is ReentrancyGuard, ERC1271, EIP712, PermitContro
      * @dev Validate a provided previously approved / signed order, hash, and signature.
      * @param hash Order hash (already calculated, passed to avoid recalculation)
      * @param order Order to validate
-     * @param signature ECDSA signature
+     * @param sig ECDSA signature
      */
-    function _validateOrder(bytes32 hash, Order memory order, bytes calldata signature) 
+    function _validateOrder(bytes32 hash, Order memory order, Sig memory sig) 
         internal
         view
         returns (bool)
@@ -302,27 +302,27 @@ abstract contract ExchangeCore is ReentrancyGuard, ERC1271, EIP712, PermitContro
         /* Calculate hash which must be signed. */
         bytes32 calculatedHashToSign = _hashToSign(order);
 
-        bool isContract = Address.isContract(order.outline.maker);
+        // bool isContract = Address.isContract(order.outline.maker);
 
-        /* (c): Contract-only authentication: EIP/ERC 1271. */
-        if (isContract) {
-            if (ERC1271(order.outline.maker).isValidSignature(abi.encodePacked(_hashToSign(order)), signature) == EIP_1271_MAGICVALUE) {
-                return true;
-            }
-            return false;
-        }
+        // /* (c): Contract-only authentication: EIP/ERC 1271. */
+        // if (isContract) {
+        //     if (ERC1271(order.outline.maker).isValidSignature(abi.encodePacked(_hashToSign(order)), signature) == EIP_1271_MAGICVALUE) {
+        //         return true;
+        //     }
+        //     return false;
+        // }
 
-        /* (d): Account-only authentication: ECDSA-signed by maker. */
-        (uint8 v, bytes32 r, bytes32 s) = abi.decode(signature, (uint8, bytes32, bytes32));
+        // /* (d): Account-only authentication: ECDSA-signed by maker. */
+        // (uint8 v, bytes32 r, bytes32 s) = abi.decode(signature, (uint8, bytes32, bytes32));
         
-        if (signature.length > 65 && signature[signature.length-1] == 0x03) { // EthSign byte
-            /* (d.1): Old way: order hash signed by maker using the prefixed personal_sign */
-            if (ecrecover(keccak256(abi.encodePacked(personalSignPrefix,"32",calculatedHashToSign)), v, r, s) == order.outline.maker) {
-                return true;
-            }
-        }
+        // if (signature.length > 65 && signature[signature.length-1] == 0x03) { // EthSign byte
+        //     /* (d.1): Old way: order hash signed by maker using the prefixed personal_sign */
+        //     if (ecrecover(keccak256(abi.encodePacked(personalSignPrefix,"32",calculatedHashToSign)), v, r, s) == order.outline.maker) {
+        //         return true;
+        //     }
+        // }
         /* (d.2): New way: order hash signed by maker using sign_typed_data */
-        else if (ecrecover(calculatedHashToSign, v, r, s) == order.outline.maker) {
+        if (ecrecover(calculatedHashToSign, sig.v, sig.r, sig.s) == order.outline.maker) {
             return true;
         }
         return false;
@@ -365,9 +365,9 @@ abstract contract ExchangeCore is ReentrancyGuard, ERC1271, EIP712, PermitContro
     /**
      * @dev Cancel an order, preventing it from being matched. Must be called by the maker of the order
      * @param order Order to cancel
-     * @param signature ECDSA signature
+     * @param sig ECDSA signature
      */
-    function _cancelOrder(Order memory order, bytes calldata signature) 
+    function _cancelOrder(Order memory order, Sig memory sig) 
         internal
     {
         /** CHECKS */
@@ -376,7 +376,7 @@ abstract contract ExchangeCore is ReentrancyGuard, ERC1271, EIP712, PermitContro
         require(msg.sender == order.outline.maker);
 
         /** Calculate order hash. */
-        bytes32 hash = requireValidOrder(order, signature);
+        bytes32 hash = requireValidOrder(order, sig);
   
         /** EFFECTS */
       
@@ -511,11 +511,11 @@ abstract contract ExchangeCore is ReentrancyGuard, ERC1271, EIP712, PermitContro
     /**
      * @dev Atomically match two orders, ensuring validity of the match, and execute all associated state transitions. Protected against reentrancy by a contract-global lock.
      * @param buy Buy-side order
-     * @param signatureBuy Buy-side order signature
+     * @param sigBuy Buy-side order signature
      * @param sell Sell-side order
-     * @param signatureSell Sell-side order signature
+     * @param sigSell Sell-side order signature
      */
-    function _atomicMatch(Order memory buy, bytes calldata signatureBuy, Order memory sell, bytes calldata signatureSell, bytes32 metadata, Order[] calldata additionalSales, bytes calldata signatures )
+    function _atomicMatch(Order memory buy, Sig memory sigBuy, Order memory sell, Sig memory sigSell, bytes32 metadata, Order[] calldata additionalSales, Sig[] calldata sigs )
         internal
     {   
         /// calculate buy order hash
@@ -532,14 +532,14 @@ abstract contract ExchangeCore is ReentrancyGuard, ERC1271, EIP712, PermitContro
             if (buy.outline.maker == msg.sender) {
                 require(_validateOrderParameters(buy));
             } else {
-                buyHash = requireValidOrder(buy, signatureBuy);
+                buyHash = requireValidOrder(buy, sigBuy);
             }
 
             /** Ensure sell order validity and calculate hash if necessary. */
             if (sell.outline.maker == msg.sender) {
                 require(_validateOrderParameters(sell));
             } else {
-                sellHash = requireValidOrder(sell, signatureSell);
+                sellHash = requireValidOrder(sell, sigSell);
             }
         
         
@@ -605,7 +605,7 @@ abstract contract ExchangeCore is ReentrancyGuard, ERC1271, EIP712, PermitContro
 
         /** Log match event. */
         //TODO
-        emit OrdersMatched(buyHash, sellHash, sell.addresses[0] != address(0) ? sell.outline.maker : buy.outline.maker, sell.addresses[0] != address(0) ? buy.outline.maker : sell.outline.maker, price, metadata, buy, sell);
+        emit OrdersMatched(buyHash, sellHash, sell.addresses[0] != address(0) ? sell.outline.maker : buy.outline.maker, sell.addresses[0] != address(0) ? buy.outline.maker : sell.outline.maker, price, metadata);
     }
 
 }

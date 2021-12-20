@@ -131,9 +131,9 @@ describe("SuperFarm Marketplace", function(){
 
     it("MarketPlace listing with decreasing price", async function() {
         let salt = 1;
-        let abi = ["function transferFrom(address from,address to,uint256 tokenId)"]
+        let abi = ["function safeTransferFrom(address from,address to,uint256 id,uint256 amount,bytes data)"]
         let iface = new ethers.utils.Interface(abi)
-        let dataSell = iface.encodeFunctionData("transferFrom", [bob.address, utils.NULL_ADDRESS, 1]);
+        let dataSell = iface.encodeFunctionData("safeTransferFrom", [bob.address, utils.NULL_ADDRESS, 1]);
         let time = await utils.getCurrentTime()
         let orderSell = utils.makeOrder(
             ethers.utils.parseEther("1.5"),

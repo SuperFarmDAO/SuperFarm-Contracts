@@ -72,11 +72,11 @@ abstract contract Exchange is ExchangeCore {
     /**
      * @dev Call validateOrder
      */
-    function validateOrder(Order calldata order, bytes calldata signature)
+    function validateOrder(Order calldata order, Sig calldata sig)
         external view
         returns (bool)
     {
-        return _validateOrder(_hashToSign(order), order, signature);
+        return _validateOrder(_hashToSign(order), order, sig);
     }
 
     /**
@@ -91,10 +91,10 @@ abstract contract Exchange is ExchangeCore {
     /**
      * @dev Call cancelOrder
      */
-    function cancelOrder_(Order calldata order,bytes calldata signature)
+    function cancelOrder_(Order calldata order,Sig calldata sig)
         external
     {
-        return _cancelOrder(order, signature);
+        return _cancelOrder(order, sig);
     }
 
     /**
@@ -153,18 +153,18 @@ abstract contract Exchange is ExchangeCore {
      */
     function atomicMatch_(
         Order calldata buy,
-        bytes calldata signatureBuy,
+        Sig calldata sigBuy,
         Order calldata sell,
-        bytes calldata signatureSell,
+        Sig calldata sigSell,
         bytes32 metadata,
         Order[] calldata toInvalidate,
-        bytes calldata signatures
+        Sig[] calldata sigs
         )
         external payable
         nonReentrant
     {
 
-        return _atomicMatch(buy, signatureBuy, sell, signatureSell, metadata, toInvalidate, signatures);
+        return _atomicMatch(buy, sigBuy, sell, sigSell, metadata, toInvalidate, sigs);
     }
 
 }
