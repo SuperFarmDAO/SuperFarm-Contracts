@@ -8,7 +8,6 @@ import "../../proxy/TokenTransferProxy.sol";
 import "../../proxy/AuthenticatedProxy.sol";
 import "../../utils/Utils.sol";
 import "../../libraries/Sales.sol";
-import "../../libraries/Fees.sol";
 import "../../libraries/EIP712.sol";
 import "../../libraries/EIP1271.sol";
 
@@ -17,37 +16,48 @@ import "../../libraries/EIP1271.sol";
     @author Project Wyvern Developers
     @author Rostislav Khlebnikov
  */
-contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
+abstract contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
+
+    /**  The public identifier for the right to set new items. */
+    bytes32 public constant FEE_CONFIG = keccak256("FEE_CONFIG");
+
+    bytes32 public constant OUTLINE_TYPEHASH =
+        keccak256(
+            "Outline(uint256 basePrice,uint256 listingTime,uint256 expirationTime,address exchange,address maker,uint8 side,address taker,uint8 saleKind,address target,uint8 callType,address paymentToken)"
+        );
+
+    bytes32 public constant ORDER_TYPEHASH =
+        keccak256(
+            "Order(Outline outline,uint256[] extra,uint256 salt,uint256[] fees,address[] addresses,address staticTarget,bytes data,bytes replacementPattern,bytes staticExtradata)Outline(uint256 basePrice,uint256 listingTime,uint256 expirationTime,address exchange,address maker,uint8 side,address taker,uint8 saleKind,address target,uint8 callType,address paymentToken)"
+        );
 
     bytes4 constant internal EIP_1271_MAGICVALUE = 0x20c13b0b;
 
-    bytes internal personalSignPrefix = "\x19Ethereum Signed Message:\n";
-
-    // The public identifier for the right to set new items.
-  bytes32 public constant SET_FEES = keccak256("SET_FEES");
-
-    /* Token transfer proxy. */
+    /** Token transfer proxy. */
     address public tokenTransferProxy;
 
-    /* User registry. */
+    /** User registry. */
     address public registry;
 
-    /* Trusted proxy registry contracts. */
+    /** Trusted proxy registry contracts. */
     mapping(address => bool) public registries;
 
-    /* Cancelled / finalized orders, by hash. */
+    /** Cancelled / finalized orders, by hash. */
     mapping(bytes32 => bool) public cancelledOrFinalized;
 
-    /* Orders verified by on-chain approval (alternative to ECDSA signatures so that smart contracts can place orders directly). */
+    /** Orders verified by on-chain approval (alternative to ECDSA signatures so that smart contracts can place orders directly). */
     mapping(bytes32 => bool) public approvedOrders;
 
-    /* The royalty fee for this platform. */
+    /** The royalty fee for this platform. */
     uint public minimumPlatformFee; 
 
-    /* Inverse basis point. */
+    /** The royalty fee address of the platform */
+    address public platformFeeAddress;
+
+    /** Inverse basis point. */
     uint public constant INVERSE_BASIS_POINT = 10000;
 
-    /* An ECDSA signature. */ 
+     /* An ECDSA signature. */ 
     struct Sig {
         /* v parameter */
         uint8 v;
@@ -57,53 +67,60 @@ contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
         bytes32 s;
     }
 
-    /* An order on the exchange. */
-    struct Order {
-        /* Base price of the order (in paymentTokens). */
-        uint basePrice;
-        /* ending time + ending price.*/
-        uint[] extra;
-        /* Listing timestamp. */
-        uint listingTime;
-        /* Expiration timestamp - 0 for no expiry. */
-        uint expirationTime;
-        /* Order salt, used to prevent duplicate hashes. */
-        uint salt;
-        /* Royalty fees per group */ 
-        uint[] fees;
-        /* Royalty fees receivers per group */ 
-        address[][] addresses; 
-        /* Exchange address, intended as a versioning mechanism. */
+    /** supporting struct for order to avoid stack too deep */
+    struct Outline{
+        /** Base price of the order (in paymentTokens). */
+        uint256 basePrice;
+        /** Listing timestamp. */
+        uint256 listingTime;
+        /** Expiration timestamp - 0 for no expiry. */
+        uint256 expirationTime;
+        /** Exchange address, intended as a versioning mechanism. */
         address exchange;
-        /* Order maker address. */
+        /** Order maker address. */
         address maker;
-        /* Side (buy/sell). */
+        /** Side (buy/sell). */
         Sales.Side side;
-        /* Order taker address, if specified. */
+        /** Order taker address, if specified. */
         address taker;
-        /* Kind of sale. */
+        /** Kind of sale. */
         Sales.SaleKind saleKind;
-        /* callType. */
-        AuthenticatedProxy.CallType callType;
-        /* Target. */
+        /** Target. */
         address target;
-        /* Static call target, zero-address for no static call. */
-        address staticTarget;
-        /* Token used to pay for the order, or the zero-address as a sentinel value for Ether. */
+        /** callType. */
+        AuthenticatedProxy.CallType callType;
+        /** Token used to pay for the order, or the zero-address as a sentinel value for Ether. */
         address paymentToken;
-        /* Calldata. */
+    }
+
+    /** An order on the exchange. */
+    struct Order {
+        /** order essentials */
+        Outline outline;
+        /** ending time + ending price.*/
+        uint256[] extra;
+        /** Order salt, used to prevent duplicate hashes. */
+        uint256 salt;
+        /** Royalty fees*/ 
+        uint256[] fees;
+        /** Royalty fees receivers*/ 
+        address[] addresses; 
+        /** Static call target, zero-address for no static call. */
+        address staticTarget;
+        /** Calldata. */
         bytes data;
-        /* Calldata replacement pattern, or an empty byte array for no replacement. */
+        /** Calldata replacement pattern, or an empty byte array for no replacement. */
         bytes replacementPattern;
-        /* Static call extra data. */
+        /** Static call extra data. */
         bytes staticExtradata;
     }
 
-    event OrderApprovedPartOne    (bytes32 indexed hash, address exchange, address indexed maker, address taker, uint platformFee, address indexed feeRecipient, Sales.Side side, Sales.SaleKind saleKind, address target);
-    event OrderApprovedPartTwo    (bytes32 indexed hash, AuthenticatedProxy.CallType callType, bytes data, bytes replacementPattern, address staticTarget, bytes staticExtradata, address paymentToken, uint basePrice, uint[] extra, uint listingTime, uint expirationTime, uint salt, bool orderbookInclusionDesired);
-    event OrderCancelled                    (bytes32 indexed hash);
-    event OrdersMatched                    (bytes32 buyHash, bytes32 sellHash, address indexed maker, address indexed taker, uint price, bytes32 indexed metadata);
+    event OrderApproved(bytes32 indexed hash, address indexed maker, address indexed taker, bytes data);
+    event OrderCancelled(bytes32 indexed hash, address indexed maker, bytes data);
+    event OrdersMatched (bytes32 buyHash, bytes32 sellHash, address indexed maker, address indexed taker, bytes data);
     
+    constructor(string memory name, string memory version) EIP712(name, version){}
+
     /**
      * @dev Transfer tokens
      * @param token Token to transfer
@@ -145,70 +162,51 @@ contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
     }
 
     /**
-     * Calculate size of an order struct when tightly packed
-     *
-     * @param order Order to calculate size of
-     * @return Size in bytes
-     */
-    function sizeOf(Order memory order)
-        private
-        pure
-        returns (uint)
-    {
-        return ((0x14 * 7) + (0x20 * 9) + 4 + order.data.length + order.replacementPattern.length + order.staticExtradata.length);
-    }
-
-    function exists(address what)
-        private
-        view
-        returns (bool)
-    {
-        uint size;
-        assembly {
-            size := extcodesize(what)
-        }
-        return size > 0;
-    }
-
-    /**
      * @dev Hash an order, returning the canonical order hash, without the message prefix
      * @param order Order to hash
      * @return hash Hash of order
      */
-    function _hashOrder(Order memory order)
+    function _hash(Order memory order)
         internal
         pure
-        returns (bytes32 hash){
-        /* Unfortunately abi.encodePacked doesn't work here, stack size constraints. */
-        uint size = sizeOf(order);
-        bytes memory array = new bytes(size);
-        uint index;
-        assembly {
-            index := add(array, 0x20)
-        }
-        index = ArrayUtils.unsafeWriteUint(index, order.basePrice);
-        index = ArrayUtils.unsafeWriteUintArray(index, order.extra);
-        index = ArrayUtils.unsafeWriteUint(index, order.listingTime);
-        index = ArrayUtils.unsafeWriteUint(index, order.expirationTime);
-        index = ArrayUtils.unsafeWriteUint(index, order.salt);
-        index = ArrayUtils.unsafeWriteUintArray(index, order.fees);
-        index = ArrayUtils.unsafeWriteAddressMap(index, order.addresses);
-        index = ArrayUtils.unsafeWriteAddress(index, order.exchange);
-        index = ArrayUtils.unsafeWriteAddress(index, order.maker);
-        index = ArrayUtils.unsafeWriteUint8(index, uint8(order.side));
-        index = ArrayUtils.unsafeWriteAddress(index, order.taker);
-        index = ArrayUtils.unsafeWriteUint8(index, uint8(order.saleKind));
-        index = ArrayUtils.unsafeWriteUint8(index, uint8(order.callType));
-        index = ArrayUtils.unsafeWriteAddress(index, order.target);
-        index = ArrayUtils.unsafeWriteAddress(index, order.staticTarget);
-        index = ArrayUtils.unsafeWriteAddress(index, order.paymentToken);
-        index = ArrayUtils.unsafeWriteBytes(index, order.data);
-        index = ArrayUtils.unsafeWriteBytes(index, order.replacementPattern);
-        index = ArrayUtils.unsafeWriteBytes(index, order.staticExtradata);
-        assembly {
-            hash := keccak256(add(array, 0x20), size)
-        }
-        return hash;
+        returns (bytes32){
+        return keccak256(
+            abi.encode(
+                ORDER_TYPEHASH,
+                _hash(order.outline),
+                keccak256(abi.encodePacked(order.extra)),
+                order.salt,
+                keccak256(abi.encodePacked(order.fees)),
+                keccak256(abi.encodePacked(order.addresses)),
+                order.staticTarget,
+                keccak256(order.data),
+                keccak256(order.replacementPattern),
+                keccak256(order.staticExtradata)
+            ));
+    }
+
+    function _hash(Outline memory outline)
+        private
+        pure
+        returns (bytes32)
+    {
+        return
+            keccak256(
+                abi.encode(
+                    OUTLINE_TYPEHASH,
+                    outline.basePrice,
+                    outline.listingTime,
+                    outline.expirationTime,
+                    outline.exchange,
+                    outline.maker,
+                    outline.side,
+                    outline.taker,
+                    outline.saleKind,
+                    outline.target,
+                    outline.callType,
+                    outline.paymentToken
+                )
+            );
     }
     
 
@@ -219,25 +217,19 @@ contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
      */
     function _hashToSign(Order memory order)
         internal
-        pure
-        returns (bytes32)
-    {
-        return keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", _hashOrder(order)));
-    }
-
-    /**
-     * @dev Assert an order is valid and return its hash
-     * @param order Order to validate
-     * @param sig ECDSA signature
-     */
-    function requireValidOrder(Order memory order, Sig memory sig)
-        internal
         view
         returns (bytes32)
     {
-        bytes32 hash = _hashToSign(order);
-        require(_validateOrder(hash, order, sig));
-        return hash;
+       return keccak256(abi.encodePacked(
+            "\x19\x01",
+            DOMAIN_SEPARATOR,
+            _hash(order)
+        ));
+    }
+
+    function recover(Order memory order, Sig memory sig) external view returns(address result){
+        result = ecrecover(_hashToSign(order), sig.v, sig.r, sig.s);
+        return result;
     }
 
      /**
@@ -248,14 +240,22 @@ contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
         internal
         view
         returns (bool)
-    {   // TODO (2) sell order must have fees as mandatory
-        /* Order must be targeted at this platform version (this Exchange contract). */
-        if (order.exchange != address(this)) {
+    {
+        /** Order must be targeted at this platform version (this Exchange contract). */
+        if (order.outline.exchange != address(this)) {
+            return false;
+        }
+        /** Target must exist (prevent malicious selfdestructs just prior to order settlement). */
+        if(!Address.isContract(order.outline.target)){
             return false;
         }
 
-        /* Order must possess valid sale kind parameter combination. */
-        if (!Sales.validateParameters(order.saleKind, order.expirationTime)) {
+        /** Order must possess valid sale kind parameter combination. */
+        if(!Sales.canSettleOrder(order.outline.listingTime, order.outline.expirationTime)){
+            return false;
+        }
+
+        if (!Sales.validateParameters(order.outline.saleKind, order.outline.expirationTime)) {
             return false;
         }
 
@@ -265,134 +265,42 @@ contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
     /**
      * @dev Validate a provided previously approved / signed order, hash, and signature.
      * @param hash Order hash (already calculated, passed to avoid recalculation)
-     * @param order Order to validate
+     * @param maker order maker
      * @param sig ECDSA signature
      */
-    function _validateOrder(bytes32 hash, Order memory order, Sig memory sig) 
+    function authenticateOrder(bytes32 hash, address maker, Sig memory sig) 
         internal
         view
         returns (bool)
-    {
-        /* Not done in an if-conditional to prevent unnecessary ecrecover evaluation, which seems to happen even though it should short-circuit. */
-
-        /* Order must have valid parameters. */
-        if (!_validateOrderParameters(order)) {
-            return false;
-        }
-        /* Order must have not been canceled or already filled. */
+    {   
+        /** Order is cancelled or executed in the past.*/
         if (cancelledOrFinalized[hash]) {
             return false;
         }
-        /* Order authentication. Order must be either:
-        /* (a) previously approved */
+        /** Order maker initiated transaction. */
+        if (maker == msg.sender){
+            return true;
+        }
+        /** Order is previously approved. */
         if (approvedOrders[hash]) {
             return true;
         }
-        /* or (b) ECDSA-signed by maker. */
-        if (ecrecover(hash, sig.v, sig.r, sig.s) == order.maker) {
+
+        /** Contract-only authentication: EIP/ERC 1271. */
+        if (Address.isContract(maker)) {
+            bytes memory signature = abi.encodePacked(sig.r, sig.s, sig.v);
+            if (ERC1271(maker).isValidSignature(abi.encodePacked(hash), signature) == EIP_1271_MAGICVALUE) {
+                return true;
+            }
+            return false;
+        }
+
+        /** Account-only authentication: ECDSA-signed by maker. */
+        if (ecrecover(hash, sig.v, sig.r, sig.s) == maker) {
             return true;
         }
 
         return false;
-    }
-
-    /**
-     * @dev Approve an order and optionally mark it for orderbook inclusion. Must be called by the maker of the order
-     * @param order Order to approve
-     * @param orderbookInclusionDesired Whether orderbook providers should include the order in their orderbooks
-     */
-    function _approveOrder(Order memory order, bool orderbookInclusionDesired)
-        internal
-    {
-        /* CHECKS */
-
-        /* Assert sender is authorized to approve order. */
-        require(msg.sender == order.maker);
-
-        /* Calculate order hash. */
-        bytes32 hash = _hashToSign(order);
-
-        /* Assert order has not already been approved. */
-        require(!approvedOrders[hash]);
-
-        /* EFFECTS */
-    
-        /* Mark order as approved. */
-        approvedOrders[hash] = true;
-  
-        /* Log approval event. Must be split in two due to Solidity stack size limitations. */
-        {
-            emit OrderApprovedPartOne(hash, order.exchange, order.maker, order.taker, order.fees[0], order.addresses[0][0], order.side, order.saleKind, order.target);
-        }
-        {   
-            emit OrderApprovedPartTwo(hash, order.callType, order.data, order.replacementPattern, order.staticTarget, order.staticExtradata, order.paymentToken, order.basePrice, order.extra, order.listingTime, order.expirationTime, order.salt, orderbookInclusionDesired);
-        }
-    }
-
-    /**
-     * @dev Cancel an order, preventing it from being matched. Must be called by the maker of the order
-     * @param order Order to cancel
-     * @param sig ECDSA signature
-     */
-    function _cancelOrder(Order memory order, Sig memory sig) 
-        internal
-    {
-        /* CHECKS */
-
-        /* Calculate order hash. */
-        bytes32 hash = requireValidOrder(order, sig);
-
-        /* Assert sender is authorized to cancel order. */
-        require(msg.sender == order.maker);
-  
-        /* EFFECTS */
-      
-        /* Mark order as cancelled, preventing it from being matched. */
-        cancelledOrFinalized[hash] = true;
-
-        /* Log cancel event. */
-        emit OrderCancelled(hash);
-    }
-
-    /**
-     * @dev Calculate the current price of an order (convenience function)
-     * @param order Order to calculate the price of
-     * @return The current price of the order
-     */
-    function _calculateCurrentPrice (Order memory order)
-        internal  
-        view
-        returns (uint)
-    {
-        return Sales.calculateFinalPrice(order.saleKind, order.basePrice, order.extra, order.listingTime);
-    }
-
-   /**
-     * @dev Calculate the price two orders would matchs at, if in fact they would match (otherwise fail)
-     * @param buy Buy-side order
-     * @param sell Sell-side order
-     * @return Match price
-     */
-    function _calculateMatchPrice(Order memory buy, Order memory sell)
-        view
-        internal
-        returns (uint)
-    {
-        /* Calculate sell price. */
-        uint sellPrice = Sales.calculateFinalPrice(sell.saleKind, sell.basePrice, sell.extra, sell.listingTime);
-
-        /* Calculate buy price. */
-        uint buyPrice = Sales.calculateFinalPrice(buy.saleKind, buy.basePrice, buy.extra, buy.listingTime);
-
-        /* Require price cross. */
-        require(buyPrice >= sellPrice);
-
-        /* Maker/taker priority. */
-        if (sell.saleKind == Sales.SaleKind.Auction || sell.saleKind == Sales.SaleKind.Offer) {
-            return buyPrice;
-        } else {
-            return sellPrice;
-        }
     }
 
     /**
@@ -404,38 +312,37 @@ contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
         internal
         returns (uint)
     {
-        /* Calculate match price. */
+        /** Calculate match price. */
         uint requiredAmount = _calculateMatchPrice(buy, sell);
 
-        /* Calculate royalty fees */
-        (address[] memory addresses, uint[] memory fees) = Fees.chargeFee(sell.addresses, sell.fees, requiredAmount);
-        
-        /* Calculate amount for seller to receive */
+        /** Calculate amount for seller to receive */
         uint receiveAmount =  requiredAmount;
-
+        uint fee;
         if (requiredAmount > 0){
-            /* If paying using a token (not Ether), transfer tokens. */
-            if (sell.paymentToken != address(0)){
+            /** If paying using a token (not Ether), transfer tokens. */
+            if (sell.outline.paymentToken != address(0)){
                 require(msg.value == 0);
-                for(uint256 i = 0; i < addresses.length; i++){
-                    receiveAmount -= fees[i];
-                    transferTokens(buy.paymentToken, buy.maker, addresses[i], fees[i]);
+                for(uint256 i = 0; i < sell.addresses.length; i++){
+                    fee = (requiredAmount*sell.fees[i])/10000;
+                    receiveAmount -= fee;
+                    transferTokens(buy.outline.paymentToken, buy.outline.maker, sell.addresses[i], fee);
                 }
-                transferTokens(sell.paymentToken, buy.maker, sell.maker, receiveAmount);
+                transferTokens(sell.outline.paymentToken, buy.outline.maker, sell.outline.maker, receiveAmount);
             } else {
-                /* Special-case Ether, order must be matched by buyer. */
+                /** Special-case Ether, order must be matched by buyer. */
                 require(msg.value >= requiredAmount);
-                /* transfer fees */
-                for(uint256 i = 0; i < addresses.length; i++){
-                    receiveAmount -= fees[i];
-                    payable(addresses[i]).transfer(fees[i]);
+                /** transfer fees */
+                for(uint256 i = 0; i < sell.addresses.length; i++){
+                    fee = (requiredAmount*sell.fees[i])/10000;
+                    receiveAmount -= fee;
+                    payable(sell.addresses[i]).transfer(fee);
                 }
-                payable(sell.maker).transfer(receiveAmount);
+                payable(sell.outline.maker).transfer(receiveAmount);
 
-                /* Allow overshoot for variable-price auctions, refund difference. */
+                /** Allow overshoot for variable-price auctions, refund difference. */
                 uint diff = msg.value - requiredAmount;
                 if (diff > 0) {
-                    payable(buy.maker).transfer(diff);
+                    payable(buy.outline.maker).transfer(diff);
                 }
             }
         }   
@@ -449,120 +356,233 @@ contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
      * @param sell Sell-side order
      * @return Whether or not the two orders can be matched
      */
-    function _ordersCanMatch(Order memory buy, Order memory sell)
+    function _ordersMatch(Order memory buy, Order memory sell)
         internal
         view
         returns (bool)
     {
-        return (
-            /* Must be opposite-side. */
-            (buy.side == Sales.Side.Buy && sell.side == Sales.Side.Sell) &&     
-            /* Must use same payment token. */
-            (buy.paymentToken == sell.paymentToken) &&
-            /* Must match maker/taker addresses. */
-            (sell.taker == address(0) || sell.taker == buy.maker) &&
-            (buy.taker == address(0) || buy.taker == sell.maker) &&
-            /* One must be maker and the other must be taker (no bool XOR in Solidity). */
-            sell.addresses[0][0] != address(0) &&
-            /* One must have platform fee on seller side */
-            (sell.fees[0] >= minimumPlatformFee) &&
-            /* Must match target. */
-            (buy.target == sell.target) &&
-            /* Must match callType. */
-            (buy.callType == sell.callType) &&
-            /* Buy-side order must be settleable. */
-            Sales.canSettleOrder(buy.listingTime, buy.expirationTime) &&
-            /* Sell-side order must be settleable. */
-            Sales.canSettleOrder(sell.listingTime, sell.expirationTime)
-        );
+            /** Must be opposite-side. */
+            if(!(buy.outline.side == Sales.Side.Buy && sell.outline.side == Sales.Side.Sell)){ 
+                return false;
+            }     
+            /** Must use same payment token. */
+            if(!(buy.outline.paymentToken == sell.outline.paymentToken)){
+                return false;
+            }
+            /** Must match maker/taker addresses. */
+            if(!(sell.outline.taker == address(0) || sell.outline.taker == buy.outline.maker)){
+                return false;
+            }
+            if(!(buy.outline.taker == address(0) || buy.outline.taker == sell.outline.maker)){
+                return false;
+            }
+            /** Platform fees address is  */
+            if(!(sell.addresses[0] == platformFeeAddress)){
+                return false;
+            }
+            /** One must have platform fee on seller side */
+            if(!(sell.fees[0] >= minimumPlatformFee)){
+                return false;
+            }
+            /** Must match target. */
+            if(!(buy.outline.target == sell.outline.target)){
+                return false;
+            }
+            /** Must match callType. */
+            if(!(buy.outline.callType == sell.outline.callType)){
+                return false;
+            }
+            return true;
     }
 
     /**
      * @dev Atomically match two orders, ensuring validity of the match, and execute all associated state transitions. Protected against reentrancy by a contract-global lock.
-     * @param buy Buy-side order
-     * @param buySig Buy-side order signature
-     * @param sell Sell-side order
-     * @param sellSig Sell-side order signature
+     * @param buy Buy-side order.
+     * @param sigBuy Buy-side order signature.
+     * @param sell Sell-side order.
+     * @param sigSell Sell-side order signature.
+     * @param additionalSales Additional sell-orders to invalidate.
+     * @param sigs Signatures for additional sales.
      */
-    function _atomicMatch(Order memory buy, Sig calldata buySig, Order memory sell, Sig calldata sellSig, bytes32 metadata, Order[] calldata additionalSales, Sig[] calldata sigs )
+    function _atomicMatch(Order memory buy, Sig memory sigBuy, Order memory sell, Sig memory sigSell, Order[] calldata additionalSales, Sig[] calldata sigs )
         internal
-    {
-        /* CHECKS */
-        bytes32 buyHash;
-        bytes32 sellHash;
-        AuthenticatedProxy proxy;
-        {
-        /* Ensure buy order validity and calculate hash if necessary. */
-        if (buy.maker == msg.sender) {
-            require(_validateOrderParameters(buy));
-        } else {
-            buyHash = requireValidOrder(buy, buySig);
-        }
+    {   
+        /** CHECKS */
 
-        /* Ensure sell order validity and calculate hash if necessary. */
-        if (sell.maker == msg.sender) {
-            require(_validateOrderParameters(sell));
-        } else {
-            sellHash = requireValidOrder(sell, sellSig);
-        }
-        
-        /* Must be matchable. */
-        require(_ordersCanMatch(buy, sell));
-        
-        /* Target must exist (prevent malicious selfdestructs just prior to order settlement). */
-        require(exists(sell.target));
-        /* Must match calldata after replacement, if specified. */
+        /** Orders should match. */
+        require(_ordersMatch(buy, sell), "Marketplace: orders do not match.");
+
+        /** Get buy order hash. */
+        bytes32 buyHash = _hashToSign(buy);
+
+        /** Validate buy order. */
+        require(_validateOrderParameters(buy), "Marketplace: buy order invalid.");
+
+        /** Get sell order hash. */
+        bytes32 sellHash = _hashToSign(sell);
+
+        /** Validate sell order. */
+        require(_validateOrderParameters(sell), "Marketplace: sell order invalid.");
+
+        /** Prevent self-matching. */
+        require(buyHash != sellHash, "Marketplace: self-matching is prohibited.");
+
+        /** Authenticate buy order. */
+        require(authenticateOrder(buyHash, buy.outline.maker, sigBuy), "Marketplace: can not autheticate buy order.");
+
+        /** Authenticate sell order. */
+        require(authenticateOrder(sellHash, sell.outline.maker, sigSell), "Marketplace: can not autheticate buy order.");
+   
+        /** Must match calldata after replacement, if specified. */
         if (buy.replacementPattern.length > 0) {
-          ArrayUtils.guardedArrayReplace(buy.data, sell.data, buy.replacementPattern);
+            ArrayUtils.guardedArrayReplace(buy.data, sell.data, buy.replacementPattern);
         }
         if (sell.replacementPattern.length > 0) {
-          ArrayUtils.guardedArrayReplace(sell.data, buy.data, sell.replacementPattern);
+            ArrayUtils.guardedArrayReplace(sell.data, buy.data, sell.replacementPattern);
         }
-        require(ArrayUtils.arrayEq(buy.data, sell.data));
+        require(ArrayUtils.arrayEq(buy.data, sell.data), "Marketplace: orders function call is not matched.");
         
-        /* Retrieve delegateProxy contract. */
-        address delegateProxy = IProxyRegistry(registry).proxies(sell.maker);
+        /** Retrieve delegateProxy contract. */
+        address delegateProxy = IProxyRegistry(registry).proxies(sell.outline.maker);
 
-        /* Proxy must exist. */
-        require(exists(delegateProxy));
+        /** Proxy must exist. */
+        require(Address.isContract(delegateProxy));
 
-        /* Assert implementation. */
+        /** Assert implementation. */
         require(OwnableDelegateProxy(payable(delegateProxy)).implementation() == IProxyRegistry(registry).delegateProxyImplementation());
+        
+        /** Access the passthrough AuthenticatedProxy. */
+        AuthenticatedProxy proxy= AuthenticatedProxy(payable(delegateProxy));
+        
+        /** EFFECTS */
 
-        /* Access the passthrough AuthenticatedProxy. */
-        proxy= AuthenticatedProxy(payable(delegateProxy));
-        }
-        /* EFFECTS */
+        /** Mark previously signed or approved orders as finalized. */
+        cancelledOrFinalized[buyHash] = true;
+        cancelledOrFinalized[sellHash] = true;
+    
+        /** INTERACTIONS */
 
-        /* Mark previously signed or approved orders as finalized. */
-        if (msg.sender != buy.maker) {
-            cancelledOrFinalized[buyHash] = true;
-        }
-        if (msg.sender != sell.maker) {
-            cancelledOrFinalized[sellHash] = true;
-        }
-        /* INTERACTIONS */
-
-        /* Execute funds transfer and pay fees. */
+        /** Execute funds transfer and pay fees. */
         uint price = executeFundsTransfer(buy, sell);
 
-        /* Execute specified call through proxy. */
-        require(proxy.call(sell.target, sell.callType, sell.data));
+        /** Execute asset transfer call through proxy. */
+        require(proxy.call(sell.outline.target, sell.outline.callType, sell.data));
 
-        /* Static calls are intentionally done after the effectful call so they can check resulting state. */
+        /** Static calls are intentionally done after the effectful call so they can check resulting state. */
 
-        /* Handle buy-side static call if specified. */
+        /** Handle buy-side static call if specified. */
         if (buy.staticTarget != address(0)) {
             require(staticCall(buy.staticTarget, sell.data, buy.staticExtradata));
         }
 
-        /* Handle sell-side static call if specified. */
+        /** Handle sell-side static call if specified. */
         if (sell.staticTarget != address(0)) {
             require(staticCall(sell.staticTarget, sell.data, sell.staticExtradata));
         }
 
-        /* Log match event. */
-        emit OrdersMatched(buyHash, sellHash, sell.addresses[0][0] != address(0) ? sell.maker : buy.maker, sell.addresses[0][0] != address(0) ? buy.maker : sell.maker, price, metadata);
+        if (additionalSales.length > 0){
+            require(additionalSales.length == sigs.length, "Marketplace: wrong arguments for invalidation.");
+            for(uint i; i < additionalSales.length; i++){
+                _cancelOrder(additionalSales[i], sigs[i]);
+            }
+        }
+
+        /** Log match */
+        bytes memory settledParameters = abi.encode(price, sell.outline.target, buy.data);
+
+        emit OrdersMatched(buyHash, sellHash,sell.outline.maker, buy.outline.maker, settledParameters);
     }
 
+    /**
+     * @dev Calculate the current price of an order (convenience function)
+     * @param order Order to calculate the price of
+     * @return The current price of the order
+     */
+    function _calculateCurrentPrice (Order memory order)
+        internal  
+        view
+        returns (uint)
+    {
+        return Sales.calculateFinalPrice(order.outline.saleKind, order.outline.basePrice, order.extra, order.outline.listingTime);
+    }
+
+   /**
+     * @dev Calculate the price two orders would matchs at, if in fact they would match (otherwise fail)
+     * @param buy Buy-side order
+     * @param sell Sell-side order
+     * @return Match price
+     */
+    function _calculateMatchPrice(Order memory buy, Order memory sell)
+        view
+        internal
+        returns (uint)
+    {
+        /** Calculate sell price. */
+        uint sellPrice = Sales.calculateFinalPrice(sell.outline.saleKind, sell.outline.basePrice, sell.extra, sell.outline.listingTime);
+
+        /** Calculate buy price. */
+        uint buyPrice = Sales.calculateFinalPrice(buy.outline.saleKind, buy.outline.basePrice, buy.extra, buy.outline.listingTime);
+
+        /** Require price cross. */
+        require(buyPrice >= sellPrice);
+
+        /** Maker/taker priority. */
+        if (sell.outline.saleKind == Sales.SaleKind.Auction || sell.outline.saleKind == Sales.SaleKind.Offer) {
+            return buyPrice;
+        } else {
+            return sellPrice;
+        }
+    }
+    /**
+     * @dev Approve an order and optionally mark it for orderbook inclusion. Must be called by the maker of the order
+     * @param order Order to approve
+     */
+    function _approveOrder(Order memory order)
+        internal
+    {
+        /** CHECKS */
+
+        /** Assert sender is authorized to approve order. */
+        require(msg.sender == order.outline.maker);
+
+        require(order.outline.taker != address(0));
+
+        /** Calculate order hash. */
+        bytes32 hash = _hashToSign(order);
+
+        /** Assert order has not already been approved. */
+        require(!approvedOrders[hash]);
+
+        /** EFFECTS */
+    
+         /** Mark order as approved. */
+        approvedOrders[hash] = true;
+  
+        emit OrderApproved(hash, order.outline.maker, order.outline.taker, order.data);
+    }
+
+    /**
+     * @dev Cancel an order, preventing it from being matched. Must be called by the maker of the order
+     * @param order Order to cancel
+     * @param sig ECDSA signature
+     */
+    function _cancelOrder(Order memory order, Sig memory sig) 
+        internal
+    {
+        /** CHECKS */
+
+        /** Calculate order hash. */
+        bytes32 hash = _hashToSign(order);
+        
+        /** Assert sender is authorized to cancel order. */
+        require(msg.sender == order.outline.maker || authenticateOrder(hash, order.outline.maker, sig));
+
+        /** EFFECTS */
+      
+        /** Mark order as cancelled, preventing it from being matched. */
+        cancelledOrFinalized[hash] = true;
+
+        /** Log cancel event. */
+        emit OrderCancelled(hash, msg.sender, order.data);
+    }
 }

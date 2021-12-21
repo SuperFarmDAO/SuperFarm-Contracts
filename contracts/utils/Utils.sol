@@ -294,10 +294,11 @@ library ArrayUtils {
      * @param mask The mask specifying which bits can be changed
      */
     function guardedArrayReplace(bytes memory array, bytes memory desired, bytes memory mask)
-        internal pure
+        internal
+        pure
     {
-        require(array.length == desired.length, "Ux02");
-        require(array.length == mask.length, "Ux03");
+        require(array.length == desired.length);
+        require(array.length == mask.length);
 
         uint words = array.length / 0x20;
         uint index = words * 0x20;
@@ -341,7 +342,8 @@ library ArrayUtils {
      * @return Whether or not all bytes in the arrays are equal
      */
     function arrayEq(bytes memory a, bytes memory b)
-        internal pure
+        internal
+        pure
         returns (bool)
     {
         bool success = true;
@@ -394,7 +396,8 @@ library ArrayUtils {
      * @return End memory index
      */
     function unsafeWriteBytes(uint index, bytes memory source)
-        internal pure
+        internal
+        pure
         returns (uint)
     {
         if (source.length > 0) {
@@ -419,18 +422,19 @@ library ArrayUtils {
      * Unsafe write address array into a memory location
      *
      * @param index Memory location
-     * @param source Address array to write
+     * @param source uint array to write
      * @return End memory index
      */
     function unsafeWriteUintArray(uint index, uint[] memory source)
-        internal pure
+        internal 
+        pure
         returns (uint)
     {   
         for (uint i = 0; i < source.length; i++){
-            uint conv = uint(uint160(source[i])) << 0x60;
+            uint conv = source[i];
             assembly {
                 mstore(index, conv)
-                index := add(index, 0x14)
+                index := add(index, 0x20)
             }
         }
         return index;
@@ -440,20 +444,19 @@ library ArrayUtils {
      * Unsafe write address nested array into a memory location
      *
      * @param index Memory location
-     * @param source Address nested array to write
+     * @param source Address array to write
      * @return End memory index
      */
-    function unsafeWriteAddressMap(uint index, address[][] memory source)
-        internal pure
+    function unsafeWriteAddressArray(uint index, address[] memory source)
+        internal 
+        pure
         returns (uint)
     {   
         for (uint i = 0; i < source.length; i++){
-            for (uint j = 0; j < source[i].length; j++){
-                uint conv = uint(uint160(source[i][j])) << 0x60;
-                assembly {
+            uint conv = uint(uint160(source[i])) << 0x60;
+            assembly {
                     mstore(index, conv)
                     index := add(index, 0x14)
-                }
             }
         }
         return index;
@@ -467,7 +470,8 @@ library ArrayUtils {
      * @return End memory index
      */
     function unsafeWriteAddress(uint index, address source)
-        internal pure
+        internal
+        pure
         returns (uint)
     {
         uint conv = uint(uint160(source)) << 0x60;
@@ -486,7 +490,8 @@ library ArrayUtils {
      * @return End memory index
      */
     function unsafeWriteUint(uint index, uint source)
-        internal pure
+        internal
+        pure
         returns (uint)
     {
         assembly {
@@ -504,7 +509,8 @@ library ArrayUtils {
      * @return End memory index
      */
     function unsafeWriteUint8(uint index, uint8 source)
-        internal pure
+        internal
+        pure
         returns (uint)
     {
         assembly {
@@ -514,4 +520,14 @@ library ArrayUtils {
         return index;
     }
 
+    function summOfUintArray(uint[] memory source)
+    internal pure
+    returns (uint sum)
+    {
+        for (uint i =0; i < source.length; i++){
+            sum += source[i];
+        }
+        return sum;
+    }
+    
 }

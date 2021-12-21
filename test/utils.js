@@ -38,6 +38,8 @@ export const mint = {
         }
     }
 }
+
+
 export function makeOrder(
     _basePrice,
     _extra,
@@ -57,34 +59,37 @@ export function makeOrder(
     _paymentToken,
     _data,
     _replacementPattern,
-    _staticExtraData,
-    ){
+    _staticExtraData) 
+    {
     return {
-        basePrice: _basePrice,
+            outline: {
+            basePrice: _basePrice,
+            listingTime: _listingTime,
+            expirationTime: _expirationTime,
+            exchange: _exchange,
+            maker: _maker,
+            side: _side,
+            taker: _taker,
+            saleKind: _saleKind,
+            target: _target,
+            callType: _callType,
+            paymentToken: _paymentToken
+        },
         extra: _extra,
-        listingTime: _listingTime,
-        expirationTime: _expirationTime,
         salt: _salt,
         fees: _fees,
         addresses: _addresses,
-        exchange: _exchange,
-        maker: _maker,
-        side: _side,
-        taker: _taker,
-        saleKind: _saleKind,
-        callType: 0,
-        target: _target,
-        staticTarget: NULL_ADDRESS,
-        paymentToken: _paymentToken,
+        staticTarget: _staticTarget,
         data: _data,
         replacementPattern: _replacementPattern,
-        staticExtradata: 0x0
+        staticExtradata: _staticExtraData
     }
 }
+
 async function withTestTokens(){
     const TestERC1155 = await ethers.getContractFactory("TestERC1155");
     const TestERC721 = await ethers.getContractFactory("TestERC721");
-    const TestWrappedEther = await ethers.getContractFactory("TestWETH");
+    const TestWrappedEther = await ethers.getContractFactory("wETH");
 
     const erc1155 = await TestERC1155.deploy();
     await erc1155.deployed()
@@ -108,21 +113,109 @@ async function withProxies(){
     return [registry, transferProxy]
 }
 
-export const withContracts = async function(chainId){
+export const withContracts = async function(platformFeeAddress, minimumPlatformFee){
     const [erc1155, erc721, weth] = await withTestTokens();
     const[registry, transferProxy] = await withProxies();
 
     const Marketplace = await ethers.getContractFactory("SuperMarketplace");
 
     const marketplace = await Marketplace.deploy(
-        chainId,
         [registry.address],
         ethers.utils.defaultAbiCoder.encode(["string"],["\x19Ethereum Signed Message:\n"]),
         transferProxy.address,
+        platformFeeAddress,
+        minimumPlatformFee
     );
     await marketplace.deployed()
 
     return [marketplace, registry, transferProxy, erc1155, erc721, weth]
+}
+
+export const OrderType = {
+    Order: [
+        {
+            name: "outline",
+            type: "Outline"
+        },
+        {
+            name: "extra",
+            type: "uint256[]"
+        },
+        {
+            name: "salt",
+            type: "uint256"
+        },
+        {
+            name: "fees",
+            type: "uint256[]"
+        },
+        {
+            name: "addresses",
+            type: "address[]"
+        },
+        {
+            name: "staticTarget",
+            type: "address"
+        },
+        {
+            name: "data",
+            type: "bytes"
+        },
+        {
+            name: "replacementPattern",
+            type: "bytes"
+        },
+        {
+            name: "staticExtradata",
+            type: "bytes"
+        }
+    ],
+    Outline: [
+        {
+            name: "basePrice",
+            type: "uint256"
+        },
+        {
+            name: "listingTime",
+            type: "uint256"
+        },
+        {
+            name: "expirationTime",
+            type: "uint256"
+        },
+        {
+            name: "exchange",
+            type: "address"
+        },
+        {
+            name: "maker",
+            type: "address"
+        },
+        {
+            name: "side",
+            type: "uint8"
+        },
+        {
+            name: "taker",
+            type: "address"
+        },
+        {
+            name: "saleKind",
+            type: "uint8"
+        },
+        {
+            name: "target",
+            type: "address"
+        },
+        {
+            name: "callType",
+            type: "uint8"
+        },
+        {
+            name: "paymentToken",
+            type: "address"
+        },
+    ]
 }
 /*=======================MARKETPLACE===========================*/
 
