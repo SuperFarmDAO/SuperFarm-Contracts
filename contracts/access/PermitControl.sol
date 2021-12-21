@@ -76,22 +76,22 @@ abstract contract PermitControl is Ownable {
     uint256 expirationTime
   );
 
-  /**
-    A version of PermitUpdated for work with setPermits() function.
+//   /**
+//     A version of PermitUpdated for work with setPermits() function.
     
-    @param updator The address which has updated the permit.
-    @param updatees The addresses whose permit were updated.
-    @param circumstances The circumstances wherein the permits were updated.
-    @param roles The roles which were updated.
-    @param expirationTimes The times when the permits expire.
-  */
-  event PermitsUpdated(
-    address indexed updator,
-    address[] indexed updatees,
-    bytes32[] circumstances,
-    bytes32[] indexed roles,
-    uint256[] expirationTimes
-  );
+//     @param updator The address which has updated the permit.
+//     @param updatees The addresses whose permit were updated.
+//     @param circumstances The circumstances wherein the permits were updated.
+//     @param roles The roles which were updated.
+//     @param expirationTimes The times when the permits expire.
+//   */
+//   event PermitsUpdated(
+//     address indexed updator,
+//     address[] indexed updatees,
+//     bytes32[] circumstances,
+//     bytes32[] indexed roles,
+//     uint256[] expirationTimes
+//   );
 
   /**
     An event emitted when a management relationship in `managerRight` is
@@ -193,44 +193,44 @@ abstract contract PermitControl is Ownable {
       _expirationTime);
   }
 
-  /**
-    Version of setPermit() that works with multiple addresses in one transaction.
+//   /**
+//     Version of setPermit() that works with multiple addresses in one transaction.
 
-    @param _addresses The array of addresses to assign the specified `_right` to.
-    @param _circumstances The array of circumstances in which the `_right` is 
-                          valid.
-    @param _rights The array of specific rights to assign.
-    @param _expirationTimes The array of times when the `_rights` expires for 
-                            the provided _circumstance`.
-  */
-  function setPermits(
-    address[] memory _addresses,
-    bytes32[] memory _circumstances, 
-    bytes32[] memory _rights, 
-    uint256[] memory _expirationTimes
-  ) public virtual {
-    require((_addresses.length == _circumstances.length)
-             && (_circumstances.length == _rights.length)
-             && (_rights.length == _expirationTimes.length),
-             "leghts of input arrays are not equal"
-    );
-    bytes32 lastRight;
-    for(uint i = 0; i < _rights.length; i++) {
-      if (lastRight != _rights[i] || (i == 0)) { 
-        require(_msgSender() == owner() || hasRight(_msgSender(), _circumstances[i], _rights[i]), "P1");
-        require(_rights[i] != ZERO_RIGHT, "P2");
-        lastRight = _rights[i];
-      }
-      permissions[_addresses[i]][_circumstances[i]][_rights[i]] = _expirationTimes[i];
-    }
-    emit PermitsUpdated(
-      _msgSender(), 
-      _addresses,
-      _circumstances,
-      _rights,
-      _expirationTimes
-    );
-  }
+//     @param _addresses The array of addresses to assign the specified `_right` to.
+//     @param _circumstances The array of circumstances in which the `_right` is 
+//                           valid.
+//     @param _rights The array of specific rights to assign.
+//     @param _expirationTimes The array of times when the `_rights` expires for 
+//                             the provided _circumstance`.
+//   */
+//   function setPermits(
+//     address[] memory _addresses,
+//     bytes32[] memory _circumstances, 
+//     bytes32[] memory _rights, 
+//     uint256[] memory _expirationTimes
+//   ) public virtual {
+//     require((_addresses.length == _circumstances.length)
+//              && (_circumstances.length == _rights.length)
+//              && (_rights.length == _expirationTimes.length),
+//              "leghts of input arrays are not equal"
+//     );
+//     bytes32 lastRight;
+//     for(uint i = 0; i < _rights.length; i++) {
+//       if (lastRight != _rights[i] || (i == 0)) { 
+//         require(_msgSender() == owner() || hasRight(_msgSender(), _circumstances[i], _rights[i]), "P1");
+//         require(_rights[i] != ZERO_RIGHT, "P2");
+//         lastRight = _rights[i];
+//       }
+//       permissions[_addresses[i]][_circumstances[i]][_rights[i]] = _expirationTimes[i];
+//     }
+//     emit PermitsUpdated(
+//       _msgSender(), 
+//       _addresses,
+//       _circumstances,
+//       _rights,
+//       _expirationTimes
+//     );
+//   }
 
   /**
     Set the `_managerRight` whose `UNIVERSAL` holders may freely manage the
