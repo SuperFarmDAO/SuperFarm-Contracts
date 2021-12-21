@@ -67,7 +67,7 @@ describe("===TokenVault Timelock MultiSig=== ", function () {
         ProxyRegistry;
     let transValue = ethers.utils.parseEther("0");
     let prov = waffle.provider;        
-    let TimeNow = Math.floor(Date.now() / 1000);
+    let TimeNow = Math.floor(Date.now() / 1000)+1000;
     let transactionValue = ethers.utils.parseEther("0");
     let signatureMSG = "";
     let etherBalanceVault = ethers.utils.parseEther('500');
