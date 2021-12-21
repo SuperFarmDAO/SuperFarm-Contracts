@@ -11,8 +11,6 @@ import "../../libraries/Sales.sol";
 import "../../libraries/EIP712.sol";
 import "../../libraries/EIP1271.sol";
 
-import "hardhat/console.sol";
-
 /**
     @title modified ExchangeCore of ProjectWyvernV2
     @author Project Wyvern Developers
@@ -320,7 +318,6 @@ abstract contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
         /** Calculate amount for seller to receive */
         uint receiveAmount =  requiredAmount;
         uint fee;
-        console.logUint(receiveAmount);
         if (requiredAmount > 0){
             /** If paying using a token (not Ether), transfer tokens. */
             if (sell.outline.paymentToken != address(0)){
@@ -328,7 +325,6 @@ abstract contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
                 for(uint256 i = 0; i < sell.addresses.length; i++){
                     fee = (requiredAmount*sell.fees[i])/10000;
                     receiveAmount -= fee;
-                    console.logUint(receiveAmount);
                     transferTokens(buy.outline.paymentToken, buy.outline.maker, sell.addresses[i], fee);
                 }
                 transferTokens(sell.outline.paymentToken, buy.outline.maker, sell.outline.maker, receiveAmount);
@@ -339,7 +335,6 @@ abstract contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
                 for(uint256 i = 0; i < sell.addresses.length; i++){
                     fee = (requiredAmount*sell.fees[i])/10000;
                     receiveAmount -= fee;
-                    console.logUint(receiveAmount);
                     payable(sell.addresses[i]).transfer(fee);
                 }
                 payable(sell.outline.maker).transfer(receiveAmount);

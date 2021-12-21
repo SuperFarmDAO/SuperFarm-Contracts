@@ -162,7 +162,6 @@ abstract contract Exchange is ExchangeCore {
         external payable
         nonReentrant
     {
-
         return _atomicMatch(buy, sigBuy, sell, sigSell, toInvalidate, sigs);
     }
 
