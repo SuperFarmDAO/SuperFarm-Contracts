@@ -67,7 +67,7 @@ describe("===TokenVault Timelock MultiSig=== ", function () {
         ProxyRegistry;
     let transValue = ethers.utils.parseEther("0");
     let prov = waffle.provider;        
-    let TimeNow = Math.floor(Date.now() / 1000)+1000;
+    let TimeNow;
     let transactionValue = ethers.utils.parseEther("0");
     let signatureMSG = "";
     let etherBalanceVault = ethers.utils.parseEther('500');
@@ -75,6 +75,7 @@ describe("===TokenVault Timelock MultiSig=== ", function () {
     before(async () => {
         [admin, alice, bob, carol, dev] = await ethers.getSigners();
         // Create factories for deploying all required contracts using specified signers.
+        TimeNow = await getTime() + 100;
         Token = await ethers.getContractFactory("Token");
         MultiSigWallet = await ethers.getContractFactory("MultiSigWallet");
         Timelock = await ethers.getContractFactory("Timelock");
@@ -121,9 +122,9 @@ describe("===TokenVault Timelock MultiSig=== ", function () {
         tokenVault = await TokenVault.connect(admin).deploy(
             "Vault One",
             token.address,
-            multiSig.address,
-            multiSig.address,
-            3
+            multiSig.address, // panic owner  
+            multiSig.address, // panic destination
+            3 // panic
         );
         await tokenVault.deployed();
         proxyRegistry = await ProxyRegistry.connect(admin).deploy();
@@ -242,8 +243,11 @@ describe("===TokenVault Timelock MultiSig=== ", function () {
             ethers.constants.MaxUint256
         );
 
-        let works = await super721.hasRight(tokenVault.address, UNIVERSAL, BURN);
-
+        let works721 = await super721.hasRight(tokenVault.address, UNIVERSAL, BURN);
+        let works1155 = await super1155.hasRight(tokenVault.address, UNIVERSAL, BURN);
+        if (!works721) { console.log("BURN right was not given for 721 contract")}
+        if (!works1155) { console.log("BURN right was not given for 1155 contract")}
+        
         await expect( dev.sendTransaction({
             to: tokenVault.address,
             value: etherBalanceVault
@@ -260,7 +264,7 @@ describe("===TokenVault Timelock MultiSig=== ", function () {
     it("should allow the multisig to send tokens via timelock", async () => {
         let devBalance = await token.balanceOf(dev.address);
         devBalance.should.be.equal(0);
-        let eta = Math.floor(Date.now() / 1000) + 180000;
+        let eta = await getTime() + 180000;
 
         // Generate the raw transaction for releasing tokens from the vault.
         let releaseTokenTransaction =
@@ -361,36 +365,28 @@ describe("===TokenVault Timelock MultiSig=== ", function () {
         bobConfirmation.should.be.equal(true);
 
         // Wait for the time lock to mature.
-        let currentTime = 200500;
-        ethers.provider.send("evm_increaseTime", [currentTime]);
+        ethers.provider.send("evm_increaseTime", [190000]);
         ethers.provider.send("evm_mine");
 
         // Reset the second multisig holder's confirmation.
         await multiSig.connect(bob).revokeConfirmation(1);
-        console.log();
         let confCount = await multiSig.getConfirmationCount(1);
-        console.log("Confirmations: " + confCount);
+        // console.log("Confirmations: " + confCount);
         let owners = await multiSig.getOwners();
         let transCount = await multiSig.getTransactionCount(true, true);
-        console.log(owners.toString());
-        console.log(transCount.toString());
-
+        // console.log(owners.toString());
+        // console.log(transCount.toString());
         // Confirm that the time lock may now be executed.
-        console.log(1);
         confirmationTransaction = await multiSig.connect(bob).confirmTransaction(1);
 
         confCount = await multiSig.getConfirmationCount(1);
-        console.log("Confirmations: " + confCount);
-        
+        // console.log("Confirmations: " + confCount);
+        confirmationReceipt = await confirmationTransaction.wait();
+        executionEvent = confirmationReceipt.events[confirmationReceipt.events.length - 1];
+        executionEvent.event.should.be.equal("Execution");  
+
         devBalance = await token.balanceOf(dev.address);
         devBalance.should.be.equal(ethers.utils.parseEther("1000"));
-        
-        confirmationReceipt = await confirmationTransaction.wait();
-        executionEvent =
-            confirmationReceipt.events[confirmationReceipt.events.length - 1];
-        executionEvent.event.should.be.equal("Execution");
-
-        // TODO time now update  
     });
 
     it("should update panic data", async () => {
@@ -563,8 +559,8 @@ describe("===TokenVault Timelock MultiSig=== ", function () {
     describe('Test adding of tokens on contract ->', function () {
         beforeEach(async () => {
             let estimatesTimeOfArrival = await getTime() + 180000;
-            let add721 = await tokenVault.populateTransaction.addSuper721Addr([super721.address, super721Additional.address]);
-            let add1155 = await tokenVault.populateTransaction.addSuper1155Addr([super1155.address, super1155Additional.address]);
+            let add721 = await tokenVault.populateTransaction.addSuper721Addr([super721.address]);
+            let add1155 = await tokenVault.populateTransaction.addSuper1155Addr([super1155.address]);
 
             let enqueueTransaction1 = await timeLock.populateTransaction.queueTransaction(tokenVault.address, transactionValue, signatureMSG, add721.data, estimatesTimeOfArrival);
             let enqueueTransaction2 = await timeLock.populateTransaction.queueTransaction(tokenVault.address, transactionValue, signatureMSG, add1155.data, estimatesTimeOfArrival);
@@ -602,6 +598,8 @@ describe("===TokenVault Timelock MultiSig=== ", function () {
                 amounts: [ethers.utils.parseEther('10')], 
                 ids: []
             };
+
+            // TODO add assets to contract 
         });
         
         it("should add 721 and 1155 tokens to contract", async () => {
@@ -683,7 +681,7 @@ describe("===TokenVault Timelock MultiSig=== ", function () {
                     addTokens.data, 
                     estimatesTimeOfArrival
                 );
-                let executeTransaction = await timeLock.populateTransaction.queueTransaction(
+                let executeTransaction = await timeLock.populateTransaction.executeTransaction(
                     tokenVault.address,
                     transactionValue,
                     signatureMSG, 
@@ -692,8 +690,8 @@ describe("===TokenVault Timelock MultiSig=== ", function () {
                 );
                 
                 await multiSig.connect(alice).submitTransaction(timeLock.address, transactionValue, enqueueTransaction.data);
-                await multiSig.connect(alice).submitTransaction(timeLock.address, transactionValue, executeTransaction.data);
                 await multiSig.connect(bob).confirmTransaction(4);
+                await multiSig.connect(alice).submitTransaction(timeLock.address, transactionValue, executeTransaction.data);
                 ethers.provider.send("evm_increaseTime", [190000]);
                 ethers.provider.send("evm_mine");
                 
@@ -908,36 +906,45 @@ describe("===TokenVault Timelock MultiSig=== ", function () {
 
             // TODO before panic send tokens to contract
             it('PANIC transfer', async () => {
-                // let panicOwner = await tokenVault.panicOwner();
+                let panicOwner = await tokenVault.panicOwner();
+                // expect(panicOwner).to.be.equal(multiSig.address);
                 let balanceERC20 = await token.balanceOf(tokenVault.address);
                 let balanceERC721 = await super721.balanceOf(tokenVault.address);
                 let balanceERC1155 = await super1155.balanceOf(tokenVault.address, shiftedItemGroupId.add(1));
                 let balanceEthBefore = await prov.getBalance(tokenVault.address);
                 let balanceEthMsg = await prov.getBalance(multiSig.address);
-
                 let panic = await tokenVault.populateTransaction.panic();
-                await multiSig.connect(alice).submitTransaction(timeLock.address, transactionValue, panic.data);
-                console.log("submited")
+                await multiSig.connect(alice).submitTransaction(tokenVault.address, transactionValue, panic.data);
                 await multiSig.connect(bob).confirmTransaction(6);
                 
+                    
+                let balanceEthAfter = await prov.getBalance(tokenVault.address);
                 let zero = ethers.utils.parseEther('0');
-                // TODO tokens after operation on carol address balance on vault is zero  
-                // vault balances are zero 
-                expect(await token.balanceOf(tokenVault.address)).to.be.equal(zero);
-                expect(await super721.balanceOf(tokenVault.address)).to.be.equal(zero);
-                expect(await super1155.balanceOf(tokenVault.address, shiftedItemGroupId.add(1))).to.be.equal(zero);
-                expect(balanceEthAfter.sub(balanceEthBefore)).to.be.equal(zero); 
                 
+                // check ETH 
+                expect(balanceEthAfter).to.be.equal(zero); 
+                expect(await prov.getBalance(panicOwner)).to.be.equal(balanceEthBefore);
+                
+                // check ERC20 
                 expect(await token.balanceOf(multiSig.address)).to.be.equal(balanceERC20);
+                expect(await token.balanceOf(tokenVault.address)).to.be.equal(zero);
+                
+                // check ERC721
                 expect(await super721.balanceOf(multiSig.address)).to.be.equal(balanceERC721);
+                expect(await super721.balanceOf(tokenVault.address)).to.be.equal(zero);
+                
+                // check ERC1155 
                 expect(await super1155.balanceOf(multiSig.address, shiftedItemGroupId.add(1))).to.be.equal(balanceERC1155);
-
+                expect(await super1155.balanceOf(tokenVault.address, shiftedItemGroupId.add(1))).to.be.equal(zero);
+                
             });
 
             it('PANIC burn', async () => {
                 let estimatesTimeOfArrival = await getTime() + 180000;
                 let balanceEthBefore = await prov.getBalance(tokenVault.address);
-                
+                let balance721 = await super721.balanceOf(tokenVault.address);
+                let balance1155 = await super1155.balanceOf(tokenVault.address, shiftedItemGroupId.add(1));
+                let balanceERC20 = await token.balanceOf(tokenVault.address);
                 // change pnic distination to zero to call burn 
                 let changePanicDetails = await tokenVault.populateTransaction.changePanicDetails(bob.address, ZERO_ADDRESS);
                 let enqueueTransaction = await timeLock.populateTransaction.queueTransaction(
@@ -968,13 +975,14 @@ describe("===TokenVault Timelock MultiSig=== ", function () {
 
                 await tokenVault.connect(bob).panic();
                 let balanceEthAfter = await prov.getBalance(tokenVault.address);
-
+                
                 let zero = ethers.utils.parseEther('0');
                 // vault balances are zero 
+                expect(balanceEthAfter).to.be.equal(zero); 
                 expect(await token.balanceOf(tokenVault.address)).to.be.equal(zero);
-                expect(await super721.balanceOf(tokenVault.address)).to.be.equal(zero);
                 expect(await super1155.balanceOf(tokenVault.address, shiftedItemGroupId.add(1))).to.be.equal(zero);
-                expect(balanceEthAfter.sub(balanceEthBefore)).to.be.equal(zero); 
+                expect(await super721.balanceOf(tokenVault.address)).to.be.equal(zero);
+                
                 // bob's balance are zero 
                 expect(await token.balanceOf(bob.address)).to.be.equal(zero);
                 expect(await super721.balanceOf(bob.address)).to.be.equal(zero);
