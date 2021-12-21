@@ -14,20 +14,18 @@ contract SuperMarketplace is Exchange {
     string public constant marketplaceVersion = "1";
 
     /**
-    * @param _registries array of existing registry addresses
+    * @param _registry  existing registry address
     * @param _personalSignPrefix  "\x19Ethereum Signed Message:\n"
     */
-    constructor (address[] memory _registries, bytes memory _personalSignPrefix, address _tokenTransferProxy, address _platformFeeAddress, uint _minimumPlatformFee) ExchangeCore(name, marketplaceVersion){
-        registry = _registries[0];
+    constructor (address _registry, bytes memory _personalSignPrefix, address _tokenTransferProxy, address _platformFeeAddress, uint _minimumPlatformFee) ExchangeCore(name, marketplaceVersion){
+        registry = _registry;
         tokenTransferProxy = _tokenTransferProxy;
         platformFeeAddress = _platformFeeAddress;
         minimumPlatformFee = _minimumPlatformFee;
-        for (uint index = 0; index < _registries.length; index++) {
-          registries[_registries[index]] = true;
-        }
         if (_personalSignPrefix.length > 0) {
           personalSignPrefix = _personalSignPrefix;
         }
+        setPermit(_msgSender(), UNIVERSAL, FEE_CONFIG, type(uint256).max);
     }
 
 }

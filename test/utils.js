@@ -120,7 +120,7 @@ export const withContracts = async function(platformFeeAddress, minimumPlatformF
     const Marketplace = await ethers.getContractFactory("SuperMarketplace");
 
     const marketplace = await Marketplace.deploy(
-        [registry.address],
+        registry.address,
         ethers.utils.defaultAbiCoder.encode(["string"],["\x19Ethereum Signed Message:\n"]),
         transferProxy.address,
         platformFeeAddress,

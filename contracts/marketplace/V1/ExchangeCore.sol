@@ -4,6 +4,7 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
 import "../../access/PermitControl.sol";
 import "../../interfaces/IProxyRegistry.sol";
+import "../../proxy/OwnableMutableDelegateProxy.sol";
 import "../../proxy/TokenTransferProxy.sol";
 import "../../proxy/AuthenticatedProxy.sol";
 import "../../utils/Utils.sol";
@@ -53,9 +54,6 @@ abstract contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
 
     /** The royalty fee address of the platform */
     address public platformFeeAddress;
-
-    /** Inverse basis point. */
-    uint public constant INVERSE_BASIS_POINT = 10000;
 
      /* An ECDSA signature. */ 
     struct Sig {
