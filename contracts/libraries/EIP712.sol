@@ -44,4 +44,19 @@ abstract contract EIP712 {
         ));
     }
 
+    function parseSignature(bytes memory signature)
+        internal
+        pure
+        returns (uint8 v, bytes32 r, bytes32 s)
+    {
+        // ecrecover takes the signature parameters, and the only way to get them
+        // currently is to use assembly.
+        // solhint-disable-next-line no-inline-assembly
+        assembly {
+            r := mload(add(signature, 0x20))
+            s := mload(add(signature, 0x40))
+            v := byte(0, mload(add(signature, 0x60)))
+        }
+        return(v,r,s);
+    }
 }

@@ -65,27 +65,27 @@ abstract contract Exchange is ExchangeCore {
     function validateOrderParameters(Order calldata order)
         external view
         returns (bool)
-    {
+    {   
         return _validateOrderParameters(order);
     }
 
     /**
      * @dev Call validateOrder
      */
-    function validateOrder(Order calldata order, Sig calldata sig)
+    function validateOrderAthentication(Order calldata order, Sig calldata sig)
         external view
         returns (bool)
     {
-        return _validateOrder(_hashToSign(order), order, sig);
+        return authenticateOrder(_hashToSign(order), order.outline.maker, sig);
     }
 
     /**
      * @dev Call approveOrder
      */
-    function approveOrder_(Order calldata order, bool orderbookInclusionDesired)
+    function approveOrder_(Order calldata order)
         external
     {
-        return _approveOrder(order, orderbookInclusionDesired);
+        return _approveOrder(order);
     }
 
     /**
@@ -110,11 +110,11 @@ abstract contract Exchange is ExchangeCore {
     /**
      * @dev Call ordersCanMatch
      */
-    function ordersCanMatch(Order calldata buy, Order calldata sell)
+    function ordersMatch(Order calldata buy, Order calldata sell)
         external view
         returns (bool)
     {
-        return _ordersCanMatch(buy, sell);
+        return _ordersMatch(buy, sell);
     }
 
     /**
@@ -125,7 +125,7 @@ abstract contract Exchange is ExchangeCore {
      * @param sellReplacementPattern Sell-side order calldata replacement mask
      * @return Whether the orders' calldata can be matched
      */
-    function orderCalldataCanMatch(bytes memory buyCalldata, bytes calldata buyReplacementPattern, bytes memory sellCalldata, bytes calldata sellReplacementPattern)
+    function orderCalldataCanMatch(bytes calldata buyCalldata, bytes calldata buyReplacementPattern, bytes calldata sellCalldata, bytes calldata sellReplacementPattern)
         external pure
         returns (bool)
     {
@@ -156,7 +156,6 @@ abstract contract Exchange is ExchangeCore {
         Sig calldata sigBuy,
         Order calldata sell,
         Sig calldata sigSell,
-        bytes32 metadata,
         Order[] calldata toInvalidate,
         Sig[] calldata sigs
         )
@@ -164,7 +163,7 @@ abstract contract Exchange is ExchangeCore {
         nonReentrant
     {
 
-        return _atomicMatch(buy, sigBuy, sell, sigSell, metadata, toInvalidate, sigs);
+        return _atomicMatch(buy, sigBuy, sell, sigSell, toInvalidate, sigs);
     }
 
 }

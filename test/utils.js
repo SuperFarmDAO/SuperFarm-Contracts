@@ -14,8 +14,8 @@ export async function evm_increaseTime(seconds){
 }
 
 /*=======================MARKETPLACE===========================*/
-export const replacementPatternBuy = "0x00000000ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
-export const replacementPatternSell = "0x000000000000000000000000000000000000000000000000000000000000000000000000ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
+export const replacementPatternBuy = "0x00000000ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
+export const replacementPatternSell = "0x000000000000000000000000000000000000000000000000000000000000000000000000ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff0000000000000000000000000000000000000000000000000000000000000000";
 export const mint = {
     weth: {
         bob: ethers.utils.parseEther("100"),
@@ -89,7 +89,7 @@ export function makeOrder(
 async function withTestTokens(){
     const TestERC1155 = await ethers.getContractFactory("TestERC1155");
     const TestERC721 = await ethers.getContractFactory("TestERC721");
-    const TestWrappedEther = await ethers.getContractFactory("TestWETH");
+    const TestWrappedEther = await ethers.getContractFactory("wETH");
 
     const erc1155 = await TestERC1155.deploy();
     await erc1155.deployed()
@@ -131,23 +131,15 @@ export const withContracts = async function(platformFeeAddress, minimumPlatformF
     return [marketplace, registry, transferProxy, erc1155, erc721, weth]
 }
 
-export const OrderTypes = {
-    Order:  [
+export const OrderType = {
+    Order: [
         {
-            name: "basePrice",
-            type: "uint256"
+            name: "outline",
+            type: "Outline"
         },
         {
             name: "extra",
             type: "uint256[]"
-        },
-        {
-            name: "listingTime",
-            type: "uint256"
-        },
-        {
-            name: "expirationTime",
-            type: "uint256"
         },
         {
             name: "salt",
@@ -160,6 +152,36 @@ export const OrderTypes = {
         {
             name: "addresses",
             type: "address[]"
+        },
+        {
+            name: "staticTarget",
+            type: "address"
+        },
+        {
+            name: "data",
+            type: "bytes"
+        },
+        {
+            name: "replacementPattern",
+            type: "bytes"
+        },
+        {
+            name: "staticExtradata",
+            type: "bytes"
+        }
+    ],
+    Outline: [
+        {
+            name: "basePrice",
+            type: "uint256"
+        },
+        {
+            name: "listingTime",
+            type: "uint256"
+        },
+        {
+            name: "expirationTime",
+            type: "uint256"
         },
         {
             name: "exchange",
@@ -182,36 +204,19 @@ export const OrderTypes = {
             type: "uint8"
         },
         {
-            name: "callType",
-            type: "uint8"
-        },
-        {
             name: "target",
             type: "address"
         },
         {
-            name: "staticTarget",
-            type: "address"
+            name: "callType",
+            type: "uint8"
         },
         {
             name: "paymentToken",
             type: "address"
         },
-        {
-            name: "data",
-            type: "bytes"
-        },
-        {
-            name: "replacementPattern",
-            type: "bytes"
-        },
-        {
-            name: "staticExtradata",
-            type: "bytes"
-        }
     ]
 }
-
 /*=======================MARKETPLACE===========================*/
 
 /*=======================MERKLE UTILS (with allowances)===========================*/

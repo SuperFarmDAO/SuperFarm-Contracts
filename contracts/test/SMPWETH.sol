@@ -5,9 +5,7 @@ import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
 contract wETH is Ownable, ERC20("Wrapped Ether", "TWETH"){
-    constructor(address toMint){
-        _mint(toMint, 10_000*(10^decimals()));
-    }
+    constructor(){}
 
     function mint(address account, uint256 amount) external onlyOwner{
         _mint(account, amount);
