@@ -13,13 +13,13 @@ describe("SuperFarm Marketplace", function(){
     let marketplace, registry, transferProxy, erc1155, erc721, weth;
     let domain;
 
-    beforeEach(async function () {
+    before(async function () {
         [owner, protocolFeeRecipient, creator, alice, bob, royaltyOwner1, royaltyOwner2] = await ethers.getSigners();
         [marketplace, registry, transferProxy, erc1155, erc721, weth] =  await utils.withContracts(protocolFeeRecipient.address, 100);
         domain = {
             name: "Super Marketplace",
             version: "1",
-            chainId: network.config.chainId,
+            chainId: 31337, // sued to run test on local node, use network.config.chainId instead
             verifyingContract: marketplace.address
         }
         await weth.mint(alice.address, utils.mint.weth.alice)
@@ -31,10 +31,49 @@ describe("SuperFarm Marketplace", function(){
         await erc1155.mint(bob.address, utils.mint.erc1155.bob.id, utils.mint.erc1155.bob.amount, utils.mint.erc1155.bob.data)
 
         await registry.startGrantAuthentication(marketplace.address)
-        await utils.evm_increaseTime(604_801_000)
+        await utils.evm_increaseTime(1_209_600)
         await registry.endGrantAuthentication(marketplace.address)
         await registry.connect(alice).registerProxy();
         await registry.connect(bob).registerProxy();
+
+        const provider = new ethers.providers.WebSocketProvider("http://127.0.0.1:8545/");
+    
+        let filter = marketplace.filters.OrdersMatched(null, null)
+
+        provider.on(filter, (event) => { 
+            // proceed with event
+            let deal = {
+                transactionExecuter: "0x"+event.data.slice(26, 66),
+                keys: {
+                    buyHash: event.topics[1],
+                    sellHash: event.topics[2]
+                },
+                deal: {
+                    settledPrice: ethers.utils.defaultAbiCoder.decode(["uint256"], "0x"+event.data.slice(66, 130)),
+                    collectionAddress: "0x0"+event.data.slice(26, 66),
+                    tokenId: ethers.utils.defaultAbiCoder.decode(["uint256"], "0x"+event.data.slice(66, 130)),
+                    quantity: event.data.length > 5378 ? ethers.utils.defaultAbiCoder.decode(["uint256"], "0x"+event.data.slice(66, 130)) : null,
+                    paymentToken: "0x0"+event.data.slice(26, 66),
+                    buyer: "0x0"+event.data.slice(26, 66),
+                    seller: "0x0" +event.data.slice(26, 66)
+                },
+                buyArgs: {
+                    buyPrice: ethers.utils.defaultAbiCoder.decode(["uint256"], "0x"+event.data.slice(258, 322)),
+                    buyListingTime: ethers.utils.defaultAbiCoder.decode(["uint256"], "0x"+event.data.slice(66, 130)),
+                    buyExpirationTime: ethers.utils.defaultAbiCoder.decode(["uint256"], "0x"+event.data.slice(66, 130))
+                },
+                sellArgs: {
+                    sellPrice: ethers.utils.defaultAbiCoder.decode(["uint256"], "0x"+event.data.slice(66, 130)),
+                    sellListingTime: ethers.utils.defaultAbiCoder.decode(["uint256"], "0x"+event.data.slice(66, 130)),
+                    sellExpirationTime: ethers.utils.defaultAbiCoder.decode(["uint256"], "0x"+event.data.slice(66, 130))
+                },
+                fees: {
+                    feePercents: ethers.utils.defaultAbiCoder.decode(["uint256"], "0x"+event.data.slice(66, 130)),
+                    feeReceivers: ethers.utils.defaultAbiCoder.decode(["address"], "0x"+event.data.slice(66, 130))
+                }
+            }
+            console.log(deal)
+        })
 
     });
 
@@ -53,88 +92,86 @@ describe("SuperFarm Marketplace", function(){
         expect(await registry.proxies(bob.address)).to.not.be.eq(utils.NULL_ADDRESS)
     })
 
-    it("Marketplace: erc721 for erc20", async function(){
-        let salt = 1;
-        let abi = ["function transferFrom(address from,address to,uint256 tokenId)"]
-        let iface = new ethers.utils.Interface(abi)
-        let dataSell = iface.encodeFunctionData("transferFrom", [bob.address, utils.NULL_ADDRESS, 1]);
-        let time = await utils.getCurrentTime()
-        let orderSell = utils.makeOrder(
-            ethers.utils.parseEther("1"),
-            [],
-            time, 
-            time + 100, 
-            salt, 
-            [100, 200, 300, 400], // 100 = 1% in basis points
-            [protocolFeeRecipient.address, creator.address, royaltyOwner1.address, royaltyOwner2.address],
-            marketplace.address, 
-            bob.address, // Seller
-            1, 
-            utils.NULL_ADDRESS, 
-            0, 
-            0,
-            erc721.address, 
-            utils.NULL_ADDRESS, 
-            weth.address, 
-            dataSell, 
-            utils.replacementPatternSell, 
-            0x0 
-        )
-        salt++
-        let dataBuy = iface.encodeFunctionData("transferFrom", [utils.NULL_ADDRESS, alice.address, 1]);
-        let orderBuy = utils.makeOrder(
-            ethers.utils.parseEther("1.5"),
-            [],
-            await utils.getCurrentTime(), 
-            await utils.getCurrentTime() + 100, 
-            salt, 
-            [], 
-            [], 
-            marketplace.address, 
-            alice.address, // Buyer
-            0, 
-            utils.NULL_ADDRESS, 
-            0, 
-            0,
-            erc721.address, 
-            utils.NULL_ADDRESS, 
-            weth.address, 
-            dataBuy, 
-            utils.replacementPatternBuy, 
-            0x0 
-        )
-        // Sign Orders
-        let signatureSell = await bob._signTypedData(domain, utils.OrderType, orderSell);
-        let signatureBuy = await alice._signTypedData(domain, utils.OrderType, orderBuy);
+    // it("Marketplace: erc721 for erc20", async function(){
+    //     let salt = 1;
+    //     let abi = ["function transferFrom(address from,address to,uint256 tokenId)"]
+    //     let iface = new ethers.utils.Interface(abi)
+    //     let dataSell = iface.encodeFunctionData("transferFrom", [bob.address, utils.NULL_ADDRESS, 1]);
+    //     let time = await utils.getCurrentTime()
+    //     let orderSell = utils.makeOrder(
+    //         ethers.utils.parseEther("1"),
+    //         [],
+    //         time, 
+    //         time + 100, 
+    //         salt, 
+    //         [100, 200, 300, 400], // 100 = 1% in basis points
+    //         [protocolFeeRecipient.address, creator.address, royaltyOwner1.address, royaltyOwner2.address],
+    //         marketplace.address, 
+    //         bob.address, // Seller
+    //         1, 
+    //         utils.NULL_ADDRESS, 
+    //         0, 
+    //         0,
+    //         erc721.address, 
+    //         utils.NULL_ADDRESS, 
+    //         weth.address, 
+    //         dataSell, 
+    //         utils.replacementPatternSell721, 
+    //         0x0 
+    //     )
+    //     salt++
+    //     let dataBuy = iface.encodeFunctionData("transferFrom", [utils.NULL_ADDRESS, alice.address, 1]);
+    //     let orderBuy = utils.makeOrder(
+    //         ethers.utils.parseEther("1.5"),
+    //         [],
+    //         await utils.getCurrentTime(), 
+    //         await utils.getCurrentTime() + 100, 
+    //         salt, 
+    //         [], 
+    //         [], 
+    //         marketplace.address, 
+    //         alice.address, // Buyer
+    //         0, 
+    //         utils.NULL_ADDRESS, 
+    //         0, 
+    //         0,
+    //         erc721.address, 
+    //         utils.NULL_ADDRESS, 
+    //         weth.address, 
+    //         dataBuy, 
+    //         utils.replacementPatternBuy721, 
+    //         0x0 
+    //     )
+    //     // Sign Orders
+    //     let signatureSell = await bob._signTypedData(domain, utils.OrderType, orderSell);
+    //     let signatureBuy = await alice._signTypedData(domain, utils.OrderType, orderBuy);
 
-        // Get V, R, S
-        let sigSell = ethers.utils.splitSignature(signatureSell);
-        let sigBuy = ethers.utils.splitSignature(signatureBuy);
+    //     // Get V, R, S
+    //     let sigSell = ethers.utils.splitSignature(signatureSell);
+    //     let sigBuy = ethers.utils.splitSignature(signatureBuy);
 
-        // Approve corresponding proxy
-        let proxy = await registry.proxies(bob.address)
-        await erc721.connect(bob).approve(proxy, 1)
-        await weth.connect(alice).approve(transferProxy.address, ethers.utils.parseEther("1"))
+    //     // Approve corresponding proxy
+    //     let proxy = await registry.proxies(bob.address)
+    //     await erc721.connect(bob).approve(proxy, 1)
+    //     await weth.connect(alice).approve(transferProxy.address, ethers.utils.parseEther("1"))
 
-        console.log((await weth.balanceOf(alice.address)).toString(), "  alice")
-
-        // BOOM ! Atomic Match
-        await marketplace.connect(alice).atomicMatch_(orderBuy, sigBuy, orderSell, sigSell, [], [])
+    //     // BOOM ! Atomic Match
+    //     await marketplace.connect(alice).atomicMatch_(orderBuy, sigBuy, orderSell, sigSell, [], [])
         
-        // Confirm NFT transfers
-        expect(await erc721.balanceOf(alice.address)).to.be.eq("2")
-        expect(await erc721.balanceOf(bob.address)).to.be.eq("0")
+    //     // Confirm NFT transfers
+    //     expect(await erc721.balanceOf(alice.address)).to.be.eq("2")
+    //     expect(await erc721.balanceOf(bob.address)).to.be.eq("0")
         
-        // Confirm Price Token Transfer
-        expect(await weth.balanceOf(bob.address)).to.be.eq(ethers.utils.parseEther("100.9"))
-        expect(await weth.balanceOf(alice.address)).to.be.eq(ethers.utils.parseEther("9"))
+    //     // Confirm Price Token Transfer
+    //     expect(await weth.balanceOf(bob.address)).to.be.eq(ethers.utils.parseEther("100.9"))
+    //     expect(await weth.balanceOf(alice.address)).to.be.eq(ethers.utils.parseEther("9"))
 
-        // Confirm fee tranfers
-        expect(await weth.balanceOf(protocolFeeRecipient.address)).to.be.eq(ethers.utils.parseEther("0.01"))
-        expect(await weth.balanceOf(creator.address)).to.be.eq(ethers.utils.parseEther("0.02"))
-        expect(await weth.balanceOf(royaltyOwner1.address)).to.be.eq(ethers.utils.parseEther("0.03"))
-        expect(await weth.balanceOf(royaltyOwner2.address)).to.be.eq(ethers.utils.parseEther("0.04"))
-    })
+    //     // Confirm fee tranfers
+    //     expect(await weth.balanceOf(protocolFeeRecipient.address)).to.be.eq(ethers.utils.parseEther("0.01"))
+    //     expect(await weth.balanceOf(creator.address)).to.be.eq(ethers.utils.parseEther("0.02"))
+    //     expect(await weth.balanceOf(royaltyOwner1.address)).to.be.eq(ethers.utils.parseEther("0.03"))
+    //     expect(await weth.balanceOf(royaltyOwner2.address)).to.be.eq(ethers.utils.parseEther("0.04"))
+    // })
 
     it("MarketPlace listing with decreasing price", async function() {
         let salt = 1;
@@ -161,8 +198,8 @@ describe("SuperFarm Marketplace", function(){
             utils.NULL_ADDRESS, 
             weth.address, 
             dataSell, 
-            utils.replacementPatternSell, 
-            0x0 
+            utils.replacementPatternSell721, 
+            []
         )
         salt++
         let dataBuy = iface.encodeFunctionData("transferFrom", [utils.NULL_ADDRESS, alice.address, 1]);
@@ -184,8 +221,8 @@ describe("SuperFarm Marketplace", function(){
             utils.NULL_ADDRESS, 
             weth.address, 
             dataBuy, 
-            utils.replacementPatternBuy, 
-            0x0 
+            utils.replacementPatternBuy721, 
+            []
         )
 
         // Sign Orders
@@ -225,230 +262,230 @@ describe("SuperFarm Marketplace", function(){
         expect(await weth.balanceOf(royaltyOwner2.address)).to.be.above(ethers.utils.parseEther("0"))
     });
     
-    it("Buy erc721 for ether", async function() {
-        let salt = 1;
-        let abi = ["function transferFrom(address from,address to,uint256 tokenId)"]
-        let iface = new ethers.utils.Interface(abi)
-        let dataSell = iface.encodeFunctionData("transferFrom", [bob.address, utils.NULL_ADDRESS, 1]);
-        let time = await utils.getCurrentTime()
+    // it("Buy erc721 for ether", async function() {
+    //     let salt = 1;
+    //     let abi = ["function transferFrom(address from,address to,uint256 tokenId)"]
+    //     let iface = new ethers.utils.Interface(abi)
+    //     let dataSell = iface.encodeFunctionData("transferFrom", [bob.address, utils.NULL_ADDRESS, 1]);
+    //     let time = await utils.getCurrentTime()
         
-        let orderSell = utils.makeOrder(
-            ethers.utils.parseEther("12"),
-            [],
-            time, 
-            time + 1000, 
-            salt, 
-            [100, 200, 300, 400], // 100 = 1% in basis points
-            [protocolFeeRecipient.address, creator.address, royaltyOwner2.address, royaltyOwner1.address],
-            marketplace.address, 
-            bob.address, // Seller
-            1, 
-            utils.NULL_ADDRESS, 
-            0,
-            0,
-            erc721.address, 
-            utils.NULL_ADDRESS, 
-            utils.NULL_ADDRESS, 
-            dataSell, 
-            utils.replacementPatternSell, 
-            0x0 
-        )
-        salt++
-        let dataBuy = iface.encodeFunctionData("transferFrom", [utils.NULL_ADDRESS, alice.address, 1]);
-        let orderBuy = utils.makeOrder(
-            ethers.utils.parseEther("12"),
-            [],
-            time, 
-            time + 1000, 
-            salt, 
-            [], 
-            [], 
-            marketplace.address, 
-            alice.address, // Buyer
-            0, 
-            utils.NULL_ADDRESS, 
-            0, 
-            0,
-            erc721.address, 
-            utils.NULL_ADDRESS, 
-            utils.NULL_ADDRESS, 
-            dataBuy, 
-            utils.replacementPatternBuy, 
-            0x0
-        )
+    //     let orderSell = utils.makeOrder(
+    //         ethers.utils.parseEther("12"),
+    //         [],
+    //         time, 
+    //         time + 1000, 
+    //         salt, 
+    //         [100, 200, 300, 400], // 100 = 1% in basis points
+    //         [protocolFeeRecipient.address, creator.address, royaltyOwner2.address, royaltyOwner1.address],
+    //         marketplace.address, 
+    //         bob.address, // Seller
+    //         1, 
+    //         utils.NULL_ADDRESS, 
+    //         0,
+    //         0,
+    //         erc721.address, 
+    //         utils.NULL_ADDRESS, 
+    //         utils.NULL_ADDRESS, 
+    //         dataSell, 
+    //         utils.replacementPatternSell721, 
+    //         0x0 
+    //     )
+    //     salt++
+    //     let dataBuy = iface.encodeFunctionData("transferFrom", [utils.NULL_ADDRESS, alice.address, 1]);
+    //     let orderBuy = utils.makeOrder(
+    //         ethers.utils.parseEther("12"),
+    //         [],
+    //         time, 
+    //         time + 1000, 
+    //         salt, 
+    //         [], 
+    //         [], 
+    //         marketplace.address, 
+    //         alice.address, // Buyer
+    //         0, 
+    //         utils.NULL_ADDRESS, 
+    //         0, 
+    //         0,
+    //         erc721.address, 
+    //         utils.NULL_ADDRESS, 
+    //         utils.NULL_ADDRESS, 
+    //         dataBuy, 
+    //         utils.replacementPatternBuy721, 
+    //         0x0
+    //     )
        
-        // Sign Orders
-        let signatureSell = await bob._signTypedData(domain, utils.OrderType, orderSell);
-        let signatureBuy = await alice._signTypedData(domain, utils.OrderType, orderBuy);
+    //     // Sign Orders
+    //     let signatureSell = await bob._signTypedData(domain, utils.OrderType, orderSell);
+    //     let signatureBuy = await alice._signTypedData(domain, utils.OrderType, orderBuy);
 
-        // Get V, R, S
-        let sigSell = ethers.utils.splitSignature(signatureSell);
-        let sigBuy = ethers.utils.splitSignature(signatureBuy);
+    //     // Get V, R, S
+    //     let sigSell = ethers.utils.splitSignature(signatureSell);
+    //     let sigBuy = ethers.utils.splitSignature(signatureBuy);
 
-        // Approve corresponding proxy
-        let proxy = await registry.proxies(bob.address)
-        await erc721.connect(bob).approve(proxy, 1)
+    //     // Approve corresponding proxy
+    //     let proxy = await registry.proxies(bob.address)
+    //     await erc721.connect(bob).approve(proxy, 1)
 
-        // BOOM ! Atomic Match
-        await marketplace.connect(alice).atomicMatch_(orderBuy, {v: sigBuy.v, r: sigBuy.r, s: sigBuy.s}, orderSell, {v: sigSell.v, r: sigSell.r, s: sigSell.s}, [], [], { value: ethers.utils.parseEther("15")})
+    //     // BOOM ! Atomic Match
+    //     await marketplace.connect(alice).atomicMatch_(orderBuy, {v: sigBuy.v, r: sigBuy.r, s: sigBuy.s}, orderSell, {v: sigSell.v, r: sigSell.r, s: sigSell.s}, [], [], { value: ethers.utils.parseEther("15")})
         
-        // Confirm Ether Transfer
-        expect(await bob.getBalance()).to.be.above(ethers.utils.parseEther("10005")); // Must be around 10011
-        expect(await alice.getBalance()).to.be.below(ethers.utils.parseEther("9990")); // Must be around 988
+    //     // Confirm Ether Transfer
+    //     expect(await bob.getBalance()).to.be.above(ethers.utils.parseEther("10005")); // Must be around 10011
+    //     expect(await alice.getBalance()).to.be.below(ethers.utils.parseEther("9990")); // Must be around 988
 
-        // Confirm NFT transfers
-        expect(await erc721.balanceOf(alice.address)).to.be.eq("2")
-        expect(await erc721.balanceOf(bob.address)).to.be.eq("0")
-    });
+    //     // Confirm NFT transfers
+    //     expect(await erc721.balanceOf(alice.address)).to.be.eq("2")
+    //     expect(await erc721.balanceOf(bob.address)).to.be.eq("0")
+    // });
 
-    it("Erc721 auction via ether", async function() {
-        let salt = 1;
-        let abi = ["function transferFrom(address from,address to,uint256 tokenId)"]
-        let iface = new ethers.utils.Interface(abi)
-        let dataSell = iface.encodeFunctionData("transferFrom", [bob.address, utils.NULL_ADDRESS, 1]);
-        let time = await utils.getCurrentTime()
-        let orderSell = utils.makeOrder(
-            ethers.utils.parseEther("12"),
-            [],
-            time, 
-            time + 1000, 
-            salt, 
-            [100, 200, 300, 400], // 100 = 1% in basis points
-            [protocolFeeRecipient.address, creator.address, royaltyOwner2.address, royaltyOwner1.address],
-            marketplace.address, 
-            bob.address, // Seller
-            1, 
-            utils.NULL_ADDRESS, 
-            2,
-            0,
-            erc721.address, 
-            utils.NULL_ADDRESS, 
-            utils.NULL_ADDRESS, 
-            dataSell, 
-            utils.replacementPatternSell, 
-            0x0 
-        )
-        salt++
-        let dataBuy = iface.encodeFunctionData("transferFrom", [utils.NULL_ADDRESS, alice.address, 1]);
-        let orderBuy = utils.makeOrder(
-            ethers.utils.parseEther("12"),
-            [],
-            time, 
-            time + 1000, 
-            salt, 
-            [], 
-            [], 
-            marketplace.address, 
-            alice.address, // Buyer
-            0, 
-            utils.NULL_ADDRESS, 
-            2, 
-            0,
-            erc721.address, 
-            utils.NULL_ADDRESS, 
-            utils.NULL_ADDRESS, 
-            dataBuy, 
-            utils.replacementPatternBuy, 
-            0x0 
-        )
+    // it("Erc721 auction via ether", async function() {
+    //     let salt = 1;
+    //     let abi = ["function transferFrom(address from,address to,uint256 tokenId)"]
+    //     let iface = new ethers.utils.Interface(abi)
+    //     let dataSell = iface.encodeFunctionData("transferFrom", [bob.address, utils.NULL_ADDRESS, 1]);
+    //     let time = await utils.getCurrentTime()
+    //     let orderSell = utils.makeOrder(
+    //         ethers.utils.parseEther("12"),
+    //         [],
+    //         time, 
+    //         time + 1000, 
+    //         salt, 
+    //         [100, 200, 300, 400], // 100 = 1% in basis points
+    //         [protocolFeeRecipient.address, creator.address, royaltyOwner2.address, royaltyOwner1.address],
+    //         marketplace.address, 
+    //         bob.address, // Seller
+    //         1, 
+    //         utils.NULL_ADDRESS, 
+    //         2,
+    //         0,
+    //         erc721.address, 
+    //         utils.NULL_ADDRESS, 
+    //         utils.NULL_ADDRESS, 
+    //         dataSell, 
+    //         utils.replacementPatternSell721, 
+    //         0x0 
+    //     )
+    //     salt++
+    //     let dataBuy = iface.encodeFunctionData("transferFrom", [utils.NULL_ADDRESS, alice.address, 1]);
+    //     let orderBuy = utils.makeOrder(
+    //         ethers.utils.parseEther("12"),
+    //         [],
+    //         time, 
+    //         time + 1000, 
+    //         salt, 
+    //         [], 
+    //         [], 
+    //         marketplace.address, 
+    //         alice.address, // Buyer
+    //         0, 
+    //         utils.NULL_ADDRESS, 
+    //         2, 
+    //         0,
+    //         erc721.address, 
+    //         utils.NULL_ADDRESS, 
+    //         utils.NULL_ADDRESS, 
+    //         dataBuy, 
+    //         utils.replacementPatternBuy721, 
+    //         0x0 
+    //     )
 
-        // Sign Orders
-        let signatureSell = await bob._signTypedData(domain, utils.OrderType, orderSell);
-        let signatureBuy = await alice._signTypedData(domain, utils.OrderType, orderBuy);
+    //     // Sign Orders
+    //     let signatureSell = await bob._signTypedData(domain, utils.OrderType, orderSell);
+    //     let signatureBuy = await alice._signTypedData(domain, utils.OrderType, orderBuy);
 
-        // Get V, R, S
-        let sigSell = ethers.utils.splitSignature(signatureSell);
-        let sigBuy = ethers.utils.splitSignature(signatureBuy);
+    //     // Get V, R, S
+    //     let sigSell = ethers.utils.splitSignature(signatureSell);
+    //     let sigBuy = ethers.utils.splitSignature(signatureBuy);
 
-        // Approve corresponding proxy
-        let proxy = await registry.proxies(bob.address)
-        await erc721.connect(bob).approve(proxy, 1)
+    //     // Approve corresponding proxy
+    //     let proxy = await registry.proxies(bob.address)
+    //     await erc721.connect(bob).approve(proxy, 1)
 
-        // BOOM ! Atomic Match
-        await marketplace.connect(alice).atomicMatch_(orderBuy, {v: sigBuy.v, r: sigBuy.r, s: sigBuy.s}, orderSell, {v: sigSell.v, r: sigSell.r, s: sigSell.s}, [], [], { value: ethers.utils.parseEther("12")})
+    //     // BOOM ! Atomic Match
+    //     await marketplace.connect(alice).atomicMatch_(orderBuy, {v: sigBuy.v, r: sigBuy.r, s: sigBuy.s}, orderSell, {v: sigSell.v, r: sigSell.r, s: sigSell.s}, [], [], { value: ethers.utils.parseEther("12")})
 
-        // Confirm Ether Transfer
-        expect(await bob.getBalance()).to.be.above(ethers.utils.parseEther("10005")); // Must be around 10011
-        expect(await alice.getBalance()).to.be.below(ethers.utils.parseEther("9990")); // Must be around 988
+    //     // Confirm Ether Transfer
+    //     expect(await bob.getBalance()).to.be.above(ethers.utils.parseEther("10005")); // Must be around 10011
+    //     expect(await alice.getBalance()).to.be.below(ethers.utils.parseEther("9990")); // Must be around 988
 
-        // Confirm NFT transfers
-        expect(await erc721.balanceOf(alice.address)).to.be.eq("2")
-        expect(await erc721.balanceOf(bob.address)).to.be.eq("0")
-    });
+    //     // Confirm NFT transfers
+    //     expect(await erc721.balanceOf(alice.address)).to.be.eq("2")
+    //     expect(await erc721.balanceOf(bob.address)).to.be.eq("0")
+    // });
 
-    it("Marketplace offer listing", async function() {
-        let salt = 1;
-        let abi = ["function transferFrom(address from,address to,uint256 tokenId)"]
-        let iface = new ethers.utils.Interface(abi)
-        let dataSell = iface.encodeFunctionData("transferFrom", [bob.address, utils.NULL_ADDRESS, 1]);
-        let time = await utils.getCurrentTime()
-        let orderSell = utils.makeOrder(
-            0, // Not needed since buyer is offering
-            [],
-            time, 
-            time + 1000, 
-            salt, 
-            [100, 200, 300, 400], // 100 = 1% in basis points
-            [protocolFeeRecipient.address, creator.address, royaltyOwner2.address, royaltyOwner1.address],
-            marketplace.address, 
-            bob.address, // Seller
-            1, 
-            utils.NULL_ADDRESS, 
-            3,
-            0,
-            erc721.address, 
-            utils.NULL_ADDRESS, 
-            utils.NULL_ADDRESS, 
-            dataSell, 
-            utils.replacementPatternSell, 
-            0x0 
-        )
-        salt++
-        let dataBuy = iface.encodeFunctionData("transferFrom", [utils.NULL_ADDRESS, alice.address, 1]);
-        let orderBuy = utils.makeOrder(
-            ethers.utils.parseEther("200"),
-            [],
-            time, 
-            time + 1000, 
-            salt, 
-            [], 
-            [], 
-            marketplace.address, 
-            alice.address, // Buyer
-            0, 
-            utils.NULL_ADDRESS, 
-            3, 
-            0,
-            erc721.address, 
-            utils.NULL_ADDRESS, 
-            utils.NULL_ADDRESS, 
-            dataBuy, 
-            utils.replacementPatternBuy, 
-            0x0 
-        )
+    // it("Marketplace offer listing", async function() {
+    //     let salt = 1;
+    //     let abi = ["function transferFrom(address from,address to,uint256 tokenId)"]
+    //     let iface = new ethers.utils.Interface(abi)
+    //     let dataSell = iface.encodeFunctionData("transferFrom", [bob.address, utils.NULL_ADDRESS, 1]);
+    //     let time = await utils.getCurrentTime()
+    //     let orderSell = utils.makeOrder(
+    //         0, // Not needed since buyer is offering
+    //         [],
+    //         time, 
+    //         time + 1000, 
+    //         salt, 
+    //         [100, 200, 300, 400], // 100 = 1% in basis points
+    //         [protocolFeeRecipient.address, creator.address, royaltyOwner2.address, royaltyOwner1.address],
+    //         marketplace.address, 
+    //         bob.address, // Seller
+    //         1, 
+    //         utils.NULL_ADDRESS, 
+    //         3,
+    //         0,
+    //         erc721.address, 
+    //         utils.NULL_ADDRESS, 
+    //         utils.NULL_ADDRESS, 
+    //         dataSell, 
+    //         utils.replacementPatternSell721, 
+    //         0x0 
+    //     )
+    //     salt++
+    //     let dataBuy = iface.encodeFunctionData("transferFrom", [utils.NULL_ADDRESS, alice.address, 1]);
+    //     let orderBuy = utils.makeOrder(
+    //         ethers.utils.parseEther("200"),
+    //         [],
+    //         time, 
+    //         time + 1000, 
+    //         salt, 
+    //         [], 
+    //         [], 
+    //         marketplace.address, 
+    //         alice.address, // Buyer
+    //         0, 
+    //         utils.NULL_ADDRESS, 
+    //         3, 
+    //         0,
+    //         erc721.address, 
+    //         utils.NULL_ADDRESS, 
+    //         utils.NULL_ADDRESS, 
+    //         dataBuy, 
+    //         utils.replacementPatternBuy721, 
+    //         0x0 
+    //     )
 
-        // Sign Orders
-        let signatureSell = await bob._signTypedData(domain, utils.OrderType, orderSell);
-        let signatureBuy = await alice._signTypedData(domain, utils.OrderType, orderBuy);
+    //     // Sign Orders
+    //     let signatureSell = await bob._signTypedData(domain, utils.OrderType, orderSell);
+    //     let signatureBuy = await alice._signTypedData(domain, utils.OrderType, orderBuy);
 
-        // Get V, R, S
-        let sigSell = ethers.utils.splitSignature(signatureSell);
-        let sigBuy = ethers.utils.splitSignature(signatureBuy);
+    //     // Get V, R, S
+    //     let sigSell = ethers.utils.splitSignature(signatureSell);
+    //     let sigBuy = ethers.utils.splitSignature(signatureBuy);
 
-        // Approve corresponding proxy
-        let proxy = await registry.proxies(bob.address)
-        await erc721.connect(bob).approve(proxy, 1)
+    //     // Approve corresponding proxy
+    //     let proxy = await registry.proxies(bob.address)
+    //     await erc721.connect(bob).approve(proxy, 1)
 
-        // BOOM ! Atomic Match
-        await marketplace.connect(alice).atomicMatch_(orderBuy, {v: sigBuy.v, r: sigBuy.r, s: sigBuy.s}, orderSell, {v: sigSell.v, r: sigSell.r, s: sigSell.s}, [], [], { value: ethers.utils.parseEther("800")})
+    //     // BOOM ! Atomic Match
+    //     await marketplace.connect(alice).atomicMatch_(orderBuy, {v: sigBuy.v, r: sigBuy.r, s: sigBuy.s}, orderSell, {v: sigSell.v, r: sigSell.r, s: sigSell.s}, [], [], { value: ethers.utils.parseEther("800")})
 
-        // Confirm Ether Transfer
-        expect(await bob.getBalance()).to.be.above(ethers.utils.parseEther("10150")); // Must be around 10200
-        expect(await alice.getBalance()).to.be.below(ethers.utils.parseEther("9800")); // Must be around 9775
+    //     // Confirm Ether Transfer
+    //     expect(await bob.getBalance()).to.be.above(ethers.utils.parseEther("10150")); // Must be around 10200
+    //     expect(await alice.getBalance()).to.be.below(ethers.utils.parseEther("9800")); // Must be around 9775
 
-        // Confirm NFT transfers
-        expect(await erc721.balanceOf(alice.address)).to.be.eq("2")
-        expect(await erc721.balanceOf(bob.address)).to.be.eq("0")
-    });
+    //     // Confirm NFT transfers
+    //     expect(await erc721.balanceOf(alice.address)).to.be.eq("2")
+    //     expect(await erc721.balanceOf(bob.address)).to.be.eq("0")
+    // });
 
 });

@@ -115,7 +115,7 @@ abstract contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
 
     event OrderApproved(bytes32 indexed hash, address indexed maker, address indexed taker, bytes data);
     event OrderCancelled(bytes32 indexed hash, address indexed maker, bytes data);
-    event OrdersMatched (bytes32 buyHash, bytes32 sellHash, address indexed maker, address indexed taker, bytes data);
+    event OrdersMatched(bytes32 indexed buyHash, bytes32 indexed sellHash, address executer, uint256 settledPrice, Order buy, Order sell);
     
     constructor(string memory name, string memory version) EIP712(name, version){}
 
@@ -322,8 +322,10 @@ abstract contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
                 require(msg.value == 0);
                 for(uint256 i = 0; i < sell.addresses.length; i++){
                     fee = (requiredAmount*sell.fees[i])/10000;
-                    receiveAmount -= fee;
-                    transferTokens(buy.outline.paymentToken, buy.outline.maker, sell.addresses[i], fee);
+                    if(fee > 0){
+                        receiveAmount -= fee;
+                        transferTokens(buy.outline.paymentToken, buy.outline.maker, sell.addresses[i], fee);
+                    }
                 }
                 transferTokens(sell.outline.paymentToken, buy.outline.maker, sell.outline.maker, receiveAmount);
             } else {
@@ -415,10 +417,11 @@ abstract contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
 
         /** Validate buy order. */
         require(_validateOrderParameters(buy), "Marketplace: buy order invalid.");
-
+        
         /** Get sell order hash. */
         bytes32 sellHash = _hashToSign(sell);
-
+        uint256 price;
+    {
         /** Validate sell order. */
         require(_validateOrderParameters(sell), "Marketplace: sell order invalid.");
 
@@ -426,10 +429,10 @@ abstract contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
         require(buyHash != sellHash, "Marketplace: self-matching is prohibited.");
 
         /** Authenticate buy order. */
-        require(authenticateOrder(buyHash, buy.outline.maker, sigBuy), "Marketplace: can not autheticate buy order.");
+        require(authenticateOrder(buyHash, buy.outline.maker, sigBuy), "Marketplace: can not authenticate buy order.");
 
         /** Authenticate sell order. */
-        require(authenticateOrder(sellHash, sell.outline.maker, sigSell), "Marketplace: can not autheticate buy order.");
+        require(authenticateOrder(sellHash, sell.outline.maker, sigSell), "Marketplace: can not authenticate sell order.");
    
         /** Must match calldata after replacement, if specified. */
         if (buy.replacementPattern.length > 0) {
@@ -451,7 +454,6 @@ abstract contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
         
         /** Access the passthrough AuthenticatedProxy. */
         AuthenticatedProxy proxy= AuthenticatedProxy(payable(delegateProxy));
-        
         /** EFFECTS */
 
         /** Mark previously signed or approved orders as finalized. */
@@ -461,7 +463,7 @@ abstract contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
         /** INTERACTIONS */
 
         /** Execute funds transfer and pay fees. */
-        uint price = executeFundsTransfer(buy, sell);
+        price = executeFundsTransfer(buy, sell);
 
         /** Execute asset transfer call through proxy. */
         require(proxy.call(sell.outline.target, sell.outline.callType, sell.data));
@@ -484,11 +486,9 @@ abstract contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
                 _cancelOrder(additionalSales[i], sigs[i]);
             }
         }
+    }
 
-        /** Log match */
-        bytes memory settledParameters = abi.encode(price, sell.outline.target, buy.data);
-
-        emit OrdersMatched(buyHash, sellHash,sell.outline.maker, buy.outline.maker, settledParameters);
+        emit OrdersMatched(buyHash, sellHash, msg.sender, price, buy, sell);
     }
 
     /**
