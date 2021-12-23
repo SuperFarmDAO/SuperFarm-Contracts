@@ -131,7 +131,9 @@ library DFStorage {
   enum SupplyType {
     Capped,
     Uncapped,
-    Flexible
+    Flexible,
+    TimeValue,
+    TimePercent
   }
 
   /**
@@ -186,6 +188,9 @@ library DFStorage {
     uint256 supplyData;
     uint256 itemData;
     uint256 burnData;
+    ItemGroupTimeData timeData;
+    ItemGroupTransferData transferData;
+    ItemGroupIntrinsicData intrinsicData;
     SupplyType supplyType;
     ItemType itemType;
     BurnType burnType;
@@ -228,7 +233,22 @@ library DFStorage {
     address _token;
   }
 
-  struct ItemGroupIntrinsicInput {
+  struct ItemGroupTimeData {
+    uint256 timeStamp;
+    uint256 timeInterval;
+    uint256 timeRate;
+    uint256 timeCap;
+  }
+
+  struct ItemGroupTransferData {
+    uint256 transferTime;
+    uint256 transferFeeAmount;
+    address transferToken;
+    DFStorage.TransferType transferType;
+    DFStorage.TransferFeeType transferFeeType;
+  }
+
+  struct ItemGroupIntrinsicData {
     uint256 rate;
     uint256 burnShare;
     uint256 prefund;
@@ -237,14 +257,6 @@ library DFStorage {
     bool intrinsic;
   }
 
-  struct ItemGroupsTransfer {
-    uint256 transferTime;
-    uint256 transferFeeAmount;
-    address transferToken;
-    DFStorage.TransferType transferType;
-    DFStorage.TransferFeeType transferFeeType;
-  }
-  
   enum TransferType {
     Transferable,
     TemporaryTransfer,
@@ -255,7 +267,6 @@ library DFStorage {
     None,
     PerTransfer,
     PerItem,
-    RatioCut,
-    RatioExtra
+    RatioCut
   }
 }
