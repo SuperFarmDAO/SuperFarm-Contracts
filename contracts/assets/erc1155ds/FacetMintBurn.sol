@@ -2,8 +2,8 @@
 pragma solidity ^0.8.8;
 
 import "@openzeppelin/contracts/utils/introspection/ERC165Storage.sol";
-import "@openzeppelin/contracts/token/ERC1155/IERC1155.sol";
-import "@openzeppelin/contracts/token/ERC1155/extensions/IERC1155MetadataURI.sol";
+// import "@openzeppelin/contracts/token/ERC1155/IERC1155.sol";
+// import "@openzeppelin/contracts/token/ERC1155/extensions/IERC1155MetadataURI.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC1155/IERC1155Receiver.sol";
@@ -27,118 +27,16 @@ import "./Blueprint.sol";
 
   22 Dec, 2021.
 */
-contract FacetMintBurn is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataURI {
+contract FacetMintBurn is PermitControl, ERC165Storage {
   using Address for address;
   using SafeERC20 for IERC20;
 
-  uint256 MAX_INT = type(uint256).max;
-
-  /// The public identifier for the right to set this contract's metadata URI.
-  bytes32 public constant SET_URI = keccak256("SET_URI");
-
-  /// The public identifier for the right to set this contract's proxy registry.
-  bytes32 public constant SET_PROXY_REGISTRY = keccak256("SET_PROXY_REGISTRY");
-
-  /// The public identifier for the right to configure item groups.
-  bytes32 public constant CONFIGURE_GROUP = keccak256("CONFIGURE_GROUP");
-
-  /// The public identifier for the right to mint items.
-  bytes32 public constant MINT  = keccak256("MINT");
-
-  /// The public identifier for the right to burn items.
-  bytes32 public constant BURN = keccak256("BURN");
-
-  /// The public identifier for the right to set item metadata.
-  bytes32 public constant SET_METADATA = keccak256("SET_METADATA");
-
-  /// The public identifier for the right to lock the metadata URI.
-  bytes32 public constant LOCK_URI = keccak256("LOCK_URI");
-
-  /// The public identifier for the right to lock an item's metadata.
-  bytes32 public constant LOCK_ITEM_URI = keccak256("LOCK_ITEM_URI");
-
-  /// The public identifier for the right to disable item creation.
-  bytes32 public constant LOCK_CREATION = keccak256("LOCK_CREATION");
-
-  /// @dev Supply the magic number for the required ERC-1155 interface.
-  bytes4 private constant INTERFACE_ERC1155 = 0xd9b67a26;
-
-  /// @dev Supply the magic number for the required ERC-1155 metadata extension.
-  bytes4 private constant INTERFACE_ERC1155_METADATA_URI = 0x0e89341c;
-
-  /// @dev A mask for isolating an item's group ID.
-  uint256 private constant GROUP_MASK = uint256(type(uint128).max) << 128;
-
   /**
-    An event that gets emitted when the metadata collection URI is changed.
-
-    @param oldURI The old metadata URI.
-    @param newURI The new metadata URI.
+    @dev Equivalent to multiple {TransferSingle} events, where `operator`, `from` and `to` are the same for all
+    transfers.
+    @dev This event was explicitly declared to match IERC1155 standard.
   */
-  event ChangeURI(string indexed oldURI, string indexed newURI);
-
-  /**
-    An event that gets emitted when the proxy registry address is changed.
-
-    @param oldRegistry The old proxy registry address.
-    @param newRegistry The new proxy registry address.
-  */
-  event ChangeProxyRegistry(address indexed oldRegistry,
-    address indexed newRegistry);
-
-  /**
-    An event that gets emitted when an item group is configured.
-
-    @param manager The caller who configured the item group `_groupId`.
-    @param groupId The groupId being configured.
-    @param newGroup The new group configuration.
-  */
-  event ItemGroupConfigured(address indexed manager, uint256 groupId,
-    Blueprint.ItemGroupInput indexed newGroup);
-
-  /**
-    An event that gets emitted when the item collection is locked to further
-    creation.
-
-    @param locker The caller who locked the collection.
-  */
-  event CollectionLocked(address indexed locker);
-
-  /**
-    An event that gets emitted when a token ID has its on-chain metadata
-    changed.
-
-    @param changer The caller who triggered the metadata change.
-    @param id The ID of the token which had its metadata changed.
-    @param oldMetadata The old metadata of the token.
-    @param newMetadata The new metadata of the token.
-  */
-  event MetadataChanged(address indexed changer, uint256 indexed id,
-    string oldMetadata, string indexed newMetadata);
-
-  /**
-    An event that indicates we have set a permanent metadata URI for a token.
-
-    @param _value The value of the permanent metadata URI.
-    @param _id The token ID associated with the permanent metadata value.
-  */
-  event PermanentURI(string _value, uint256 indexed _id);
-
-  /**
-    An event that emmited when the contract URI is changed
-
-    @param oldURI The old contract URI
-    @param newURI The new contract URI
-   */
-  event ChangeContractURI(string indexed oldURI, string indexed newURI);
-
-  /**
-    An event that indicates we have set a permanent contract URI.
-
-    @param _value The value of the permanent contract URI.
-    @param _id The token ID associated with the permanent metadata value.
-  */
-  event PermanentContractURI(string _value, uint256 indexed _id);
+  event TransferBatch(address indexed operator, address indexed from, address indexed to, uint256[] ids, uint256[] values);
 
   /**
     This is a private helper function to replace the `hasItemRight` modifier
@@ -151,6 +49,7 @@ contract FacetMintBurn is PermitControl, ERC165Storage, IERC1155, IERC1155Metada
   */
   function _hasItemRight(uint256 _id, bytes32 _right) private view
     returns (bool) {
+      
     uint256 groupId = _id  >> 128;
     if (_msgSender() == owner()) {
       return true;
@@ -165,6 +64,48 @@ contract FacetMintBurn is PermitControl, ERC165Storage, IERC1155, IERC1155Metada
       return true;
     } 
     return false;
+  }
+
+    
+    /**
+    Retrieve the balance of a particular token `_id` for a particular address
+    `_owner`.
+
+    @param _owner The owner to check for this token balance.
+    @param _id The ID of the token to check for a balance.
+    @return The amount of token `_id` owned by `_owner`.
+  */
+  function balanceOf(address _owner, uint256 _id) public view virtual
+  returns (uint256) {
+
+    require(_owner != address(0),
+      "ERC1155: balance query for the zero address");
+
+    Blueprint.Super1155StateVariables storage b = Blueprint.super1155StateVariables();
+
+    return b.balances[_id][_owner];
+  }
+  
+  /**
+    Retrieve in a single call the balances of some mulitple particular token
+    `_ids` held by corresponding `_owners`.
+
+    @param _owners The owners to check for token balances.
+    @param _ids The IDs of tokens to check for balances.
+    @return the amount of each token owned by each owner.
+  */
+  function balanceOfBatch(address[] calldata _owners, uint256[] calldata _ids)
+    external view virtual returns (uint256[] memory) {
+
+    require(_owners.length == _ids.length,
+      "ERC1155: accounts and ids length mismatch");
+
+    // Populate and return an array of balances.
+    uint256[] memory batchBalances = new uint256[](_owners.length);
+    for (uint256 i = 0; i < _owners.length; ++i) {
+      batchBalances[i] = balanceOf(_owners[i], _ids[i]);
+    }
+    return batchBalances;
   }
 
   /**
@@ -196,6 +137,7 @@ contract FacetMintBurn is PermitControl, ERC165Storage, IERC1155, IERC1155Metada
   function _doSafeBatchTransferAcceptanceCheck(address _operator, address _from,
     address _to, uint256[] memory _ids, uint256[] memory _amounts, bytes memory
     _data) private {
+
     if (_to.isContract()) {
       try IERC1155Receiver(_to).onERC1155BatchReceived(_operator, _from, _ids,
         _amounts, _data) returns (bytes4 response) {
@@ -225,7 +167,7 @@ contract FacetMintBurn is PermitControl, ERC165Storage, IERC1155, IERC1155Metada
     Blueprint.Super1155StateVariables storage b = Blueprint.super1155StateVariables();
 
     // Retrieve the item's group ID.
-    uint256 shiftedGroupId = (_id & GROUP_MASK);
+    uint256 shiftedGroupId = (_id & Blueprint.GROUP_MASK);
     uint256 groupId = shiftedGroupId >> 128;
     require(b.itemGroups[groupId].initialized,
       "Super1155: you cannot mint a non-existent item group");
@@ -279,6 +221,7 @@ contract FacetMintBurn is PermitControl, ERC165Storage, IERC1155, IERC1155Metada
   function mintBatch(address _recipient, uint256[] calldata _ids,
     uint256[] calldata _amounts, bytes calldata _data)
     external payable {
+
     require(_recipient != address(0),
       "ERC1155: mint to the zero address");
     require(_ids.length == _amounts.length,
@@ -295,7 +238,7 @@ contract FacetMintBurn is PermitControl, ERC165Storage, IERC1155, IERC1155Metada
     // balances and circulation balances.
     uint256 etherValue = msg.value;
     for (uint256 i = 0; i < _ids.length; i++) {
-      require(_hasItemRight(_ids[i], MINT),
+      require(_hasItemRight(_ids[i], Blueprint.MINT),
         "Super1155: you do not have the right to mint that item");
 
       // Retrieve the group ID from the given item `_id`.
@@ -373,7 +316,7 @@ contract FacetMintBurn is PermitControl, ERC165Storage, IERC1155, IERC1155Metada
     Blueprint.Super1155StateVariables storage b = Blueprint.super1155StateVariables();
 
     // Retrieve the item's group ID.
-    uint256 shiftedGroupId = (_id & GROUP_MASK);
+    uint256 shiftedGroupId = (_id & Blueprint.GROUP_MASK);
     uint256 groupId = shiftedGroupId >> 128;
     require(b.itemGroups[groupId].initialized,
       "Super1155: you cannot burn a non-existent item group");
@@ -408,13 +351,13 @@ contract FacetMintBurn is PermitControl, ERC165Storage, IERC1155, IERC1155Metada
   */
   function burnBatch(address _burner, uint256[] memory _ids,
     uint256[] memory _amounts) public virtual {
+
     require(_burner != address(0),
       "ERC1155: burn from the zero address");
     require(_ids.length == _amounts.length,
       "ERC1155: ids and amounts length mismatch");
 
     Blueprint.Super1155StateVariables storage b = Blueprint.super1155StateVariables();
-
 
     // Validate and perform the burn.
     address operator = _msgSender();
@@ -423,7 +366,7 @@ contract FacetMintBurn is PermitControl, ERC165Storage, IERC1155, IERC1155Metada
     // Loop through each of the batched IDs to update storage of special
     // balances and circulation balances.
     for (uint i = 0; i < _ids.length; i++) {
-      require(_hasItemRight(_ids[i], BURN),
+      require(_hasItemRight(_ids[i], Blueprint.BURN),
         "Super1155: you do not have the right to burn that item");
 
       // Retrieve the group ID from the given item `_id` and check burn.
@@ -474,8 +417,9 @@ contract FacetMintBurn is PermitControl, ERC165Storage, IERC1155, IERC1155Metada
     @param _amount The amount of the corresponding item ID to burn.
   */
   function burn(address _burner, uint256 _id, uint256 _amount) external virtual{
-      require(_hasItemRight(_id, BURN), "Super1155: you don't have rights to burn");
-      burnBatch(_burner, _asSingletonArray(_id), _asSingletonArray(_amount));
+
+    require(_hasItemRight(_id, Blueprint.BURN), "Super1155: you don't have rights to burn");
+    burnBatch(_burner, _asSingletonArray(_id), _asSingletonArray(_amount));
   }
 
   /**
@@ -486,39 +430,9 @@ contract FacetMintBurn is PermitControl, ERC165Storage, IERC1155, IERC1155Metada
   */
   function _asSingletonArray(uint256 _element) private pure
     returns (uint256[] memory) {
+
     uint256[] memory array = new uint256[](1);
     array[0] = _element;
     return array;
   }
-
-  /**  Unsupported methods in this facet
-  */
-  function balanceOf(address account, uint256 id) external override view returns (uint256) {}
-
-  function balanceOfBatch(address[] calldata accounts, uint256[] calldata ids)
-      external
-      view
-      returns (uint256[] memory) {}
-
-  function setApprovalForAll(address operator, bool approved) external {}
-
-  function isApprovedForAll(address account, address operator) external view returns (bool) {}
-
-  function safeTransferFrom(
-      address from,
-      address to,
-      uint256 id,
-      uint256 amount,
-      bytes calldata data
-  ) external {}
-
-  function safeBatchTransferFrom(
-      address from,
-      address to,
-      uint256[] calldata ids,
-      uint256[] calldata amounts,
-      bytes calldata data
-  ) external {}
-
-  function uri(uint256 id) external view returns (string memory) {}
 }
