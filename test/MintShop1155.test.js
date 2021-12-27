@@ -35,6 +35,7 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
         setMintRight;
 
     let mintShop1155;
+    let multicall;
     let super1155;
     let super1155Second;
     let mockERC20;
@@ -54,6 +55,7 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
         this.Staker = await ethers.getContractFactory("Staker");
         this.ProxyRegistry = await ethers.getContractFactory("ProxyRegistry");
         this.Super1155 = await ethers.getContractFactory("Super1155");
+        this.Multicall = await ethers.getContractFactory("Multicall");
         // this.Item721 = await ethers.getContractFactory("Super721");
     });
 
@@ -86,11 +88,14 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
         await super1155.deployed();
         // await super1155Second._transferOwnership(owner.address);
 
+        multicall = await this.Multicall.deploy();
+
         mintShop1155 = await this.MintShop1155.deploy(
             owner.address,
             paymentReceiver.address,
             4,
-            200
+            200,
+            multicall.address
         );
         await mintShop1155.deployed();
 
@@ -168,7 +173,8 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
                 deployer.address,
                 paymentReceiver.address,
                 "4",
-                1
+                1,
+                multicall.address
             );
             await super1155.deployed();
 
@@ -1438,7 +1444,8 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
                 deployer.address,
                 paymentReceiver.address,
                 "4",
-                1
+                1,
+                multicall.address
             );
 
 
@@ -1795,6 +1802,100 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
             console.log(balanceBefore.toString() - balanceAfter.toString());
         })
 
+        
+    });
+    describe("CheckRequirments() staticCalls test", function() {
+        beforeEach(async function(){
+            await super1155.connect(owner).configureGroup(itemGroupId2, {
+                name: 'NFT',
+                supplyType: 0,
+                supplyData: 5,
+                itemType: 0,
+                itemData: 0,
+                burnType: 0,
+                burnData: 0
+            });
+
+            await super1155.connect(owner).configureGroup(itemGroupId2.add(1), {
+                name: 'SUPERNFT',
+                supplyType: 0,
+                supplyData: 5,
+                itemType: 0,
+                itemData: 0,
+                burnType: 0,
+                burnData: 0
+            });
+
+            let mintShop = await this.MintShop1155.deploy(
+                owner.address,
+                paymentReceiver.address,
+                4,
+                200,
+                multicall.address
+            );
+            let ABItotalBalances = ["function totalBalances (address) external view returns (uint256)"];
+            let balanceOf1155ABI = ["balanceOf (address _owner, uint256 _id) external view returns (uint256)"];
+            let iface = new ethers.utils.Interface(balanceOf1155ABI);
+            let encodedCallData = {
+                target: super1155.address,
+                callData: iface.iface.getSighash("balanceOf"),
+                args: [NULL_ADDRESS, ethers.utils.hexlify(itemGroupId2)]
+            };
+
+
+            await mintShop1155.connect(owner).addPool({
+                name: "a",
+                startTime: latestBlock.timestamp + 60,
+                endTime: latestBlock.timestamp + 120,
+                purchaseLimit: 3,
+                singlePurchaseLimit: 1,
+                requirement: {
+                    requiredType: 2,
+                    requiredAsset: [super1155.address],
+                    requiredAmount: 0,
+                    requiredId: [itemGroupId2],
+                    calls: [encodedCallData]
+                    },
+                    collection: super1155.address
+                }, [1, 2], // Groups 1 = FT, 2 = NFT
+                [1, 0], // NumberOffset 1 = FT, 0 = NFT // FT's are coerced to index 1
+                [10, 5], // Caps 10 = FT, 5 = NFT
+                [
+                    [{ // Price pair for FTs
+                        assetType: 1,
+                        asset: NULL_ADDRESS,
+                        price: 1
+                    }], 
+
+                    [{ // Price pairs for NFTs, 5 NFTs = 5 Prices Pairs
+                        assetType: 1,
+                        asset: NULL_ADDRESS,
+                        price: 1
+                    }, {
+                        assetType: 1,
+                        asset: NULL_ADDRESS,
+                        price: 1
+                    }, {
+                        assetType: 1,
+                        asset: NULL_ADDRESS,
+                        price: 1
+                    }, {
+                        assetType: 1,
+                        asset: NULL_ADDRESS,
+                        price: 1
+                    }, {
+                        assetType: 1,
+                        asset: NULL_ADDRESS,
+                        price: 1
+                    }]
+                ]);
+
+        });
+
+        it("CheckReq staticCall test", async function(){
+            let res = await mintShop1155.checkRequirments(0);
+            console.log(res);
+        })
         
     });
 });

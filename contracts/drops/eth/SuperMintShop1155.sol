@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity ^0.8.8;
+pragma solidity 0.8.8;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
@@ -11,7 +11,11 @@ import "../../assets/erc721/interfaces/ISuper721.sol";
 import "../../interfaces/IStaker.sol";
 import "../../interfaces/IMintShop.sol";
 import "../../libraries/merkle/SuperMerkleAccess.sol";
-import "../../libraries/DFStorage.sol";
+// import "../../libraries/DFStorage.sol";
+// import "../../libraries/BytesToTypes.sol";
+import "../../multicall/IMulticall.sol";
+import "hardhat/console.sol";
+import {ArrayUtils} from "../../utils/Utils.sol";
 
 /**
   @title A Shop contract for selling NFTs via direct minting through particular
@@ -27,7 +31,9 @@ import "../../libraries/DFStorage.sol";
 */
 contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop, SuperMerkleAccess {
   using SafeERC20 for IERC20;
+  // using BytesToTypes for bytes;
 
+  address multicall;
 
   /// The public identifier for the right to set the payment receiver.
   bytes32 public constant SET_PAYMENT_RECEIVER
@@ -130,6 +136,7 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop, SuperMerkleAcces
     mapping (bytes32 => mapping (uint256 => DFStorage.Price)) itemPrices;
     uint256[] itemGroups;
     Whitelist[] whiteLists;
+    // DFStorage.Call[] calls;
   }
 
   /**
@@ -283,7 +290,7 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop, SuperMerkleAcces
       single address may purchase across all item pools in the shop.
   */
   constructor(address _owner, address _paymentReceiver,
-    uint256 _globalPurchaseLimit, uint256 _maxAllocation) {
+    uint256 _globalPurchaseLimit, uint256 _maxAllocation, address _multicall) {
 
     if (_owner != owner()) {
       transferOwnership(_owner);
@@ -292,6 +299,7 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop, SuperMerkleAcces
     paymentReceiver = _paymentReceiver;
     globalPurchaseLimit = _globalPurchaseLimit;
     maxAllocation = _maxAllocation;
+    multicall = _multicall;
   }
 
   /**
@@ -669,7 +677,7 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop, SuperMerkleAcces
 
     }
 
-    require(checkRequirments(_id), "0x8B");
+    // require(checkRequirments(_id), "0x8B");
 
     sellingHelper(_id, itemKey, _assetIndex, _amount, whiteListed, _whiteList.whiteListId);
 
@@ -732,63 +740,58 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop, SuperMerkleAcces
     }
   }
 
-  /**
-  * Private function to avoid a stack-too-deep error.
-  */
-  function checkRequirments(uint256 _id) private view returns (bool) {
-    // Verify that the user meets any requirements gating participation in this
-    // pool. Verify that any possible ERC-20 requirements are met.
-    uint256 amount;
-    
-    DFStorage.PoolRequirement memory poolRequirement = pools[_id].config.requirement;
-    if (poolRequirement.requiredType == DFStorage.AccessType.TokenRequired) {
-      // bytes data 
-      for (uint256 i = 0; i < poolRequirement.requiredAsset.length; i++) {
-        amount += IERC20(poolRequirement.requiredAsset[i]).balanceOf(_msgSender());
-      }
-      return amount >= poolRequirement.requiredAmount;
-      // Verify that any possible Staker point threshold requirements are met.
-    } else if (poolRequirement.requiredType == DFStorage.AccessType.PointRequired) {
-        // IStaker requiredStaker = IStaker(poolRequirement.requiredAsset[0]);
-       return IStaker(poolRequirement.requiredAsset[0]).getAvailablePoints(_msgSender())
-          >= poolRequirement.requiredAmount;
-    }
+function checkRequirments(uint256 _poolId) public view returns (bool) {
+    // if (pools[_poolId].config.requirement.requiredType == DFStorage.AccessType.Public) {
+    //   return true;
+    // }
+    // DFStorage.Call[] memory calls = pools[_poolId].config.requirement.calls;
+    DFStorage.PoolRequirement memory poolRequirement = pools[_poolId].config.requirement;
+    bytes memory res = poolRequirement.calls[0].callData;
 
-    // Verify that any possible ERC-1155 ownership requirements are met.
-    if (poolRequirement.requiredId.length == 0) {
-      if (poolRequirement.requiredType == DFStorage.AccessType.ItemRequired) {
-        for (uint256 i = 0; i < poolRequirement.requiredAsset.length; i++) {
-            amount += ISuper1155(poolRequirement.requiredAsset[i]).totalBalances(_msgSender());
-        }
-        return amount >= poolRequirement.requiredAmount;
-      }    
-      else if (poolRequirement.requiredType == DFStorage.AccessType.ItemRequired721) {
-        for (uint256 i = 0; i < poolRequirement.requiredAsset.length; i++) {
-            amount += ISuper721(poolRequirement.requiredAsset[i]).balanceOf(_msgSender());
-        }
-        // IERC721 requiredItem = IERC721(poolRequirement.requiredAsset[0]);
-        return amount >= poolRequirement.requiredAmount;
-      } 
-    } else {
-      if (poolRequirement.requiredType == DFStorage.AccessType.ItemRequired) {
-        // ISuper1155 requiredItem = ISuper1155(poolRequirement.requiredAsset[0]);
-        for (uint256 i = 0; i < poolRequirement.requiredAsset.length; i++) {
-          for (uint256 j = 0; j < poolRequirement.requiredAsset.length; j++) {
-            amount += ISuper1155(poolRequirement.requiredAsset[i]).balanceOf(_msgSender(), poolRequirement.requiredId[j]);
-          }
-        }
-        return amount >= poolRequirement.requiredAmount;
-      }    
-      else if (poolRequirement.requiredType == DFStorage.AccessType.ItemRequired721) {
-        for (uint256 i = 0; i < poolRequirement.requiredAsset.length; i++) {
-            for (uint256 j = 0; j < poolRequirement.requiredAsset.length; j++) {
-              amount += ISuper721(poolRequirement.requiredAsset[i]).balanceOfGroup(_msgSender(), poolRequirement.requiredId[j]);
-            }
-        }
-        return amount >= poolRequirement.requiredAmount;
-    }
-  }
-  return true;
+    // uint32 selector;
+    // uint160 addr = type(uint160).max;
+    // uint256 arg1;
+    // uint256 arg2;
+    // bytes memory arr2;
+    // bytes memory mask;
+    // for (uint i = 0; i < poolRequirement.calls.length; i++) {
+    //   // console.log(i);
+    //   console.log(i, poolRequirement.calls[i].callData.length);
+    //   if (poolRequirement.calls[i].callData.length == 36) {
+    //     mask = abi.encodePacked(selector, abi.encode(addr));
+    //     arr2 = abi.encodePacked(selector, abi.encode(msg.sender));
+    //   } else {
+    //     mask = abi.encodePacked(selector, abi.encode(addr,arg1));
+    //     arr2 = abi.encodePacked(selector, abi.encode(msg.sender,arg1));
+    //   }
+    //   //  console.log(3);
+      
+    //   ArrayUtils.guardedArrayReplace(poolRequirement.calls[i].callData, arr2, mask);
+    //   //  console.log(1);
+    //   // res[i] =  poolRequirement.calls[i].callData;
+    //   // res[]
+    //   // if (bytesToUint256(32, IMulticall(multicall).staticCall(poolRequirement.calls)) > poolRequirement.requiredAmount) {
+    //   //   return true;
+    //   // }
+    //   // console.logBytes(res[i]);
+    // }
+    
+    // return (res);
+    // console.logBytes(arr2);
+
+    
+    // // for (uint i = 0; i < poolRequirement.calls.length; i++) {
+    // //   pools[_poolId].config.requirement.calls[i].args[0] = abi.encodePacked(msg.sender);
+    // // }
+    // bytes[] memory results = new bytes[](poolRequirement.calls.length);
+
+    // results = IMulticall(multicall).staticCall(poolRequirement.calls);
+    // for (uint i = 0; i<results.length; i++) {
+    //   if (bytesToUint256(32, results[i]) > poolRequirement.requiredAmount) {
+    //     return true;
+    //   }
+    // }
+    // return false;
 }
 
 
@@ -830,5 +833,14 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop, SuperMerkleAcces
 
     emit ItemPurchased(_msgSender(), _id, itemIds, amounts);
   }
+
+
+  function bytesToUint256(uint _offst, bytes memory _input) private pure returns (uint256 _output) {
+        assembly {
+            _output := mload(add(_input, _offst))
+        }
+  }
+
+
 
 }
