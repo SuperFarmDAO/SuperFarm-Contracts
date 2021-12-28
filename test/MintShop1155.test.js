@@ -23,19 +23,15 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
     let UNIVERSAL,
         MANAGER,
         zeroRight,
-
         setSweepRight, 
         setLockSweepRight,
-
         setPaymentReceiverRight,
         setLockPaymentReceiverRight,
         setUpdateGlobalLimitRight,
         setLockGlobalLimitRight,
         setWhiteListRight,
         setPoolRight,
-
         setMintRight;
-
     let mintShop1155;
     let multicall;
     let super1155;
@@ -582,6 +578,13 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
 
             // Create Pools
             let latestBlock = await ethers.provider.getBlock(await ethers.provider.getBlockNumber());
+            const Super1155ABI = await hre.artifacts.readArtifact("Super1155");
+            let calldata = utils.encodeCall(
+                super1155.address,
+                Super1155ABI, 
+                "balanceOf", 
+                [owner.address, itemGroupId2]
+            );
             await mintShop1155.connect(owner).addPool({
                 name: "firstPool",
                 startTime: latestBlock.timestamp,
@@ -589,13 +592,13 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
                 purchaseLimit: 3,
                 singlePurchaseLimit: 2,
                 requirement: {
-                    requiredType: 0,
-                    requiredAsset: [NULL_ADDRESS],
-                    requiredAmount: 1,
-                    
-                    requiredId: []
-                    },
-                    collection: super1155.address
+                    requiredType: 2,
+                    requiredAsset: [super1155.address],
+                    requiredAmount: 0,
+                    requiredId: [itemGroupId2],
+                    calls: calldata
+                },
+                collection: super1155.address
                 }, [1, 2], // Groups 1 = FT, 2 = NFT
                 [1, 0], // NumberOffset 1 = FT, 0 = NFT // FT's are coerced to index 1
                 [10, 5], // Caps 10 = FT, 5 = NFT
@@ -638,12 +641,12 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
                 singlePurchaseLimit: 1,
                 requirement: {
                     requiredType: 0,
-                    requiredAsset: [NULL_ADDRESS],
+                    requiredAsset: [super1155.address],
                     requiredAmount: 0,
-                    
-                    requiredId: []
-                    },
-                    collection: super1155.address
+                    requiredId: [itemGroupId2],
+                    calls: calldata
+                },
+                collection: super1155.address
                 }, [3], // Group
                 [0], // NumberOffset
                 [2], // Caps
