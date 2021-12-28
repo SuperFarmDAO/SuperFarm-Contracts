@@ -1,5 +1,7 @@
 const { expect } = require('chai');
 const { BigNumber} = require('ethers');
+const hre = require("hardhat");
+import * as utils from "./utils.js"
 
 import {getIndex, computeMerkleProof, computeRootHash, hash} from "./utils.js";
 
@@ -89,6 +91,7 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
         // await super1155Second._transferOwnership(owner.address);
 
         multicall = await this.Multicall.deploy();
+        await multicall.deployed();
 
         mintShop1155 = await this.MintShop1155.deploy(
             owner.address,
@@ -1806,6 +1809,8 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
     });
     describe("CheckRequirments() staticCalls test", function() {
         beforeEach(async function(){
+            let latestBlock = await ethers.provider.getBlock(await ethers.provider.getBlockNumber());
+            
             await super1155.connect(owner).configureGroup(itemGroupId2, {
                 name: 'NFT',
                 supplyType: 0,
@@ -1833,16 +1838,15 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
                 200,
                 multicall.address
             );
-            let ABItotalBalances = ["function totalBalances (address) external view returns (uint256)"];
-            let balanceOf1155ABI = ["balanceOf (address _owner, uint256 _id) external view returns (uint256)"];
-            let iface = new ethers.utils.Interface(balanceOf1155ABI);
-            let encodedCallData = {
-                target: super1155.address,
-                callData: iface.iface.getSighash("balanceOf"),
-                args: [NULL_ADDRESS, ethers.utils.hexlify(itemGroupId2)]
-            };
 
-
+            const Super1155ABI = await hre.artifacts.readArtifact("Super1155");
+            let calldata = utils.encodeCall(
+                super1155.address,
+                Super1155ABI, 
+                "balanceOf", 
+                [owner.address, itemGroupId2]
+            );
+            
             await mintShop1155.connect(owner).addPool({
                 name: "a",
                 startTime: latestBlock.timestamp + 60,
@@ -1854,9 +1858,9 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
                     requiredAsset: [super1155.address],
                     requiredAmount: 0,
                     requiredId: [itemGroupId2],
-                    calls: [encodedCallData]
-                    },
-                    collection: super1155.address
+                    calls: calldata
+                },
+                collection: super1155.address
                 }, [1, 2], // Groups 1 = FT, 2 = NFT
                 [1, 0], // NumberOffset 1 = FT, 0 = NFT // FT's are coerced to index 1
                 [10, 5], // Caps 10 = FT, 5 = NFT
@@ -1888,14 +1892,21 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
                         asset: NULL_ADDRESS,
                         price: 1
                     }]
-                ]);
+            ]);
 
-        });
+                // TODOI write test cases for 
+                // 1 - TokenRequired
+                // 2 - PointsRequired
+                // 3 - ItemsRequired (lenght == 0)
+                // 4 - ItemsRequired (lenght != 0)
+
+        });        
 
         it("CheckReq staticCall test", async function(){
-            let res = await mintShop1155.checkRequirments(0);
+            let res = await mintShop1155.checkRequirements(0);
             console.log(res);
-        })
+        })    
         
+
     });
 });

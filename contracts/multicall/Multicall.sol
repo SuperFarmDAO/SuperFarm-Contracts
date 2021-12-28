@@ -16,7 +16,7 @@ contract Multicall is IMulticall {
         data = new bytes[](calls.length);
         for (uint256 i = 0; i < calls.length; i++) {
             (bool success, bytes memory res) = calls[i].target.staticcall(calls[i].callData);
-            require(success, "Staticcall failed");
+            require(success, "staticCallBytes failed");
             data[i] = res;
         }
     }
@@ -25,7 +25,9 @@ contract Multicall is IMulticall {
     function staticCallUint(DFStorage.Call[] memory calls) external virtual view returns (uint256 result) {
         for (uint256 i = 0; i < calls.length; i++) {
             (bool success, bytes memory res) = calls[i].target.staticcall(calls[i].callData);
-            require(success, "Staticcall failed");
+            console.logBytes(res);
+            console.logBool(success);
+            require(success, "staticCallUint failed");
             result += bytesToUint256(32, res);
         }
     }

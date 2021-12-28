@@ -677,7 +677,7 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop, SuperMerkleAcces
 
     }
 
-    // require(checkRequirments(_id), "0x8B");
+    require(checkRequirements(_id), "0x8B");
 
     sellingHelper(_id, itemKey, _assetIndex, _amount, whiteListed, _whiteList.whiteListId);
 
@@ -740,58 +740,16 @@ contract MintShop1155 is Sweepable, ReentrancyGuard, IMintShop, SuperMerkleAcces
     }
   }
 
-function checkRequirments(uint256 _poolId) public view returns (bool) {
-    // if (pools[_poolId].config.requirement.requiredType == DFStorage.AccessType.Public) {
-    //   return true;
-    // }
-    // DFStorage.Call[] memory calls = pools[_poolId].config.requirement.calls;
+function checkRequirements(uint256 _poolId) public view returns (bool) {
     DFStorage.PoolRequirement memory poolRequirement = pools[_poolId].config.requirement;
-    bytes memory res = poolRequirement.calls[0].callData;
-
-    // uint32 selector;
-    // uint160 addr = type(uint160).max;
-    // uint256 arg1;
-    // uint256 arg2;
-    // bytes memory arr2;
-    // bytes memory mask;
-    // for (uint i = 0; i < poolRequirement.calls.length; i++) {
-    //   // console.log(i);
-    //   console.log(i, poolRequirement.calls[i].callData.length);
-    //   if (poolRequirement.calls[i].callData.length == 36) {
-    //     mask = abi.encodePacked(selector, abi.encode(addr));
-    //     arr2 = abi.encodePacked(selector, abi.encode(msg.sender));
-    //   } else {
-    //     mask = abi.encodePacked(selector, abi.encode(addr,arg1));
-    //     arr2 = abi.encodePacked(selector, abi.encode(msg.sender,arg1));
-    //   }
-    //   //  console.log(3);
-      
-    //   ArrayUtils.guardedArrayReplace(poolRequirement.calls[i].callData, arr2, mask);
-    //   //  console.log(1);
-    //   // res[i] =  poolRequirement.calls[i].callData;
-    //   // res[]
-    //   // if (bytesToUint256(32, IMulticall(multicall).staticCall(poolRequirement.calls)) > poolRequirement.requiredAmount) {
-    //   //   return true;
-    //   // }
-    //   // console.logBytes(res[i]);
-    // }
     
-    // return (res);
-    // console.logBytes(arr2);
-
+    if (poolRequirement.requiredType == DFStorage.AccessType.Public) {
+      return true;
+    }
     
-    // // for (uint i = 0; i < poolRequirement.calls.length; i++) {
-    // //   pools[_poolId].config.requirement.calls[i].args[0] = abi.encodePacked(msg.sender);
-    // // }
-    // bytes[] memory results = new bytes[](poolRequirement.calls.length);
-
-    // results = IMulticall(multicall).staticCall(poolRequirement.calls);
-    // for (uint i = 0; i<results.length; i++) {
-    //   if (bytesToUint256(32, results[i]) > poolRequirement.requiredAmount) {
-    //     return true;
-    //   }
-    // }
-    // return false;
+    // for other cases 
+    return IMulticall(multicall).staticCallUint(poolRequirement.calls)
+        >= poolRequirement.requiredAmount;
 }
 
 
