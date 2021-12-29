@@ -9,11 +9,11 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC1155/IERC1155Receiver.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 
-import "../../access/PermitControl.sol";
+import "../../access/PermitControlds.sol";
 import "../../proxy/StubProxyRegistry.sol";
 
 
-import "./Blueprint.sol";
+import "./BlueprintSuper1155.sol";
 
 /** 
   @title Diamond facet for Super1155's Transfer and Approval functions.
@@ -29,7 +29,7 @@ import "./Blueprint.sol";
 
   22 Dec, 2021.
 */
-contract FacetTransferApproval is PermitControl, ERC165Storage {
+contract FacetTransferApproval is PermitControlds, ERC165Storage {
   using Address for address;
   using SafeERC20 for IERC20;
 
@@ -114,7 +114,7 @@ contract FacetTransferApproval is PermitControl, ERC165Storage {
     uint256[] memory _ids, uint256[] memory _amounts, bytes memory _data)
     public virtual {
 
-    Blueprint.Super1155StateVariables storage b = Blueprint.super1155StateVariables();
+    BlueprintSuper1155.Super1155StateVariables storage b = BlueprintSuper1155.super1155StateVariables();
 
     require(_ids.length == _amounts.length,
       "ERC1155: ids and amounts length mismatch");
@@ -131,18 +131,18 @@ contract FacetTransferApproval is PermitControl, ERC165Storage {
     for (uint256 i = 0; i < _ids.length; ++i) {
 
       // Retrieve the item's group ID.
-      uint256 groupId = (_ids[i] & Blueprint.GROUP_MASK) >> 128;
+      uint256 groupId = (_ids[i] & BlueprintSuper1155.GROUP_MASK) >> 128;
       uint256 ratioCut;
 
       // Check transfer type.
-      if (b.itemGroups[groupId].transferData.transferType == Blueprint.TransferType.BoundToAddress) {
+      if (b.itemGroups[groupId].transferData.transferType == BlueprintSuper1155.TransferType.BoundToAddress) {
         revert("Bound to Address");
-      } else if (b.itemGroups[groupId].transferData.transferType == Blueprint.TransferType.TemporaryTransfer) {
+      } else if (b.itemGroups[groupId].transferData.transferType == BlueprintSuper1155.TransferType.TemporaryTransfer) {
         require(block.timestamp <= b.itemGroups[groupId].transferData.transferTime, "Transfer time is over");
       }
 
       // Check transfer fee type.
-      if (b.itemGroups[groupId].transferData.transferFeeType == Blueprint.TransferFeeType.PerTransfer) {
+      if (b.itemGroups[groupId].transferData.transferFeeType == BlueprintSuper1155.TransferFeeType.PerTransfer) {
         bool paid;
         for (uint256 j = 0; i < paidGroup.length; j++) {
           if (paidGroup[j] == groupId) {
@@ -159,15 +159,15 @@ contract FacetTransferApproval is PermitControl, ERC165Storage {
           paidGroup[paidGroup.length - 1] = groupId;
           IERC20(b.itemGroups[groupId].transferData.transferToken).safeTransferFrom(_from, owner(), b.itemGroups[groupId].transferData.transferFeeAmount);
         }
-      } else if (b.itemGroups[groupId].transferData.transferFeeType == Blueprint.TransferFeeType.PerItem) {
-        if (b.itemGroups[groupId].itemType == Blueprint.ItemType.Fungible) {
+      } else if (b.itemGroups[groupId].transferData.transferFeeType == BlueprintSuper1155.TransferFeeType.PerItem) {
+        if (b.itemGroups[groupId].itemType == BlueprintSuper1155.ItemType.Fungible) {
           IERC20(b.itemGroups[groupId].transferData.transferToken).safeTransferFrom(_from, owner(), (b.itemGroups[groupId].transferData.transferFeeAmount * _amounts[i]) / 10000);
         }
         else {
           IERC20(b.itemGroups[groupId].transferData.transferToken).safeTransferFrom(_from, owner(), b.itemGroups[groupId].transferData.transferFeeAmount * _amounts[i]);
         }
-      } else if (b.itemGroups[groupId].transferData.transferFeeType == Blueprint.TransferFeeType.RatioCut) {
-        if (b.itemGroups[groupId].itemType == Blueprint.ItemType.Fungible) {
+      } else if (b.itemGroups[groupId].transferData.transferFeeType == BlueprintSuper1155.TransferFeeType.RatioCut) {
+        if (b.itemGroups[groupId].itemType == BlueprintSuper1155.ItemType.Fungible) {
           ratioCut = (_amounts[i] * b.itemGroups[groupId].transferData.transferFeeAmount) / 10000;
         }
       }
@@ -182,7 +182,7 @@ contract FacetTransferApproval is PermitControl, ERC165Storage {
       b.totalBalances[_to] = b.totalBalances[_to] + _amounts[i] - ratioCut;
 
       // Update RatioCut and RatioExtra fees.
-      if (b.itemGroups[groupId].transferData.transferFeeType == Blueprint.TransferFeeType.RatioCut) {
+      if (b.itemGroups[groupId].transferData.transferFeeType == BlueprintSuper1155.TransferFeeType.RatioCut) {
           b.balances[_ids[i]][owner()] = b.balances[_ids[i]][owner()] + ratioCut;
           b.groupBalances[groupId][owner()] = b.groupBalances[groupId][owner()] + ratioCut;
           b.totalBalances[owner()] = b.totalBalances[owner()] + ratioCut;
@@ -203,9 +203,9 @@ contract FacetTransferApproval is PermitControl, ERC165Storage {
       update to.
   */
   function setProxyRegistry(address _proxyRegistryAddress) external virtual
-    hasValidPermit(UNIVERSAL, Blueprint.SET_PROXY_REGISTRY) {
+    hasValidPermit(UNIVERSAL, BlueprintSuper1155.SET_PROXY_REGISTRY) {
 
-    Blueprint.Super1155StateVariables storage b = Blueprint.super1155StateVariables();
+    BlueprintSuper1155.Super1155StateVariables storage b = BlueprintSuper1155.super1155StateVariables();
 
     address oldRegistry = b.proxyRegistryAddress;
     b.proxyRegistryAddress = _proxyRegistryAddress;
@@ -224,7 +224,7 @@ contract FacetTransferApproval is PermitControl, ERC165Storage {
   function isApprovedForAll(address _owner, address _operator) public
     view virtual returns (bool) {
 
-    Blueprint.Super1155StateVariables storage b = Blueprint.super1155StateVariables();
+    BlueprintSuper1155.Super1155StateVariables storage b = BlueprintSuper1155.super1155StateVariables();
 
     if (StubProxyRegistry(b.proxyRegistryAddress).proxies(_owner) == _operator) {
       return true;
@@ -245,7 +245,7 @@ contract FacetTransferApproval is PermitControl, ERC165Storage {
   function setApprovalForAll(address _operator, bool _approved) external
     virtual {
 
-    Blueprint.Super1155StateVariables storage b = Blueprint.super1155StateVariables();
+    BlueprintSuper1155.Super1155StateVariables storage b = BlueprintSuper1155.super1155StateVariables();
 
     require(_msgSender() != _operator,
       "ERC1155: setting approval status for self");

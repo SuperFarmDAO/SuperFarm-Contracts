@@ -9,9 +9,9 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC1155/IERC1155Receiver.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 
-import "../../access/PermitControl.sol";
+import "../../access/PermitControlds.sol";
 
-import "./Blueprint.sol";
+import "./BlueprintSuper1155.sol";
 
 /** 
   @title Diamond facet for Super1155's Mint and Burn functions.
@@ -27,7 +27,7 @@ import "./Blueprint.sol";
 
   22 Dec, 2021.
 */
-contract FacetMintBurn is PermitControl, ERC165Storage {
+contract FacetMintBurn is PermitControlds, ERC165Storage {
   using Address for address;
   using SafeERC20 for IERC20;
 
@@ -81,7 +81,7 @@ contract FacetMintBurn is PermitControl, ERC165Storage {
     require(_owner != address(0),
       "ERC1155: balance query for the zero address");
 
-    Blueprint.Super1155StateVariables storage b = Blueprint.super1155StateVariables();
+    BlueprintSuper1155.Super1155StateVariables storage b = BlueprintSuper1155.super1155StateVariables();
 
     return b.balances[_id][_owner];
   }
@@ -164,10 +164,10 @@ contract FacetMintBurn is PermitControl, ERC165Storage {
   function _mintChecker(uint256 _id, uint256 _amount) private view
     returns (uint256) {
 
-    Blueprint.Super1155StateVariables storage b = Blueprint.super1155StateVariables();
+    BlueprintSuper1155.Super1155StateVariables storage b = BlueprintSuper1155.super1155StateVariables();
 
     // Retrieve the item's group ID.
-    uint256 shiftedGroupId = (_id & Blueprint.GROUP_MASK);
+    uint256 shiftedGroupId = (_id & BlueprintSuper1155.GROUP_MASK);
     uint256 groupId = shiftedGroupId >> 128;
     require(b.itemGroups[groupId].initialized,
       "Super1155: you cannot mint a non-existent item group");
@@ -176,31 +176,31 @@ contract FacetMintBurn is PermitControl, ERC165Storage {
     // supply matters. Otherwise, historic mints are what determine the cap.
     uint256 currentGroupSupply = b.itemGroups[groupId].mintCount;
     uint256 currentItemSupply = b.mintCount[_id];
-    if (b.itemGroups[groupId].burnType == Blueprint.BurnType.Replenishable) {
+    if (b.itemGroups[groupId].burnType == BlueprintSuper1155.BurnType.Replenishable) {
       currentGroupSupply = b.itemGroups[groupId].circulatingSupply;
       currentItemSupply = b.circulatingSupply[_id];
     }
 
     // If we are subject to a cap on group size, ensure we don't exceed it.
-    if (b.itemGroups[groupId].supplyType != Blueprint.SupplyType.Uncapped) {
+    if (b.itemGroups[groupId].supplyType != BlueprintSuper1155.SupplyType.Uncapped) {
       require((currentGroupSupply + _amount) <= b.itemGroups[groupId].supplyData,
         "Super1155: you cannot mint a group beyond its cap");
     }
 
     // Do not violate nonfungibility rules.
-    if (b.itemGroups[groupId].itemType == Blueprint.ItemType.Nonfungible) {
+    if (b.itemGroups[groupId].itemType == BlueprintSuper1155.ItemType.Nonfungible) {
       require((currentItemSupply + _amount) <= 1,
         "Super1155: you cannot mint more than a single nonfungible item");
 
     // Do not violate semifungibility rules.
-    } else if (b.itemGroups[groupId].itemType == Blueprint.ItemType.Semifungible) {
+    } else if (b.itemGroups[groupId].itemType == BlueprintSuper1155.ItemType.Semifungible) {
       require((currentItemSupply + _amount) <= b.itemGroups[groupId].itemData,
         "Super1155: you cannot mint more than the alloted semifungible items");
     }
 
     // Fungible items are coerced into the single group ID + index one slot.
     uint256 mintedItemId = _id;
-    if (b.itemGroups[groupId].itemType == Blueprint.ItemType.Fungible) {
+    if (b.itemGroups[groupId].itemType == BlueprintSuper1155.ItemType.Fungible) {
       mintedItemId = shiftedGroupId + 1;
     }
     return mintedItemId;
@@ -227,7 +227,7 @@ contract FacetMintBurn is PermitControl, ERC165Storage {
     require(_ids.length == _amounts.length,
       "ERC1155: ids and amounts length mismatch");
 
-    Blueprint.Super1155StateVariables storage b = Blueprint.super1155StateVariables();
+    BlueprintSuper1155.Super1155StateVariables storage b = BlueprintSuper1155.super1155StateVariables();
 
     // Validate and perform the mint.
     address operator = _msgSender();
@@ -238,17 +238,17 @@ contract FacetMintBurn is PermitControl, ERC165Storage {
     // balances and circulation balances.
     uint256 etherValue = msg.value;
     for (uint256 i = 0; i < _ids.length; i++) {
-      require(_hasItemRight(_ids[i], Blueprint.MINT),
+      require(_hasItemRight(_ids[i], BlueprintSuper1155.MINT),
         "Super1155: you do not have the right to mint that item");
 
       // Retrieve the group ID from the given item `_id`.
       uint256 groupId = _ids[i] >> 128;
 
       // Add supplyData if the supplyTime was time dependent.
-      if (b.itemGroups[groupId].supplyType == Blueprint.SupplyType.TimeValue) {
+      if (b.itemGroups[groupId].supplyType == BlueprintSuper1155.SupplyType.TimeValue) {
         uint256 intervals = (block.timestamp - b.itemGroups[groupId].timeData.timeStamp) / b.itemGroups[groupId].timeData.timeInterval;
         b.itemGroups[groupId].supplyData += intervals * b.itemGroups[groupId].timeData.timeRate;
-      } else if (b.itemGroups[groupId].supplyType == Blueprint.SupplyType.TimePercent) {
+      } else if (b.itemGroups[groupId].supplyType == BlueprintSuper1155.SupplyType.TimePercent) {
         uint256 intervals = (block.timestamp - b.itemGroups[groupId].timeData.timeStamp) / b.itemGroups[groupId].timeData.timeInterval;
         b.itemGroups[groupId].supplyData = intervals * b.itemGroups[groupId].timeData.timeStamp;
         if (b.itemGroups[groupId].supplyData > b.itemGroups[groupId].timeData.timeCap) {
@@ -313,21 +313,21 @@ contract FacetMintBurn is PermitControl, ERC165Storage {
   function _burnChecker(uint256 _id, uint256 _amount) private view
     returns (uint256) {
 
-    Blueprint.Super1155StateVariables storage b = Blueprint.super1155StateVariables();
+    BlueprintSuper1155.Super1155StateVariables storage b = BlueprintSuper1155.super1155StateVariables();
 
     // Retrieve the item's group ID.
-    uint256 shiftedGroupId = (_id & Blueprint.GROUP_MASK);
+    uint256 shiftedGroupId = (_id & BlueprintSuper1155.GROUP_MASK);
     uint256 groupId = shiftedGroupId >> 128;
     require(b.itemGroups[groupId].initialized,
       "Super1155: you cannot burn a non-existent item group");
 
     // If the item group is non-burnable, then revert.
-    if (b.itemGroups[groupId].burnType == Blueprint.BurnType.None) {
+    if (b.itemGroups[groupId].burnType == BlueprintSuper1155.BurnType.None) {
       revert("Super1155: you cannot burn a non-burnable item group");
     }
 
     // If we can burn items, then we must verify that we do not exceed the cap.
-    if (b.itemGroups[groupId].burnType == Blueprint.BurnType.Burnable) {
+    if (b.itemGroups[groupId].burnType == BlueprintSuper1155.BurnType.Burnable) {
       require((b.itemGroups[groupId].burnCount + _amount)
         <= b.itemGroups[groupId].burnData,
         "Super1155: you may not exceed the burn limit on this item group");
@@ -335,7 +335,7 @@ contract FacetMintBurn is PermitControl, ERC165Storage {
 
     // Fungible items are coerced into the single group ID + index one slot.
     uint256 burntItemId = _id;
-    if (b.itemGroups[groupId].itemType == Blueprint.ItemType.Fungible) {
+    if (b.itemGroups[groupId].itemType == BlueprintSuper1155.ItemType.Fungible) {
       burntItemId = shiftedGroupId + 1;
     }
     return burntItemId;
@@ -357,7 +357,7 @@ contract FacetMintBurn is PermitControl, ERC165Storage {
     require(_ids.length == _amounts.length,
       "ERC1155: ids and amounts length mismatch");
 
-    Blueprint.Super1155StateVariables storage b = Blueprint.super1155StateVariables();
+    BlueprintSuper1155.Super1155StateVariables storage b = BlueprintSuper1155.super1155StateVariables();
 
     // Validate and perform the burn.
     address operator = _msgSender();
@@ -366,7 +366,7 @@ contract FacetMintBurn is PermitControl, ERC165Storage {
     // Loop through each of the batched IDs to update storage of special
     // balances and circulation balances.
     for (uint i = 0; i < _ids.length; i++) {
-      require(_hasItemRight(_ids[i], Blueprint.BURN),
+      require(_hasItemRight(_ids[i], BlueprintSuper1155.BURN),
         "Super1155: you do not have the right to burn that item");
 
       // Retrieve the group ID from the given item `_id` and check burn.
@@ -418,7 +418,7 @@ contract FacetMintBurn is PermitControl, ERC165Storage {
   */
   function burn(address _burner, uint256 _id, uint256 _amount) external virtual{
 
-    require(_hasItemRight(_id, Blueprint.BURN), "Super1155: you don't have rights to burn");
+    require(_hasItemRight(_id, BlueprintSuper1155.BURN), "Super1155: you don't have rights to burn");
     burnBatch(_burner, _asSingletonArray(_id), _asSingletonArray(_amount));
   }
 

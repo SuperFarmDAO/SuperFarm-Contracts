@@ -9,11 +9,13 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 // import "@openzeppelin/contracts/token/ERC1155/IERC1155Receiver.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 
-import "../../access/PermitControl.sol";
+import "hardhat/console.sol";
+
+
+import "../../access/PermitControlds.sol";
 import "../../proxy/StubProxyRegistry.sol";
 
-
-import "./Blueprint.sol";
+import "./BlueprintSuper1155.sol";
 
 /** 
   @title Diamond facet for Super1155's Group and Uri functions.
@@ -29,7 +31,7 @@ import "./Blueprint.sol";
 
   22 Dec, 2021.
 */
-contract FacetGroupUri is PermitControl, ERC165Storage {
+contract FacetGroupUri is PermitControlds, ERC165Storage {
   using Address for address;
   using SafeERC20 for IERC20;
 
@@ -49,7 +51,7 @@ contract FacetGroupUri is PermitControl, ERC165Storage {
     @param newGroup The new group configuration.
   */
   event ItemGroupConfigured(address indexed manager, uint256 groupId,
-    Blueprint.ItemGroupInput indexed newGroup);
+    BlueprintSuper1155.ItemGroupInput indexed newGroup);
 
   /**
     An event that gets emitted when the item collection is locked to further
@@ -95,6 +97,10 @@ contract FacetGroupUri is PermitControl, ERC165Storage {
   */
   event PermanentContractURI(string _value, uint256 indexed _id);
 
+  function initialize() public initializer {
+    __Ownable_init_unchained();
+  }
+
   /**
     This is a private helper function to replace the `hasItemRight` modifier
     that we use on some functions in order to inline this check during batch
@@ -135,9 +141,9 @@ contract FacetGroupUri is PermitControl, ERC165Storage {
   */
   function uri(uint256) external view returns (string memory) {
     
-    Blueprint.Super1155StateVariables storage b = Blueprint.super1155StateVariables();
+    BlueprintSuper1155.Super1155StateVariables storage b = BlueprintSuper1155.super1155StateVariables();
 
-    return b.metadataUri;
+    return b.metadataURI;
   }
 
   /**
@@ -149,14 +155,14 @@ contract FacetGroupUri is PermitControl, ERC165Storage {
     @param _uri The new URI to update to.
   */
   function setURI(string calldata _uri) external virtual
-    hasValidPermit(UNIVERSAL, Blueprint.SET_URI) {
+    hasValidPermit(UNIVERSAL, BlueprintSuper1155.SET_URI) {
 
-    Blueprint.Super1155StateVariables storage b = Blueprint.super1155StateVariables();
+    BlueprintSuper1155.Super1155StateVariables storage b = BlueprintSuper1155.super1155StateVariables();
 
     require(!b.uriLocked,
       "Super1155: the collection URI has been permanently locked");
-    string memory oldURI = b.metadataUri;
-    b.metadataUri = _uri;
+    string memory oldURI = b.metadataURI;
+    b.metadataURI = _uri;
     emit ChangeURI(oldURI, _uri);
   }
 
@@ -167,9 +173,9 @@ contract FacetGroupUri is PermitControl, ERC165Storage {
     @param _uri The new contract URI to update to.
   */
   function setContractUri(string calldata _uri) external virtual
-    hasValidPermit(UNIVERSAL, Blueprint.SET_URI) {
+    hasValidPermit(UNIVERSAL, BlueprintSuper1155.SET_URI) {
 
-      Blueprint.Super1155StateVariables storage b = Blueprint.super1155StateVariables();
+      BlueprintSuper1155.Super1155StateVariables storage b = BlueprintSuper1155.super1155StateVariables();
 
       require(!b.contractUriLocked,
         "Super1155: the contract URI has been permanently locked");
@@ -188,10 +194,10 @@ contract FacetGroupUri is PermitControl, ERC165Storage {
   */
   function setMetadata(uint256 _id, string memory _metadata) external {
 
-    require(_hasItemRight(_id, Blueprint.SET_METADATA), "Super1155: you don't have rights to setMetadata");
+    require(_hasItemRight(_id, BlueprintSuper1155.SET_METADATA), "Super1155: you don't have rights to setMetadata");
     uint groupId = _id >> 128;
 
-    Blueprint.Super1155StateVariables storage b = Blueprint.super1155StateVariables();
+    BlueprintSuper1155.Super1155StateVariables storage b = BlueprintSuper1155.super1155StateVariables();
 
     require(!b.uriLocked && !b.metadataFrozen[_id] &&  !b.metadataFrozen[groupId],
       "Super1155: you cannot edit this metadata because it is frozen");
@@ -205,12 +211,12 @@ contract FacetGroupUri is PermitControl, ERC165Storage {
     metadata URI on the entire collection to future changes.
   */
   function lockURI() external
-    hasValidPermit(UNIVERSAL, Blueprint.LOCK_URI) {
+    hasValidPermit(UNIVERSAL, BlueprintSuper1155.LOCK_URI) {
 
-    Blueprint.Super1155StateVariables storage b = Blueprint.super1155StateVariables();
+    BlueprintSuper1155.Super1155StateVariables storage b = BlueprintSuper1155.super1155StateVariables();
 
     b.uriLocked = true;
-    emit PermanentURI(b.metadataUri, 2 ** 256 - 1);
+    emit PermanentURI(b.metadataURI, 2 ** 256 - 1);
   }
   
   /** 
@@ -218,9 +224,9 @@ contract FacetGroupUri is PermitControl, ERC165Storage {
     changes
   */
   function lockContractUri() external
-    hasValidPermit(UNIVERSAL, Blueprint.LOCK_URI) {
+    hasValidPermit(UNIVERSAL, BlueprintSuper1155.LOCK_URI) {
 
-    Blueprint.Super1155StateVariables storage b = Blueprint.super1155StateVariables();
+    BlueprintSuper1155.Super1155StateVariables storage b = BlueprintSuper1155.super1155StateVariables();
 
     b.contractUriLocked = true;
     emit PermanentContractURI(b.contractURI, 2 ** 256 - 1);   
@@ -235,9 +241,9 @@ contract FacetGroupUri is PermitControl, ERC165Storage {
   */
   function lockGroupURI(string calldata _uri, uint256 groupId) external {
 
-    require(_hasItemRight(groupId, Blueprint.LOCK_ITEM_URI), "Super1155: you don't have rights to lock group URI");
+    require(_hasItemRight(groupId, BlueprintSuper1155.LOCK_ITEM_URI), "Super1155: you don't have rights to lock group URI");
 
-    Blueprint.Super1155StateVariables storage b = Blueprint.super1155StateVariables();
+    BlueprintSuper1155.Super1155StateVariables storage b = BlueprintSuper1155.super1155StateVariables();
 
     b.metadataFrozen[groupId] = true;
     emit PermanentURI(_uri, groupId);
@@ -247,9 +253,9 @@ contract FacetGroupUri is PermitControl, ERC165Storage {
     Allow the item collection owner or an associated manager to forever lock
     this contract to further item minting.
   */
-  function lock() external virtual hasValidPermit(UNIVERSAL, Blueprint.LOCK_CREATION) {
+  function lock() external virtual hasValidPermit(UNIVERSAL, BlueprintSuper1155.LOCK_CREATION) {
 
-    Blueprint.Super1155StateVariables storage b = Blueprint.super1155StateVariables();
+    BlueprintSuper1155.Super1155StateVariables storage b = BlueprintSuper1155.super1155StateVariables();
 
     b.locked = true;
     emit CollectionLocked(_msgSender());
@@ -265,9 +271,9 @@ contract FacetGroupUri is PermitControl, ERC165Storage {
   */
   function lockURI(string calldata _uri, uint256 _id) external {
 
-    require(_hasItemRight(_id, Blueprint.LOCK_ITEM_URI), "Super1155: you don't have rights to lock URI");
+    require(_hasItemRight(_id, BlueprintSuper1155.LOCK_ITEM_URI), "Super1155: you don't have rights to lock URI");
 
-    Blueprint.Super1155StateVariables storage b = Blueprint.super1155StateVariables();
+    BlueprintSuper1155.Super1155StateVariables storage b = BlueprintSuper1155.super1155StateVariables();
 
     b.metadataFrozen[_id] = true;
     emit PermanentURI(_uri, _id);
@@ -284,13 +290,13 @@ contract FacetGroupUri is PermitControl, ERC165Storage {
     @param _groupId The ID of the item group to create or configure.
     @param _data The `ItemGroup` data input.
   */
-  function configureGroup(uint256 _groupId, Blueprint.ItemGroupInput calldata _data) external payable {
+  function configureGroup(uint256 _groupId, BlueprintSuper1155.ItemGroupInput calldata _data) external payable {
     
     require(_groupId != 0,
       "Super1155: group ID 0 is invalid");
-    require(_hasItemRight(_groupId, Blueprint.CONFIGURE_GROUP), "Super1155: you don't have rights to configure group");
+    require(_hasItemRight(_groupId, BlueprintSuper1155.CONFIGURE_GROUP), "Super1155: you don't have rights to configure group");
 
-    Blueprint.Super1155StateVariables storage b = Blueprint.super1155StateVariables();
+    BlueprintSuper1155.Super1155StateVariables storage b = BlueprintSuper1155.super1155StateVariables();
 
     // If the collection is not locked, we may add a new item group.
     if (!b.itemGroups[_groupId].initialized) {
@@ -298,7 +304,7 @@ contract FacetGroupUri is PermitControl, ERC165Storage {
         "Super1155: the collection is locked so groups cannot be created");
 
       // Add actual item group.
-      b.itemGroups[_groupId] = Blueprint.ItemGroup({
+      b.itemGroups[_groupId] = BlueprintSuper1155.ItemGroup({
         initialized: true,
         name: _data.name,
         supplyType: _data.supplyType,
@@ -324,20 +330,20 @@ contract FacetGroupUri is PermitControl, ERC165Storage {
 
       // A capped or time capped supply type may not change.
       // It may also not have its cap increased.
-      if (b.itemGroups[_groupId].supplyType == Blueprint.SupplyType.Capped) {
-        require(_data.supplyType == Blueprint.SupplyType.Capped,
+      if (b.itemGroups[_groupId].supplyType == BlueprintSuper1155.SupplyType.Capped) {
+        require(_data.supplyType == BlueprintSuper1155.SupplyType.Capped,
           "Super1155: you may not uncap a capped supply type");
         require(_data.supplyData <= b.itemGroups[_groupId].supplyData,
           "Super1155: you may not increase the supply of a capped type");
 
       // The flexible, uncapped, timeRate and timePercent types may freely change.
-      } else if (_data.supplyType == Blueprint.SupplyType.TimeValue) {
+      } else if (_data.supplyType == BlueprintSuper1155.SupplyType.TimeValue) {
         b.itemGroups[_groupId].supplyType = _data.supplyType;
         b.itemGroups[_groupId].timeData.timeStamp = block.timestamp;
         b.itemGroups[_groupId].timeData.timeInterval = _data.timeData.timeInterval;
         b.itemGroups[_groupId].timeData.timeRate = _data.timeData.timeRate;
 
-      } else if (_data.supplyType == Blueprint.SupplyType.TimePercent) {
+      } else if (_data.supplyType == BlueprintSuper1155.SupplyType.TimePercent) {
         require(_data.timeData.timeCap >= _data.supplyData,
           "Super1155: you may not set the timeCap less than supplyData");
         b.itemGroups[_groupId].supplyType = _data.supplyType;
@@ -351,27 +357,27 @@ contract FacetGroupUri is PermitControl, ERC165Storage {
       b.itemGroups[_groupId].supplyData = _data.supplyData;
 
       // A nonfungible item may not change type.
-      if (b.itemGroups[_groupId].itemType == Blueprint.ItemType.Nonfungible) {
-        require(_data.itemType == Blueprint.ItemType.Nonfungible,
+      if (b.itemGroups[_groupId].itemType == BlueprintSuper1155.ItemType.Nonfungible) {
+        require(_data.itemType == BlueprintSuper1155.ItemType.Nonfungible,
           "Super1155: you may not alter nonfungible items");
 
       // A semifungible item may not change type.
-      } else if (b.itemGroups[_groupId].itemType == Blueprint.ItemType.Semifungible) {
-        require(_data.itemType == Blueprint.ItemType.Semifungible,
+      } else if (b.itemGroups[_groupId].itemType == BlueprintSuper1155.ItemType.Semifungible) {
+        require(_data.itemType == BlueprintSuper1155.ItemType.Semifungible,
           "Super1155: you may not alter nonfungible items");
 
       // A fungible item may change type if it is unique enough.
-      } else if (b.itemGroups[_groupId].itemType == Blueprint.ItemType.Fungible) {
-        if (_data.itemType == Blueprint.ItemType.Nonfungible) {
+      } else if (b.itemGroups[_groupId].itemType == BlueprintSuper1155.ItemType.Fungible) {
+        if (_data.itemType == BlueprintSuper1155.ItemType.Nonfungible) {
           require(b.itemGroups[_groupId].circulatingSupply <= 1,
             "Super1155: the fungible item is not unique enough to change");
-          b.itemGroups[_groupId].itemType = Blueprint.ItemType.Nonfungible;
+          b.itemGroups[_groupId].itemType = BlueprintSuper1155.ItemType.Nonfungible;
 
         // We may also try for semifungible items with a high-enough cap.
-        } else if (_data.itemType == Blueprint.ItemType.Semifungible) {
+        } else if (_data.itemType == BlueprintSuper1155.ItemType.Semifungible) {
           require(b.itemGroups[_groupId].circulatingSupply <= _data.itemData,
             "Super1155: the fungible item is not unique enough to change");
-          b.itemGroups[_groupId].itemType = Blueprint.ItemType.Semifungible;
+          b.itemGroups[_groupId].itemType = BlueprintSuper1155.ItemType.Semifungible;
           b.itemGroups[_groupId].itemData = _data.itemData;
         }
       }
