@@ -43,7 +43,7 @@ contract StorageSuperMintShop1155 {
         b.maxAllocation = _maxAllocation;
     }
 
-    fallback() external {
+    fallback() external payable {
 
         // Load variables related to DiamondProxy from this contract's memory
         BlueprintSuperMintShop1155.SuperMintShop1155StateVariables storage b = BlueprintSuperMintShop1155.superMintShop1155StateVariables();

@@ -13,6 +13,8 @@ import "../../access/PermitControlds.sol";
 
 import "./BlueprintSuper1155.sol";
 
+import "hardhat/console.sol";
+
 /** 
   @title Diamond facet for Super1155's Mint and Burn functions.
   @author Tim Clancy

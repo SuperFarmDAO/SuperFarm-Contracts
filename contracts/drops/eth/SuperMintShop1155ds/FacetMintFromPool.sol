@@ -11,6 +11,8 @@ import "../../../interfaces/IStaker.sol";
 
 import "./BlueprintSuperMintShop1155.sol";
 
+import "hardhat/console.sol";
+
 /** 
   @title Diamond facet for Super1155's Transfer and Approval functions.
   @author Tim Clancy
@@ -268,7 +270,7 @@ contract FacetMintFromPool is SuperMerkleAccessds, ReentrancyGuard {
 
     // Update the global count of items that a user has purchased.
     b.globalPurchaseCounts[_msgSender()] = _userGlobalPurchaseAmount;
-    
+
     // Mint the items.
     b.items[_itemIndex].mintBatch(_msgSender(), itemIds, amounts, "");
 
