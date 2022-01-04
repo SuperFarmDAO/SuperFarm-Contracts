@@ -786,7 +786,6 @@ contract Super721IMX is PermitControl, ERC165Storage, IERC721 {
     // Retrieve the item's group ID.
     uint256 shiftedGroupId = (_id & GROUP_MASK);
     uint256 groupId = shiftedGroupId >> 128;
-    // console.logUint(groupId);
     require(itemGroups[groupId].initialized,
       "Ix22");
 

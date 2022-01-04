@@ -1,7 +1,6 @@
 'use strict';
 const { expect } = require('chai');
 
-const today = Math.trunc(new Date().getTime() / 1000);
 import 'chai/register-should';
 import { BigNumber } from 'ethers';
 // import { ethers } from 'ethers';
@@ -9,11 +8,21 @@ let owner, user_one, user_two;
 
 const decimalPlaces = 18;
 
+async function getTime() {
+    let blockNumBefore = await ethers.provider.getBlockNumber();
+    let blockBefore = await ethers.provider.getBlock(blockNumBefore);
+    let timestampBefore = blockBefore.timestamp;
+    return timestampBefore;
+}
+
 describe("SelfStarterV2", function () {
     let starter, Starter, token, Token, token2, Token2;
+    let today;
     beforeEach(async () => {
+        today = await getTime() + 100;
         [owner, user_one, user_two] = await ethers.getSigners();
     });
+
 
     it("Shoud deploy all contracts", async function() {
         Starter = await ethers.getContractFactory('SelfStarterV2');
@@ -50,8 +59,8 @@ describe("SelfStarterV2", function () {
                 true,
                 owner.address,
                 '0',
-                today + 1000,
-                today + 10000
+                today + (1000),
+                today + (10000)
             );
         } catch (error) {
             expect(error.message).to.include("Ownable: caller is not the owner")
@@ -70,8 +79,8 @@ describe("SelfStarterV2", function () {
             true,
             owner.address,
             '0',
-            today + 1000,
-            today + 10000
+            today + (1000),
+            today + (10000)
         );
         
         let value = await starter.poolsLength();
@@ -91,9 +100,9 @@ describe("SelfStarterV2", function () {
 
         await starter.setHolderToken('0', owner.address);
 
-        await starter.setStartTime('0', today + 1010);
+        await starter.setStartTime('0', today + (1010));
 
-        await starter.setTimespan('0', today + 10100);
+        await starter.setTimespan('0', today + (10100));
 
         await starter.setTitle('Updated title');
      });
@@ -115,7 +124,7 @@ describe("SelfStarterV2", function () {
         }
 
         try {
-            await starter.swap(ethers.utils.parseUnits('1', decimalPlaces), [Number({value: ethers.utils.parseUnits('1', decimalPlaces)})]);
+            await starter.swap(ethers.utils.parseEther('1'), ethers.utils.parseEther('0'));
         } catch (error) {
             expect(error.message).to.include("Amount should not be zero")
         }

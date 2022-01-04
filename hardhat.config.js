@@ -104,6 +104,54 @@ module.exports = {
 		goerli: {
 			url: `https://goerli.infura.io/v3/${INFURA_PROJECT_ID}`,
 			accounts: [ `0x${DEPLOYER_PRIVATE_KEY}` ]
+		},
+		bsc_testnet: {
+			url: "https://data-seed-prebsc-1-s1.binance.org:8545",
+			chainId: 97,
+			gasPrice: "auto",
+			accounts: [ `0x${DEPLOYER_PRIVATE_KEY}` ]
+		},
+		bsc_mainnet: {
+			url: "https://bsc-dataseed.binance.org/",
+			chainId: 56,
+			gasPrice: "auto",
+			accounts: [ `0x${DEPLOYER_PRIVATE_KEY}` ]
+		},
+		polygon: {
+			url: "https://polygon-rpc.com",
+			chainId: 137,
+			gasPrice: "auto",
+			accounts: [ `0x${DEPLOYER_PRIVATE_KEY}` ]
+		}, 
+		mumbai: {
+			url: "https://rpc-mumbai.maticvigil.com",
+			chainId: 80001,
+			gasPrice: "auto",
+			accounts: [ `0x${DEPLOYER_PRIVATE_KEY}` ]
+		}, 
+		avalanche: {
+			url: "https://api.avax.network/ext/bc/C/rpc",
+			chainId: 43114,
+			gasPrice: "auto",
+			accounts: [ `0x${DEPLOYER_PRIVATE_KEY}` ]
+		}, 
+		avalanche_fuji: {
+			url: "https://api.avax-test.network/ext/bc/C/rpc",
+			chainId: 43113,
+			gasPrice: "auto",
+			accounts: [ `0x${DEPLOYER_PRIVATE_KEY}` ]
+		}, 
+		fantom_testnet:{
+			url: "https://rpc.testnet.fantom.network/",
+			chainId: 4002,
+			gasPrice: "auto",
+			accounts: [ `0x${DEPLOYER_PRIVATE_KEY}` ]
+		}, 
+		fantom:{
+			url: "https://rpc.ftm.tools/",
+			chainId: 250,
+			gasPrice: "auto",
+			accounts: [ `0x${DEPLOYER_PRIVATE_KEY}` ]
 		}
 	},
 	etherscan: {

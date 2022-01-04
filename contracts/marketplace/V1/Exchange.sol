@@ -7,17 +7,28 @@ import "./ExchangeCore.sol";
  * @author Project Wyvern Developers
  * @author Rostislav Khlebnikov
  */
-contract Exchange is ExchangeCore {
+abstract contract Exchange is ExchangeCore {
 
     /**
-     * @dev Change the minimum taker fee paid to the protocol
+     * @dev Change the minimum taker fee paid to the platform
      * @param newMinimumPlatformFee New fee to set in basis points
      */
     function changeMinimumPlatformFee(uint newMinimumPlatformFee)
         external
-        hasValidPermit(UNIVERSAL, SET_FEES)
+        hasValidPermit(UNIVERSAL, FEE_CONFIG)
     {
         minimumPlatformFee = newMinimumPlatformFee;
+    }
+
+      /**
+     * @dev Change the address of platform for royalty fees
+     * @param newPlatformFeeAddress New fee to set in basis points
+     */
+    function changePlatformFeeAddress(address newPlatformFeeAddress)
+        external
+        hasValidPermit(UNIVERSAL, FEE_CONFIG)
+    {
+        platformFeeAddress = newPlatformFeeAddress;
     }
 
     /**
@@ -37,13 +48,13 @@ contract Exchange is ExchangeCore {
         external pure
         returns (bytes32)
     {
-        return _hashOrder(order);
+        return _hash(order);
     }
 
     /**
      * @dev Call hashToSign
      */
-    function hashToSign(Order calldata order) external pure returns (bytes32)
+    function hashToSign(Order calldata order) external view returns (bytes32)
     { 
         return _hashToSign(order);
     }
@@ -54,33 +65,33 @@ contract Exchange is ExchangeCore {
     function validateOrderParameters(Order calldata order)
         external view
         returns (bool)
-    {
+    {   
         return _validateOrderParameters(order);
     }
 
     /**
      * @dev Call validateOrder
      */
-    function validateOrder(Order calldata order, Sig calldata sig)
+    function validateOrderAthentication(Order calldata order, Sig calldata sig)
         external view
         returns (bool)
     {
-        return _validateOrder(_hashToSign(order), order,sig);
+        return authenticateOrder(_hashToSign(order), order.outline.maker, sig);
     }
 
     /**
      * @dev Call approveOrder
      */
-    function approveOrder_(Order calldata order, bool orderbookInclusionDesired)
+    function approveOrder_(Order calldata order)
         external
     {
-        return _approveOrder(order, orderbookInclusionDesired);
+        return _approveOrder(order);
     }
 
     /**
      * @dev Call cancelOrder
      */
-    function cancelOrder_(Order calldata order, Sig calldata sig)
+    function cancelOrder_(Order calldata order,Sig calldata sig)
         external
     {
         return _cancelOrder(order, sig);
@@ -99,11 +110,11 @@ contract Exchange is ExchangeCore {
     /**
      * @dev Call ordersCanMatch
      */
-    function ordersCanMatch(Order calldata buy, Order calldata sell)
+    function ordersMatch(Order calldata buy, Order calldata sell)
         external view
         returns (bool)
     {
-        return _ordersCanMatch(buy, sell);
+        return _ordersMatch(buy, sell);
     }
 
     /**
@@ -114,7 +125,7 @@ contract Exchange is ExchangeCore {
      * @param sellReplacementPattern Sell-side order calldata replacement mask
      * @return Whether the orders' calldata can be matched
      */
-    function orderCalldataCanMatch(bytes memory buyCalldata, bytes calldata buyReplacementPattern, bytes memory sellCalldata, bytes calldata sellReplacementPattern)
+    function orderCalldataCanMatch(bytes calldata buyCalldata, bytes calldata buyReplacementPattern, bytes calldata sellCalldata, bytes calldata sellReplacementPattern)
         external pure
         returns (bool)
     {
@@ -142,18 +153,16 @@ contract Exchange is ExchangeCore {
      */
     function atomicMatch_(
         Order calldata buy,
-        Sig calldata buySig,
+        Sig calldata sigBuy,
         Order calldata sell,
-        Sig calldata sellSig,
-        bytes32 metadata,
+        Sig calldata sigSell,
         Order[] calldata toInvalidate,
         Sig[] calldata sigs
         )
         external payable
         nonReentrant
     {
-
-        return _atomicMatch(buy, buySig, sell, sellSig, metadata, toInvalidate, sigs);
+        return _atomicMatch(buy, sigBuy, sell, sigSell, toInvalidate, sigs);
     }
 
 }

@@ -31,6 +31,7 @@ describe('===Super1155===', function () {
     let proxyRegistry;
     let omdProxy;
     const originalUri = "://ipfs/uri/{id}";
+    const contractUri1155 = "://ipfs/uri/{id}";
     let itemGroupId = ethers.BigNumber.from(1);
     let shiftedItemGroupId = itemGroupId.shl(128);
     let itemGroupId2 = ethers.BigNumber.from(2);
@@ -54,12 +55,14 @@ describe('===Super1155===', function () {
         await proxyRegistry.transferOwnership(proxyRegistryOwner.address);
 
         super1155 = await this.Super1155.deploy(
+            owner.address,
             "Super1155",
             originalUri,
+            contractUri1155,
             proxyRegistry.address
         );
         await super1155.deployed();
-        await super1155.transferOwnership(owner.address);
+        // await super1155.transferOwnership(owner.address);
         omdProxy = await this.OMDProxy.deploy(owner.address, super1155.address, selector);
         await omdProxy.deployed();
 
@@ -90,8 +93,10 @@ describe('===Super1155===', function () {
 
         it('should deploy a new instance where deployer is the owner', async function () {
             super1155 = await this.Super1155.deploy(
+                deployer.address,
                 "Super1155",
                 originalUri,
+                contractUri1155,
                 proxyRegistry.address
             );
             
@@ -120,17 +125,17 @@ describe('===Super1155===', function () {
         it('Reverts: no valid permit', async function () {
             await expect(
                 super1155.setURI("://ipfs/newuri/{id}")
-            ).to.be.revertedWith('PermitControl: sender does not have a valid permit');
+            ).to.be.revertedWith('P1');
             expect(await super1155.uri(1)).to.equal(originalUri);
         });
 
         it('Reverts: collection has been locked', async function () {
-            await super1155.connect(owner)["lockURI(string)"]("hi");
+            await super1155.connect(owner)["lockURI()"]();
             await expect(
                 super1155.connect(owner).setURI("://ipfs/newuri/{id}")
             ).to.be.revertedWith("Super1155: the collection URI has been permanently locked");
 
-            expect(await super1155.uri(1)).to.equal('hi');
+            expect(await super1155.uri(1)).to.equal(originalUri);
         });
 
         it('should set the metadataUri when there is a valid permit', async function () {
@@ -150,7 +155,7 @@ describe('===Super1155===', function () {
         it('Reverts: no valid permit', async function () {
             await expect(
                 super1155.setProxyRegistry(proxyRegistry.address)
-            ).to.be.revertedWith('PermitControl: sender does not have a valid permit');
+            ).to.be.revertedWith('P1');
         });
 
         it('should set ProxyRegistry when there is permission', async function(){
@@ -407,7 +412,7 @@ describe('===Super1155===', function () {
 
         it('Reverts: sender does not have the right', async () => {
             await expect(
-                super1155.connect(deployer).configureGroup(itemGroupId, {
+                super1155.connect(signer1).configureGroup(itemGroupId, {
                     name: 'KFC',
                     supplyType: 0,
                     supplyData: 20000,
@@ -1306,17 +1311,17 @@ describe('===Super1155===', function () {
                 setConfigureGroupRight,
                 ethers.constants.MaxUint256
             );
-            
-            // Set permit for setting metadata
-            await super1155.connect(owner).setPermit(
+
+             // Set permit for setting metadata
+             await super1155.connect(owner).setPermit(
                 deployer.address,
                 UNIVERSAL,
                 setMetadataRight,
                 ethers.constants.MaxUint256
             );
 
-            // Set permit for locking an item
-            await super1155.connect(owner).setPermit(
+             // Set permit for locking an item
+             await super1155.connect(owner).setPermit(
                 deployer.address,
                 UNIVERSAL,
                 lockItemUriRight,
@@ -1355,8 +1360,8 @@ describe('===Super1155===', function () {
     describe("lockURI", function () {
         it('Reverts: no valid permit', async function () {
             await expect(
-                super1155["lockURI(string)"]("://ipfs/lockeduri/{id}")
-            ).to.be.revertedWith('PermitControl: sender does not have a valid permit');
+                super1155["lockURI()"]()
+            ).to.be.revertedWith('P1');
             expect(await super1155.uri(1)).to.equal(originalUri);
         });
 
@@ -1368,7 +1373,14 @@ describe('===Super1155===', function () {
                 lockUriRight,
                 ethers.constants.MaxUint256
             );
-            await super1155["lockURI(string)"]("://ipfs/lockeduri/{id}")
+            await super1155.connect(owner).setPermit(
+                deployer.address,
+                UNIVERSAL,
+                setUriRight,
+                ethers.constants.MaxUint256
+            );
+            await super1155.connect(deployer).setURI("://ipfs/lockeduri/{id}");
+            await super1155.connect(deployer)["lockURI()"]();
             expect(await super1155.uri(1)).to.equal("://ipfs/lockeduri/{id}");
             expect(await super1155.uriLocked()).to.equal(true);
         });
@@ -1967,10 +1979,6 @@ describe('===Super1155===', function () {
                 [1],
                 ethers.utils.id('a'))
             ).to.be.revertedWith("Super1155: you cannot mint more than the alloted semifungible items");
-
-
-            let types = await super1155.getGroupTypes(shiftedItemGroupId.add(1));
-            console.log(types);
         });
     });
     

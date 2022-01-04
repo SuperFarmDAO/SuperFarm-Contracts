@@ -6,8 +6,7 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
-
-import "./base/Sweepable.sol";
+import "../base/Sweepable.sol";
 
 contract SuperStarter is Ownable, ReentrancyGuard, Sweepable {
     using SafeERC20 for IERC20;
@@ -68,7 +67,7 @@ contract SuperStarter is Ownable, ReentrancyGuard, Sweepable {
     }
 
     modifier onlyCreator(uint256 id) {
-        require(pools[id].creator == msg.sender, "Should be creator");
+        require(pools[id].creator == _msgSender(), "Should be creator");
         _;
     }
 
@@ -106,7 +105,7 @@ contract SuperStarter is Ownable, ReentrancyGuard, Sweepable {
         bool onlyHolder,
         uint256 maxCap
     ) external onlyOwner returns (uint256) {
-        require(cap <= IERC20(token).balanceOf(msg.sender) && cap > 0, "Cap check");
+        require(cap <= IERC20(token).balanceOf(_msgSender()) && cap > 0, "Cap check");
         require(token != address(0), "Pool token cannot be zero address");
         require(price > uint256(0), "Price must be greater than 0");
         Pool memory newPool =
@@ -114,7 +113,7 @@ contract SuperStarter is Ownable, ReentrancyGuard, Sweepable {
                 cap,
                 price,
                 maxCap,
-                msg.sender,
+                _msgSender(),
                 token,
                 swapToken,
                 isWhiteList,
@@ -124,10 +123,10 @@ contract SuperStarter is Ownable, ReentrancyGuard, Sweepable {
             );
         pools.push(newPool);
         uint256 id = pools.length;
-        IERC20(token).safeTransferFrom(msg.sender, address(this), cap);
+        IERC20(token).safeTransferFrom(_msgSender(), address(this), cap);
         emit NewPool(
             id,
-            msg.sender,
+            _msgSender(),
             token,
             swapToken,
             cap,
@@ -143,10 +142,10 @@ contract SuperStarter is Ownable, ReentrancyGuard, Sweepable {
         require(amount != 0, "Amount should not be zero");
         require(pools[id].enabled, "Pool must be enabled");
         if (pools[id].onlyHolder) {
-            require(IERC20(superToken).balanceOf(msg.sender) >= minSuper, "Miniumum for the pool");
+            require(IERC20(superToken).balanceOf(_msgSender()) >= minSuper, "Miniumum for the pool");
         }
         if (pools[id].isWhiteList) {
-            require(whiteList[id][msg.sender] > 0, "Should be white listed for the pool");
+            require(whiteList[id][_msgSender()] > 0, "Should be white listed for the pool");
         }
         if (pools[id].swapToken == address(0)) {
             require(amount == msg.value, "Amount is not equal msg.value");
@@ -157,12 +156,12 @@ contract SuperStarter is Ownable, ReentrancyGuard, Sweepable {
     function _simpleSwap(uint256 id, uint256 amount) internal {
         Pool memory pool = pools[id];
         uint256 left = pool.cap - poolsSold[id];
-        uint256 curLocked = lockedTokens[id][msg.sender];
+        uint256 curLocked = lockedTokens[id][_msgSender()];
         if (left > pool.maxCap - curLocked) {
             left = pool.maxCap - curLocked;
         }
-        if (pool.isWhiteList && left > whiteList[id][msg.sender] - curLocked) {
-            left = whiteList[id][msg.sender] - curLocked;
+        if (pool.isWhiteList && left > whiteList[id][_msgSender()] - curLocked) {
+            left = whiteList[id][_msgSender()] - curLocked;
         }
         require(left > 0, "Not enough tokens for swap");
         uint256 amt = (pool.price * amount) / scaleFactor;
@@ -175,13 +174,13 @@ contract SuperStarter is Ownable, ReentrancyGuard, Sweepable {
             back = amount - newAmount;
             amount = newAmount;
         }
-        lockedTokens[id][msg.sender] = curLocked + amt;
+        lockedTokens[id][_msgSender()] = curLocked + amt;
         poolsSold[id] = poolsSold[id ]+ amt;
         if (pool.swapToken == address(0)) {
             (bool success, ) = payable(pool.creator).call{value: amount}("");
             require(success, "Should transfer ethers to the pool creator");
             if (back > 0) {
-                (success, ) = payable(msg.sender).call{value: back}("");
+                (success, ) = _msgSender().call{value: back}("");
                 require(success, "Should transfer left ethers back to the user");
             }
         } else {
@@ -190,7 +189,7 @@ contract SuperStarter is Ownable, ReentrancyGuard, Sweepable {
                 amount
             );
         }
-        emit Swap(id, 0, msg.sender, amount, amt);
+        emit Swap(id, 0, _msgSender(), amount, amt);
     }
 
     function startPool(uint256 id) external onlyCreator(id) {
@@ -210,10 +209,10 @@ contract SuperStarter is Ownable, ReentrancyGuard, Sweepable {
 
     function claim(uint256 id) external nonReentrant {
         require(pools[id].finished, "Cannot claim until pool is finished");
-        require(lockedTokens[id][msg.sender] > 0, "Should have tokens to claim");
-        uint256 amount = lockedTokens[id][msg.sender];
-        lockedTokens[id][msg.sender] = 0;
-        IERC20(pools[id].token).safeTransfer(msg.sender, amount);
-        emit Claim(id, msg.sender, amount, block.timestamp);
+        require(lockedTokens[id][_msgSender()] > 0, "Should have tokens to claim");
+        uint256 amount = lockedTokens[id][_msgSender()];
+        lockedTokens[id][_msgSender()] = 0;
+        IERC20(pools[id].token).safeTransfer(_msgSender(), amount);
+        emit Claim(id, _msgSender(), amount, block.timestamp);
     }
 }

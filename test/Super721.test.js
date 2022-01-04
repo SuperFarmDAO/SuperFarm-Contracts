@@ -31,6 +31,7 @@ describe('===Super721===', function () {
     let super721;
     let proxyRegistry;
     const originalUri = "://ipfs/uri/";
+    const originalUri721 = "://ipfs/uri/";
     let itemGroupId = ethers.BigNumber.from(1);
     let shiftedItemGroupId = itemGroupId.shl(128);
     let itemGroupId2 = ethers.BigNumber.from(2);
@@ -52,6 +53,7 @@ describe('===Super721===', function () {
             "Super721",
             "SIMX721",
             originalUri,
+            originalUri721,
             proxyRegistry.address,
         );
         await super721.deployed();
@@ -86,6 +88,7 @@ describe('===Super721===', function () {
                 "Super721",
                 "SIMX721",
                 originalUri,
+                originalUri721,
                 proxyRegistry.address,
             );
             expect(await super721IMXv2.owner()).to.equal(deployer.address);
@@ -97,7 +100,7 @@ describe('===Super721===', function () {
 
     describe("uri", function () {
         it('returns the metadataUri', async function () {
-            expect(await super721.uri(1)).to.equal(originalUri);
+            expect(await super721.metadataUri()).to.equal(originalUri);
         });
     });
 
@@ -105,18 +108,18 @@ describe('===Super721===', function () {
         it('reverts when there is not a valid permit for sender', async function () {
             await expect(
                 super721.setURI("://ipfs/newuri/{id}")
-            ).to.be.revertedWith('PermitControl: sender does not have a valid permit');
-            expect(await super721.uri(1)).to.equal(originalUri);
+            ).to.be.revertedWith('P1');
+            expect(await super721.metadataUri()).to.equal(originalUri);
         });
 
         it('reverts when the collection has been locked', async function () {
-            await super721.connect(owner).lockURI('hi');
+            await super721.connect(owner).lockURI();
 
             await expect(
                 super721.connect(owner).setURI("://ipfs/newuri/")
             ).to.be.revertedWith("Super721::setURI: the collection URI has been permanently locked");
 
-            expect(await super721.uri(1)).to.equal('hi');
+            expect(await super721.metadataUri()).to.equal(originalUri);
         });
 
         it('sets the metadataUri when there is a valid permit', async function () {
@@ -127,7 +130,7 @@ describe('===Super721===', function () {
                 ethers.constants.MaxUint256
             );
             await super721.setURI("://ipfs/newuri/");
-            expect(await super721.uri(1)).to.equal("://ipfs/newuri/");
+            expect(await super721.metadataUri()).to.equal("://ipfs/newuri/");
             expect(await super721.uriLocked()).to.equal(false);
         });
     });
@@ -135,9 +138,9 @@ describe('===Super721===', function () {
     describe("lockURI", function () {
         it('reverts when there is not a valid permit for sender', async function () {
             await expect(
-                super721.lockURI("://ipfs/lockeduri/{id}")
-            ).to.be.revertedWith('PermitControl: sender does not have a valid permit');
-            expect(await super721.uri(1)).to.equal(originalUri);
+                super721.lockURI()
+            ).to.be.revertedWith('P1');
+            expect(await super721.metadataUri()).to.equal(originalUri);
         });
 
         it('sets the metadataUri and locks it when there is a valid permit', async function () {
@@ -147,8 +150,15 @@ describe('===Super721===', function () {
                 lockUriRight,
                 ethers.constants.MaxUint256
             );
-            await super721.lockURI("://ipfs/lockeduri/{id}");
-            expect(await super721.uri(1)).to.equal("://ipfs/lockeduri/{id}");
+            await super721.connect(owner).setPermit(
+                deployer.address,
+                UNIVERSAL,
+                setUriRight,
+                ethers.constants.MaxUint256
+            );
+            await super721.connect(deployer).setURI("://ipfs/lockeduri/{id}");
+            await super721.connect(deployer).lockURI();
+            expect(await super721.metadataUri()).to.equal("://ipfs/lockeduri/{id}");
             expect(await super721.uriLocked()).to.equal(true);
         });
     });
@@ -157,7 +167,7 @@ describe('===Super721===', function () {
         it('reverts when there is not a valid permit for sender', async function () {
             expect(await super721.metadataFrozen(1)).to.equal(false);
             await expect(
-                super721.lockItemGroupURI("://ipfs/lockeduri/{id}", 1)
+                super721.lockGroupURI("://ipfs/lockeduri/{id}", 1)
             ).to.be.revertedWith('Super721::hasItemRight: _msgSender does not have the right to perform that action');
             expect(await super721.metadataFrozen(1)).to.equal(false);
         });
@@ -170,9 +180,9 @@ describe('===Super721===', function () {
                 ethers.constants.MaxUint256
             );
             expect(await super721.metadataFrozen(1)).to.equal(false);
-            await super721.lockItemGroupURI("://ipfs/lockeduri/", 1);
+            await super721.lockGroupURI("://ipfs/lockeduri/", 1);
             expect(await super721.metadataFrozen(1)).to.equal(true);
-            expect(await super721.uri(1)).to.equal("://ipfs/uri/");
+            expect(await super721.metadataUri()).to.equal("://ipfs/uri/");
             expect(await super721.uriLocked()).to.equal(false);
         });
     });
@@ -181,7 +191,7 @@ describe('===Super721===', function () {
         it('Reverts: no setProxyRegistry permissions', async () => {
             await expect(
                 super721.setProxyRegistry(signer1.address)
-            ).to.be.revertedWith("PermitControl: sender does not have a valid permit");
+            ).to.be.revertedWith("P1");
         });
 
         it('allows setProxyRegistry when permissions', async () => {
@@ -233,7 +243,7 @@ describe('===Super721===', function () {
         it('Reverts: permit is not valid unless owner is sender', async () => {
             await expect(
                 super721.lock()
-            ).to.be.revertedWith("PermitControl: sender does not have a valid permit");
+            ).to.be.revertedWith("P1");
 
             expect(await super721.locked()).to.equal(false);
             await super721.connect(owner).lock();
@@ -1451,7 +1461,7 @@ describe('===Super721===', function () {
         });
 
         it('Reverts: global lockURI', async () => {
-            await super721.connect(owner).lockURI('lockedURI');
+            await super721.connect(owner).lockURI();
 
             await expect(
                 super721.connect(owner).setMetadata(1, 'mettaDatum')
@@ -1506,7 +1516,7 @@ describe('===Super721===', function () {
         it('should return the tokenURI', async () => {
             await expect(
                 await super721.tokenURI(4)
-            ).to.be.equal("://ipfs/uri/4.json");
+            ).to.be.equal("://ipfs/uri/4");
         });
     });
 
