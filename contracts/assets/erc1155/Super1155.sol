@@ -61,6 +61,9 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
   /// The public identifier for the right to disable item creation.
   bytes32 public constant LOCK_CREATION = keccak256("LOCK_CREATION");
 
+  /// The public identifier for the right to update transfer state.
+  bytes32 public constant TRANSFER_MODIDIER = keccak256("TRANSFER_MODIDIER");
+
   /// @dev Supply the magic number for the required ERC-1155 interface.
   bytes4 private constant INTERFACE_ERC1155 = 0xd9b67a26;
 
@@ -72,6 +75,10 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
 
   /// The public name of this contract.
   string public name;
+
+
+  /// Variable that is needed to lock the transfer, and unlock it after the auction.
+  bool transferEnabled = true;
 
   /**
     The ERC-1155 URI for tracking item metadata, supporting {id} substitution.
@@ -268,6 +275,14 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
     metadataUri = _metadataURI;
     contractURI = _contractURI;
     proxyRegistryAddress = _proxyRegistryAddress;
+  }
+
+  /**
+    A modifier needed to control transfers during and after the auction.
+  */
+  modifier transferLocked() {
+    require(transferEnabled == true, "Transfer is currently locked");
+    _;
   }
 
   /**
@@ -505,7 +520,7 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
   */
   function safeBatchTransferFrom(address _from, address _to,
     uint256[] memory _ids, uint256[] memory _amounts, bytes memory _data)
-    public virtual {
+    public virtual transferLocked {
     require(_ids.length == _amounts.length,
       "ERC1155: ids and amounts length mismatch");
     require(_to != address(0),
@@ -730,7 +745,7 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
   */
   function mintBatch(address _recipient, uint256[] calldata _ids,
     uint256[] calldata _amounts, bytes calldata _data)
-    external  {
+    external transferLocked  {
     require(_recipient != address(0),
       "ERC1155: mint to the zero address");
     require(_ids.length == _amounts.length,
@@ -879,6 +894,14 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
     string memory oldMetadata = metadata[_id];
     metadata[_id] = _metadata;
     emit MetadataChanged(_msgSender(), _id, oldMetadata, _metadata);
+  }
+
+
+  /**
+    Allow the item collection owner or an associated manager to update transfer state.
+  */
+  function setTransferState(bool _state) external hasValidPermit(UNIVERSAL, TRANSFER_MODIDIER) {
+    transferEnabled = _state;
   }
 
   /**
