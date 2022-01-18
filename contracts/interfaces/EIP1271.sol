@@ -1,9 +1,6 @@
 pragma solidity ^0.8.8;
 
-abstract contract ERC1271 {
-
-  // bytes4(keccak256("isValidSignature(bytes,bytes)")
-  bytes4 constant internal EIP_1271_MAGICVALUE = 0x20c13b0b;
+interface IERC1271 {
 
   /**
    * @dev Should return whether the signature provided is valid for the provided data
@@ -17,8 +14,7 @@ abstract contract ERC1271 {
   function isValidSignature(
       bytes memory _data,
       bytes memory _signature)
-      virtual
-      public
+      external
       view
       returns (bytes4 magicValue);
 }

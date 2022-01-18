@@ -34,4 +34,32 @@ contract SuperMarketplaceV2 is MarketplaceCore {
     function version() public pure override returns (uint256) {
         return 2;
     }
+
+    /**
+        @dev Invalidates order.
+        @param order Order to cancel.
+     */
+    function cancelOrder(Entity.Order calldata order) internal {
+        require(
+            _msgSender() == order.maker,
+            "Marketplace: you can not cancel this order."
+        );
+        _cancelOrder(order);
+    }
+
+    /**
+        @dev Validates orders and executes actions. One of the order makers has to be msg.sender.
+        @param signature signature of one of the orders.
+     */
+    function exchange(
+        Entity.Order calldata first,
+        Entity.Order calldata second,
+        bytes calldata signature
+    ) external nonReentrant {
+        require(
+            signature.length == 65,
+            "Marketplace: invalid ECDSA signature length."
+        );
+        _exchange(first, second, signature);
+    }
 }

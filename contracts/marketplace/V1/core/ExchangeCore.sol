@@ -4,13 +4,13 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
 import "../../../access/PermitControl.sol";
 import "../../../interfaces/IProxyRegistry.sol";
+import "../../../interfaces/EIP1271.sol";
 import "../../../proxy/OwnableMutableDelegateProxy.sol";
 import "../../../proxy/TokenTransferProxy.sol";
 import "../../../proxy/AuthenticatedProxy.sol";
 import "../../../utils/Utils.sol";
 import "../../../libraries/Sales.sol";
 import "../../../libraries/EIP712.sol";
-import "../../../libraries/EIP1271.sol";
 
 /**
     @title modified ExchangeCore of ProjectWyvernV2
@@ -287,7 +287,8 @@ abstract contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
         /** Contract-only authentication: EIP/ERC 1271. */
         if (Address.isContract(maker)) {
             bytes memory signature = abi.encodePacked(sig.r, sig.s, sig.v);
-            if (ERC1271(maker).isValidSignature(abi.encodePacked(hash), signature) == EIP_1271_MAGICVALUE) {
+            if (IERC1271(maker).isValidSignature(abi.encodePacked(hash), signature)  == 0x20c13b0b) // bytes4(keccak256("isValidSignature(bytes,bytes)") = 0x20c13b0b;
+            {
                 return true;
             }
             return false;
