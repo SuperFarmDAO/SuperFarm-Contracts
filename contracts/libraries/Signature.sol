@@ -37,7 +37,7 @@ library Signature {
             v := byte(0, mload(add(signature, 0x60)))
         }
 
-        return recover(hash, v, r, s);
+        return ecrecover(hash, v, r, s);
     }
 
     function recover(bytes32 hash, bytes memory signature)
@@ -63,19 +63,6 @@ library Signature {
             v := byte(0, mload(add(signature, 0x60)))
         }
 
-        return recover(hash, v, r, s);
-    }
-
-    /**
-     * @dev Overload of {ECDSA-recover-bytes32-bytes-} that receives the `v`,
-     * `r` and `s` signature fields separately.
-     */
-    function recover(
-        bytes32 hash,
-        uint8 v,
-        bytes32 r,
-        bytes32 s
-    ) internal pure returns (address) {
         return ecrecover(hash, v, r, s);
     }
 }

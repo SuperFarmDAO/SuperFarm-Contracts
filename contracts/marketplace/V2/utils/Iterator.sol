@@ -1,4 +1,4 @@
-library IteratorLib {
+library Iterators {
     struct Iterator {
         uint256 type_i;
         uint256 target_i;

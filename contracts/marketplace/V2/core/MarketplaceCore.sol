@@ -3,7 +3,7 @@ pragma solidity ^0.8.8;
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
 import "./MarketplaceEntities.sol";
-import "./MarketplaceFees.sol";
+import "./MarketplaceExecutor.sol";
 import "../../../libraries/EIP712.sol";
 import "../../../libraries/Signature.sol";
 import "../../../interfaces/EIP1271.sol";
@@ -12,25 +12,13 @@ import "../../../interfaces/EIP1271.sol";
     @title MarketplaceCore contract of SuperMarketplace second version.
     @author Rostislav Khlebnikov.
  */
-abstract contract MarketplaceCore is MarketplaceFees, ReentrancyGuard, EIP712 {
-    /**  The public identifier for the right to set new items. */
-    bytes32 public constant PROXY_CONFIG = keccak256("PROXY_CONFIG");
-
-    /** Token transfer proxy address. */
-    address public transferProxy;
-
+abstract contract MarketplaceCore is
+    MarketplaceExecutor,
+    ReentrancyGuard,
+    EIP712
+{
     /** Storing state of the order: order hash => Fill. */
     mapping(bytes32 => Entity.Fill) public fills;
-
-    /**
-        @dev Emmited when transfer proxy address is changed.
-        @param oldTransferProxy previous address of a transfer proxy.
-        @param newTransferProxy new address of a transfer proxy.
-     */
-    event transferProxyChanged(
-        address oldTransferProxy,
-        address newTransferProxy
-    );
 
     /**
         @dev Emmited when order is cancelled.
@@ -58,31 +46,15 @@ abstract contract MarketplaceCore is MarketplaceFees, ReentrancyGuard, EIP712 {
     );
 
     constructor(
-        address _transferProxy,
+        address transferProxy,
         address payable platformFeeRecipient,
         uint256 platformFee,
         string memory name,
         string memory version
-    ) MarketplaceFees(platformFeeRecipient, platformFee) EIP712(name, version) {
-        transferProxy = _transferProxy;
-    }
-
-    /**
-        @dev Changes transfer proxy address.
-        @param newTransferProxy new address of a transfer proxy.
-     */
-    function changeTransferProxy(address newTransferProxy)
-        external
-        hasValidPermit(UNIVERSAL, PROXY_CONFIG)
-    {
-        require(
-            newTransferProxy != address(0),
-            "MarketplaceCore: transfer can not be address(0)"
-        );
-        address oldTransferProxy = transferProxy;
-        transferProxy = newTransferProxy;
-        emit transferProxyChanged(oldTransferProxy, newTransferProxy);
-    }
+    )
+        MarketplaceExecutor(transferProxy, platformFeeRecipient, platformFee)
+        EIP712(name, version)
+    {}
 
     /**
         @dev Returns result of order matching.

@@ -3,7 +3,7 @@ pragma solidity ^0.8.8;
 import "../../../access/PermitControl.sol";
 
 /**
-    @title Fee logic contract.
+    @title MarketplaceFees is a logic domain of Marketplace which handles
     @author Rostislav Khlebnikov.
  */
 abstract contract MarketplaceFees is PermitControl {

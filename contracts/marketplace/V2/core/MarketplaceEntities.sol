@@ -1,20 +1,17 @@
 pragma solidity ^0.8.8;
 
-import "../utils/Iterator.sol";
-
 /**
     @title Library for operating marketplace entities.
     @author Rostislav Khlebnikov.
  */
 library Entity {
-    using IteratorLib for IteratorLib.Iterator;
 
     bytes32 private constant ACTIONS_TYPEHASH =
         keccak256("Actions(bytes types,bytes targets,bytes args)");
 
     bytes32 private constant ORDER_TYPEHASH =
         keccak256(
-            "Order(address maker,Actions perform,address taker,Actions expect,uint256 end,uint256 start,uint256 salt,bytes fee)Actions(bytes types,bytes targets,bytes args)"
+            "Order(address maker,Actions perform,address taker,Actions expect,uint256 end,uint256 start,uint256 saltbytes circumstances,bytes fee)Actions(bytes types,bytes targets,bytes args)"
         );
 
     struct Order {
@@ -25,6 +22,7 @@ library Entity {
         uint256 start;
         uint256 end;
         uint256 salt;
+        bytes circumstances;
         bytes fee;
     }
 
@@ -65,6 +63,7 @@ library Entity {
                     order.start,
                     order.end,
                     order.salt,
+                    keccak256(order.circumstances),
                     keccak256(order.fee)
                 )
             );
