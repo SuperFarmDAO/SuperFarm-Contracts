@@ -9,7 +9,7 @@ import "../../../libraries/Signature.sol";
 import "../../../interfaces/EIP1271.sol";
 
 /**
-    @title MarketplaceCore contract of SuperMarketplace second version.
+    @title MarketplaceCore contract aligns exchange processes flow.
     @author Rostislav Khlebnikov.
  */
 abstract contract MarketplaceCore is
