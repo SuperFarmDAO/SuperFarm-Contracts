@@ -4,22 +4,15 @@ pragma solidity ^0.8.8;
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
-
 import "../assets/erc721/interfaces/ISuper721.sol";
 import "../assets/erc1155/interfaces/ISuper1155.sol";
 
 /**
   @title A simple NFT auction contract which sells a single item for an owner to
     accept or decline via highest bid offer.
+  @title A simple NFT auction contract which sells a single item on reserve.
   @author thrpw;
   @author Tim Clancy
-
-  This auction contract accepts on-chain bids before minting an NFT to the
-  winner.
-*/
-
-/**
-  @title A simple NFT auction contract which sells a single item on reserve.
   @author SuperFarm
 
   This auction contract accepts on-chain bids before minting an NFT to the
@@ -27,7 +20,7 @@ import "../assets/erc1155/interfaces/ISuper1155.sol";
 */
 
 contract SuperAuction is Ownable, ReentrancyGuard {
-    
+    /// Type for determining item type for auction
     enum AssetType {
         Unminted721,
         Unminted1155,
@@ -44,8 +37,8 @@ contract SuperAuction is Ownable, ReentrancyGuard {
     /// The item being auctioned.
     address public item;
 
-    /// The type of NFT for auction 
-    AssetType nft;      // CHECK more correct naming needed 
+    /// The type of NFT for auction
+    AssetType itemType; // CHECK more correct naming needed
 
     /// The group ID within the item collection being auctioned for.
     uint256 public groupId;
@@ -136,9 +129,9 @@ contract SuperAuction is Ownable, ReentrancyGuard {
   */
     constructor(
         address payable _beneficiary,
-        address _item,           // TODO 
+        address _item, 
         AssetType _nft,
-        address _nftOwner,  // if assetType is minted
+        address _nftOwner, // if assetType is minted
         uint256 _groupId,
         uint256 _duration,
         uint256 _bidBuffer,
@@ -147,15 +140,60 @@ contract SuperAuction is Ownable, ReentrancyGuard {
         uint256 _reservePrice
     ) public {
         beneficiary = _beneficiary;
-        originalOwner = _nftOwner;//_item.owner();
+        originalOwner = _nftOwner;
         item = _item;
-        nft = _nft;
+        itemType = _nft;
         groupId = _groupId;
         auctionEndTime = block.timestamp + _duration;
         bidBuffer = _bidBuffer;
         receiptBuffer = _receiptBuffer;
         minimumBid = _minimumBid;
         reservePrice = _reservePrice;
+    }
+
+    /**
+        Retrieve total bid count
+    */
+    function bidCount() external view returns (uint256) {
+        return bidHistory.length;
+    }
+
+    /**
+        Retrieve all bids
+    */
+    function bidData() external view returns (Bid[] memory) {
+        return bidHistory;
+    }
+
+    /**
+        Retrieve all auction data in a single call
+    */
+    function auctionData()
+        external
+        view
+        returns (
+            address,
+            address,
+            uint256,
+            uint256,
+            address,
+            uint256,
+            uint256,
+            uint256,
+            uint256
+        )
+    {
+        return (
+            beneficiary,
+            address(item),
+            groupId,
+            highestBid,
+            highestBidder,
+            highestBidTime,
+            auctionEndTime,
+            minimumBid,
+            bidHistory.length
+        );
     }
 
     /**
@@ -184,6 +222,8 @@ contract SuperAuction is Ownable, ReentrancyGuard {
         highestBidder = msg.sender;
         highestBid = msg.value;
         highestBidTime = block.timestamp;
+        Bid memory newBid = Bid(msg.sender, msg.value, block.timestamp);
+        bidHistory.push(newBid);
         emit HighestBidIncreased(msg.sender, msg.value, block.timestamp);
     }
 
@@ -207,15 +247,29 @@ contract SuperAuction is Ownable, ReentrancyGuard {
         uint256 itemId = shiftedGroupId + 1;
         itemIds[0] = itemId;
         amounts[0] = 1;
-        // CHECK put nothing in data 
-        if (nft == AssetType.Unminted1155) {
+        // CHECK put nothing in data
+        if (itemType == AssetType.Unminted1155) {
             ISuper1155(item).mintBatch(highestBidder, itemIds, amounts, "");
-        } else if (nft == AssetType.Unminted721) {
+        }
+        if (itemType == AssetType.Unminted721) {
             ISuper721(item).mintBatch(highestBidder, itemIds, "");
-        } else if (nft == AssetType.Minted1155) {
-            ISuper1155(item).safeBatchTransferFrom(originalOwner, highestBidder, itemIds, amounts, "" );
-        } else if (nft == AssetType.Minted721) {
-            ISuper721(item).safeBatchTransferFrom(originalOwner, highestBidder, itemIds, "");
+        }
+        if (itemType == AssetType.Minted1155) {
+            ISuper1155(item).safeBatchTransferFrom(
+                originalOwner,
+                highestBidder,
+                itemIds,
+                amounts,
+                ""
+            );
+        }
+        if (itemType == AssetType.Minted721) {
+            ISuper721(item).safeBatchTransferFrom(
+                originalOwner,
+                highestBidder,
+                itemIds,
+                ""
+            );
         }
 
         // The auction ended in a sale.
@@ -251,61 +305,10 @@ contract SuperAuction is Ownable, ReentrancyGuard {
         emit AuctionEnded(highestBidder, highestBid, block.timestamp, false);
     }
 
-    /*
-    The auction owner has not taken action to conclude the auction. After a set
-    timeout period we allow anyone to conclude the auction.
-  */
-    function returnHighestBid() public nonReentrant {
-        require(
-            block.timestamp >= auctionEndTime + (receiptBuffer),
-            "Auction not yet expired."
-        );
-        require(!ended, "The auction has already ended.");
-        ended = true;
-
-        // Return the highest bidder their bid and any potential attacker dust.
-        (bool bidderReturnSuccess, ) = payable(highestBidder).call{
-            value: address(this).balance
-        }("");
-
-        // If the highest bidder is unable to receive their bid, send it to the
-        // auction beneficiary.
-        if (!bidderReturnSuccess) {
-            (bool beneficiaryRescueSuccess, ) = beneficiary.call{
-                value: address(this).balance
-            }("");
-            require(
-                beneficiaryRescueSuccess,
-                "The beneficiary is unable to rescue the bid."
-            );
-        }
-
-        // The auction expired.
-        emit AuctionExpired(highestBidder, highestBid, block.timestamp);
-    }
-
     /**
-    Withdraw a bid that was defeated.
-  */
-    function withdraw() public nonReentrant returns (bool) {
-        uint256 amount = pendingReturns[msg.sender];
-        if (amount > 0) {
-            pendingReturns[msg.sender] = 0;
-            (bool withdrawSuccess, ) = payable(msg.sender).call{value: amount}(
-                ""
-            );
-            if (!withdrawSuccess) {
-                pendingReturns[msg.sender] = amount;
-                return false;
-            }
-        }
-        return true;
-    }
-
-    /**
-    End the auction. Send the highest bid to the beneficiary and mint the winner
-    an NFT item. If the reserve price was not met, return the highest bid.
-  */
+        End the auction. Send the highest bid to the beneficiary and mint the winner
+        an NFT item. If the reserve price was not met, return the highest bid.
+    */
     function auctionEnd() public nonReentrant {
         require(block.timestamp >= auctionEndTime, "Auction not yet ended.");
         require(!ended, "The auction has already ended.");
@@ -338,15 +341,29 @@ contract SuperAuction is Ownable, ReentrancyGuard {
             uint256 itemId = shiftedGroupId + 1;
             itemIds[0] = itemId;
             amounts[0] = 1;
-            
-            if (nft == AssetType.Unminted1155) {
+
+            if (itemType == AssetType.Unminted1155) {
                 ISuper1155(item).mintBatch(highestBidder, itemIds, amounts, "");
-            } else if (nft == AssetType.Unminted721) {
+            }
+            if (itemType == AssetType.Unminted721) {
                 ISuper721(item).mintBatch(highestBidder, itemIds, "");
-            } else if (nft == AssetType.Minted1155) {
-                ISuper1155(item).safeBatchTransferFrom(originalOwner, highestBidder, itemIds, amounts, "" );
-            } else if (nft == AssetType.Minted721) {
-                ISuper721(item).safeBatchTransferFrom(originalOwner, highestBidder, itemIds, "");
+            }
+            if (itemType == AssetType.Minted1155) {
+                ISuper1155(item).safeBatchTransferFrom(
+                    originalOwner,
+                    highestBidder,
+                    itemIds,
+                    amounts,
+                    ""
+                );
+            }
+            if (itemType == AssetType.Minted721) {
+                ISuper721(item).safeBatchTransferFrom(
+                    originalOwner,
+                    highestBidder,
+                    itemIds,
+                    ""
+                );
             }
             // The auction ended in a sale.
             emit AuctionEnded(highestBidder, highestBid, block.timestamp, true);
@@ -357,10 +374,58 @@ contract SuperAuction is Ownable, ReentrancyGuard {
     A function which allows the original owner of the item contract to revoke
     ownership from the launchpad.
   */
-    //function ownershipClawback() external onlyOriginalOwner {
-    //    item.transferOwnership(originalOwner);
-//
-    //    // Emit an event that the original owner of the item contract has clawed the contract back.
-    //    emit OwnershipClawback();
-    //}
+    function ownershipClawback() external onlyOriginalOwner {
+        if (
+            itemType == AssetType.Unminted1155 ||
+            itemType == AssetType.Minted1155
+        ) {
+            ISuper1155(item).transferOwnership(originalOwner);
+        } else if (
+            itemType == AssetType.Unminted721 || itemType == AssetType.Minted721
+        ) {
+            ISuper721(item).transferOwnership(originalOwner);
+        }
+
+        //  Emit an event that the original owner of the item contract has clawed the contract back.
+        emit OwnershipClawback();
+    }
+
+    /**
+        The auction owner has not taken action to conclude the auction. After a set
+        timeout period we allow anyone to conclude the auction.
+    */
+    function returnHighestBid() public nonReentrant returns (bool) {
+        require(
+            block.timestamp >= auctionEndTime + receiptBuffer,
+            "Auction not yet expired."
+        );
+        require(!ended, "The auction has already ended.");
+        require(address(this).balance != 0, "Cannot return 0 value");
+        ended = true;
+
+        // Return the highest bidder their bid and any potential attacker dust.
+        (bool bidderReturnSuccess, ) = payable(highestBidder).call{
+            value: address(this).balance
+        }("");
+
+        // The auction expired.
+        emit AuctionExpired(highestBidder, highestBid, block.timestamp);
+
+        return bidderReturnSuccess;
+    }
+
+    /**
+        A function which allows the contract owner to claim ETH in the contract after the auction
+        has ended and full receipt buffer has transpired
+    */
+    function remainder() external onlyOwner returns (bool) {
+        require(
+            block.timestamp >= auctionEndTime + receiptBuffer,
+            "Cannot claim remainder until auction has ended."
+        );
+        (bool redeemSuccess, ) = payable(msg.sender).call{
+            value: address(this).balance
+        }("");
+        return redeemSuccess;
+    }
 }

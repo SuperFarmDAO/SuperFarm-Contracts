@@ -28,4 +28,7 @@ interface ISuper721 {
     function mintBatch(address _recipient, uint256[] calldata _ids, bytes memory _data) external; 
 
     function safeBatchTransferFrom(address _from, address _to, uint256[] memory _ids, bytes memory _data) external;
+
+    function transferOwnership(address newOwner) external;
+
 }
