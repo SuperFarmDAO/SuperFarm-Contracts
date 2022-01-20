@@ -202,7 +202,7 @@ contract SuperAuction is Ownable, ReentrancyGuard {
   */
     function bid() public payable nonReentrant {
         require(block.timestamp <= auctionEndTime, "Auction already ended.");
-        require(msg.value > highestBid, "There already is a higher bid."); // CHECK may be error
+        require(msg.value > highestBid, "There already is a higher bid."); 
         require(msg.value >= minimumBid, "Minimum bid amount not met.");
 
         // Extend the auction if a bid comes in within the ending buffer.

@@ -17,6 +17,13 @@ async function fastForward (amount) {
     await network.provider.send('evm_mine');
 }
 
+async function getTime() {
+    let blockNumBefore = await ethers.provider.getBlockNumber();
+    let blockBefore = await ethers.provider.getBlock(blockNumBefore);
+    let timestampBefore = blockBefore.timestamp;
+    return timestampBefore;
+}
+
 const AssetType = Object.freeze({
     Unminted721:0,
     Unminted1155:1,
@@ -123,7 +130,7 @@ describe('===SuperAuction===', function () {
             // deploying of Auction with given params 
             superAuction = await SuperAuction.deploy(
                 beneficiary.address,  //beneficiary
-                super1155.address,  // item.address - > address of contract TODO
+                super1155.address,  // 
                 AssetType.Unminted1155, // AssetType 
                 beneficiary.address, // owner of item CHECK who is owner if assetType is unminted
                 itemGroupId, //groupId
@@ -304,8 +311,6 @@ describe('===SuperAuction===', function () {
     
             let returnedHighBid = await superAuction.connect(bidder_02).returnHighestBid();
     
-            // TODO clawback function testing
-    
             expect(
                 await super1155.owner()
             ).to.equal(superAuction.address)
@@ -387,6 +392,11 @@ describe('===SuperAuction===', function () {
         beforeEach(async () => {
             // TODO independent timings for auction
 
+            let time = getTime();
+
+            // auctionDuration = time + ;
+            // bidbuffer = 
+            // receiptbuffer = 
             // deploying of Auction with given params 
             superAuction = await SuperAuction.deploy(
                 beneficiary.address,  //beneficiary
@@ -412,12 +422,6 @@ describe('===SuperAuction===', function () {
             await super721.connect(beneficiary).transferOwnership(superAuction.address);
         });
 
-        it('revert: bid too low', async () => {
-            await expect(
-                superAuction.connect(bidder_01).bid({value: ethers.utils.parseEther('.5')})
-            ).to.be.revertedWith("Minimum bid amount not met.")
-        });
-    
         it('successful bid', async () => {
             await superAuction.connect(bidder_01).bid({value: ethers.utils.parseEther('1')})
     
@@ -474,17 +478,18 @@ describe('===SuperAuction===', function () {
             });
             await network.provider.send('evm_mine');
     
+            
             let bidAmount = ethers.utils.parseEther('3');
             await superAuction.connect(bidder_02).bid({value: bidAmount})
-    
+            
             bidCount = await superAuction.bidCount();
             expect( bidCount ).to.equal( 2 );
-    
+            
             let lastBid = await superAuction.bidHistory(bidCount - 1);
-    
+            
             expect( lastBid.bidder ).to.equal( bidder_02.address );
             expect( lastBid.amount ).to.equal( bidAmount );
-    
+            
             let newAuctionEndTime = await superAuction.auctionEndTime();
             expect(    newAuctionEndTime ).to.equal( auctionEndTime.add(bidBuffer) );
     
@@ -506,18 +511,19 @@ describe('===SuperAuction===', function () {
             let history = await superAuction.bidData();
     
             let data = await superAuction.auctionData();
-    
+            
+            
             await expect(
                 superAuction.connect(beneficiary).remainder()
             ).to.be.revertedWith( "Cannot claim remainder until auction has ended." )
-    
             let receiptBuffer = await superAuction.receiptBuffer();
+            console.log("entered");
             await network.provider.request({
                 method: 'evm_setNextBlockTimestamp',
                 params: [parseInt(newAuctionEndTime + receiptBuffer)]
             });
             await network.provider.send('evm_mine');
-    
+            
             await expect(
                 superAuction.connect(beneficiary).returnHighestBid()
             ).to.be.revertedWith( "The auction has already ended." )
@@ -678,6 +684,38 @@ describe('===SuperAuction===', function () {
 
             await super1155.connect(beneficiary).transferOwnership(superAuction.address);
         });
+
+        describe('testing of auction ending', function () {
+            beforeEach(async() => {
+                auctionEndTime = await superAuction.auctionEndTime();
+                receiptBuffer = await superAuction.receiptBuffer();
+                receiptAllowed = auctionEndTime.add(receiptBuffer);
+            });
+    
+            it('AuctionEnd, reserve price were met', async() => {
+                await superAuction.connect(bidder_01).bid({value: ethers.utils.parseEther('2')})
+                
+                await network.provider.request({
+                    method: 'evm_setNextBlockTimestamp',
+                    params: [parseInt(receiptAllowed)]
+                });
+                await network.provider.send('evm_mine');
+                
+                await superAuction.auctionEnd();
+            });
+            
+            it('AuctionEnd, reserve price were not met', async() => {
+                await superAuction.connect(bidder_01).bid({value: ethers.utils.parseEther('1.2')})
+                
+                await network.provider.request({
+                    method: 'evm_setNextBlockTimestamp',
+                    params: [parseInt(receiptAllowed)]
+                });
+                await network.provider.send('evm_mine');
+                
+                await superAuction.auctionEnd();
+            }); 
+
      });
     describe('SuperAuction for Minted721', function () { 
         beforeEach(async () => {
