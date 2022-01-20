@@ -22,7 +22,7 @@ describe('===Super1155===', function () {
         setConfigureGroupRight,
         mintRight,
         burnRight,
-        setMetadataRight,Super
+        setMetadataRight,
         lockUriRight,
         lockItemUriRight,
         lockCreationRight;
