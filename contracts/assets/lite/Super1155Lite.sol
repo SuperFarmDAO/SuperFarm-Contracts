@@ -7,12 +7,11 @@ import "@openzeppelin/contracts/token/ERC1155/extensions/IERC1155MetadataURI.sol
 import "@openzeppelin/contracts/token/ERC1155/IERC1155Receiver.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 
-import "../../access/PermitControl.sol";
+import "../../access/PermitControlds.sol";
 import "../../proxy/StubProxyRegistry.sol";
-import "../../libraries/DFStorage.sol";
-
+import "./Super1155LiteBlueprint.sol";
 /**
-  @title An lite ERC-1155 item creation contract.
+  @title  A lite ERC-1155 item creation contract.
   @author Tim Clancy
   @author Qazawat Zirak
   @author Rostislav Khlebnikov
@@ -29,97 +28,9 @@ import "../../libraries/DFStorage.sol";
   January 15th, 2022.
 */
 contract Super1155Lite is 
-PermitControl, ERC165Storage, IERC1155, IERC1155MetadataURI {
+PermitControlds, ERC165Storage, IERC1155, IERC1155MetadataURI {
 
   using Address for address;
-
-  uint256 MAX_INT = type(uint256).max;
-
-  /// The public identifier for the right to set this contract's metadata URI.
-  bytes32 public constant SET_URI = keccak256("SET_URI");
-
-  /// The public identifier for the right to set this contract's proxy registry.
-  bytes32 public constant SET_PROXY_REGISTRY = keccak256("SET_PROXY_REGISTRY");
-
-  /// The public identifier for the right to mint items.
-  bytes32 public constant MINT  = keccak256("MINT");
-
-  /// The public identifier for the right to set item metadata.
-  bytes32 public constant SET_METADATA = keccak256("SET_METADATA");
-
-  /// The public identifier for the right to lock the metadata URI.
-  bytes32 public constant LOCK_URI = keccak256("LOCK_URI");
-
-  /// The public identifier for the right to lock an item's metadata.
-  bytes32 public constant LOCK_ITEM_URI = keccak256("LOCK_ITEM_URI");
-
-  /// The public identifier for the right to disable item creation.
-  bytes32 public constant LOCK_CREATION = keccak256("LOCK_CREATION");
-
-  /// @dev Supply the magic number for the required ERC-1155 interface.
-  bytes4 private constant INTERFACE_ERC1155 = 0xd9b67a26;
-
-  /// @dev Supply the magic number for the required ERC-1155 metadata extension.
-  bytes4 private constant INTERFACE_ERC1155_METADATA_URI = 0x0e89341c;
-
-  /// The public name of this contract.
-  string public name;
-
-  /**
-    The ERC-1155 URI for tracking item metadata, supporting {id} substitution.
-    For example: https://token-cdn-domain/{id}.json. See the ERC-1155 spec for
-    more details: https://eips.ethereum.org/EIPS/eip-1155#metadata.
-  */
-  string public metadataUri;
-
-  /// The URI for the storefront-level metadata of contract
-  string public contractURI;
-
-  /// A proxy registry address for supporting automatic delegated approval.
-  address public proxyRegistryAddress;
-
-  /// @dev A mapping from each token ID to per-address balances.
-  mapping (uint256 => mapping(address => uint256)) public balances;
-
-  /// A mapping from each address to a collection-wide balance.
-  mapping(address => uint256) public totalBalances;
-
-  /// A mapping of circulating supplies for each individual token.
-  mapping (uint256 => uint256) public circulatingSupply;
-
-  /**
-    @dev This is a mapping from each address to per-address operator approvals.
-    Operators are those addresses that have been approved to transfer tokens on
-    behalf of the approver. Transferring tokens includes the right to burn
-    tokens.
-  */
-  mapping (address => mapping(address => bool)) private operatorApprovals;
-
-  /**
-    A mapping of token ID to a boolean representing whether the item's metadata
-    has been explicitly frozen via a call to `lockURI(string calldata _uri,
-    uint256 _id)`. Do note that it is possible for an item's mapping here to be
-    false while still having frozen metadata if the item collection as a whole
-    has had its `uriLocked` value set to true.
-  */
-  mapping (uint256 => bool) public metadataFrozen;
-
-  /**
-    A public mapping of optional on-chain metadata for each token ID. A token's
-    on-chain metadata is unable to be changed if the item's metadata URI has
-    been permanently fixed or if the collection's metadata URI as a whole has
-    been frozen.
-  */
-  mapping (uint256 => string) public metadata;
-
-  /// Whether or not the metadata URI has been locked to future changes.
-  bool public uriLocked;
-
-  /// Whether or not the contract URI has been locked to future changes.
-  bool public contractUriLocked;
-
-  /// Whether or not the item collection has been locked to all further minting.
-  bool public locked;
 
   /**
     An event that gets emitted when the metadata collection URI is changed.
@@ -181,33 +92,13 @@ PermitControl, ERC165Storage, IERC1155, IERC1155MetadataURI {
     @param _id The token ID associated with the permanent metadata value.
   */
   event PermanentContractURI(string _value, uint256 indexed _id);
-
-  /**
-    Construct a new ERC-1155 item collection.
-
-    @param _owner The owner of the newly deployed contract.
-    @param _name The name to assign to this item collection contract.
-    @param _metadataURI The metadata URI to perform later token ID substitution with.
-    @param _contractURI The contract URI.
-    @param _proxyRegistryAddress The address of a proxy registry contract.
+  
+  /** 
+    A function that needs to be called immediately after deployment.
+    Sets the owner of the newly deployed proxy.
   */
-  constructor(address _owner, string memory _name, string memory _metadataURI,
-    string memory _contractURI, address _proxyRegistryAddress) {
-
-    // Transfer Ownership.
-    if (_owner != owner()) {
-      transferOwnership(_owner);
-    }
-
-    // Register ERC-1155 interfaces.
-    _registerInterface(INTERFACE_ERC1155);
-    _registerInterface(INTERFACE_ERC1155_METADATA_URI);
-
-    // Continue initialization.
-    name = _name;
-    metadataUri = _metadataURI;
-    contractURI = _contractURI;
-    proxyRegistryAddress = _proxyRegistryAddress;
+  function initialize() public initializer {
+      __Ownable_init_unchained();
   }
 
   /**
@@ -232,7 +123,10 @@ PermitControl, ERC165Storage, IERC1155, IERC1155MetadataURI {
   function uri(uint256) external view 
   returns (string memory) {
 
-    return metadataUri;
+    Super1155LiteBlueprint.Super1155LiteStateVariables
+      storage b = Super1155LiteBlueprint.super1155LiteStateVariables();
+
+    return b.metadataUri;
   }
 
   /**
@@ -244,12 +138,15 @@ PermitControl, ERC165Storage, IERC1155, IERC1155MetadataURI {
     @param _uri The new URI to update to.
   */
   function setURI(string calldata _uri) external 
-  virtual hasValidPermit(UNIVERSAL, SET_URI) {
+  virtual hasValidPermit(UNIVERSAL, Super1155LiteBlueprint.SET_URI) {
 
-    require(!uriLocked,
+    Super1155LiteBlueprint.Super1155LiteStateVariables
+      storage b = Super1155LiteBlueprint.super1155LiteStateVariables();
+
+    require(!b.uriLocked,
       "Super1155: the collection URI has been permanently locked");
-    string memory oldURI = metadataUri;
-    metadataUri = _uri;
+    string memory oldURI = b.metadataUri;
+    b.metadataUri = _uri;
     emit ChangeURI(oldURI, _uri);
   }
 
@@ -260,12 +157,15 @@ PermitControl, ERC165Storage, IERC1155, IERC1155MetadataURI {
     @param _uri The new contract URI to update to.
   */
   function setContractUri(string calldata _uri) external 
-  virtual hasValidPermit(UNIVERSAL, SET_URI) {
+  virtual hasValidPermit(UNIVERSAL, Super1155LiteBlueprint.SET_URI) {
 
-    require(!contractUriLocked,
+    Super1155LiteBlueprint.Super1155LiteStateVariables
+      storage b = Super1155LiteBlueprint.super1155LiteStateVariables();
+
+    require(!b.contractUriLocked,
       "Super1155: the contract URI has been permanently locked");
-    string memory oldContractUri = contractURI;
-    contractURI = _uri;
+    string memory oldContractUri = b.contractURI;
+    b.contractURI = _uri;
     emit ChangeContractURI(oldContractUri, _uri);
   }
 
@@ -277,10 +177,13 @@ PermitControl, ERC165Storage, IERC1155, IERC1155MetadataURI {
       update to.
   */
   function setProxyRegistry(address _proxyRegistryAddress) external 
-  virtual hasValidPermit(UNIVERSAL, SET_PROXY_REGISTRY) {
+  virtual hasValidPermit(UNIVERSAL, Super1155LiteBlueprint.SET_PROXY_REGISTRY) {
 
-    address oldRegistry = proxyRegistryAddress;
-    proxyRegistryAddress = _proxyRegistryAddress;
+    Super1155LiteBlueprint.Super1155LiteStateVariables
+      storage b = Super1155LiteBlueprint.super1155LiteStateVariables();
+
+    address oldRegistry = b.proxyRegistryAddress;
+    b.proxyRegistryAddress = _proxyRegistryAddress;
     emit ChangeProxyRegistry(oldRegistry, _proxyRegistryAddress);
   }
 
@@ -295,9 +198,12 @@ PermitControl, ERC165Storage, IERC1155, IERC1155MetadataURI {
   function balanceOf(address _owner, uint256 _id) public view 
   virtual returns (uint256) {
 
+    Super1155LiteBlueprint.Super1155LiteStateVariables
+      storage b = Super1155LiteBlueprint.super1155LiteStateVariables();
+
     require(_owner != address(0),
       "ERC1155: balance query for the zero address");
-    return balances[_id][_owner];
+    return b.balances[_id][_owner];
   }
 
   /**
@@ -335,12 +241,15 @@ PermitControl, ERC165Storage, IERC1155, IERC1155MetadataURI {
   function isApprovedForAll(address _owner, address _operator) public view 
   virtual returns (bool) {
 
-    if (StubProxyRegistry(proxyRegistryAddress).proxies(_owner) == _operator) {
+    Super1155LiteBlueprint.Super1155LiteStateVariables
+      storage b = Super1155LiteBlueprint.super1155LiteStateVariables();
+
+    if (StubProxyRegistry(b.proxyRegistryAddress).proxies(_owner) == _operator) {
       return true;
     }
 
     // We did not find an explicit whitelist in the proxy registry.
-    return operatorApprovals[_owner][_operator];
+    return b.operatorApprovals[_owner][_operator];
   }
 
   /**
@@ -354,9 +263,12 @@ PermitControl, ERC165Storage, IERC1155, IERC1155MetadataURI {
   function setApprovalForAll(address _operator, bool _approved) external
   virtual {
 
+    Super1155LiteBlueprint.Super1155LiteStateVariables
+      storage b = Super1155LiteBlueprint.super1155LiteStateVariables();
+
     require(_msgSender() != _operator,
       "ERC1155: setting approval status for self");
-    operatorApprovals[_msgSender()][_operator] = _approved;
+    b.operatorApprovals[_msgSender()][_operator] = _approved;
     emit ApprovalForAll(_msgSender(), _operator, _approved);
   }
 
@@ -460,6 +372,9 @@ PermitControl, ERC165Storage, IERC1155, IERC1155MetadataURI {
   function safeBatchTransferFrom(address _from, address _to,
   uint256[] memory _ids, uint256[] memory _amounts, bytes memory _data) public 
   virtual {
+
+    Super1155LiteBlueprint.Super1155LiteStateVariables
+      storage b = Super1155LiteBlueprint.super1155LiteStateVariables();
       
     require(_ids.length == _amounts.length,
       "ERC1155: ids and amounts length mismatch");
@@ -473,12 +388,12 @@ PermitControl, ERC165Storage, IERC1155, IERC1155MetadataURI {
     for (uint256 i = 0; i < _ids.length; ++i) {
 
       // Update all specially-tracked balances.
-      require(balances[_ids[i]][_from] >= _amounts[i], 
+      require(b.balances[_ids[i]][_from] >= _amounts[i], 
         "ERC1155: insufficient balance for transfer");
-      balances[_ids[i]][_from] = balances[_ids[i]][_from] - _amounts[i];
-      balances[_ids[i]][_to] = balances[_ids[i]][_to] + _amounts[i];
-      totalBalances[_from] = totalBalances[_from] - _amounts[i];
-      totalBalances[_to] = totalBalances[_to] + _amounts[i];
+      b.balances[_ids[i]][_from] = b.balances[_ids[i]][_from] - _amounts[i];
+      b.balances[_ids[i]][_to] = b.balances[_ids[i]][_to] + _amounts[i];
+      b.totalBalances[_from] = b.totalBalances[_from] - _amounts[i];
+      b.totalBalances[_to] = b.totalBalances[_to] + _amounts[i];
     }
 
     // Emit the transfer event and perform the safety check.
@@ -540,7 +455,10 @@ PermitControl, ERC165Storage, IERC1155, IERC1155MetadataURI {
   */
   function mintBatch(address _recipient, uint256[] calldata _ids,
   uint256[] calldata _amounts, bytes calldata _data)
-  external virtual hasValidPermit(UNIVERSAL, MINT) {
+  external virtual hasValidPermit(UNIVERSAL, Super1155LiteBlueprint.MINT) {
+
+    Super1155LiteBlueprint.Super1155LiteStateVariables
+      storage b = Super1155LiteBlueprint.super1155LiteStateVariables();
 
     require(_recipient != address(0),
       "ERC1155: mint to the zero address");
@@ -554,13 +472,13 @@ PermitControl, ERC165Storage, IERC1155, IERC1155MetadataURI {
 
     // Loop through each of the batched IDs to update balances.
     for (uint256 i = 0; i < _ids.length; i++) {
-      require(_hasItemRight(_ids[i], MINT),
+      require(_hasItemRight(_ids[i], Super1155LiteBlueprint.MINT),
         "Super1155: you do not have the right to mint that item");
 
       // Update storage of special balances and circulating values.
-      balances[_ids[i]][_recipient] = balances[_ids[i]][_recipient] + _amounts[i];
-      totalBalances[_recipient] = totalBalances[_recipient] + _amounts[i];
-      circulatingSupply[_ids[i]] = circulatingSupply[_ids[i]] + _amounts[i];
+      b.balances[_ids[i]][_recipient] = b.balances[_ids[i]][_recipient] + _amounts[i];
+      b.totalBalances[_recipient] = b.totalBalances[_recipient] + _amounts[i];
+      b.circulatingSupply[_ids[i]] = b.circulatingSupply[_ids[i]] + _amounts[i];
     }
 
     // Emit event and handle the safety check.
@@ -579,12 +497,15 @@ PermitControl, ERC165Storage, IERC1155, IERC1155MetadataURI {
   */
   function setMetadata(uint256 _id, string memory _metadata) external {
 
-    require(_hasItemRight(_id, SET_METADATA), 
+    Super1155LiteBlueprint.Super1155LiteStateVariables
+      storage b = Super1155LiteBlueprint.super1155LiteStateVariables();
+
+    require(_hasItemRight(_id, Super1155LiteBlueprint.SET_METADATA), 
       "Super1155: you don't have rights to setMetadata");
-    require(!uriLocked && !metadataFrozen[_id],
+    require(!b.uriLocked && !b.metadataFrozen[_id],
       "Super1155: you cannot edit this metadata because it is frozen");
-    string memory oldMetadata = metadata[_id];
-    metadata[_id] = _metadata;
+    string memory oldMetadata = b.metadata[_id];
+    b.metadata[_id] = _metadata;
     emit MetadataChanged(_msgSender(), _id, oldMetadata, _metadata);
   }
 
@@ -593,10 +514,13 @@ PermitControl, ERC165Storage, IERC1155, IERC1155MetadataURI {
     metadata URI on the entire collection to future changes.
   */
   function lockURI() external
-  hasValidPermit(UNIVERSAL, LOCK_URI) {
+  hasValidPermit(UNIVERSAL, Super1155LiteBlueprint.LOCK_URI) {
 
-    uriLocked = true;
-    emit PermanentURI(metadataUri, 2 ** 256 - 1);
+    Super1155LiteBlueprint.Super1155LiteStateVariables
+      storage b = Super1155LiteBlueprint.super1155LiteStateVariables();
+
+    b.uriLocked = true;
+    emit PermanentURI(b.metadataUri, 2 ** 256 - 1);
   }
 
   
@@ -605,10 +529,13 @@ PermitControl, ERC165Storage, IERC1155, IERC1155MetadataURI {
     changes
   */
   function lockContractUri() external
-  hasValidPermit(UNIVERSAL, LOCK_URI) {
+  hasValidPermit(UNIVERSAL, Super1155LiteBlueprint.LOCK_URI) {
 
-    contractUriLocked = true;
-    emit PermanentContractURI(contractURI, 2 ** 256 - 1);   
+    Super1155LiteBlueprint.Super1155LiteStateVariables
+      storage b = Super1155LiteBlueprint.super1155LiteStateVariables();
+
+    b.contractUriLocked = true;
+    emit PermanentContractURI(b.contractURI, 2 ** 256 - 1);   
   }
 
   /**
@@ -619,10 +546,13 @@ PermitControl, ERC165Storage, IERC1155, IERC1155MetadataURI {
     @param _id The token ID to lock a metadata URI value into.
   */
   function lockURI(string calldata _uri, uint256 _id) external {
+
+    Super1155LiteBlueprint.Super1155LiteStateVariables
+      storage b = Super1155LiteBlueprint.super1155LiteStateVariables();
     
-    require(_hasItemRight(_id, LOCK_ITEM_URI), 
+    require(_hasItemRight(_id, Super1155LiteBlueprint.LOCK_ITEM_URI), 
       "Super1155: you don't have rights to lock URI");
-    metadataFrozen[_id] = true;
+    b.metadataFrozen[_id] = true;
     emit PermanentURI(_uri, _id);
   }
 
@@ -631,9 +561,12 @@ PermitControl, ERC165Storage, IERC1155, IERC1155MetadataURI {
     this contract to further item minting.
   */
   function lock() external 
-  virtual hasValidPermit(UNIVERSAL, LOCK_CREATION) {
+  virtual hasValidPermit(UNIVERSAL, Super1155LiteBlueprint.LOCK_CREATION) {
 
-    locked = true;
+    Super1155LiteBlueprint.Super1155LiteStateVariables
+      storage b = Super1155LiteBlueprint.super1155LiteStateVariables();
+
+    b.locked = true;
     emit CollectionLocked(_msgSender());
   }
 }

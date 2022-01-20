@@ -7,9 +7,10 @@ import "@openzeppelin/contracts/token/ERC721/extensions/IERC721Metadata.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 
-import "../../access/PermitControl.sol";
+import "../../access/PermitControlds.sol";
 import "../../proxy/StubProxyRegistry.sol";
 import "../../utils/Utils.sol";
+import "./Super721LiteBlueprint.sol";
 
 /**
   @title A lite ERC-721 item creation contract.
@@ -28,110 +29,9 @@ import "../../utils/Utils.sol";
   January 15th, 2022.
 */
 contract Super721Lite is 
-PermitControl, ERC165Storage, IERC721, IERC721Enumerable, IERC721Metadata {
+PermitControlds, ERC165Storage, IERC721, IERC721Enumerable, IERC721Metadata {
 
   using Address for address;
-
-  /// The public identifier for the right to set this contract's metadata URI.
-  bytes32 public constant SET_URI = keccak256("SET_URI");
-
-  /// The public identifier for the right to set this contract's proxy registry.
-  bytes32 public constant SET_PROXY_REGISTRY = keccak256("SET_PROXY_REGISTRY");
-
-  /// The public identifier for the right to mint items.
-  bytes32 public constant MINT = keccak256("MINT");
-
-  /// The public identifier for the right to set item metadata.
-  bytes32 public constant SET_METADATA = keccak256("SET_METADATA");
-
-  /// The public identifier for the right to lock the metadata URI.
-  bytes32 public constant LOCK_URI = keccak256("LOCK_URI");
-
-  /// The public identifier for the right to lock an item's metadata.
-  bytes32 public constant LOCK_ITEM_URI = keccak256("LOCK_ITEM_URI");
-
-  /// The public identifier for the right to disable item creation.
-  bytes32 public constant LOCK_CREATION = keccak256("LOCK_CREATION");
-  
-  /// @dev Magic number for ERC721 interface.
-  bytes4 private constant _INTERFACE_ID_ERC721 = 0x80ac58cd;
-
-  /// @dev Magic number for ERC721 metadata interface.
-  bytes4 private constant _INTERFACE_ID_ERC721_METADATA = 0x5b5e139f;
-
-  /// @dev Magic number for ERC721 enumberable interface.
-  bytes4 private constant _INTERFACE_ID_ERC721_ENUMERABLE = 0x780e9d63;
-
-  /// The public name of this contract.
-  string public name;
-
-  /// A symbol representing this collection of NFT's.
-  string public symbol;
-
-  /// The total supply cap of mints.
-  uint256 public totalSupply;
-
-  /// The current index of minting.
-  uint256 public mintIndex;
-
-  /// The amount that can be minted one time.
-  uint256 public immutable batchSize;
-
-  /**
-    The ERC-721 URI for tracking item metadata, supporting {id} substitution.
-    For example: https://token-cdn-domain/{id}.json. See the ERC-721 spec for
-    more details: https://eips.ethereum.org/EIPS/eip-721#metadata.
-  */
-  string public metadataUri;
-
-  /// The URI for the storefront-level metadata of contract
-  string public contractURI;
-
-  /// A proxy registry address for supporting automatic delegated approval.
-  address public proxyRegistryAddress;
-
-  /// A mapping that keeps track of ownership for each individual token.
-  mapping (uint256 => address) public ownerships;
-
-  /// A mapping from address to total NFT's owned.
-  mapping(address => uint256) public balances;
-
-  /**
-    @dev This is a mapping from each address to per-address operator approvals.
-    Operators are those addresses that have been approved to transfer tokens on
-    behalf of the approver. Transferring tokens includes the right to burn
-    tokens.
-  */
-  mapping (address => mapping(address => bool)) public operatorApprovals;
-
-  /// Mapping from token ID to approved address
-  mapping (uint256 => address) public tokenApprovals;
-
-  /**
-    A mapping of token ID to a boolean representing whether the item's metadata
-    has been explicitly frozen via a call to `lockURI(string calldata _uri,
-    uint256 _id)`. Do note that it is possible for an item's mapping here to be
-    false while still having frozen metadata if the item collection as a whole
-    has had its `uriLocked` value set to true.
-  */
-  mapping (uint256 => bool) public metadataFrozen;
-
-  /**
-    A public mapping of optional on-chain metadata for each token ID. A token's
-    on-chain metadata is unable to be changed if the item's metadata URI has
-    been permanently fixed or if the collection's metadata URI as a whole has
-    been frozen.
-  */
-  mapping (uint256 => string) public metadata;
-
-  /// Whether or not the metadata URI has been locked to future changes.
-  bool public uriLocked;  
-  
-  /// Whether or not the metadata URI has been locked to future changes.
-  bool public contractUriLocked;
-
-  /// Whether or not the item collection has been locked to all further minting.
-  bool public locked;
 
   /**
     An event that gets emitted when the metadata collection URI is changed.
@@ -211,40 +111,12 @@ PermitControl, ERC165Storage, IERC721, IERC721Enumerable, IERC721Metadata {
     }
   }
 
-  /**
-    Construct a new ERC-721 item collection.
-
-    @param _owner The address of the administrator governing this collection.
-    @param _name The name to assign to this item collection contract.
-    @param _symbol The string that represents the entire collection symbol.
-    @param _totalSupply The supply cap of this contract.
-    @param _batchSize The amount that can be minted one time.
-    @param _metadataURI The metadata URI to perform later token ID substitution with.
-    @param _contractURI The contract URI.
-    @param _proxyRegistryAddress The address of a proxy registry contract.
+  /** 
+    A function that needs to be called immediately after deployment.
+    Sets the owner of the newly deployed proxy.
   */
-  constructor(address _owner, string memory _name, string memory _symbol, 
-  uint256 _totalSupply, uint256 _batchSize, string memory _metadataURI, 
-  string memory _contractURI, address _proxyRegistryAddress) {
-
-    // Transfer Ownership.
-    if (_owner != owner()) {
-      transferOwnership(_owner);
-    }
-
-    // Register ERC-721 interfaces.
-    _registerInterface(_INTERFACE_ID_ERC721);
-    _registerInterface(_INTERFACE_ID_ERC721_METADATA);
-    _registerInterface(_INTERFACE_ID_ERC721_ENUMERABLE);
-
-    // Continue initialization.
-    name = _name;
-    symbol = _symbol;
-    totalSupply = _totalSupply;
-    batchSize = _batchSize;
-    metadataUri = _metadataURI;
-    contractURI = _contractURI;
-    proxyRegistryAddress = _proxyRegistryAddress;
+  function initialize() public initializer {
+      __Ownable_init_unchained();
   }
 
 /**
@@ -258,7 +130,10 @@ PermitControl, ERC165Storage, IERC721, IERC721Enumerable, IERC721Metadata {
   function _exists(uint256 tokenId) internal view 
   returns (bool) {
 
-    return tokenId < mintIndex;
+    Super721LiteBlueprint.Super721LiteStateVariables
+      storage b = Super721LiteBlueprint.super721LiteStateVariables();
+
+    return tokenId < b.mintIndex;
   }
 
   /** 
@@ -269,16 +144,19 @@ PermitControl, ERC165Storage, IERC721, IERC721Enumerable, IERC721Metadata {
   function ownershipOf(uint256 tokenId) internal view 
   returns (address) {
 
+    Super721LiteBlueprint.Super721LiteStateVariables
+      storage b = Super721LiteBlueprint.super721LiteStateVariables();
+
     require(_exists(tokenId), 
       "ERC721: owner query for nonexistent token");
 
     uint256 lowestTokenToCheck;
-    if (tokenId >= batchSize) {
-      lowestTokenToCheck = tokenId - batchSize + 1;
+    if (tokenId >= b.batchSize) {
+      lowestTokenToCheck = tokenId - b.batchSize + 1;
     }
 
     for (uint256 curr = tokenId; curr >= lowestTokenToCheck; curr--) {
-      address ownership = ownerships[curr];
+      address ownership = b.ownerships[curr];
       if (ownership != address(0)) {
         return ownership;
       }
@@ -302,6 +180,9 @@ PermitControl, ERC165Storage, IERC721, IERC721Enumerable, IERC721Metadata {
   function approve(address to, uint256 tokenId) public 
   virtual override {
 
+    Super721LiteBlueprint.Super721LiteStateVariables
+      storage b = Super721LiteBlueprint.super721LiteStateVariables();
+
     address tokenOwner = ownerOf(tokenId);
     require(to != tokenOwner, 
       "Super721: approval to current owner");
@@ -310,7 +191,7 @@ PermitControl, ERC165Storage, IERC721, IERC721Enumerable, IERC721Metadata {
       isApprovedForAll(tokenOwner, _msgSender()),
       "Super721: approve caller is not owner or approved");
 
-    tokenApprovals[tokenId] = to;
+    b.tokenApprovals[tokenId] = to;
     emit Approval(ownerOf(tokenId), to, tokenId);
   }
 
@@ -336,10 +217,13 @@ PermitControl, ERC165Storage, IERC721, IERC721Enumerable, IERC721Metadata {
   function tokenURI(uint256 id) external override view 
   returns (string memory) {
 
-    if(bytes(metadataUri).length == 0) {
-      return metadata[id];
+    Super721LiteBlueprint.Super721LiteStateVariables
+      storage b = Super721LiteBlueprint.super721LiteStateVariables();
+
+    if(bytes(b.metadataUri).length == 0) {
+      return b.metadata[id];
     }
-    return Utils.interpolate(metadataUri, id);
+    return Utils.interpolate(b.metadataUri, id);
   }
 
   /**
@@ -351,12 +235,15 @@ PermitControl, ERC165Storage, IERC721, IERC721Enumerable, IERC721Metadata {
     @param _uri The new URI to update to.
   */
   function setURI(string calldata _uri) external 
-  virtual hasValidPermit(UNIVERSAL, SET_URI) {
+  virtual hasValidPermit(UNIVERSAL, Super721LiteBlueprint.SET_URI) {
 
-    require(!uriLocked,
+    Super721LiteBlueprint.Super721LiteStateVariables
+      storage b = Super721LiteBlueprint.super721LiteStateVariables();
+
+    require(!b.uriLocked,
       "Super721: the collection URI has been permanently locked");
-    string memory oldURI = metadataUri;
-    metadataUri = _uri;
+    string memory oldURI = b.metadataUri;
+    b.metadataUri = _uri;
     emit ChangeURI(oldURI, _uri);
   }
 
@@ -367,12 +254,15 @@ PermitControl, ERC165Storage, IERC721, IERC721Enumerable, IERC721Metadata {
     @param _uri The new contract URI to update to.
    */
   function setContractURI(string calldata _uri) external 
-  virtual hasValidPermit(UNIVERSAL, SET_URI) {
+  virtual hasValidPermit(UNIVERSAL, Super721LiteBlueprint.SET_URI) {
 
-    require(!contractUriLocked,
+    Super721LiteBlueprint.Super721LiteStateVariables
+      storage b = Super721LiteBlueprint.super721LiteStateVariables();
+
+    require(!b.contractUriLocked,
       "Super721: the contract URI has been permanently locked");
-    string memory oldContractUri = contractURI;
-    contractURI = _uri;
+    string memory oldContractUri = b.contractURI;
+    b.contractURI = _uri;
     emit ChangeContractURI(oldContractUri, _uri);
   }
 
@@ -384,10 +274,13 @@ PermitControl, ERC165Storage, IERC721, IERC721Enumerable, IERC721Metadata {
       update to.
   */
   function setProxyRegistry(address _proxyRegistryAddress) external 
-  virtual hasValidPermit(UNIVERSAL, SET_PROXY_REGISTRY) {
+  virtual hasValidPermit(UNIVERSAL, Super721LiteBlueprint.SET_PROXY_REGISTRY) {
 
-    address oldRegistry = proxyRegistryAddress;
-    proxyRegistryAddress = _proxyRegistryAddress;
+    Super721LiteBlueprint.Super721LiteStateVariables
+      storage b = Super721LiteBlueprint.super721LiteStateVariables();
+
+    address oldRegistry = b.proxyRegistryAddress;
+    b.proxyRegistryAddress = _proxyRegistryAddress;
     emit ChangeProxyRegistry(oldRegistry, _proxyRegistryAddress);
   }
 
@@ -397,9 +290,12 @@ PermitControl, ERC165Storage, IERC721, IERC721Enumerable, IERC721Metadata {
   function balanceOf(address _owner) public view 
   virtual override returns (uint256) {
 
+    Super721LiteBlueprint.Super721LiteStateVariables
+      storage b = Super721LiteBlueprint.super721LiteStateVariables();
+
     require(_owner != address(0), 
       "ERC721: balance query for the zero address");
-    return balances[_owner];
+    return b.balances[_owner];
   }
 
   /**
@@ -431,13 +327,16 @@ PermitControl, ERC165Storage, IERC721, IERC721Enumerable, IERC721Metadata {
   function isApprovedForAll(address _owner, address _operator) public view 
   virtual override returns (bool) {
 
-    StubProxyRegistry proxyRegistry = StubProxyRegistry(proxyRegistryAddress);
+    Super721LiteBlueprint.Super721LiteStateVariables
+      storage b = Super721LiteBlueprint.super721LiteStateVariables();
+
+    StubProxyRegistry proxyRegistry = StubProxyRegistry(b.proxyRegistryAddress);
     if (address(proxyRegistry.proxies(_owner)) == _operator) {
       return true;
     }
 
     // We did not find an explicit whitelist in the proxy registry.
-    return operatorApprovals[_owner][_operator];
+    return b.operatorApprovals[_owner][_operator];
   }
 
   /**
@@ -451,9 +350,12 @@ PermitControl, ERC165Storage, IERC721, IERC721Enumerable, IERC721Metadata {
   function setApprovalForAll(address _operator, bool _approved) external 
   virtual override {
 
+    Super721LiteBlueprint.Super721LiteStateVariables
+      storage b = Super721LiteBlueprint.super721LiteStateVariables();
+
     require(_msgSender() != _operator,
       "Super721: setting approval status for self");
-    operatorApprovals[_msgSender()][_operator] = _approved;
+    b.operatorApprovals[_msgSender()][_operator] = _approved;
     emit ApprovalForAll(_msgSender(), _operator, _approved);
   }
 
@@ -544,10 +446,13 @@ PermitControl, ERC165Storage, IERC721, IERC721Enumerable, IERC721Metadata {
   uint256[] memory _ids, bytes memory _data) public 
   virtual {
 
+    Super721LiteBlueprint.Super721LiteStateVariables
+      storage b = Super721LiteBlueprint.super721LiteStateVariables();
+
     require(_to != address(0), 
       "ERC721: transfer to the zero address");
       
-    _beforeTokenTransfer(_msgSender(), address(0), _to, mintIndex, _ids.length, _data);
+    _beforeTokenTransfer(_msgSender(), address(0), _to, b.mintIndex, _ids.length, _data);
     for (uint256 i = 0; i < _ids.length; i++) {
       require(_exists(_ids[i]),
         "ERC721: non existent token id");
@@ -565,21 +470,21 @@ PermitControl, ERC165Storage, IERC721, IERC721Enumerable, IERC721Metadata {
       // Clear approvals from the previous owner
       approve(address(0), _ids[i]);
 
-      balances[_from] -= 1;
-      balances[_to] += 1;
-      ownerships[_ids[i]] = _to;
+      b.balances[_from] -= 1;
+      b.balances[_to] += 1;
+      b.ownerships[_ids[i]] = _to;
 
       // Set the immediate ownership of token index + 1
       uint256 nextTokenId = _ids[i] + 1;
-      if (ownerships[nextTokenId] == address(0)) {
+      if (b.ownerships[nextTokenId] == address(0)) {
         if (_exists(nextTokenId)) {
-          ownerships[nextTokenId] = prevOwnership;
+          b.ownerships[nextTokenId] = prevOwnership;
         }
       }
       emit Transfer(_from, _to, _ids[i]);
     }
 
-    _afterTokenTransfer(_msgSender(), address(0), _to, mintIndex, _ids.length, _data);
+    _afterTokenTransfer(_msgSender(), address(0), _to, b.mintIndex, _ids.length, _data);
   }
 
   /**
@@ -627,16 +532,19 @@ PermitControl, ERC165Storage, IERC721, IERC721Enumerable, IERC721Metadata {
   */
 
   function mintBatch(address _recipient, uint256 _quantity, bytes memory _data) external 
-  virtual hasValidPermit(UNIVERSAL, MINT) {
+  virtual hasValidPermit(UNIVERSAL, Super721LiteBlueprint.MINT) {
+
+    Super721LiteBlueprint.Super721LiteStateVariables
+      storage b = Super721LiteBlueprint.super721LiteStateVariables();
 
     require(_recipient != address(0), "Super721: mint to zero address");
-    require(_quantity <= batchSize, "Super721: quantity too high");
-    require(mintIndex + _quantity <= totalSupply, "Super721: cap reached");
+    require(_quantity <= b.batchSize, "Super721: quantity too high");
+    require(b.mintIndex + _quantity <= b.totalSupply, "Super721: cap reached");
 
     _beforeTokenTransfer(_msgSender(), address(0), _recipient, 
-      mintIndex, _quantity, _data);
+      b.mintIndex, _quantity, _data);
 
-    uint256 startTokenId = mintIndex;
+    uint256 startTokenId = b.mintIndex;
     uint256 updatedId = startTokenId;
 
     for (uint256 j = 0; j < _quantity; j++) {
@@ -647,12 +555,12 @@ PermitControl, ERC165Storage, IERC721, IERC721Enumerable, IERC721Metadata {
     }
 
     // Update storage of special balances and circulating values.
-    mintIndex = updatedId;
-    ownerships[startTokenId] = _recipient;
-    balances[_recipient] = balances[_recipient] + _quantity;
+    b.mintIndex = updatedId;
+    b.ownerships[startTokenId] = _recipient;
+    b.balances[_recipient] = b.balances[_recipient] + _quantity;
 
     _afterTokenTransfer(_msgSender(), address(0), _recipient, 
-      mintIndex, _quantity, _data);
+      b.mintIndex, _quantity, _data);
   }
 
   /**
@@ -664,12 +572,15 @@ PermitControl, ERC165Storage, IERC721, IERC721Enumerable, IERC721Metadata {
     @param _metadata The metadata string to store on-chain.
   */
   function setMetadata(uint256 _id, string memory _metadata) external 
-  hasItemRight(_id, SET_METADATA) {
+  hasItemRight(_id, Super721LiteBlueprint.SET_METADATA) {
 
-    require(!uriLocked && !metadataFrozen[_id], 
+    Super721LiteBlueprint.Super721LiteStateVariables
+      storage b = Super721LiteBlueprint.super721LiteStateVariables();
+
+    require(!b.uriLocked && !b.metadataFrozen[_id], 
       "Super721: metadata is frozen");
-    string memory oldMetadata = metadata[_id];
-    metadata[_id] = _metadata;
+    string memory oldMetadata = b.metadata[_id];
+    b.metadata[_id] = _metadata;
     emit MetadataChanged(_msgSender(), _id, oldMetadata, _metadata);
   }
 
@@ -678,20 +589,26 @@ PermitControl, ERC165Storage, IERC721, IERC721Enumerable, IERC721Metadata {
     metadata URI on the entire collection to future changes.
   */
   function lockURI() external 
-  hasValidPermit(UNIVERSAL, LOCK_URI) {
+  hasValidPermit(UNIVERSAL, Super721LiteBlueprint.LOCK_URI) {
 
-    uriLocked = true;
-    emit PermanentURI(metadataUri, 2 ** 256 - 1);
+    Super721LiteBlueprint.Super721LiteStateVariables
+      storage b = Super721LiteBlueprint.super721LiteStateVariables();
+
+    b.uriLocked = true;
+    emit PermanentURI(b.metadataUri, 2 ** 256 - 1);
   }
 
   /**
     Allow the associated manager to forever lock the contract URI to future changes
    */
   function lockContractUri() external 
-  hasValidPermit(UNIVERSAL, LOCK_URI) {
+  hasValidPermit(UNIVERSAL, Super721LiteBlueprint.LOCK_URI) {
 
-    contractUriLocked = true;
-    emit PermanentContractURI(contractURI, 2 ** 256 - 1);   
+    Super721LiteBlueprint.Super721LiteStateVariables
+      storage b = Super721LiteBlueprint.super721LiteStateVariables();
+
+    b.contractUriLocked = true;
+    emit PermanentContractURI(b.contractURI, 2 ** 256 - 1);   
   }
 
   /**
@@ -702,9 +619,12 @@ PermitControl, ERC165Storage, IERC721, IERC721Enumerable, IERC721Metadata {
     @param _id The token ID to lock a metadata URI value into.
   */
   function lockItemURI(string calldata _uri, uint256 _id) external 
-  hasItemRight(_id, LOCK_ITEM_URI) {
+  hasItemRight(_id, Super721LiteBlueprint.LOCK_ITEM_URI) {
 
-    metadataFrozen[_id] = true;
+    Super721LiteBlueprint.Super721LiteStateVariables
+      storage b = Super721LiteBlueprint.super721LiteStateVariables();
+
+    b.metadataFrozen[_id] = true;
     emit PermanentURI(_uri, _id);
   }
 
@@ -713,9 +633,12 @@ PermitControl, ERC165Storage, IERC721, IERC721Enumerable, IERC721Metadata {
     this contract to further item minting.
   */
   function lock() external virtual 
-  hasValidPermit(UNIVERSAL, LOCK_CREATION) {
+  hasValidPermit(UNIVERSAL, Super721LiteBlueprint.LOCK_CREATION) {
 
-    locked = true;
+    Super721LiteBlueprint.Super721LiteStateVariables
+      storage b = Super721LiteBlueprint.super721LiteStateVariables();
+
+    b.locked = true;
     emit CollectionLocked(_msgSender());
   }
 
@@ -725,32 +648,38 @@ PermitControl, ERC165Storage, IERC721, IERC721Enumerable, IERC721Metadata {
   function getApproved(uint256 tokenId) public view 
   override returns (address) {
 
+    Super721LiteBlueprint.Super721LiteStateVariables
+      storage b = Super721LiteBlueprint.super721LiteStateVariables();
+
     require(_exists(tokenId), 
       "ERC721: approved query for nonexistent token");
-    return tokenApprovals[tokenId];
+    return b.tokenApprovals[tokenId];
   }
   
   /**
    * @dev See {IERC721Enumerable-tokenOfOwnerByIndex}.
    */
-  function tokenOfOwnerByIndex(address owner, uint256 index) public view 
+  function tokenOfOwnerByIndex(address _owner, uint256 _index) public view 
   returns (uint256) {
 
-    require(owner != address(0), 
+    Super721LiteBlueprint.Super721LiteStateVariables
+      storage b = Super721LiteBlueprint.super721LiteStateVariables();
+
+    require(_owner != address(0), 
       "ERC721: invalid owner address");
-    require(index < balanceOf(owner), 
+    require(_index < balanceOf(_owner), 
       "ERC721: owner index out of bounds");
 
-    uint256 numMintedSoFar = mintIndex;
+    uint256 numMintedSoFar = b.mintIndex;
     uint256 tokenIdsIdx = 0;
     address currOwnershipAddr = address(0);
     for (uint256 i = 0; i < numMintedSoFar; i++) {
-      address ownership = ownerships[i];
+      address ownership = b.ownerships[i];
       if (ownership != address(0)) {
         currOwnershipAddr = ownership;
       }
-      if (currOwnershipAddr == owner) {
-        if (tokenIdsIdx == index) {
+      if (currOwnershipAddr == _owner) {
+        if (tokenIdsIdx == _index) {
           return i;
         }
         tokenIdsIdx++;
@@ -765,8 +694,47 @@ PermitControl, ERC165Storage, IERC721, IERC721Enumerable, IERC721Metadata {
   function tokenByIndex(uint256 index) public view 
   returns (uint256) {
 
-    require(index < totalSupply, 
+    Super721LiteBlueprint.Super721LiteStateVariables
+      storage b = Super721LiteBlueprint.super721LiteStateVariables();
+
+    require(index < b.totalSupply, 
       "ERC721: index out of bounds");
     return index;
+  }
+
+  /**
+   * @dev See {IERC721Enumerable-name}.
+   */
+  function name() external view 
+  virtual override returns (string memory _name) {
+
+    Super721LiteBlueprint.Super721LiteStateVariables
+      storage b = Super721LiteBlueprint.super721LiteStateVariables();
+
+    _name = b.name;
+  }
+
+  /**
+   * @dev See {IERC721Enumerable-symbol}.
+   */
+  function symbol() external view 
+  virtual override returns (string memory _symbol) {
+
+    Super721LiteBlueprint.Super721LiteStateVariables
+      storage b = Super721LiteBlueprint.super721LiteStateVariables();
+
+    _symbol = b.symbol;
+  }
+
+  /**
+   * @dev See {IERC721Enumerable-totalSupply}.
+   */
+  function totalSupply() external view 
+  virtual override returns (uint256) {
+
+    Super721LiteBlueprint.Super721LiteStateVariables
+      storage b = Super721LiteBlueprint.super721LiteStateVariables();
+
+    return b.totalSupply;
   }
 }
