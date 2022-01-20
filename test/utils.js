@@ -316,3 +316,43 @@ export const getIndex = function(balances, address) {
 }
 
 /*=======================MERKLE UTILS (with allowances)===========================*/
+/*=======================MULTICALL=================================*/ 
+export const decodeResult = function(contractABI, func, result) {
+    var functionABI =  contractABI.abi.find((abiItem) => {return abiItem.name == func;});
+    var abiCoder = ethers.utils.defaultAbiCoder;
+    var decoded = abiCoder.decode(functionABI.outputs, String(result)); 
+    return decoded;   
+}
+
+export const encodeCall = function(address, contractABI, func, param) {
+    var functionABI =  contractABI.abi.find((abiItem) => {return abiItem.name == func;});
+    var iface = new ethers.utils.Interface([functionABI]);
+    var encodedData = iface.encodeFunctionData(func, param);
+    var call = {
+        target: address,
+        callData: encodedData
+    };
+    return [call];
+}
+
+// TODO decodeResults and encodeCalls fucntions  
+export const decodeResults = function(contractABIs, funcs, results) {
+    // iterate over ABIs and funcs to extract result for each call from common
+    var decoded = [];
+    for(var i = 0; i < funcs.length; i++) {
+        var result = decodeResult(contractABIs[i], funcs[i], results[i])
+        decoded = decoded.concat(result); 
+    }
+    return decoded;
+}
+
+export const encodeCalls = function(addresses, contractABIs, funcs, params) {
+    var encoded = [];
+    for(var i = 0; i < addresses.length; i++) {
+        var call = encodeCall(addresses[i], contractABIs[i], funcs[i], params[i])
+        encoded = encoded.concat(call);
+    }
+    return encoded;
+}
+
+/*=======================MULTICALL=================================*/ 
