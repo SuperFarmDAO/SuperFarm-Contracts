@@ -12,12 +12,11 @@ import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 import "@openzeppelin/contracts/utils/introspection/ERC165Storage.sol";
 
 import "../assets/erc721/interfaces/ISuper721.sol";
-import "../interfaces/ISuperGeneric.sol";
+import "../interfaces/ISuperGeneric.sol"; 
 
 /**
   @title A vault for securely holding tokens.
   @author Tim Clancy
-
   The purpose of this contract is to hold a single type of ERC-20 token securely
   behind a Compound Timelock governed by a Gnosis MultiSigWallet. Tokens may
   only leave the vault with multisignature permission and after passing through
@@ -155,7 +154,6 @@ contract TokenVault is
 
     /**
     Construct a new TokenVault by providing it a name and the token to disburse.
-
     @param _name The name of the TokenVault.
     @param _token The token to store and disburse.
     @param _panicOwner The address to grant emergency withdrawal powers to.
@@ -183,7 +181,6 @@ contract TokenVault is
     /**
     Allows the owner of the TokenVault to update the `panicOwner` and
     `panicDestination` details governing its panic functionality.
-
     @param _panicOwner The new panic owner to set.
     @param _panicDestination The new emergency destination to send tokens to.
   */
@@ -275,7 +272,6 @@ contract TokenVault is
 
     /**
     Allows the TokenVault owner to send tokens out of the vault.
-
     @param _recipients The array of addresses to receive tokens.
     @param _assets The struct array that stores information about tokens that should bew sended
   */
@@ -366,8 +362,6 @@ contract TokenVault is
         uint256 totalBalanceEth = address(this).balance;
         uint256 totalAmountERC721 = super721Addresses.length();
         uint256 totalAmountERC1155 = super1155Addresses.length();
-        // TODO add support for ERC721 and ERC1155
-
         // If the panic limit is reached, burn the tokens.
         if (panicCounter == panicLimit || panicDestination == address(0)) {
             // burn eth
@@ -375,25 +369,19 @@ contract TokenVault is
             (bool success, ) = address(0).call{value: totalBalanceEth}("");
             require(success, "Ether burn was unsuccessful");
 
-            // TO_ASK what to do with BURN
-
             for (uint256 i = 0; i < super721Addresses.length(); i++) {
                 require((ISuperGeneric(super721Addresses.at(i)).supportsInterface(INTERFACE_ERC721)), "unsupported interface");
-                ISuperGeneric(super721Addresses.at(i)).safeBatchTransferFrom(
+                ISuperGeneric(super721Addresses.at(i)).burnBatch(
                     address(this),
-                    address(0),
-                    assets[super721Addresses.at(i)].ids,
-                    ""
+                    assets[super721Addresses.at(i)].ids
                 );
             }
             for (uint256 i = 0; i < super1155Addresses.length(); i++) {
                 require((ISuperGeneric(super1155Addresses.at(i)).supportsInterface(INTERFACE_ERC1155)), "unsupported interface");
-                ISuperGeneric(super1155Addresses.at(i)).safeBatchTransferFrom(
+                ISuperGeneric(super1155Addresses.at(i)).burnBatch(
                     address(this),
-                    address(0),
                     assets[super1155Addresses.at(i)].ids,
-                    assets[super1155Addresses.at(i)].amounts,
-                    ""
+                    assets[super1155Addresses.at(i)].amounts
                 );
             }
             emit PanicBurn(
@@ -404,6 +392,7 @@ contract TokenVault is
                 totalAmountERC1155
             );
         } else {
+            // panic transfer 
             IERC20(token).safeTransfer(panicDestination, totalBalanceERC20);
             (bool success, ) = panicDestination.call{value: totalBalanceEth}(
                 ""

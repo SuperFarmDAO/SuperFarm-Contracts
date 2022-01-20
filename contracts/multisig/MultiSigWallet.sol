@@ -1,11 +1,13 @@
 // SPDX-License-Identifier: LGPL-3.0
 // Modified from https://github.com/gnosis/MultiSigWallet/blob/master/contracts/MultiSigWallet.sol
 pragma solidity ^0.8.8;
+import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
+import "@openzeppelin/contracts/token/ERC1155/utils/ERC1155Holder.sol";
 
 
 /// @title Multisignature wallet - Allows multiple parties to agree on transactions before execution.
 /// @author Stefan George - <stefan.george@consensys.net>
-contract MultiSigWallet {
+contract MultiSigWallet is IERC721Receiver, ERC1155Holder{
     /*
      *  Events
      */
@@ -97,6 +99,15 @@ contract MultiSigWallet {
     /// @dev Fallback function allows to deposit ether.
     receive() external payable {
         if (msg.value > 0) emit Deposit(msg.sender, msg.value);
+    }
+
+    function onERC721Received(
+        address,
+        address,
+        uint256,
+        bytes memory
+    ) public virtual override returns (bytes4) {
+        return this.onERC721Received.selector;
     }
 
     /*

@@ -7,12 +7,21 @@ import * as utils from "./utils.js"
 // Note ethers 5.5.0 might not work with signMessage. So downgrade to 5.4.0.
 
 describe("SuperFarm Marketplace", function(){
+
+    
     let owner, protocolFeeRecipient, creator, alice, bob, royaltyOwner1, royaltyOwner2;
     let marketplace, registry, transferProxy, erc1155, erc721, weth;
+    let domain;
 
     beforeEach(async function () {
         [owner, protocolFeeRecipient, creator, alice, bob, royaltyOwner1, royaltyOwner2] = await ethers.getSigners();
-        [marketplace, registry, transferProxy, erc1155, erc721, weth] =  await utils.withContracts(network.config.chainId);
+        [marketplace, registry, transferProxy, erc1155, erc721, weth] =  await utils.withContracts(protocolFeeRecipient.address, 100);
+        domain = {
+            name: "Super Marketplace",
+            version: "1",
+            chainId: network.config.chainId,
+            verifyingContract: marketplace.address
+        }
         await weth.mint(alice.address, utils.mint.weth.alice)
         await weth.mint(bob.address, utils.mint.weth.bob)
         await erc721.mint(alice.address, utils.mint.erc721.alice)
@@ -56,8 +65,8 @@ describe("SuperFarm Marketplace", function(){
             time, 
             time + 100, 
             salt, 
-            [100, 200, 300, 400, 500], // 100 = 1% in basis points
-            [[protocolFeeRecipient.address], [creator.address], [royaltyOwner1.address], [royaltyOwner2.address], []],
+            [100, 200, 300, 400], // 100 = 1% in basis points
+            [protocolFeeRecipient.address, creator.address, royaltyOwner1.address, royaltyOwner2.address],
             marketplace.address, 
             bob.address, // Seller
             1, 
@@ -80,7 +89,7 @@ describe("SuperFarm Marketplace", function(){
             await utils.getCurrentTime() + 100, 
             salt, 
             [], 
-            [[]], 
+            [], 
             marketplace.address, 
             alice.address, // Buyer
             0, 
@@ -94,13 +103,9 @@ describe("SuperFarm Marketplace", function(){
             utils.replacementPatternBuy, 
             0x0 
         )
-        // Create Orders Hashes
-        let sellHash = await marketplace.hashOrder(orderSell)
-        let buyHash = await marketplace.hashOrder(orderBuy)
-
-        // Sign transactions
-        let signatureSell = await bob.signMessage(ethers.utils.arrayify(sellHash));
-        let signatureBuy = await alice.signMessage(ethers.utils.arrayify(buyHash));
+        // Sign Orders
+        let signatureSell = await bob._signTypedData(domain, utils.OrderType, orderSell);
+        let signatureBuy = await alice._signTypedData(domain, utils.OrderType, orderBuy);
 
         // Get V, R, S
         let sigSell = ethers.utils.splitSignature(signatureSell);
@@ -111,8 +116,10 @@ describe("SuperFarm Marketplace", function(){
         await erc721.connect(bob).approve(proxy, 1)
         await weth.connect(alice).approve(transferProxy.address, ethers.utils.parseEther("1"))
 
+        console.log((await weth.balanceOf(alice.address)).toString(), "  alice")
+
         // BOOM ! Atomic Match
-        await marketplace.connect(alice).atomicMatch_(orderBuy, {v: sigBuy.v, r: sigBuy.r, s: sigBuy.s}, orderSell, {v: sigSell.v, r: sigSell.r, s: sigSell.s}, "0x0000000000000000000000000000000000000000000000000000000000000000", [], [])
+        await marketplace.connect(alice).atomicMatch_(orderBuy, sigBuy, orderSell, sigSell, [], [])
         
         // Confirm NFT transfers
         expect(await erc721.balanceOf(alice.address)).to.be.eq("2")
@@ -143,7 +150,7 @@ describe("SuperFarm Marketplace", function(){
             salt, 
             // Different combination of fees and addresses were checked!
             [100, 200, 300, 400], // 100 = 1% in basis points
-            [[protocolFeeRecipient.address, royaltyOwner1.address], [creator.address], [royaltyOwner2.address], [royaltyOwner1.address, royaltyOwner2.address]], 
+            [protocolFeeRecipient.address, creator.address, royaltyOwner2.address, royaltyOwner1.address], 
             marketplace.address, 
             bob.address, // Seller
             1, 
@@ -166,7 +173,7 @@ describe("SuperFarm Marketplace", function(){
             time + 1000, 
             salt, 
             [], 
-            [[]], 
+            [], 
             marketplace.address, 
             alice.address, // Buyer
             0, 
@@ -181,14 +188,10 @@ describe("SuperFarm Marketplace", function(){
             0x0 
         )
 
-        // Create Orders Hashes
-        let sellHash = await marketplace.hashOrder(orderSell)
-        let buyHash = await marketplace.hashOrder(orderBuy)
-        
-        // Sign Transactions
-        let signatureSell = await bob.signMessage(ethers.utils.arrayify(sellHash));
-        let signatureBuy = await alice.signMessage(ethers.utils.arrayify(buyHash));
-        
+        // Sign Orders
+        let signatureSell = await bob._signTypedData(domain, utils.OrderType, orderSell);
+        let signatureBuy = await alice._signTypedData(domain, utils.OrderType, orderBuy);
+
         // Get V, R, S
         let sigSell = ethers.utils.splitSignature(signatureSell);
         let sigBuy = ethers.utils.splitSignature(signatureBuy);
@@ -205,7 +208,7 @@ describe("SuperFarm Marketplace", function(){
         expect(price).to.be.eq(ethers.utils.parseEther("0.5"))
 
         // BOOM ! Atomic Match
-        await marketplace.connect(alice).atomicMatch_(orderBuy, {v: sigBuy.v, r: sigBuy.r, s: sigBuy.s}, orderSell, {v: sigSell.v, r: sigSell.r, s: sigSell.s}, "0x0000000000000000000000000000000000000000000000000000000000000000", [], [])
+        await marketplace.connect(alice).atomicMatch_(orderBuy, {v: sigBuy.v, r: sigBuy.r, s: sigBuy.s}, orderSell, {v: sigSell.v, r: sigSell.r, s: sigSell.s}, [], [])
 
         // Confirm NFT transfers
         expect(await erc721.balanceOf(alice.address)).to.be.eq("2")
@@ -228,6 +231,7 @@ describe("SuperFarm Marketplace", function(){
         let iface = new ethers.utils.Interface(abi)
         let dataSell = iface.encodeFunctionData("transferFrom", [bob.address, utils.NULL_ADDRESS, 1]);
         let time = await utils.getCurrentTime()
+        
         let orderSell = utils.makeOrder(
             ethers.utils.parseEther("12"),
             [],
@@ -235,7 +239,7 @@ describe("SuperFarm Marketplace", function(){
             time + 1000, 
             salt, 
             [100, 200, 300, 400], // 100 = 1% in basis points
-            [[protocolFeeRecipient.address], [creator.address], [royaltyOwner1.address], [royaltyOwner2.address]],
+            [protocolFeeRecipient.address, creator.address, royaltyOwner2.address, royaltyOwner1.address],
             marketplace.address, 
             bob.address, // Seller
             1, 
@@ -258,7 +262,7 @@ describe("SuperFarm Marketplace", function(){
             time + 1000, 
             salt, 
             [], 
-            [[]], 
+            [], 
             marketplace.address, 
             alice.address, // Buyer
             0, 
@@ -270,16 +274,12 @@ describe("SuperFarm Marketplace", function(){
             utils.NULL_ADDRESS, 
             dataBuy, 
             utils.replacementPatternBuy, 
-            0x0 
+            0x0
         )
-
-        // Create Orders Hashes
-        let sellHash = await marketplace.hashOrder(orderSell)
-        let buyHash = await marketplace.hashOrder(orderBuy)
-
-        // Sign Transactions
-        let signatureSell = await bob.signMessage(ethers.utils.arrayify(sellHash));
-        let signatureBuy = await alice.signMessage(ethers.utils.arrayify(buyHash));
+       
+        // Sign Orders
+        let signatureSell = await bob._signTypedData(domain, utils.OrderType, orderSell);
+        let signatureBuy = await alice._signTypedData(domain, utils.OrderType, orderBuy);
 
         // Get V, R, S
         let sigSell = ethers.utils.splitSignature(signatureSell);
@@ -288,11 +288,9 @@ describe("SuperFarm Marketplace", function(){
         // Approve corresponding proxy
         let proxy = await registry.proxies(bob.address)
         await erc721.connect(bob).approve(proxy, 1)
-        let oldBobBalance = await bob.getBalance();
-        let oldAliceBalance = await alice.getBalance();
 
         // BOOM ! Atomic Match
-        await marketplace.connect(alice).atomicMatch_(orderBuy, {v: sigBuy.v, r: sigBuy.r, s: sigBuy.s}, orderSell, {v: sigSell.v, r: sigSell.r, s: sigSell.s}, "0x0000000000000000000000000000000000000000000000000000000000000000", [], [], { value: ethers.utils.parseEther("15")})
+        await marketplace.connect(alice).atomicMatch_(orderBuy, {v: sigBuy.v, r: sigBuy.r, s: sigBuy.s}, orderSell, {v: sigSell.v, r: sigSell.r, s: sigSell.s}, [], [], { value: ethers.utils.parseEther("15")})
         
         // Confirm Ether Transfer
         expect(await bob.getBalance()).to.be.above(ethers.utils.parseEther("10005")); // Must be around 10011
@@ -316,7 +314,7 @@ describe("SuperFarm Marketplace", function(){
             time + 1000, 
             salt, 
             [100, 200, 300, 400], // 100 = 1% in basis points
-            [[protocolFeeRecipient.address], [creator.address], [royaltyOwner1.address], [royaltyOwner2.address]],
+            [protocolFeeRecipient.address, creator.address, royaltyOwner2.address, royaltyOwner1.address],
             marketplace.address, 
             bob.address, // Seller
             1, 
@@ -339,7 +337,7 @@ describe("SuperFarm Marketplace", function(){
             time + 1000, 
             salt, 
             [], 
-            [[]], 
+            [], 
             marketplace.address, 
             alice.address, // Buyer
             0, 
@@ -354,13 +352,9 @@ describe("SuperFarm Marketplace", function(){
             0x0 
         )
 
-        // Create Orders Hashes
-        let sellHash = await marketplace.hashOrder(orderSell)
-        let buyHash = await marketplace.hashOrder(orderBuy)
-
-        // Sign Transactions
-        let signatureSell = await bob.signMessage(ethers.utils.arrayify(sellHash));
-        let signatureBuy = await alice.signMessage(ethers.utils.arrayify(buyHash));
+        // Sign Orders
+        let signatureSell = await bob._signTypedData(domain, utils.OrderType, orderSell);
+        let signatureBuy = await alice._signTypedData(domain, utils.OrderType, orderBuy);
 
         // Get V, R, S
         let sigSell = ethers.utils.splitSignature(signatureSell);
@@ -371,7 +365,7 @@ describe("SuperFarm Marketplace", function(){
         await erc721.connect(bob).approve(proxy, 1)
 
         // BOOM ! Atomic Match
-        await marketplace.connect(alice).atomicMatch_(orderBuy, {v: sigBuy.v, r: sigBuy.r, s: sigBuy.s}, orderSell, {v: sigSell.v, r: sigSell.r, s: sigSell.s}, "0x0000000000000000000000000000000000000000000000000000000000000000", [], [], { value: ethers.utils.parseEther("12")})
+        await marketplace.connect(alice).atomicMatch_(orderBuy, {v: sigBuy.v, r: sigBuy.r, s: sigBuy.s}, orderSell, {v: sigSell.v, r: sigSell.r, s: sigSell.s}, [], [], { value: ethers.utils.parseEther("12")})
 
         // Confirm Ether Transfer
         expect(await bob.getBalance()).to.be.above(ethers.utils.parseEther("10005")); // Must be around 10011
@@ -395,7 +389,7 @@ describe("SuperFarm Marketplace", function(){
             time + 1000, 
             salt, 
             [100, 200, 300, 400], // 100 = 1% in basis points
-            [[protocolFeeRecipient.address], [creator.address], [royaltyOwner1.address], [royaltyOwner2.address]],
+            [protocolFeeRecipient.address, creator.address, royaltyOwner2.address, royaltyOwner1.address],
             marketplace.address, 
             bob.address, // Seller
             1, 
@@ -418,7 +412,7 @@ describe("SuperFarm Marketplace", function(){
             time + 1000, 
             salt, 
             [], 
-            [[]], 
+            [], 
             marketplace.address, 
             alice.address, // Buyer
             0, 
@@ -433,13 +427,9 @@ describe("SuperFarm Marketplace", function(){
             0x0 
         )
 
-        // Create Orders Hashes
-        let sellHash = await marketplace.hashOrder(orderSell)
-        let buyHash = await marketplace.hashOrder(orderBuy)
-
-        // Sign Transactions
-        let signatureSell = await bob.signMessage(ethers.utils.arrayify(sellHash));
-        let signatureBuy = await alice.signMessage(ethers.utils.arrayify(buyHash));
+        // Sign Orders
+        let signatureSell = await bob._signTypedData(domain, utils.OrderType, orderSell);
+        let signatureBuy = await alice._signTypedData(domain, utils.OrderType, orderBuy);
 
         // Get V, R, S
         let sigSell = ethers.utils.splitSignature(signatureSell);
@@ -450,7 +440,7 @@ describe("SuperFarm Marketplace", function(){
         await erc721.connect(bob).approve(proxy, 1)
 
         // BOOM ! Atomic Match
-        await marketplace.connect(alice).atomicMatch_(orderBuy, {v: sigBuy.v, r: sigBuy.r, s: sigBuy.s}, orderSell, {v: sigSell.v, r: sigSell.r, s: sigSell.s}, "0x0000000000000000000000000000000000000000000000000000000000000000", [], [], { value: ethers.utils.parseEther("800")})
+        await marketplace.connect(alice).atomicMatch_(orderBuy, {v: sigBuy.v, r: sigBuy.r, s: sigBuy.s}, orderSell, {v: sigSell.v, r: sigSell.r, s: sigSell.s}, [], [], { value: ethers.utils.parseEther("800")})
 
         // Confirm Ether Transfer
         expect(await bob.getBalance()).to.be.above(ethers.utils.parseEther("10150")); // Must be around 10200
@@ -460,4 +450,5 @@ describe("SuperFarm Marketplace", function(){
         expect(await erc721.balanceOf(alice.address)).to.be.eq("2")
         expect(await erc721.balanceOf(bob.address)).to.be.eq("0")
     });
+
 });

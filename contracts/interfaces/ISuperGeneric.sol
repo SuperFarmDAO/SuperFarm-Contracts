@@ -26,4 +26,15 @@ interface ISuperGeneric is IERC165 {
         uint256[] memory _amounts, 
         bytes memory _data
     ) external;
+
+    function burnBatch(
+        address _burner,
+        uint256[] memory _ids
+    ) external;
+
+   function burnBatch(
+        address _burner,
+        uint256[] memory _ids,
+        uint256[] memory _amounts
+    ) external;
 }

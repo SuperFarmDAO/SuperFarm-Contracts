@@ -19,4 +19,9 @@ interface ISuper721 {
         @param _owner address of NFTs owner.
      */
     function balanceOf(address _owner) external view returns (uint256);
+
+    function balanceOfBatch(address[] calldata _owners, uint256[] calldata _ids)
+        external
+        view
+        returns (uint256[] memory);
 }

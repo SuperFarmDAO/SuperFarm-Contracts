@@ -3,6 +3,7 @@ pragma solidity ^0.8.7;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 
+import "../proxy/OwnableMutableDelegateProxy.sol";
 import "./AuthenticatedProxy.sol";
 import "../interfaces/IProxyRegistry.sol";
 

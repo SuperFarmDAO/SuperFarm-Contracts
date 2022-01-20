@@ -1311,17 +1311,17 @@ describe('===Super1155===', function () {
                 setConfigureGroupRight,
                 ethers.constants.MaxUint256
             );
-            
-            // Set permit for setting metadata
-            await super1155.connect(owner).setPermit(
+
+             // Set permit for setting metadata
+             await super1155.connect(owner).setPermit(
                 deployer.address,
                 UNIVERSAL,
                 setMetadataRight,
                 ethers.constants.MaxUint256
             );
 
-            // Set permit for locking an item
-            await super1155.connect(owner).setPermit(
+             // Set permit for locking an item
+             await super1155.connect(owner).setPermit(
                 deployer.address,
                 UNIVERSAL,
                 lockItemUriRight,

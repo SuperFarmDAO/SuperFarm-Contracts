@@ -1,7 +1,5 @@
 pragma solidity ^0.8.8;
 
-import "../proxy/OwnableMutableDelegateProxy.sol";
-
 /**
  * @title ProxyRegistry Interface
  * @author Rostislav Khlebnikov

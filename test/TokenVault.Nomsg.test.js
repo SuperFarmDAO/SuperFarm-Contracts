@@ -411,26 +411,28 @@ describe('===TokenVault w/o Timelock and MultiSig===', function () {
                 expect(await token.balanceOf(carol.address)).to.be.equal(balanceERC20);
                 expect(await super721.balanceOf(carol.address)).to.be.equal(balanceERC721);
                 expect(await super1155.balanceOf(carol.address, shiftedItemGroupId.add(1))).to.be.equal(balanceERC1155);
-                expect(carolEthAfter.sub(carolEthBefore)).to.be.equal(zero); 
+                expect(carolEthAfter.sub(carolEthBefore)).to.be.equal(balanceEthBefore); 
                 
                 expect(await token.balanceOf(tokenVault.address)).to.be.equal(zero);
                 expect(await super721.balanceOf(tokenVault.address)).to.be.equal(zero);
                 expect(await super1155.balanceOf(tokenVault.address, shiftedItemGroupId.add(1))).to.be.equal(zero);
-                expect(balanceEthAfter.sub(balanceEthBefore)).to.be.equal(zero); 
+                expect(balanceEthAfter).to.be.equal(zero); 
                
             });
 
             it('PANIC burn', async () => {
                 let zero = ethers.utils.parseEther('0');
+                let balanceEthBefore = await prov.getBalance(tokenVault.address);
                 
                 await tokenVault.connect(dev).changePanicDetails(bob.address, ZERO_ADDRESS);
                 
                 await tokenVault.connect(bob).panic();
+                let balanceEthAfter = await prov.getBalance(tokenVault.address);
 
                 expect(await token.balanceOf(tokenVault.address)).to.be.equal(zero);
                 expect(await super721.balanceOf(tokenVault.address)).to.be.equal(zero);
                 expect(await super1155.balanceOf(tokenVault.address, shiftedItemGroupId.add(1))).to.be.equal(zero);
-                expect(balanceEthAfter.sub(balanceEthBefore)).to.be.equal(zero); 
+                expect(balanceEthAfter).to.be.equal(zero); 
                 // bob's balance are zero 
                 expect(await token.balanceOf(bob.address)).to.be.equal(zero);
                 expect(await super721.balanceOf(bob.address)).to.be.equal(zero);

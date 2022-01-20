@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 pragma solidity ^0.8.7;
 
-import "hardhat/console.sol";
+//import "hardhat/console.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
@@ -46,7 +46,7 @@ contract SelfStarterV2 is Ownable {
 
   constructor(string memory _title) {
     idoTitle = _title;
-    emit NewSelfStarter(msg.sender, address(this), block.timestamp, uint(0));
+    emit NewSelfStarter(_msgSender(), address(this), block.timestamp, uint(0));
   }
 
   modifier onlyPreLaunch(uint256 _id) {
@@ -124,7 +124,7 @@ contract SelfStarterV2 is Ownable {
       uint256 timespan
 
   ) external onlyOwner returns (uint256) {
-      require(cap <= token.balanceOf(msg.sender) && cap > 0, "Cap check");
+      require(cap <= token.balanceOf(_msgSender()) && cap > 0, "Cap check");
       require(address(token) != address(0), "Pool token cannot be zero address");
       require(price > uint256(0), "Price must be greater than 0");
       if(startTime > 0){
@@ -146,8 +146,8 @@ contract SelfStarterV2 is Ownable {
               false
           );
       pools.push(newPool);
-      token.transferFrom(msg.sender, address(this), cap);
-      emit NewPool(msg.sender, address(this), pools.length);
+      token.transferFrom(_msgSender(), address(this), cap);
+      emit NewPool(_msgSender(), address(this), pools.length);
       return pools.length;
   }
 
@@ -159,10 +159,10 @@ contract SelfStarterV2 is Ownable {
         require(pools[id].startTime < block.timestamp && block.timestamp < pools[id].startTime + pools[id].timespan, "TIME: Pool not open");
       }
       if (_isOnlyHolder(id)) {
-          require(IERC20(pools[id].onlyHolderToken).balanceOf(msg.sender) >= pools[id].minHolderBalance, "Miniumum balance not met");
+          require(IERC20(pools[id].onlyHolderToken).balanceOf(_msgSender()) >= pools[id].minHolderBalance, "Miniumum balance not met");
       }
       if (pools[id].isWhiteList) {
-          require(whiteList[id][msg.sender] > 0, "Should be white listed for the pool");
+          require(whiteList[id][_msgSender()] > 0, "Should be white listed for the pool");
       }
       require(amount == msg.value, "Amount is not equal msg.value");
 
@@ -170,16 +170,16 @@ contract SelfStarterV2 is Ownable {
       uint256 left = pool.cap - poolsSold[id];
 
       //console.log("left1", left);
-      uint256 curLocked = lockedTokens[id][msg.sender];
+      uint256 curLocked = lockedTokens[id][_msgSender()];
       if (left > pool.maxContribution - curLocked) {
           left = pool.maxContribution - curLocked;
       }
       //console.log("left2", left);
-      if (pools[id].isWhiteList && left >= whiteList[id][msg.sender] - curLocked) {
-          left = whiteList[id][msg.sender] - curLocked;
+      if (pools[id].isWhiteList && left >= whiteList[id][_msgSender()] - curLocked) {
+          left = whiteList[id][_msgSender()] - curLocked;
       }
       //console.log("left3", left);
-      //console.log("curLocked", curLocked, "allo", whiteList[id][msg.sender]);
+      //console.log("curLocked", curLocked, "allo", whiteList[id][_msgSender()]);
 
       uint256 amt = (pool.price * amount) / scaleFactor;
 
@@ -194,17 +194,17 @@ contract SelfStarterV2 is Ownable {
           back = amount - newAmount;
           amount = newAmount;
       }
-      lockedTokens[id][msg.sender] = curLocked + amt;
+      lockedTokens[id][_msgSender()] = curLocked + amt;
       poolsSold[id] = poolsSold[id] + amt;
 
-      (bool success, ) = payable(owner()).call{value: amount}("");
+      (bool success, ) = owner().call{value: amount}("");
       require(success, "Should transfer ethers to the pool creator");
       if (back > 0) {
-          (success, ) = payable(msg.sender).call{value: back}("");
+          (success, ) = _msgSender().call{value: back}("");
           require(success, "Should transfer left ethers back to the user");
       }
 
-      emit Swap(id, 0, msg.sender, amount, amt);
+      emit Swap(id, 0, _msgSender(), amount, amt);
   }
 
   function startPool(uint256 id) external onlyOwner {
@@ -235,11 +235,11 @@ contract SelfStarterV2 is Ownable {
       }else{
         require(block.timestamp > pools[id].startTime + pools[id].timespan);
       }
-      require(lockedTokens[id][msg.sender] > 0, "Should have tokens to claim");
-      uint256 amount = lockedTokens[id][msg.sender];
-      lockedTokens[id][msg.sender] = 0;
-      pools[id].token.transfer(msg.sender, amount);
-      emit Claim(id, msg.sender, amount);
+      require(lockedTokens[id][_msgSender()] > 0, "Should have tokens to claim");
+      uint256 amount = lockedTokens[id][_msgSender()];
+      lockedTokens[id][_msgSender()] = 0;
+      pools[id].token.transfer(_msgSender(), amount);
+      emit Claim(id, _msgSender(), amount);
   }
 
 
