@@ -19,9 +19,10 @@ contract Multicall is IMulticall {
             (bool success, bytes memory res) = calls[i].target.staticcall(
                 calls[i].callData
             );
-            require(success, "Staticcall failed");
+            require(success, "Multicall:: Staticcall failed");
             output[i] = res;
         }
+        return output;
     }
 
     function staticCallUint(Call[] memory calls)
@@ -35,9 +36,10 @@ contract Multicall is IMulticall {
             (bool success, bytes memory res) = calls[i].target.staticcall(
                 calls[i].callData
             );
-            require(success, "Staticcall failed");
+            require(success, "Multicall:: Staticcall failed");
             output[i] = bytesToUint256(32, res);
         }
+        return output;
     }
 
     function staticCallUintSumm(Call[] memory calls)
@@ -50,7 +52,7 @@ contract Multicall is IMulticall {
             (bool success, bytes memory res) = calls[i].target.staticcall(
                 calls[i].callData
             );
-            require(success, "Staticcall failed");
+            require(success, "Multicall:: Staticcall failed");
             summ += bytesToUint256(32, res);
         }
     }

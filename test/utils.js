@@ -335,7 +335,7 @@ export const encodeCall = function(address, contractABI, func, param) {
     return [call];
 }
 
-// TODO decodeResults and encodeCalls fucntions  
+// decodeResults and encodeCalls fucntions  
 export const decodeResults = function(contractABIs, funcs, results) {
     // iterate over ABIs and funcs to extract result for each call from common
     var decoded = [];
