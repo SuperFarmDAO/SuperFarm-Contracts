@@ -18,15 +18,12 @@ import "./interfaces/ISuper1155.sol";
   @author Qazawat Zirak
   @author Rostislav Khlebnikov
   @author Nikita Elunin
-
   This contract represents the NFTs within a single collection. It allows for a
   designated collection owner address to manage the creation of NFTs within this
   collection. The collection owner grants approval to or removes approval from
   other addresses governing their ability to mint NFTs from this collection.
-
   This contract is forked from the inherited OpenZeppelin dependency, and uses
   ideas from the original ERC-1155 reference implementation.
-
   July 19th, 2021.
 */
 contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataURI {
@@ -61,9 +58,6 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
   /// The public identifier for the right to disable item creation.
   bytes32 public constant LOCK_CREATION = keccak256("LOCK_CREATION");
 
-  /// The public identifier for the right to update transfer state.
-  bytes32 public constant TRANSFER_MODIDIER = keccak256("TRANSFER_MODIDIER");
-
   /// @dev Supply the magic number for the required ERC-1155 interface.
   bytes4 private constant INTERFACE_ERC1155 = 0xd9b67a26;
 
@@ -75,10 +69,6 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
 
   /// The public name of this contract.
   string public name;
-
-
-  /// Variable that is needed to lock the transfer, and unlock it after the auction.
-  bool transferEnabled = true;
 
   /**
     The ERC-1155 URI for tracking item metadata, supporting {id} substitution.
@@ -113,7 +103,6 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
   /**
     This struct defines the settings for a particular item group and is tracked
     in storage.
-
     @param initialized Whether or not this `ItemGroup` has been initialized.
     @param name A name for the item group.
     @param supplyType The supply type for this group of items.
@@ -181,7 +170,6 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
 
   /**
     An event that gets emitted when the metadata collection URI is changed.
-
     @param oldURI The old metadata URI.
     @param newURI The new metadata URI.
   */
@@ -189,7 +177,6 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
 
   /**
     An event that gets emitted when the proxy registry address is changed.
-
     @param oldRegistry The old proxy registry address.
     @param newRegistry The new proxy registry address.
   */
@@ -198,7 +185,6 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
 
   /**
     An event that gets emitted when an item group is configured.
-
     @param manager The caller who configured the item group `_groupId`.
     @param groupId The groupId being configured.
     @param newGroup The new group configuration.
@@ -209,7 +195,6 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
   /**
     An event that gets emitted when the item collection is locked to further
     creation.
-
     @param locker The caller who locked the collection.
   */
   event CollectionLocked(address indexed locker);
@@ -217,7 +202,6 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
   /**
     An event that gets emitted when a token ID has its on-chain metadata
     changed.
-
     @param changer The caller who triggered the metadata change.
     @param id The ID of the token which had its metadata changed.
     @param oldMetadata The old metadata of the token.
@@ -228,7 +212,6 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
 
   /**
     An event that indicates we have set a permanent metadata URI for a token.
-
     @param _value The value of the permanent metadata URI.
     @param _id The token ID associated with the permanent metadata value.
   */
@@ -236,7 +219,6 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
 
   /**
     An event that emmited when the contract URI is changed
-
     @param oldURI The old contract URI
     @param newURI The new contract URI
    */
@@ -244,7 +226,6 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
 
   /**
     An event that indicates we have set a permanent contract URI.
-
     @param _value The value of the permanent contract URI.
     @param _id The token ID associated with the permanent metadata value.
   */
@@ -252,7 +233,6 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
 
   /**
     Construct a new ERC-1155 item collection.
-
     @param _name The name to assign to this item collection contract.
     @param _metadataURI The metadata URI to perform later token ID substitution with.
     @param _contractURI The contract URI.
@@ -278,14 +258,6 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
   }
 
   /**
-    A modifier needed to control transfers during and after the auction.
-  */
-  modifier transferLocked() {
-    require(transferEnabled == true, "Transfer is currently locked");
-    _;
-  }
-
-  /**
     Return a version number for this contract's interface.
   */
   function version() external virtual override pure returns (uint256) {
@@ -299,7 +271,6 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
     said specification, clients calling this function must replace the {id}
     substring with the actual token ID in hex, not prefixed by 0x, and padded
     to 64 characters in length.
-
     @return The metadata URI string of the item with ID `_itemId`.
   */
   function uri(uint256) external view returns (string memory) {
@@ -312,7 +283,6 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
     metadata URI of this collection. This implementation relies on a single URI
     for all items within the collection, and as such does not emit the standard
     URI event. Instead, we emit our own event to reflect changes in the URI.
-
     @param _uri The new URI to update to.
   */
   function setURI(string calldata _uri) external virtual
@@ -327,7 +297,6 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
   /**
     Allow approved manager to update the contract URI. At the end of update, we 
     emit our own event to reflect changes in the URI.
-
     @param _uri The new contract URI to update to.
   */
   function setContractUri(string calldata _uri) external virtual
@@ -342,7 +311,6 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
   /**
     Allow the item collection owner or an approved manager to update the proxy
     registry address handling delegated approval.
-
     @param _proxyRegistryAddress The address of the new proxy registry to
       update to.
   */
@@ -356,7 +324,6 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
   /**
     Retrieve the balance of a particular token `_id` for a particular address
     `_owner`.
-
     @param _owner The owner to check for this token balance.
     @param _id The ID of the token to check for a balance.
     @return The amount of token `_id` owned by `_owner`.
@@ -371,7 +338,6 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
   /**
     Retrieve in a single call the balances of some mulitple particular token
     `_ids` held by corresponding `_owners`.
-
     @param _owners The owners to check for token balances.
     @param _ids The IDs of tokens to check for balances.
     @return the amount of each token owned by each owner.
@@ -393,7 +359,6 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
     This function returns true if `_operator` is approved to transfer items
     owned by `_owner`. This approval check features an override to explicitly
     whitelist any addresses delegated in the proxy registry.
-
     @param _owner The owner of items to check for transfer ability.
     @param _operator The potential transferrer of `_owner`'s items.
     @return Whether `_operator` may transfer items owned by `_owner`.
@@ -411,7 +376,6 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
   /**
     Enable or disable approval for a third party `_operator` address to manage
     (transfer or burn) all of the caller's tokens.
-
     @param _operator The address to grant management rights over all of the
       caller's tokens.
     @param _approved The status of the `_operator`'s approval for the caller.
@@ -426,7 +390,6 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
 
   /**
     This private helper function converts a number into a single-element array.
-
     @param _element The element to convert to an array.
     @return The array containing the single `_element`.
   */
@@ -440,7 +403,6 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
   /**
     An inheritable and configurable pre-transfer hook that can be overridden.
     It fires before any token transfer, including mints and burns.
-
     @param _operator The caller who triggers the token transfer.
     @param _from The address to transfer tokens from.
     @param _to The address to transfer tokens to.
@@ -457,7 +419,6 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
     ERC-1155 dictates that any contract which wishes to receive ERC-1155 tokens
     must explicitly designate itself as such. This function checks for such
     designation to prevent undesirable token transfers.
-
     @param _operator The caller who triggers the token transfer.
     @param _from The address to transfer tokens from.
     @param _to The address to transfer tokens to.
@@ -483,7 +444,6 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
 
   /**
     The batch equivalent of `_doSafeTransferAcceptanceCheck()`.
-
     @param _operator The caller who triggers the token transfer.
     @param _from The address to transfer tokens from.
     @param _to The address to transfer tokens to.
@@ -511,7 +471,6 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
   /**
     Transfer on behalf of a caller or one of their authorized token managers
     items from one address to another.
-
     @param _from The address to transfer tokens from.
     @param _to The address to transfer tokens to.
     @param _ids The specific token IDs to transfer.
@@ -520,7 +479,7 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
   */
   function safeBatchTransferFrom(address _from, address _to,
     uint256[] memory _ids, uint256[] memory _amounts, bytes memory _data)
-    public virtual transferLocked {
+    public virtual {
     require(_ids.length == _amounts.length,
       "ERC1155: ids and amounts length mismatch");
     require(_to != address(0),
@@ -555,7 +514,6 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
   /**
     Transfer on behalf of a caller or one of their authorized token managers
     items from one address to another.
-
     @param _from The address to transfer tokens from.
     @param _to The address to transfer tokens to.
     @param _id The specific token ID to transfer.
@@ -572,7 +530,6 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
     group share a group ID in the upper 128-bits of their full item ID.
     Within a group NFTs can be distinguished for the purposes of serializing
     issue numbers.
-
     @param _groupId The ID of the item group to create or configure.
     @param _data The `ItemGroup` data input.
   */
@@ -656,7 +613,6 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
     This is a private helper function to replace the `hasItemRight` modifier
     that we use on some functions in order to inline this check during batch
     minting and burning.
-
     @param _id The ID of the item to check for the given `_right` on.
     @param _right The right that the caller is trying to exercise on `_id`.
     @return Whether or not the caller has a valid right on this item.
@@ -683,7 +639,6 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
     This is a private helper function to verify, according to all of our various
     minting and burning rules, whether it would be valid to mint some `_amount`
     of a particular item `_id`.
-
     @param _id The ID of the item to check for minting validity.
     @param _amount The amount of the item to try checking mintability for.
     @return The ID of the item that should have `_amount` minted for it.
@@ -736,7 +691,6 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
     address. In order to mint an item, its item group must first have been
     created. Minting an item must obey both the fungibility and size cap of its
     group.
-
     @param _recipient The address to receive all NFTs within the newly-minted
       group.
     @param _ids The item IDs for the new items to create.
@@ -745,7 +699,7 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
   */
   function mintBatch(address _recipient, uint256[] calldata _ids,
     uint256[] calldata _amounts, bytes calldata _data)
-    external transferLocked  {
+    external  {
     require(_recipient != address(0),
       "ERC1155: mint to the zero address");
     require(_ids.length == _amounts.length,
@@ -787,7 +741,6 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
     This is a private helper function to verify, according to all of our various
     minting and burning rules, whether it would be valid to burn some `_amount`
     of a particular item `_id`.
-
     @param _id The ID of the item to check for burning validity.
     @param _amount The amount of the item to try checking burning for.
     @return The ID of the item that should have `_amount` burnt for it.
@@ -824,7 +777,6 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
   /**
     This function allows an address to destroy multiple different items in a
     single call.
-
     @param _burner The address whose items are burning.
     @param _ids The item IDs to burn.
     @param _amounts The amounts of the corresponding item IDs to burn.
@@ -868,7 +820,6 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
 
   /**
     This function allows an address to destroy some of its items.
-
     @param _burner The address whose item is burning.
     @param _id The item ID to burn.
     @param _amount The amount of the corresponding item ID to burn.
@@ -882,7 +833,6 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
     Set the on-chain metadata attached to a specific token ID so long as the
     collection as a whole or the token specifically has not had metadata
     editing frozen.
-
     @param _id The ID of the token to set the `_metadata` for.
     @param _metadata The metadata string to store on-chain.
   */
@@ -894,14 +844,6 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
     string memory oldMetadata = metadata[_id];
     metadata[_id] = _metadata;
     emit MetadataChanged(_msgSender(), _id, oldMetadata, _metadata);
-  }
-
-
-  /**
-    Allow the item collection owner or an associated manager to update transfer state.
-  */
-  function setTransferState(bool _state) external hasValidPermit(UNIVERSAL, TRANSFER_MODIDIER) {
-    transferEnabled = _state;
   }
 
   /**
@@ -928,7 +870,6 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
   /**
     Allow the item collection owner or an associated manager to forever lock the
     metadata URI on an item to future changes.
-
     @param _uri The value of the URI to lock for `_id`.
     @param _id The token ID to lock a metadata URI value into.
   */
@@ -941,7 +882,6 @@ contract Super1155 is PermitControl, ERC165Storage, IERC1155, IERC1155MetadataUR
   /**
     Allow the item collection owner or an associated manager to forever lock the
     metadata URI on a group of items to future changes.
-
     @param _uri The value of the URI to lock for `groupId`.
     @param groupId The group ID to lock a metadata URI value into.
   */

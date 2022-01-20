@@ -58,7 +58,7 @@ contract Super721 is PermitControl, ERC165Storage, IERC721 {
   bytes32 public constant LOCK_CREATION = keccak256("LOCK_CREATION");
 
   /// The public identifier for the right to update transfer state.
-  bytes32 public constant TRANSFER_MODIDIER = keccak256("TRANSFER_MODIDIER");
+  bytes32 public constant TRANSFER_LOCK = keccak256("TRANSFER_LOCK");
 
 
   /*
@@ -105,7 +105,7 @@ contract Super721 is PermitControl, ERC165Storage, IERC721 {
   string public symbol;
 
   /// Variable that is needed to lock the transfer, and unlock it after the auction.
-  bool transferEnabled = true;
+  bool transferLocked = true;
 
   /**
     The ERC-721 URI for tracking item metadata, supporting {id} substitution.
@@ -385,8 +385,8 @@ contract Super721 is PermitControl, ERC165Storage, IERC721 {
   /**
     A modifier needed to control transfers during and after the auction.
   */
-  modifier transferLocked() {
-    require(transferEnabled == true, "Transfer is currently locked");
+  modifier transferLock() {
+    require(!transferLocked, "Transfer is currently locked");
     _;
   }
 
@@ -631,7 +631,7 @@ contract Super721 is PermitControl, ERC165Storage, IERC721 {
   }
 
   function _safeTransferFrom(address _from, address _to, uint256 _id,
-    bytes memory _data) internal  virtual transferLocked {
+    bytes memory _data) internal  virtual transferLock {
     require(_to != address(0),
       "Super721::_safeTransferFrom : transfer to the zero address");
     require(_from == _msgSender() || isApprovedForAll(_from, _msgSender()),
@@ -676,7 +676,7 @@ contract Super721 is PermitControl, ERC165Storage, IERC721 {
 
   function safeBatchTransferFrom(address _from, address _to,
     uint256[] memory _ids, bytes memory _data)
-    external virtual transferLocked {
+    external virtual transferLock {
     require(_to != address(0),
       "Super721::safeBatchTransferFrom: transfer to the zero address");
     require(_from == _msgSender() || isApprovedForAll(_from, _msgSender()),
@@ -837,7 +837,7 @@ contract Super721 is PermitControl, ERC165Storage, IERC721 {
   */
 
   function mintBatch(address _recipient, uint256[] calldata _ids,
-    bytes memory _data) transferLocked
+    bytes memory _data)
     external virtual {
     require(_recipient != address(0),
       "Super721::mintBatch: mint to the zero address");
@@ -1067,8 +1067,8 @@ contract Super721 is PermitControl, ERC165Storage, IERC721 {
   /**
     Allow the item collection owner or an associated manager to update transfer state.
   */
-  function setTransferState(bool _state) external hasValidPermit(UNIVERSAL, TRANSFER_MODIDIER) {
-    transferEnabled = _state;
+  function unlockTransfers() external hasValidPermit(UNIVERSAL, TRANSFER_LOCK) {
+    transferLocked = false;
   }
 
   /**
