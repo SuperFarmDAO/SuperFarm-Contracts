@@ -5,7 +5,6 @@ pragma solidity ^0.8.8;
     @author Rostislav Khlebnikov.
  */
 library Entity {
-
     bytes32 private constant ACTIONS_TYPEHASH =
         keccak256("Actions(bytes types,bytes targets,bytes args)");
 
@@ -32,14 +31,16 @@ library Entity {
         bytes args;
     }
 
-    struct Fill {
+    struct State {
         uint256 length;
         uint256 current;
+    }
+    struct Fill {
+        State state;
         mapping(uint256 => bool) actions;
     }
-    
 
-    function hash(Actions memory actions) internal pure returns (bytes32) {
+    function hash(Actions calldata actions) internal pure returns (bytes32) {
         return
             keccak256(
                 abi.encode(
@@ -51,7 +52,7 @@ library Entity {
             );
     }
 
-    function hash(Order memory order) internal pure returns (bytes32) {
+    function hash(Order calldata order) internal pure returns (bytes32) {
         return
             keccak256(
                 abi.encode(
@@ -67,6 +68,10 @@ library Entity {
                     keccak256(order.royalties)
                 )
             );
+    }
+
+    function isFull(State memory state) internal pure returns (bool) {
+        return state.current >= state.length && state.length > 0;
     }
     // Idea: use calldata as trusted layout for Actions to come in and parse accordingly. ~63gas per read.
     // Idea: matching actions is to use evm memory stack layout as a hashtable of key for loading N actions from calldaata, and iterator will just increment until calldata isnt read fully. ~218 gas per match.

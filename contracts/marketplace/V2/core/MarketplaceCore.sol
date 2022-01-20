@@ -82,7 +82,7 @@ abstract contract MarketplaceCore is
      */
     function _cancelOrder(Entity.Order calldata order) internal {
         bytes32 key = Entity.hash(order);
-        fills[key].current = type(uint256).max;
+        fills[key].state.current = type(uint256).max;
         emit OrderCanceled(key, order.maker, _msgSender(), order.salt);
     }
 
@@ -94,7 +94,18 @@ abstract contract MarketplaceCore is
         Entity.Order calldata first,
         Entity.Order calldata second,
         bytes calldata signature
-    ) internal {}
+    ) internal {
+        bytes32 firstHash = Entity.hash(first);
+        require(
+            authenticateOrder(_hashToSign(firstHash), first.maker, signature),
+            "Marketplace: couldn't authenticate first order."
+        );
+        bytes32 secondHash = Entity.hash(second);
+        require(
+            authenticateOrder(_hashToSign(secondHash), second.maker, signature),
+            "Marketplace: couldn't authenticate second order."
+        );
+    }
 
     /**
      * @dev Validate a provided previously approved / signed order, hash, and signature.
@@ -105,12 +116,10 @@ abstract contract MarketplaceCore is
     function authenticateOrder(
         bytes32 hash,
         address maker,
-        bytes memory signature
-    ) internal view returns (bool) {
+        bytes calldata signature
+    ) private view returns (bool) {
         /** Order is already cancelled or filled.*/
-        if (
-            fills[hash].current >= fills[hash].length && fills[hash].length > 0
-        ) {
+        if (Entity.isFull(fills[hash].state)) {
             return false;
         }
         /** Order maker initiated transaction. */
