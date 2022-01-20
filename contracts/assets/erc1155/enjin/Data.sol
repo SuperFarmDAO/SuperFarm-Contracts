@@ -1,6 +1,6 @@
 pragma solidity ^0.8.8;
 
-library DFStorage {
+library Data {
     /**
     @notice This struct is a source of mapping-free input to the `addPool` function.
     @param name A name for the pool.
@@ -125,7 +125,9 @@ library DFStorage {
   enum SupplyType {
     Capped,
     Uncapped,
-    Flexible
+    Flexible,
+    TimeValue,
+    TimePercent
   }
 
   /**
@@ -178,6 +180,9 @@ library DFStorage {
     uint256 supplyData;
     uint256 itemData;
     uint256 burnData;
+    ItemGroupTimeData timeData;
+    ItemGroupTransferData transferData;
+    ItemGroupIntrinsicData intrinsicData;
     SupplyType supplyType;
     ItemType itemType;
     BurnType burnType;
@@ -218,5 +223,42 @@ library DFStorage {
     uint256 _endTime; 
     uint256 _price; 
     address _token;
+  }
+
+  struct ItemGroupTimeData {
+    uint256 timeStamp;
+    uint256 timeInterval;
+    uint256 timeRate;
+    uint256 timeCap;
+  }
+
+  struct ItemGroupTransferData {
+    uint256 transferTime;
+    uint256 transferFeeAmount;
+    address transferToken;
+    TransferType transferType;
+    TransferFeeType transferFeeType;
+  }
+
+  struct ItemGroupIntrinsicData {
+    uint256 rate;
+    uint256 burnShare;
+    uint256 prefund;
+    uint256 totalLocked;
+    address intrinsicToken;
+    bool intrinsic;
+  }
+
+  enum TransferType {
+    Transferable,
+    TemporaryTransfer,
+    BoundToAddress
+  }
+
+  enum TransferFeeType {
+    None,
+    PerTransfer,
+    PerItem,
+    RatioCut
   }
 }

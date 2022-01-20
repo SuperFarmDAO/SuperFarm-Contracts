@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity 0.8.8;
+pragma solidity ^0.8.8;
 
 import "../../../assets/erc1155/Super1155.sol";
 import "../../../interfaces/IHelper.sol";

@@ -42,7 +42,7 @@ describe('===Super1155Intrinsic===', function () {
     let selector = "0x54fd4d50fce680dbc2593d9e893064bfa880e5642d0036394e1a1849f7fc0749"
 
     before(async function () {
-        this.Super1155 = await ethers.getContractFactory("Super1155");
+        this.Super1155 = await ethers.getContractFactory("SuperEnjin1155");
         this.ProxyRegistry = await ethers.getContractFactory("ProxyRegistry");
         this.OMDProxy = await ethers.getContractFactory("OwnableMutableDelegateProxy");
     });
