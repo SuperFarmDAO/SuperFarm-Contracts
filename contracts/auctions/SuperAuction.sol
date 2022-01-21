@@ -3,7 +3,6 @@ pragma solidity ^0.8.8;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
-import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "../assets/erc721/interfaces/ISuper721.sol";
 import "../assets/erc1155/interfaces/ISuper1155.sol";
 
@@ -255,7 +254,6 @@ contract SuperAuction is Ownable, ReentrancyGuard {
             itemIds[0] = shiftedGroupId;
         }
         amounts[0] = 1;
-        // CHECK put nothing in data
         if (itemType == AssetType.Unminted1155) {
             ISuper1155(item).mintBatch(highestBidder, itemIds, amounts, "");
         }
