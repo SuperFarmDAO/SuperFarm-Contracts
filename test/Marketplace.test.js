@@ -9,13 +9,13 @@ import * as utils from "./utils.js"
 describe("SuperFarm Marketplace", function(){
 
     
-    let owner, protocolFeeRecipient, creator, alice, bob, royaltyOwner1, royaltyOwner2;
+    let owner, platformFeeRecipient, creator, alice, bob, royaltyOwner1, royaltyOwner2, protocolFeeRecepient;
     let marketplace, registry, transferProxy, erc1155, erc721, weth;
     let domain;
 
     beforeEach(async function () {
-        [owner, protocolFeeRecipient, creator, alice, bob, royaltyOwner1, royaltyOwner2] = await ethers.getSigners();
-        [marketplace, registry, transferProxy, erc1155, erc721, weth] =  await utils.withContracts(protocolFeeRecipient.address, 100);
+        [owner, platformFeeRecipient, creator, alice, bob, royaltyOwner1, royaltyOwner2, protocolFeeRecepient] = await ethers.getSigners();
+        [marketplace, registry, transferProxy, erc1155, erc721, weth] =  await utils.withContracts(platformFeeRecipient.address, 100, protocolFeeRecepient.address, 100);
         domain = {
             name: "Super Marketplace",
             version: "1",
@@ -65,8 +65,8 @@ describe("SuperFarm Marketplace", function(){
             time, 
             time + 100, 
             salt, 
-            [100, 200, 300, 400], // 100 = 1% in basis points
-            [protocolFeeRecipient.address, creator.address, royaltyOwner1.address, royaltyOwner2.address],
+            [200, 300, 400], // 100 = 1% in basis points
+            [creator.address, royaltyOwner1.address, royaltyOwner2.address],
             marketplace.address, 
             bob.address, // Seller
             1, 
@@ -130,7 +130,7 @@ describe("SuperFarm Marketplace", function(){
         expect(await weth.balanceOf(alice.address)).to.be.eq(ethers.utils.parseEther("9"))
 
         // Confirm fee tranfers
-        expect(await weth.balanceOf(protocolFeeRecipient.address)).to.be.eq(ethers.utils.parseEther("0.01"))
+        expect(await weth.balanceOf(platformFeeRecipient.address)).to.be.eq(ethers.utils.parseEther("0.01"))
         expect(await weth.balanceOf(creator.address)).to.be.eq(ethers.utils.parseEther("0.02"))
         expect(await weth.balanceOf(royaltyOwner1.address)).to.be.eq(ethers.utils.parseEther("0.03"))
         expect(await weth.balanceOf(royaltyOwner2.address)).to.be.eq(ethers.utils.parseEther("0.04"))
@@ -149,8 +149,8 @@ describe("SuperFarm Marketplace", function(){
             time + 1000, 
             salt, 
             // Different combination of fees and addresses were checked!
-            [100, 200, 300, 400], // 100 = 1% in basis points
-            [protocolFeeRecipient.address, creator.address, royaltyOwner2.address, royaltyOwner1.address], 
+            [200, 300, 400], // 100 = 1% in basis points
+            [creator.address, royaltyOwner2.address, royaltyOwner1.address], 
             marketplace.address, 
             bob.address, // Seller
             1, 
@@ -219,7 +219,7 @@ describe("SuperFarm Marketplace", function(){
         expect(await weth.balanceOf(alice.address)).to.be.eq(ethers.utils.parseEther("9.5"))
 
         // Confirm fee tranfers
-        expect(await weth.balanceOf(protocolFeeRecipient.address)).to.be.above(ethers.utils.parseEther("0"))
+        expect(await weth.balanceOf(platformFeeRecipient.address)).to.be.above(ethers.utils.parseEther("0"))
         expect(await weth.balanceOf(creator.address)).to.be.above(ethers.utils.parseEther("0"))
         expect(await weth.balanceOf(royaltyOwner1.address)).to.be.above(ethers.utils.parseEther("0"))
         expect(await weth.balanceOf(royaltyOwner2.address)).to.be.above(ethers.utils.parseEther("0"))
@@ -238,8 +238,8 @@ describe("SuperFarm Marketplace", function(){
             time, 
             time + 1000, 
             salt, 
-            [100, 200, 300, 400], // 100 = 1% in basis points
-            [protocolFeeRecipient.address, creator.address, royaltyOwner2.address, royaltyOwner1.address],
+            [200, 300, 400], // 100 = 1% in basis points
+            [creator.address, royaltyOwner2.address, royaltyOwner1.address],
             marketplace.address, 
             bob.address, // Seller
             1, 
@@ -313,8 +313,8 @@ describe("SuperFarm Marketplace", function(){
             time, 
             time + 1000, 
             salt, 
-            [100, 200, 300, 400], // 100 = 1% in basis points
-            [protocolFeeRecipient.address, creator.address, royaltyOwner2.address, royaltyOwner1.address],
+            [200, 300, 400], // 100 = 1% in basis points
+            [creator.address, royaltyOwner2.address, royaltyOwner1.address],
             marketplace.address, 
             bob.address, // Seller
             1, 
@@ -388,8 +388,8 @@ describe("SuperFarm Marketplace", function(){
             time, 
             time + 1000, 
             salt, 
-            [100, 200, 300, 400], // 100 = 1% in basis points
-            [protocolFeeRecipient.address, creator.address, royaltyOwner2.address, royaltyOwner1.address],
+            [200, 300, 400], // 100 = 1% in basis points
+            [creator.address, royaltyOwner2.address, royaltyOwner1.address],
             marketplace.address, 
             bob.address, // Seller
             1, 

@@ -17,7 +17,7 @@ contract SuperMarketplace is Exchange {
     * @param _registry  existing registry address
     * @param _personalSignPrefix  "\x19Ethereum Signed Message:\n"
     */
-    constructor (address _registry, bytes memory _personalSignPrefix, address _tokenTransferProxy, address _platformFeeAddress, uint _minimumPlatformFee) ExchangeCore(name, marketplaceVersion){
+    constructor (address _registry, bytes memory _personalSignPrefix, address _tokenTransferProxy, address _platformFeeAddress, uint _minimumPlatformFee, address _protocolFeeAddress, uint _minimumProtocolFee) ExchangeCore(name, marketplaceVersion){
         registry = _registry;
         tokenTransferProxy = _tokenTransferProxy;
         platformFeeAddress = _platformFeeAddress;
@@ -25,6 +25,8 @@ contract SuperMarketplace is Exchange {
         if (_personalSignPrefix.length > 0) {
           personalSignPrefix = _personalSignPrefix;
         }
+        protocolFeeAddress = _protocolFeeAddress;
+        minimumProtocolFee = _minimumProtocolFee;
         setPermit(_msgSender(), UNIVERSAL, FEE_CONFIG, type(uint256).max);
     }
 
