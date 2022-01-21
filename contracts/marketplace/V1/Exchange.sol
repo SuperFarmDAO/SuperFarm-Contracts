@@ -10,6 +10,20 @@ import "./ExchangeCore.sol";
 abstract contract Exchange is ExchangeCore {
 
     /**
+     * @dev Change the minimum amount of fees
+     * @param _newFees New fee to set
+     */
+    function changeMarketplaceFees(Fees calldata _newFees)
+        external
+        hasValidPermit(UNIVERSAL, FEE_CONFIG)
+    {
+        fees.minimumProtocolFee = _newFees.minimumProtocolFee;
+        fees.minimumPlatformFee = _newFees.minimumPlatformFee;
+        fees.platformFeeAddress = _newFees.platformFeeAddress;
+        fees.protocolFeeAddress = _newFees.protocolFeeAddress;
+    }
+
+    /**
      * @dev Change the minimum taker fee paid to the protocol
      * @param newMinimumProtocolFee New fee to set in basis points
      */
@@ -17,7 +31,7 @@ abstract contract Exchange is ExchangeCore {
         external
         hasValidPermit(UNIVERSAL, FEE_CONFIG)
     {
-        minimumProtocolFee = newMinimumProtocolFee;
+        fees.minimumProtocolFee = newMinimumProtocolFee;
     }
 
     /**
@@ -28,7 +42,7 @@ abstract contract Exchange is ExchangeCore {
         external
         hasValidPermit(UNIVERSAL, FEE_CONFIG)
     {
-        minimumPlatformFee = newMinimumPlatformFee;
+        fees.minimumPlatformFee = newMinimumPlatformFee;
     }
 
     /**
@@ -39,7 +53,7 @@ abstract contract Exchange is ExchangeCore {
         external
         hasValidPermit(UNIVERSAL, FEE_CONFIG)
     {
-        protocolFeeAddress = newProtocolFeeAddress;
+        fees.protocolFeeAddress = newProtocolFeeAddress;
     }
 
     /**
@@ -50,7 +64,7 @@ abstract contract Exchange is ExchangeCore {
         external
         hasValidPermit(UNIVERSAL, FEE_CONFIG)
     {
-        platformFeeAddress = newPlatformFeeAddress;
+        fees.platformFeeAddress = newPlatformFeeAddress;
     }
 
     /**
@@ -133,7 +147,7 @@ abstract contract Exchange is ExchangeCore {
      * @dev Call ordersCanMatch
      */
     function ordersMatch(Order calldata buy, Order calldata sell)
-        external view
+        external pure
         returns (bool)
     {
         return _ordersMatch(buy, sell);

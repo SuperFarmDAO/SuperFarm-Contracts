@@ -20,13 +20,13 @@ contract SuperMarketplace is Exchange {
     constructor (address _registry, bytes memory _personalSignPrefix, address _tokenTransferProxy, address _platformFeeAddress, uint _minimumPlatformFee, address _protocolFeeAddress, uint _minimumProtocolFee) ExchangeCore(name, marketplaceVersion){
         registry = _registry;
         tokenTransferProxy = _tokenTransferProxy;
-        platformFeeAddress = _platformFeeAddress;
-        minimumPlatformFee = _minimumPlatformFee;
+        fees.platformFeeAddress = _platformFeeAddress;
+        fees.minimumPlatformFee = _minimumPlatformFee;
         if (_personalSignPrefix.length > 0) {
           personalSignPrefix = _personalSignPrefix;
         }
-        protocolFeeAddress = _protocolFeeAddress;
-        minimumProtocolFee = _minimumProtocolFee;
+        fees.protocolFeeAddress = _protocolFeeAddress;
+        fees.minimumProtocolFee = _minimumProtocolFee;
         setPermit(_msgSender(), UNIVERSAL, FEE_CONFIG, type(uint256).max);
     }
 
