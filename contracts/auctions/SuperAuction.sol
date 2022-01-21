@@ -336,7 +336,7 @@ contract SuperAuction is Ownable, ReentrancyGuard {
 
             // Otherwise, take the highest bid and mint the item.
         } else {
-            (bool beneficiarySendSuccess, ) = payable(highestBidder).call{
+            (bool beneficiarySendSuccess, ) = payable(beneficiary).call{
                 value: highestBid
             }("");
 
