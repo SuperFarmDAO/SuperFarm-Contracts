@@ -52,6 +52,13 @@ abstract contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
     /** The royalty fee for this platform. */
     uint public minimumPlatformFee; 
 
+    /** The protocol fee for this platform. */
+    uint public minimumProtocolFee;  
+
+
+    /** The protocol fee address of the platform */
+    address public protocolFeeAddress;
+
     /** The royalty fee address of the platform */
     address public platformFeeAddress;
 
@@ -316,10 +323,18 @@ abstract contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
         /** Calculate amount for seller to receive */
         uint receiveAmount =  requiredAmount;
         uint fee;
+        uint plFee = (requiredAmount * minimumPlatformFee) / 10000;
+        uint prFee = (requiredAmount * minimumProtocolFee) / 10000;
+
         if (requiredAmount > 0){
             /** If paying using a token (not Ether), transfer tokens. */
             if (sell.outline.paymentToken != address(0)){
                 require(msg.value == 0);
+                {
+                    transferTokens(buy.outline.paymentToken, buy.outline.maker, platformFeeAddress, plFee);
+                    transferTokens(buy.outline.paymentToken, buy.outline.maker, protocolFeeAddress, prFee);
+                    receiveAmount -= prFee + plFee;
+                }
                 for(uint256 i = 0; i < sell.addresses.length; i++){
                     fee = (requiredAmount*sell.fees[i])/10000;
                     receiveAmount -= fee;
@@ -329,6 +344,12 @@ abstract contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
             } else {
                 /** Special-case Ether, order must be matched by buyer. */
                 require(msg.value >= requiredAmount);
+                {
+                    payable(platformFeeAddress).transfer(plFee);
+                    payable(protocolFeeAddress).transfer(prFee);
+                    receiveAmount -= prFee + prFee;
+                }
+
                 /** transfer fees */
                 for(uint256 i = 0; i < sell.addresses.length; i++){
                     fee = (requiredAmount*sell.fees[i])/10000;
@@ -372,14 +393,6 @@ abstract contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
                 return false;
             }
             if(!(buy.outline.taker == address(0) || buy.outline.taker == sell.outline.maker)){
-                return false;
-            }
-            /** Platform fees address is  */
-            if(!(sell.addresses[0] == platformFeeAddress)){
-                return false;
-            }
-            /** One must have platform fee on seller side */
-            if(!(sell.fees[0] >= minimumPlatformFee)){
                 return false;
             }
             /** Must match target. */
