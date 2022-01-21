@@ -2,6 +2,7 @@
 pragma solidity ^0.8.7;
 
 import "./Super721LiteBlueprint.sol";
+import "hardhat/console.sol";
 
 /** 
   @title A diamond standard proxy storage for Super721Lite
@@ -32,19 +33,20 @@ contract Super721LiteProxy {
     Super721LiteBlueprint.Super721LiteStateVariables
       storage b = Super721LiteBlueprint.super721LiteStateVariables();
     
-    // At this point, deployer owns this contract
+    // Execute all the delegate calls
     bool resultant = true;
-    (bool success,) = _implementation.delegatecall(abi.encodeWithSignature("initialize()")); 
+    (bool success,) = _implementation.delegatecall(abi.encodeWithSignature("initialize()")); // Deployer owns
     resultant = success && resultant;
-    (success,) = _implementation.delegatecall(abi.encodeWithSignature("transferOwnership(address)", _owner)); 
+    (success,) = _implementation.delegatecall(abi.encodeWithSignature("registerInterface(bytes4)", Super721LiteBlueprint._INTERFACE_ID_ERC721)); 
     resultant = success && resultant;
-    (success,) = _implementation.delegatecall(abi.encodeWithSignature("_registerInterface(bytes4)", Super721LiteBlueprint._INTERFACE_ID_ERC721)); 
+    (success,) = _implementation.delegatecall(abi.encodeWithSignature("registerInterface(bytes4)", Super721LiteBlueprint._INTERFACE_ID_ERC721_METADATA)); 
     resultant = success && resultant;
-    (success,) = _implementation.delegatecall(abi.encodeWithSignature("_registerInterface(bytes4)", Super721LiteBlueprint._INTERFACE_ID_ERC721_METADATA)); 
+    (success,) = _implementation.delegatecall(abi.encodeWithSignature("registerInterface(bytes4)", Super721LiteBlueprint._INTERFACE_ID_ERC721_ENUMERABLE)); 
     resultant = success && resultant;
-    (success,) = _implementation.delegatecall(abi.encodeWithSignature("_registerInterface(bytes4)", Super721LiteBlueprint._INTERFACE_ID_ERC721_ENUMERABLE)); 
+    (success,) = _implementation.delegatecall(abi.encodeWithSignature("transferOwnership(address)", _owner)); // Owner owns
     resultant = success && resultant;
-        
+
+    // Represents collective succuess
     require(resultant, "Delegate call failed");
 
     // If deployment is success, store constructor parameters

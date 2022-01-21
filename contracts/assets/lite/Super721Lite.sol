@@ -642,6 +642,17 @@ PermitControlds, ERC165Storage, IERC721, IERC721Enumerable, IERC721Metadata {
     emit CollectionLocked(_msgSender());
   }
 
+  /** 
+    A function used for registering interface when deploying.
+    
+    @param interfaceId The hash of the interface.
+  */
+  function registerInterface(bytes4 interfaceId) external 
+  virtual onlyOwner {
+
+    _registerInterface(interfaceId);
+  }
+
   /**
    * @dev See {IERC721-getApproved}.
    */
@@ -736,5 +747,29 @@ PermitControlds, ERC165Storage, IERC721, IERC721Enumerable, IERC721Metadata {
       storage b = Super721LiteBlueprint.super721LiteStateVariables();
 
     return b.totalSupply;
+  }
+
+  /** 
+    A function to get batchSize via a delegate call.
+  */
+  function batchSize() external view
+  virtual returns (uint256) {
+
+    Super721LiteBlueprint.Super721LiteStateVariables
+      storage b = Super721LiteBlueprint.super721LiteStateVariables();
+
+    return b.batchSize;
+  }
+
+  /** 
+    A function to get implementation address via a delegate call.
+  */
+  function implementation() external view
+  virtual returns (address) {
+
+    Super721LiteBlueprint.Super721LiteStateVariables
+      storage b = Super721LiteBlueprint.super721LiteStateVariables();
+
+    return b.implementation;
   }
 }

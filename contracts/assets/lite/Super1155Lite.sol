@@ -569,4 +569,27 @@ PermitControlds, ERC165Storage, IERC1155, IERC1155MetadataURI {
     b.locked = true;
     emit CollectionLocked(_msgSender());
   }
+
+  /** 
+    A function to get implementation address via a delegate call.
+  */
+  function implementation() external view
+  virtual returns (address) {
+
+    Super1155LiteBlueprint.Super1155LiteStateVariables
+      storage b = Super1155LiteBlueprint.super1155LiteStateVariables();
+
+    return b.implementation;
+  }
+
+  /** 
+    A function used for registering interface when deploying.
+    
+    @param interfaceId The hash of the interface.
+  */
+  function registerInterface(bytes4 interfaceId) external 
+  virtual onlyOwner {
+
+    _registerInterface(interfaceId);
+  }
 }

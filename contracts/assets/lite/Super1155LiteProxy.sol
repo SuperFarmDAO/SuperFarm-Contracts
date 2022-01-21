@@ -28,15 +28,15 @@ contract Super1155LiteProxy {
     Super1155LiteBlueprint.Super1155LiteStateVariables
       storage b = Super1155LiteBlueprint.super1155LiteStateVariables();
     
-    // At this point, deployer owns this contract
+    // Execute all the delegate calls
     bool resultant = true;
-    (bool success,) = _implementation.delegatecall(abi.encodeWithSignature("initialize()")); 
+    (bool success,) = _implementation.delegatecall(abi.encodeWithSignature("initialize()")); // Deployer owns
     resultant = success && resultant;
-    (success,) = _implementation.delegatecall(abi.encodeWithSignature("transferOwnership(address)", _owner)); 
+    (success,) = _implementation.delegatecall(abi.encodeWithSignature("registerInterface(bytes4)", Super1155LiteBlueprint.INTERFACE_ERC1155));
     resultant = success && resultant;
-    (success,) = _implementation.delegatecall(abi.encodeWithSignature("_registerInterface(bytes4)", Super1155LiteBlueprint.INTERFACE_ERC1155));
+    (success,) = _implementation.delegatecall(abi.encodeWithSignature("registerInterface(bytes4)", Super1155LiteBlueprint.INTERFACE_ERC1155_METADATA_URI)); 
     resultant = success && resultant;
-    (success,) = _implementation.delegatecall(abi.encodeWithSignature("_registerInterface(bytes4)", Super1155LiteBlueprint.INTERFACE_ERC1155_METADATA_URI)); 
+    (success,) = _implementation.delegatecall(abi.encodeWithSignature("transferOwnership(address)", _owner)); // Owner owns
     resultant = success && resultant;
         
     require(resultant, "Delegate call failed");
