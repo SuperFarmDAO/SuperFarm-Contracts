@@ -129,7 +129,7 @@ contract SuperAuction is Ownable, ReentrancyGuard {
   */
     constructor(
         address payable _beneficiary,
-        address _item, 
+        address _item,
         AssetType _nft,
         address _nftOwner, // if assetType is minted
         uint256 _groupId,
@@ -202,7 +202,7 @@ contract SuperAuction is Ownable, ReentrancyGuard {
   */
     function bid() public payable nonReentrant {
         require(block.timestamp <= auctionEndTime, "Auction already ended.");
-        require(msg.value > highestBid, "There already is a higher bid."); 
+        require(msg.value > highestBid, "There already is a higher bid.");
         require(msg.value >= minimumBid, "Minimum bid amount not met.");
 
         // Extend the auction if a bid comes in within the ending buffer.
@@ -244,8 +244,16 @@ contract SuperAuction is Ownable, ReentrancyGuard {
         uint256[] memory itemIds = new uint256[](1);
         uint256[] memory amounts = new uint256[](1);
         uint256 shiftedGroupId = groupId << 128;
-        uint256 itemId = shiftedGroupId + 1;
-        itemIds[0] = itemId;
+        if ( itemType == AssetType.Unminted1155 ||
+                 itemType == AssetType.Minted1155
+        ) {
+            itemIds[0] = shiftedGroupId + 1;
+        }
+        if ( itemType == AssetType.Unminted721 ||
+                itemType == AssetType.Minted721
+        ) {
+            itemIds[0] = shiftedGroupId;
+        }
         amounts[0] = 1;
         // CHECK put nothing in data
         if (itemType == AssetType.Unminted1155) {
@@ -338,8 +346,16 @@ contract SuperAuction is Ownable, ReentrancyGuard {
             uint256[] memory itemIds = new uint256[](1);
             uint256[] memory amounts = new uint256[](1);
             uint256 shiftedGroupId = groupId << 128;
-            uint256 itemId = shiftedGroupId + 1;
-            itemIds[0] = itemId;
+            if ( itemType == AssetType.Unminted1155 ||
+                 itemType == AssetType.Minted1155
+            ) {
+                itemIds[0] = shiftedGroupId + 1;
+            }
+            if ( itemType == AssetType.Unminted721 ||
+                 itemType == AssetType.Minted721
+            ) {
+                itemIds[0] = shiftedGroupId;
+            }
             amounts[0] = 1;
 
             if (itemType == AssetType.Unminted1155) {
@@ -380,8 +396,10 @@ contract SuperAuction is Ownable, ReentrancyGuard {
             itemType == AssetType.Minted1155
         ) {
             ISuper1155(item).transferOwnership(originalOwner);
-        } else if (
-            itemType == AssetType.Unminted721 || itemType == AssetType.Minted721
+        }
+        if (
+            itemType == AssetType.Unminted721 ||
+            itemType == AssetType.Minted721
         ) {
             ISuper721(item).transferOwnership(originalOwner);
         }
