@@ -8,6 +8,6 @@ contract MintShopHelper is IHelper {
    constructor() {}
 
    function getByteCode() external override pure returns (bytes memory) {
-       return type(MintShop1155).creationCode;
+       return type(SuperMintShop1155).creationCode;
    }
 }

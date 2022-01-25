@@ -13,6 +13,7 @@ library DFStorage {
       purchase from this pool in a single transaction.
     @param requirement A PoolRequirement requisite for users who want to
       participate in this pool.
+    @param collection The address of items collection.
   */
     struct PoolInput {
         string name;
