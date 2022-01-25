@@ -648,12 +648,11 @@ contract SuperMintShop1155 is SuperMerkleAccess, ReentrancyGuard, IMintShop {
       "0x1B");
 
     bool whiteListed;
-    if (pools[_id].whiteLists.length != 0)
-    {
-        bytes32 root = keccak256(abi.encodePacked(_whiteList.index, _msgSender(), _whiteList.allowance));
-        whiteListed = verify(_whiteList.whiteListId, _whiteList.index, root, _whiteList.merkleProof) &&
-                                root == _whiteList.node &&
-                                !pools[_id].whiteLists[_whiteList.whiteListId].minted[_msgSender()];
+    if (pools[_id].whiteLists.length != 0) {
+      bytes32 root = keccak256(abi.encodePacked(_whiteList.index, _msgSender(), _whiteList.allowance));
+      whiteListed = verify(_whiteList.whiteListId, _whiteList.index, root, _whiteList.merkleProof) &&
+                              root == _whiteList.node &&
+                              !pools[_id].whiteLists[_whiteList.whiteListId].minted[_msgSender()];
     }
 
     require(block.timestamp >= pools[_id].config.startTime && block.timestamp <= pools[_id].config.endTime || whiteListed, "0x4B");
@@ -666,12 +665,12 @@ contract SuperMintShop1155 is SuperMerkleAccess, ReentrancyGuard, IMintShop {
     // Verify that the pool is respecting per-address global purchase limits.
     uint256 userGlobalPurchaseAmount = _amount + globalPurchaseCounts[_msgSender()];
     require(userGlobalPurchaseAmount <= globalPurchaseLimit,
-      "0x5B");
+      "0x5BG");
 
     // Verify that the pool is respecting per-address pool purchase limits. 
     uint256 userPoolPurchaseAmount = _amount + pools[_id].purchaseCounts[_msgSender()];
     require(userPoolPurchaseAmount <= pools[_id].config.purchaseLimit,
-      "0x5B");
+      "0x5BU");
 
     // Verify that the pool is not depleted by the user's purchase.
     uint256 newCirculatingTotal = pools[_id].itemMinted[itemKey] + _amount;
@@ -686,9 +685,9 @@ contract SuperMintShop1155 is SuperMerkleAccess, ReentrancyGuard, IMintShop {
     require(_checkRequirments(_id), 
       "0x8B");
 
-    sellingHelper(_id, itemKey, _assetIndex, _amount, whiteListed, _whiteList.whiteListId);
+    _sellingHelper(_id, itemKey, _assetIndex, _amount, whiteListed, _whiteList.whiteListId);
     
-    mintingHelper(_itemIndex, _groupId, _id, itemKey, _amount, newCirculatingTotal, userPoolPurchaseAmount, userGlobalPurchaseAmount);
+    _mintingHelper(_itemIndex, _groupId, _id, itemKey, _amount, newCirculatingTotal, userPoolPurchaseAmount, userGlobalPurchaseAmount);
 
     // Emit an event indicating a successful purchase.
   }
@@ -775,7 +774,7 @@ contract SuperMintShop1155 is SuperMerkleAccess, ReentrancyGuard, IMintShop {
   /**
   * Private function to avoid a stack-too-deep error.
   */
-  function sellingHelper(uint256 _id, bytes32 itemKey, uint256 _assetIndex, uint256 _amount, bool _whiteListPrice, uint256 _accesListId) private {
+  function _sellingHelper(uint256 _id, bytes32 itemKey, uint256 _assetIndex, uint256 _amount, bool _whiteListPrice, uint256 _accesListId) private {
     
     // Process payment for the user, checking to sell for Staker points.
     if (_whiteListPrice) {
@@ -826,7 +825,7 @@ contract SuperMintShop1155 is SuperMerkleAccess, ReentrancyGuard, IMintShop {
   /**
   * Private function to avoid a stack-too-deep error.
   */
-  function mintingHelper(uint256 _itemIndex, uint256 _groupId, uint256 _id, bytes32 _key, uint256 _amount, uint256 _newCirculatingTotal, uint256 _userPoolPurchaseAmount, uint256 _userGlobalPurchaseAmount) private {
+  function _mintingHelper(uint256 _itemIndex, uint256 _groupId, uint256 _id, bytes32 _key, uint256 _amount, uint256 _newCirculatingTotal, uint256 _userPoolPurchaseAmount, uint256 _userGlobalPurchaseAmount) private {
 
     // If payment is successful, mint each of the user's purchased items.
     uint256[] memory itemIds = new uint256[](_amount);

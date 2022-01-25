@@ -15,7 +15,7 @@ const DATA = "0x02";
 ///////////////////////////////////////////////////////////
 
 // Start test block
-describe('===MintShop1155, PermitControl, Sweepable===', function () {
+describe('===SuperMintShop1155, PermitControl, Sweepable===', function () {
     let tree;
     let deployer, owner, paymentReceiver, proxyRegistryOwner, signer1, signer2, signer3;
     let UNIVERSAL,
@@ -49,7 +49,7 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
     let MINT721;
 
     before(async function () {
-        this.MintShop1155 = await ethers.getContractFactory("MintShop1155");
+        this.MintShop1155 = await ethers.getContractFactory("SuperMintShop1155");
         this.MockERC20 = await ethers.getContractFactory("MockERC20");
         this.Staker = await ethers.getContractFactory("Staker");
         this.ProxyRegistry = await ethers.getContractFactory("ProxyRegistry");
@@ -192,7 +192,7 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
             await mintShop1155.connect(owner).lockPaymentReceiver();
             await expect(
                 mintShop1155.connect(owner).updatePaymentReceiver(owner.address)
-            ).to.be.revertedWith("XXX");
+            ).to.be.revertedWith("UPR");
         });
 
         it('Reverts: no valid permit', async function(){
@@ -308,7 +308,7 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
         it('Reverts: updatePool a non-existent pool', async function(){
             // Updating a pool with non-existent pool id
             let latestBlock = await ethers.provider.getBlock(await ethers.provider.getBlockNumber());
-            await expect(mintShop1155.connect(owner).updatePool(1, {
+            await expect(mintShop1155.connect(owner).updatePool(0, {
                 name: "firstPool",
                 startTime: latestBlock.timestamp,
                 endTime: latestBlock.timestamp + 60,
@@ -378,8 +378,34 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
         });
 
         it('Reverts: updatePool groups and offsets length mismatch', async function(){
-            // Updating a pool with groups and offsets length mismatch
+            // Creating a pool
             let latestBlock = await ethers.provider.getBlock(await ethers.provider.getBlockNumber());
+            await mintShop1155.connect(owner).addPool({
+                name: "firstPool",
+                startTime: latestBlock.timestamp,
+                endTime: latestBlock.timestamp + 60,
+                purchaseLimit: 5,
+                singlePurchaseLimit: 2,
+                requirement: {
+                    requiredType: 0,
+                    requiredAsset: [NULL_ADDRESS],
+                    requiredAmount: 1,
+                    whitelistId: 1,
+                    requiredId: []
+                },
+                collection: super1155.address
+            }, [1, 2], [1, 1], [10, 1], [[{
+                assetType: 1,
+                asset: NULL_ADDRESS,
+                price: 1
+            }], [{
+                assetType: 1,
+                asset: NULL_ADDRESS,
+                price: 1
+            }]]);
+
+            // Updating a pool with groups and offsets length mismatch
+            latestBlock = await ethers.provider.getBlock(await ethers.provider.getBlockNumber());
             await expect(mintShop1155.connect(owner).updatePool(0, {
                 name: "firstPool",
                 startTime: latestBlock.timestamp,
@@ -402,8 +428,34 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
         });
 
         it('Reverts: updatePool groups and caps length mismatch', async function(){
-            // Updating a pool with groups and caps length mismatch
+            // Creating a pool
             let latestBlock = await ethers.provider.getBlock(await ethers.provider.getBlockNumber());
+            await mintShop1155.connect(owner).addPool({
+                name: "firstPool",
+                startTime: latestBlock.timestamp,
+                endTime: latestBlock.timestamp + 60,
+                purchaseLimit: 5,
+                singlePurchaseLimit: 2,
+                requirement: {
+                    requiredType: 0,
+                    requiredAsset: [NULL_ADDRESS],
+                    requiredAmount: 1,
+                    whitelistId: 1,
+                    requiredId: []
+                },
+                collection: super1155.address
+            }, [1, 2], [1, 1], [10, 1], [[{
+                assetType: 1,
+                asset: NULL_ADDRESS,
+                price: 1
+            }], [{
+                assetType: 1,
+                asset: NULL_ADDRESS,
+                price: 1
+            }]]);
+
+            // Updating a pool with groups and caps length mismatch
+            latestBlock = await ethers.provider.getBlock(await ethers.provider.getBlockNumber());
             await expect(mintShop1155.connect(owner).updatePool(0, {
                 name: "firstPool",
                 startTime: latestBlock.timestamp,
@@ -426,8 +478,34 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
         });
 
         it('Reverts: updatePool groups and prices length mismatch', async function(){
-            // Updating a pool with groups and prices length mismatch
+            // Creating a pool
             let latestBlock = await ethers.provider.getBlock(await ethers.provider.getBlockNumber());
+            await mintShop1155.connect(owner).addPool({
+                name: "firstPool",
+                startTime: latestBlock.timestamp,
+                endTime: latestBlock.timestamp + 60,
+                purchaseLimit: 5,
+                singlePurchaseLimit: 2,
+                requirement: {
+                    requiredType: 0,
+                    requiredAsset: [NULL_ADDRESS],
+                    requiredAmount: 1,
+                    whitelistId: 1,
+                    requiredId: []
+                },
+                collection: super1155.address
+            }, [1, 2], [1, 1], [10, 1], [[{
+                assetType: 1,
+                asset: NULL_ADDRESS,
+                price: 1
+            }], [{
+                assetType: 1,
+                asset: NULL_ADDRESS,
+                price: 1
+            }]]);
+
+            // Updating a pool with groups and prices length mismatch
+            latestBlock = await ethers.provider.getBlock(await ethers.provider.getBlockNumber());
             await expect(mintShop1155.connect(owner).updatePool(0, {
                 name: "firstPool",
                 startTime: latestBlock.timestamp,
@@ -450,8 +528,34 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
         });
 
         it('Reverts: updatePool no mintable amount', async function(){
-            // Updating a pool with no mintable amount
+            // Creating a pool
             let latestBlock = await ethers.provider.getBlock(await ethers.provider.getBlockNumber());
+            await mintShop1155.connect(owner).addPool({
+                name: "firstPool",
+                startTime: latestBlock.timestamp,
+                endTime: latestBlock.timestamp + 60,
+                purchaseLimit: 5,
+                singlePurchaseLimit: 2,
+                requirement: {
+                    requiredType: 0,
+                    requiredAsset: [NULL_ADDRESS],
+                    requiredAmount: 1,
+                    whitelistId: 1,
+                    requiredId: []
+                },
+                collection: super1155.address
+            }, [1, 2], [1, 1], [1, 1], [[{
+                assetType: 1,
+                asset: NULL_ADDRESS,
+                price: 1
+            }], [{
+                assetType: 1,
+                asset: NULL_ADDRESS,
+                price: 1
+            }]]);
+            
+            // Updating a pool with no mintable amount
+            latestBlock = await ethers.provider.getBlock(await ethers.provider.getBlockNumber());
             await expect(mintShop1155.connect(owner).updatePool(0, {
                 name: "firstPool",
                 startTime: latestBlock.timestamp,
@@ -466,7 +570,7 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
                     requiredId: []
                 },
                 collection: super1155.address
-            }, [1], [1], [0], [[{
+            }, [0], [1], [0], [[{
                 assetType: 1,
                 asset: NULL_ADDRESS,
                 price: 1
@@ -653,7 +757,6 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
             // Get the pool
             let pools = await mintShop1155.connect(owner).getPools([0], 0);
             expect(pools[0].config.name).to.be.equal("firstPool");
-
         });
 
         it('Reverts: mintFromPool amount less than 0', async function(){
@@ -764,7 +867,7 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
 
         it('Reverts: mintFromPool pool is not running', async function(){
             // Jump forward in time more than the pool end time
-            await ethers.provider.send("evm_increaseTime", [70]);
+            await ethers.provider.send("evm_increaseTime", [100]);
             await ethers.provider.send("evm_mine", []);
 
             await super1155.connect(owner).setPermit(
@@ -825,20 +928,14 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
                 merkleProof: computeMerkleProof(getIndex(whiteList, signer1.address), whiteList),
               }
             // Mint three times
-            mintShop1155.connect(signer1).mintFromPool(0, 2, 0, 1, 0, whiteListInput, {value: ethers.utils.parseEther("1")})
-            mintShop1155.connect(signer1).mintFromPool(0, 2, 0, 1, 0, whiteListInput, {value: ethers.utils.parseEther("1")})
-            mintShop1155.connect(signer1).mintFromPool(0, 2, 0, 1, 0, whiteListInput, {value: ethers.utils.parseEther("1")})
-            mintShop1155.connect(signer1).mintFromPool(0, 2, 0, 1, 0, whiteListInput, {value: ethers.utils.parseEther("1")})
-
-            // await mintShop1155.connect(signer1).mintFromPool(1, 3, 1, 1, 0, whiteListInput, {value: ethers.utils.parseEther("1")})
-            // await mintShop1155.connect(signer1).mintFromPool(1, 3, 1, 1, 0, whiteListInput, {value: ethers.utils.parseEther("1")})
-            // await mintShop1155.connect(signer1).mintFromPool(1, 2, 0, 1, 0, whiteListInput, {value: ethers.utils.parseEther("1")})
-
+            await mintShop1155.connect(signer1).mintFromPool(0, 2, 0, 1, 0, whiteListInput, {value: ethers.utils.parseEther("1")})
+            await mintShop1155.connect(signer1).mintFromPool(0, 2, 0, 1, 0, whiteListInput, {value: ethers.utils.parseEther("1")})
+            await mintShop1155.connect(signer1).mintFromPool(0, 2, 0, 1, 0, whiteListInput, {value: ethers.utils.parseEther("1")})
 
             // Mint again surpassing the purchase limit of the pool
             await expect(
                 mintShop1155.connect(signer1).mintFromPool(0, 2, 0, 1, 0, whiteListInput, {value: ethers.utils.parseEther("1")})
-            ).to.be.revertedWith("0x5B");
+            ).to.be.revertedWith("0x5BU");
         });
 
         it('Reverts: mintFromPool global purchase limit reach', async function(){
@@ -865,21 +962,18 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
                 allowance: whiteList[signer1.address],
                 node: hash(getIndex(whiteList, signer1.address), signer1.address, whiteList[signer1.address]),
                 merkleProof: computeMerkleProof(getIndex(whiteList, signer1.address), whiteList),
-              }
+            }
+
             // Mint four times
-            mintShop1155.connect(signer1).mintFromPool(0, 2, 0, 1, 0, whiteListInput, {value: ethers.utils.parseEther("1")})
-            mintShop1155.connect(signer1).mintFromPool(0, 2, 0, 1, 0, whiteListInput, {value: ethers.utils.parseEther("1")})
-            mintShop1155.connect(signer1).mintFromPool(0, 2, 0, 1, 0, whiteListInput, {value: ethers.utils.parseEther("1")})
-            mintShop1155.connect(signer1).mintFromPool(0, 2, 0, 1, 0, whiteListInput, {value: ethers.utils.parseEther("1")})
-
-
-            // await mintShop1155.connect(signer1).mintFromPool(1, 3, 1, 1, 0, whiteListInput, {value: ethers.utils.parseEther("1")})
-            // await mintShop1155.connect(signer1).mintFromPool(1, 3, 1, 1, 0, whiteListInput, {value: ethers.utils.parseEther("1")})
+            await mintShop1155.connect(signer1).mintFromPool(0, 2, 0, 1, 0, whiteListInput, {value: ethers.utils.parseEther("1")})
+            await mintShop1155.connect(signer1).mintFromPool(0, 2, 0, 1, 0, whiteListInput, {value: ethers.utils.parseEther("1")})
+            await mintShop1155.connect(signer1).mintFromPool(0, 2, 0, 1, 0, whiteListInput, {value: ethers.utils.parseEther("1")})
+            await mintShop1155.connect(signer1).mintFromPool(1, 3, 0, 1, 0, whiteListInput, {value: ethers.utils.parseEther("1")})
 
             // Mint again surpassing the global purchase limit
             await expect(
-                mintShop1155.connect(signer1).mintFromPool(0, 2, 0, 1, 0, whiteListInput, {value: ethers.utils.parseEther("1")})
-            ).to.be.revertedWith("0x5B");
+                mintShop1155.connect(signer1).mintFromPool(1, 3, 0, 1, 0, whiteListInput, {value: ethers.utils.parseEther("1")})
+            ).to.be.revertedWith("0x5BG");
         });
 
         // it('Reverts: mintFromPool not whitelisted in the pool', async function(){
@@ -1433,14 +1527,13 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
     });
 
     describe("max allocation test", function() {
-        it("Shoud revert", async function() {
+        it("Reverts: max allocatio limit reached", async function() {
             let mShop = await this.MintShop1155.deploy(
                 deployer.address,
                 paymentReceiver.address,
-                "4",
+                4,
                 1
             );
-
 
             let sup = await this.Super1155.deploy(
                 owner.address,
@@ -1468,10 +1561,7 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
 
             await mShop.setItems([sup.address]);
 
-            // await super1155.setPermit();
-
             let latestBlock = await ethers.provider.getBlock(await ethers.provider.getBlockNumber());
-            console.log()
             await mShop.connect(deployer).addPool({
                 name: "maxAllocationTest",
                 startTime: latestBlock.timestamp,
@@ -1513,21 +1603,16 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
                 node: hash(getIndex(whiteList, signer1.address), signer1.address, whiteList[signer1.address]),
                 merkleProof: computeMerkleProof(getIndex(whiteList, signer1.address), whiteList),
               }
-                let pools = await mShop.getPools([0], 0);
-                console.log(pools[0].items[0].groupId.toString());
 
-                await mShop.connect(signer1).mintFromPool(0, 1, 0, 1, 0, whiteListInput, {value: ethers.utils.parseEther("1")})
-                await expect(
-                    mShop.connect(signer1).mintFromPool(0, 1, 0, 1, 0, whiteListInput, {value: ethers.utils.parseEther("1")})
-                ).to.be.revertedWith("0x0D");
+            await mShop.connect(signer1).mintFromPool(0, 1, 0, 1, 0, whiteListInput, {value: ethers.utils.parseEther("1")})
+            await expect(
+                mShop.connect(signer1).mintFromPool(0, 1, 0, 1, 0, whiteListInput, {value: ethers.utils.parseEther("1")})
+            ).to.be.revertedWith("0x0D");
         });
     });
 
     describe("mintFromPool with whiteList ristrictions", function() {
         beforeEach(async function(){
-
-
-
             // Configure token groups
             await super1155.connect(owner).configureGroup(itemGroupId, {
                 name: 'FUNGIBLE',
@@ -1688,10 +1773,8 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
                 _token: NULL_ADDRESS
             }
 
-    
             // await mintShop1155.connect(owner).setItems([super1155.address, super1155Second.address]);
             await mintShop1155.connect(owner).addWhiteList(0, [whiteListCreate]);
-
         });
 
         it("Shoud revert, user already bought", async function() {
@@ -1783,18 +1866,135 @@ describe('===MintShop1155, PermitControl, Sweepable===', function () {
                 allowance: whiteList[signer1.address],
                 node: hash(getIndex(whiteList, signer1.address), signer1.address, whiteList[signer1.address]),
                 merkleProof: computeMerkleProof(getIndex(whiteList, signer1.address), whiteList),
-              }
+            }
             let provider = signer1.provider;
             let balanceBefore = await provider.getBalance(signer1.address);
             console.log(balanceBefore.toString())
             await mintShop1155.connect(signer1).mintFromPool(1, 2, 1, 1, 0, whiteListInput, {value: ethers.utils.parseEther("100")})
             let balanceAfter = await provider.getBalance(signer1.address);
             console.log(balanceAfter.toString())
-
-
             console.log(balanceBefore.toString() - balanceAfter.toString());
-        })
+        });
+    });
 
-        
+    // Special test cases written after coming across bugs
+    describe("Bug Fixes Tests", function() {
+        it("should correctly set the Offset of new Pool whose collection pre-existed", async function() {
+
+            // Configure an NFT group of 9 as a cap
+            await super1155.connect(owner).configureGroup(itemGroupId, {
+                name: 'FUNGIBLE',
+                supplyType: 0,
+                supplyData: 9,
+                itemType: 0,
+                itemData: 0,
+                burnType: 0,
+                burnData: 0
+            });
+
+            await super1155.connect(owner).setPermit(
+                mintShop1155.address,
+                UNIVERSAL,
+                setMintRight,
+                ethers.constants.MaxUint256
+            );
+            
+            // Assumption: Super1155 had some mints before adding to SuperMintShop
+            // Mint 7 NFT's to signer1.address via direct super1155 contract
+            await super1155.connect(owner).mintBatch(signer1.address, 
+                // ID from 0 to 6 =  7 NFT's
+                [shiftedItemGroupId, shiftedItemGroupId.add(1), shiftedItemGroupId.add(2), shiftedItemGroupId.add(3),
+                shiftedItemGroupId.add(4), shiftedItemGroupId.add(5), shiftedItemGroupId.add(6)], 
+                // Amount of each NFT ID = 1
+                ["1", "1", "1", "1", "1", "1", "1"], 
+                DATA);
+
+            // Create Pools: The offset at this point must be at 7th index of the group
+            let latestBlock = await ethers.provider.getBlock(await ethers.provider.getBlockNumber());
+            await mintShop1155.connect(owner).addPool({
+                name: "firstPool",
+                startTime: latestBlock.timestamp + 10,
+                endTime: latestBlock.timestamp + 60,
+                purchaseLimit: 3,
+                singlePurchaseLimit: 2,
+                requirement: {
+                    requiredType: 0,
+                    requiredAsset: [NULL_ADDRESS],
+                    requiredAmount: 0,
+                    requiredId: []
+                    },
+                    collection: super1155.address
+                }, [1], // Group ID 0 = NFT
+                [7], // Offset = 7th Index of NFT group
+                [2], // Caps = 2 [7 Already Minted, 2 Remaining, Total Cap = 9]
+                [
+                    [{ // Price pairs for NFTs, 2 NFTs = 2 Prices Pairs
+                        assetType: 1,
+                        asset: NULL_ADDRESS,
+                        price: 1
+                    }, {
+                        assetType: 1,
+                        asset: NULL_ADDRESS,
+                        price: 1
+                    }]
+                ]);
+
+            // Get the pool
+            let pools = await mintShop1155.connect(owner).getPools([0], 0);
+            expect(pools[0].config.name).to.be.equal("firstPool");
+
+            let whiteList = {
+                "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266" : 1, 
+                "0x70997970C51812dc3A010C7d01b50e0d17dc79C8" : 1, 
+                "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC": 1, 
+                "0x90F79bf6EB2c4f870365E785982E1f101E93b906": 1, 
+                "0x15d34AAf54267DB7D7c367839AAf71A00a2C6A65": 1, 
+                "0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc": 1, 
+                "0x976EA74026E726554dB657fA54763abd0C3a0aa9": 1
+            }
+    
+            const root = computeRootHash(whiteList);
+    
+            const whiteListCreate = {
+                _accesslistId: 0,
+                _merkleRoot: root,
+                _startTime: 0,
+                _endTime: ethers.constants.MaxUint256,
+                _price: ethers.utils.parseEther("100"),
+                _token: NULL_ADDRESS
+            }
+
+            await mintShop1155.connect(owner).setItems([super1155.address]);
+            await mintShop1155.connect(owner).addWhiteList(0, [whiteListCreate]);
+
+            let whiteListInput = {
+                whiteListId: 0,
+                index: getIndex(whiteList, signer1.address),
+                allowance: whiteList[signer1.address],
+                node: hash(getIndex(whiteList, signer1.address), signer1.address, whiteList[signer1.address]),
+                merkleProof: computeMerkleProof(getIndex(whiteList, signer1.address), whiteList),
+            }
+
+            // Signer1's balance must be equal to 7 before mintingFromPool
+            await expect(await super1155.totalBalances(signer1.address)).to.be.equal(7);
+
+            // Check if all the NFT's are owned by Signer1
+            await expect(await super1155.balanceOf(signer1.address, shiftedItemGroupId)).to.be.equal(1);
+            await expect(await super1155.balanceOf(signer1.address, shiftedItemGroupId.add(1))).to.be.equal(1);
+            await expect(await super1155.balanceOf(signer1.address, shiftedItemGroupId.add(2))).to.be.equal(1);
+            await expect(await super1155.balanceOf(signer1.address, shiftedItemGroupId.add(3))).to.be.equal(1);
+            await expect(await super1155.balanceOf(signer1.address, shiftedItemGroupId.add(4))).to.be.equal(1);
+            await expect(await super1155.balanceOf(signer1.address, shiftedItemGroupId.add(5))).to.be.equal(1);
+            await expect(await super1155.balanceOf(signer1.address, shiftedItemGroupId.add(6))).to.be.equal(1);
+
+            // Mint some items through the mintShop to Singer2
+            await mintShop1155.connect(signer1).mintFromPool(0, 1, 0, 1, 0, whiteListInput, {value: ethers.utils.parseEther("100")})
+
+            // Signer1's balance must be equal to 8 after mintingFromPool
+            await expect(await super1155.totalBalances(signer1.address)).to.be.equal(8);
+
+            // Check if Signer1 owns the 8th NFT
+            await expect(await super1155.balanceOf(signer1.address, shiftedItemGroupId.add(8))).to.be.equal(1);
+        });
     });
 });
