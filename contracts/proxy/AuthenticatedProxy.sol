@@ -78,26 +78,30 @@ contract AuthenticatedProxy is Ownable, TokenRecipient {
     by the owner, or on behalf of the owner by a caller authorized by the
     registry. Unless the user has revoked access to the registry, that is.
 
-    @param _target The target address to make the call to.
-    @param _type The type of call to make: direct or delegated.
+    @param _targets The target address to make the call to.
+    @param _types The type of call to make: direct or delegated.
     @param _data The call data to send to `_target`.
     @return Whether or not the call succeeded.
   */
-  function call(address _target, CallType _type, bytes calldata _data) public
-    returns (bool) {
+  function call(address[] memory _targets, CallType[] memory _types,uint[] memory calldataPointers, bytes calldata _data) public
+    returns (bool[] memory) {
     require(_msgSender() == owner()
       || (!revoked && IProxyRegistry(registry).authorizedCallers(_msgSender())),
       "AuthenticatedProxy: not owner, not authorized by an unrevoked registry");
+    bool[] memory results = new bool[](_targets.length);
 
-    // The call is authorized to be performed, now select a type and return.
-    if (_type == CallType.Call) {
-      (bool success, ) = _target.call(_data);
-      return success;
-    } else if (_type == CallType.DelegateCall) {
-      (bool success, ) = _target.delegatecall(_data);
-      return success;
+    for (uint i = 0; i < _targets.length; i++) {
+      // The call is authorized to be performed, now select a type and return.
+      if (_types[i] == CallType.Call) {
+        (bool success, ) = _targets[i].call(_data[calldataPointers[i]:calldataPointers[i+1]-1]);
+        results[i] = success;
+      } else if (_types[i] == CallType.DelegateCall) {
+        (bool success, ) = _targets[i].delegatecall(_data[calldataPointers[i]:calldataPointers[i+1]-1]);
+        results[i] = success;
+      }
+      results[i] = false;
     }
-    return false;
+    
   }
 
   /**
@@ -110,7 +114,15 @@ contract AuthenticatedProxy is Ownable, TokenRecipient {
   */
   function callAssert(address _target, CallType _type, bytes calldata _data)
     external {
-    require(call(_target, _type, _data),
+      address[] memory targets;
+      CallType[] memory types;
+      uint[] memory pointers;
+      targets[0] = _target;
+      types[0] = _type;
+      pointers[0] = 0;
+      pointers[1] = _data.length;
+    bool[] memory result = call(targets, types, pointers, _data);   
+    require(result[0],
       "AuthenticatedProxy: the asserted call did not succeed");
   }
 }

@@ -24,12 +24,12 @@ abstract contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
 
     bytes32 public constant OUTLINE_TYPEHASH =
         keccak256(
-            "Outline(uint256 basePrice,uint256 listingTime,uint256 expirationTime,address exchange,address maker,uint8 side,address taker,uint8 saleKind,address target,uint8 callType,address paymentToken)"
+            "Outline(uint256 basePrice,uint256 listingTime,uint256 expirationTime,address exchange,address maker,uint8 side,address taker,uint8 saleKind,address[] targets,uint8 callType,address paymentToken)"
         );
 
     bytes32 public constant ORDER_TYPEHASH =
         keccak256(
-            "Order(Outline outline,uint256[] extra,uint256 salt,uint256[] fees,address[] addresses,address staticTarget,bytes data,bytes replacementPattern,bytes staticExtradata)Outline(uint256 basePrice,uint256 listingTime,uint256 expirationTime,address exchange,address maker,uint8 side,address taker,uint8 saleKind,address target,uint8 callType,address paymentToken)"
+            "Order(Outline outline,uint256[] extra,uint256 salt,uint256[] fees,uint256[] calldataPointers,address[] addresses,address staticTarget,bytes data,bytes replacementPattern,bytes staticExtradata)Outline(uint256 basePrice,uint256 listingTime,uint256 expirationTime,address exchange,address maker,uint8 side,address taker,uint8 saleKind,address target,uint8 callType,address paymentToken)"
         );
 
     bytes4 constant internal EIP_1271_MAGICVALUE = 0x20c13b0b;
@@ -80,9 +80,9 @@ abstract contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
         /** Kind of sale. */
         Sales.SaleKind saleKind;
         /** Target. */
-        address target;
+        address[] targets;
         /** callType. */
-        AuthenticatedProxy.CallType callType;
+        AuthenticatedProxy.CallType[] callTypes;
         /** Token used to pay for the order, or the zero-address as a sentinel value for Ether. */
         address paymentToken;
     }
@@ -97,6 +97,8 @@ abstract contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
         uint256 salt;
         /** Royalty fees*/ 
         uint256[] fees;
+        /** Pointers for spliting calldata*/
+        uint256[] calldataPointers;
         /** Royalty fees receivers*/ 
         address[] addresses; 
         /** Static call target, zero-address for no static call. */
@@ -122,7 +124,7 @@ abstract contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
 
     event OrderApproved(bytes32 indexed hash, address indexed maker, address indexed taker, bytes data);
     event OrderCancelled(bytes32 indexed hash, address indexed maker, bytes data);
-    event OrdersMatched (bytes32 buyHash, bytes32 sellHash, address indexed maker, address indexed taker, bytes data);
+    event OrdersMatched (bytes32 buyHash, bytes32 sellHash, address indexed maker, address indexed taker, bytes data, bool[] results);
     
     constructor(string memory name, string memory version) EIP712(name, version){}
 
@@ -182,6 +184,7 @@ abstract contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
                 keccak256(abi.encodePacked(order.extra)),
                 order.salt,
                 keccak256(abi.encodePacked(order.fees)),
+                keccak256(abi.encodePacked(order.calldataPointers)),
                 keccak256(abi.encodePacked(order.addresses)),
                 order.staticTarget,
                 keccak256(order.data),
@@ -207,8 +210,8 @@ abstract contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
                     outline.side,
                     outline.taker,
                     outline.saleKind,
-                    outline.target,
-                    outline.callType,
+                    outline.targets,
+                    outline.callTypes,
                     outline.paymentToken
                 )
             );
@@ -251,8 +254,10 @@ abstract contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
             return false;
         }
         /** Target must exist (prevent malicious selfdestructs just prior to order settlement). */
-        if(!Address.isContract(order.outline.target)){
-            return false;
+        for (uint i = 0; i < order.outline.targets.length; i++) {
+            if(!Address.isContract(order.outline.targets[i])){
+                return false;
+            }
         }
 
         /** Order must possess valid sale kind parameter combination. */
@@ -395,13 +400,25 @@ abstract contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
             if(!(buy.outline.taker == address(0) || buy.outline.taker == sell.outline.maker)){
                 return false;
             }
-            /** Must match target. */
-            if(!(buy.outline.target == sell.outline.target)){
+            /** Must match targets lengths. */
+            if(!(buy.outline.targets.length == sell.outline.targets.length)){
+                return false;
+            }
+            /** Must match targets. */
+            for (uint i = 0; i < sell.outline.targets.length; i++) {
+                if(!(buy.outline.targets[i] == sell.outline.targets[i])){
+                    return false;
+                }
+            }
+            /** Must match callTypes lengths */
+            if(!(buy.outline.callTypes.length == sell.outline.callTypes.length)){
                 return false;
             }
             /** Must match callType. */
-            if(!(buy.outline.callType == sell.outline.callType)){
-                return false;
+            for (uint i = 0; i < sell.outline.callTypes.length; i++) {
+                if(!(buy.outline.callTypes[i] == sell.outline.callTypes[i])){
+                    return false;
+                }
             }
             return true;
     }
@@ -476,8 +493,9 @@ abstract contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
         /** Execute funds transfer and pay fees. */
         uint price = executeFundsTransfer(buy, sell);
 
-        /** Execute asset transfer call through proxy. */
-        require(proxy.call(sell.outline.target, sell.outline.callType, sell.data));
+        /** Execute asset transfer call through proxy. */ 
+        // CHECK 
+        bool[] memory results = proxy.call(sell.outline.targets, sell.outline.callTypes, sell.calldataPointers, sell.data);
 
         /** Static calls are intentionally done after the effectful call so they can check resulting state. */
 
@@ -499,9 +517,9 @@ abstract contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
         }
 
         /** Log match */
-        bytes memory settledParameters = abi.encode(price, sell.outline.target, buy.data);
+        bytes memory settledParameters = abi.encode(price, sell.outline.targets, buy.data);
 
-        emit OrdersMatched(buyHash, sellHash,sell.outline.maker, buy.outline.maker, settledParameters);
+        emit OrdersMatched(buyHash, sellHash,sell.outline.maker, buy.outline.maker, settledParameters, results);
     }
 
     /**
