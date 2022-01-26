@@ -37,4 +37,10 @@ interface ISuperGeneric is IERC165 {
         uint256[] memory _ids,
         uint256[] memory _amounts
     ) external;
+
+    /// Balance of ERC721
+    function balanceOf(address _owner) external view returns (uint256);
+
+    /// Balace of ERC1155
+    function balanceOf (address _owner, uint256 _id) external view returns (uint256);
 }
