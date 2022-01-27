@@ -146,12 +146,24 @@ contract StakerV3 is Sweepable, ReentrancyGuard, IERC721Receiver, ERC1155Holder 
     uint256 pointsPerShare;
     uint256 lastRewardEvent;
     uint256[] boostInfo;
+    NftHoldingInfo holdingInfo;
   }
 
   enum StakingAssetType {
     ERC1155, 
     ERC721,
     ERC20
+  }
+
+  struct AddPoolStruct {
+    uint256 id;
+    uint256 tokenStrength;
+    uint256 pointStrength;
+    uint256 groupId;
+    uint256 tps;
+    uint256[] boostInfo;
+    StakingAsset asset;
+    NftHoldingInfo holdingInfo;
   }
 
   /**
@@ -178,6 +190,20 @@ contract StakerV3 is Sweepable, ReentrancyGuard, IERC721Receiver, ERC1155Holder 
     bytes32 s;
   }
 
+  struct Checkpoint {
+    uint256 startTime;
+    uint256 endTime;
+    uint256 balance;
+    Sig sig;
+    bytes32 hash;
+  }
+
+  struct NftHoldingInfo {
+    address contractAddress;
+    uint256 groupId;
+    uint256 tps;
+  }
+
   /**  
     A struct containing the Fungible Token Staker information.
     @param amount amount of the pool asset being provided by the user.
@@ -198,6 +224,7 @@ contract StakerV3 is Sweepable, ReentrancyGuard, IERC721Receiver, ERC1155Holder 
     uint256 tokenPaid;
     uint256 pointPaid;
     uint256 IOUTokenId;
+
   }
 
   uint256 public nextIOUTokenId;
@@ -509,35 +536,36 @@ contract StakerV3 is Sweepable, ReentrancyGuard, IERC721Receiver, ERC1155Holder 
     @param _pointStrength the relative strength of the new asset for earning points.
     @param _boostInfo collection of boosters the pool supports.
   */
-  function addPool(uint256 _id, StakingAsset memory _asset, uint256 _tokenStrength, uint256 _pointStrength, uint256[] calldata _boostInfo) external hasValidPermit(UNIVERSAL, ADD_POOL) {
+  function addPool(AddPoolStruct calldata _addPoolStruct) external hasValidPermit(UNIVERSAL, ADD_POOL) {
 
     require(tokenEmissionEventsCount > 0 && pointEmissionEventsCount > 0,
       "Emissions required.");
-    require(address(_asset.assetAddress) != address(token), 
+    require(address(_addPoolStruct.asset.assetAddress) != address(token), 
       "Disburse token.");
-    require(_tokenStrength > 0 && _pointStrength > 0, 
+    require(_addPoolStruct.tokenStrength > 0 && _addPoolStruct.pointStrength > 0, 
       "Strength/s are Zero.");
 
     uint256 lastTokenRewardTime = block.timestamp > earliestTokenEmissionEvent ? block.timestamp : earliestTokenEmissionEvent;
     uint256 lastPointRewardTime = block.timestamp > earliestPointEmissionEvent ? block.timestamp : earliestPointEmissionEvent;
     uint256 lastRewardEvent = lastTokenRewardTime > lastPointRewardTime ? lastTokenRewardTime : lastPointRewardTime;
-    if (address(poolInfo[_id].asset.assetAddress) == address(0)) {
-      poolAssets.push(_asset);
-      totalTokenStrength = totalTokenStrength + _tokenStrength;
-      totalPointStrength = totalPointStrength + _pointStrength;
-      poolInfo[_id] = PoolInfo({
-        asset: _asset,
-        tokenStrength: _tokenStrength,
+    if (address(poolInfo[_addPoolStruct.id].asset.assetAddress) == address(0)) {
+      poolAssets.push(_addPoolStruct.asset);
+      totalTokenStrength = totalTokenStrength + _addPoolStruct.tokenStrength;
+      totalPointStrength = totalPointStrength + _addPoolStruct.pointStrength;
+      poolInfo[_addPoolStruct.id] = PoolInfo({
+        asset: _addPoolStruct.asset,
+        tokenStrength: _addPoolStruct.tokenStrength,
         tokenBoostedDeposit: 0,
         tokensPerShare: 0,
-        pointStrength: _pointStrength,
+        pointStrength: _addPoolStruct.pointStrength,
         pointBoostedDeposit: 0,
         pointsPerShare: 0,
         lastRewardEvent: lastRewardEvent,
-        boostInfo: _boostInfo
+        boostInfo: _addPoolStruct.boostInfo,
+        holdingInfo: _addPoolStruct.holdingInfo
       });
     } else {
-      addPool(_id, _boostInfo, _tokenStrength, _pointStrength);
+      addPool(_addPoolStruct.id, _addPoolStruct.boostInfo, _addPoolStruct.tokenStrength, _addPoolStruct.pointStrength);
     }
   }
 
@@ -727,11 +755,11 @@ contract StakerV3 is Sweepable, ReentrancyGuard, IERC721Receiver, ERC1155Holder 
       } else if (_asset.assetType == StakingAssetType.ERC1155) {
           ISuperGeneric(_asset.assetAddress).safeBatchTransferFrom(address(this), msg.sender, _asSingletonArray(_asset.groupId), _asSingletonArray(_amount), "");
           user.IOUTokenId = 0;
-          ISuper721(IOUTokenAddress).burnBatch(msg.sender, _asSingletonArray(nextIOUTokenId));
+          ISuper721(IOUTokenAddress).burnBatch(msg.sender, _asSingletonArray(user.IOUTokenId));
       } else if (_asset.assetType == StakingAssetType.ERC721) {
           ISuperGeneric(_asset.assetAddress).safeBatchTransferFrom(address(this), msg.sender, _asSingletonArray(_asset.groupId), "");
           user.IOUTokenId = 0;
-          ISuper721(IOUTokenAddress).burnBatch(msg.sender, _asSingletonArray(nextIOUTokenId));
+          ISuper721(IOUTokenAddress).burnBatch(msg.sender, _asSingletonArray(user.IOUTokenId));
       }
   }
 
@@ -943,26 +971,30 @@ contract StakerV3 is Sweepable, ReentrancyGuard, IERC721Receiver, ERC1155Holder 
   }
 
 
-  function claim(uint256 _id, Sig calldata sig, bytes32 _hash, uint256 _startTime, uint256 _endTime, uint256 _amountStaked) external {
-
-    require(admin == ecrecover(_hash, sig.v, sig.r, sig.s), "Signed not by admin");
-
-    bytes32 messageHash = keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", keccak256(abi.encodePacked(_startTime, _endTime, _amountStaked))));
-    require(messageHash == _hash, "Invalid hashed message");
-    if (_endTime == 0) {
-      _endTime = block.timestamp;
-    }
+  function claim(uint256 _id, Checkpoint[] calldata _checkpoints) external {
     UserInfo storage user = userInfo[_id][msg.sender];
     PoolInfo storage pool = poolInfo[_id];
+    NftHoldingInfo memory holdingInfo = pool.holdingInfo;
     uint256 pendingTokens;
     uint256 pendingPoints;
+    uint256 endTime;
+    for (uint256 i = 0; i < _checkpoints.length; i++) {
+      require(admin == ecrecover(_checkpoints[i].hash, _checkpoints[i].sig.v, _checkpoints[i].sig.r, _checkpoints[i].sig.s), "Signed not by admin");
 
-    updatePool(_id, _startTime, _endTime);
-    if (user.amount > 0) {
-      pendingTokens = ((_amountStaked * pool.tokensPerShare) / 1e12) - user.tokenPaid;
-      pendingPoints = ((user.pointBoostedAmount * pool.pointsPerShare) / 1e30) - user.pointPaid;
-      totalTokenDisbursed = totalTokenDisbursed + pendingTokens;
+      bytes32 messageHash = keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", keccak256(abi.encodePacked(_checkpoints[i].startTime, _checkpoints[i].endTime, _checkpoints[i].balance))));
+      require(messageHash == _checkpoints[i].hash, "Invalid hashed message");
+
+      endTime = _checkpoints[i].endTime == 0 ? block.timestamp : _checkpoints[i].endTime;
+     
+
+      updatePool(_id, _checkpoints[i].startTime, endTime);
+      
+      pendingTokens = pendingTokens + (((_checkpoints[i].balance * holdingInfo.tps) / 1e12) - user.tokenPaid);
+      pendingPoints = pendingPoints + (((_checkpoints[i].balance * holdingInfo.tps) / 1e30) - user.pointPaid);
     }
+    
+    totalTokenDisbursed = totalTokenDisbursed + pendingTokens;
+    
     uint256 _tokenRewards = user.tokenRewards + pendingTokens;
     uint256 _pointRewards = user.pointRewards + pendingPoints;
     IERC20(token).safeTransfer(msg.sender, _tokenRewards);
@@ -970,8 +1002,10 @@ contract StakerV3 is Sweepable, ReentrancyGuard, IERC721Receiver, ERC1155Holder 
     user.tokenRewards = 0;
     user.pointRewards = 0;
 
-    user.tokenPaid = (_amountStaked * pool.tokensPerShare) / 1e12;
-    user.pointPaid = (_amountStaked * pool.pointsPerShare) / 1e30;
+    // user.tokenPaid = (_amountStaked * pool.tokensPerShare) / 1e12;
+    user.tokenPaid = pendingTokens;
+    // user.pointPaid = (_amountStaked * pool.pointsPerShare) / 1e30;
+    user.pointPaid = pendingPoints;
     emit Claim(msg.sender, _id, _tokenRewards, _pointRewards);
   }
 
