@@ -203,11 +203,11 @@ contract StakerV3 is Sweepable, ReentrancyGuard, IERC721Receiver, ERC1155Holder 
     @param hash User's hashed message
    */
   struct Checkpoint {
-    uint256 startTime;
-    uint256 endTime;
-    uint256 balance;
-    Sig sig;
-    bytes32 hash;
+    uint256[] startTime;
+    uint256[] endTime;
+    uint256[] balance;
+    // Sig sig;
+    // bytes32 hash;
   }
 
   /**  
@@ -1046,36 +1046,50 @@ contract StakerV3 is Sweepable, ReentrancyGuard, IERC721Receiver, ERC1155Holder 
     emit Claim(msg.sender, _id, _tokenRewards, _pointRewards);
   }
 
+  // mapping (address => uint256) claimedAt;
+
+  struct Checkpoint2 {
+    uint256[] startTime;
+    uint256[] endTime;
+    uint256[] balance;
+  }
+
   /**
     Claim accumulated token and point rewards from the Staker.
     @param _id The id of pool to claim rewards from.
     @param _checkpoints Information about what time intervals to count rewards
    */
-  function claim(uint256 _id, Checkpoint[] calldata _checkpoints) external {
+  function claim(uint256 _id, bytes32 _hash, Sig calldata sig, Checkpoint calldata _checkpoints) external {
+    require(_checkpoints.startTime.length == _checkpoints.endTime.length);
     UserInfo storage user = userInfo[_id][msg.sender];
-    PoolInfo storage pool = poolInfo[_id];
+    // PoolInfo storage pool = poolInfo[_id];
     // NftHoldingInfo memory holdingInfo = pool.holdingInfo;
     uint256 pendingTokens;
     uint256 pendingPoints;
-    uint256 endTime;
-    // require(admin == ecrecover(_hash, sig.v, sig.r, sig.s), "Signed not by admin");
-      // bytes32 messageHash = keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", keccak256(abi.encodePacked(_checkpoints)));
-    
-    for (uint256 i = 0; i < _checkpoints.length; i++) {
-      require(admin == ecrecover(_checkpoints[i].hash, _checkpoints[i].sig.v, _checkpoints[i].sig.r, _checkpoints[i].sig.s), "Signed not by admin");
+    // uint256 endTime;
+    // claimedAt[msg.sender]
+    require(admin == ecrecover(_hash, sig.v, sig.r, sig.s), "Signed not by admin");
+    bytes32 messageHash = keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", checkpointsHash(_checkpoints)));
+    require(messageHash == _hash, "Invalid hashed message");
 
-      bytes32 messageHash = keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", keccak256(abi.encodePacked(_checkpoints[i].startTime, _checkpoints[i].endTime, _checkpoints[i].balance))));
-      require(messageHash == _checkpoints[i].hash, "Invalid hashed message");
 
-      endTime = _checkpoints[i].endTime == 0 ? block.timestamp : _checkpoints[i].endTime;
+    // for (uint256 i = 0; i < _checkpoints.length; i++) {
+    //   require(admin == ecrecover(_checkpoints[i].hash, _checkpoints[i].sig.v, _checkpoints[i].sig.r, _checkpoints[i].sig.s), "Signed not by admin");
+
+    //   bytes32 messageHash = keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", keccak256(abi.encodePacked(_checkpoints[i].startTime, _checkpoints[i].endTime, _checkpoints[i].balance))));
+    //   require(messageHash == _checkpoints[i].hash, "Invalid hashed message");
+
+    //   endTime = _checkpoints[i].endTime == 0 ? block.timestamp : _checkpoints[i].endTime;
      
 
-      updatePool(_id, _checkpoints[i].startTime, endTime);
+    //   updatePool(_id, _checkpoints[i].startTime, endTime);
 
       
-      pendingTokens = pendingTokens + (((_checkpoints[i].balance * pool.tokensPerShare) / 1e12));
-      pendingPoints = pendingPoints + (((_checkpoints[i].balance * pool.pointsPerShare) / 1e30));
-    }
+    //   pendingTokens = pendingTokens + (((_checkpoints[i].balance * pool.tokensPerShare) / 1e12));
+    //   pendingPoints = pendingPoints + (((_checkpoints[i].balance * pool.pointsPerShare) / 1e30));
+    // }
+    
+    (pendingTokens, pendingTokens) = calculateRewardsForHolders(_checkpoints, _id);
     pendingTokens = pendingTokens - user.tokenPaid;
     pendingPoints = pendingPoints - user.pointPaid;
     totalTokenDisbursed = totalTokenDisbursed + pendingTokens;
@@ -1086,12 +1100,28 @@ contract StakerV3 is Sweepable, ReentrancyGuard, IERC721Receiver, ERC1155Holder 
     userPoints[msg.sender] = userPoints[msg.sender] + _pointRewards;
     user.tokenRewards = 0;
     user.pointRewards = 0;
-
+    // claimedAt[msg.sender] = _checkpoints[length-1].endTime;
     // user.tokenPaid = (_amountStaked * pool.tokensPerShare) / 1e12;
     user.tokenPaid += user.tokenPaid + pendingTokens;
     // user.pointPaid = (_amountStaked * pool.pointsPerShare) / 1e30;
     user.pointPaid += user.pointPaid + pendingPoints;
     emit Claim(msg.sender, _id, _tokenRewards, _pointRewards);
+  }
+
+  function calculateRewardsForHolders(Checkpoint calldata _checkpoints, uint256 _poolId) internal returns (uint256 pendingTokens, uint256 pendingPoints) {
+    uint256 endTime;
+    PoolInfo memory pool = poolInfo[_poolId];
+
+    for (uint256 i = 0; i < _checkpoints.startTime.length; i++) {
+      endTime = _checkpoints.endTime[i] == 0 ? block.timestamp : _checkpoints.endTime[i];
+      updatePool(_poolId, _checkpoints.startTime[i], endTime);
+      pendingTokens = pendingTokens + (((_checkpoints.balance[i] * pool.tokensPerShare) / 1e12));
+      pendingPoints = pendingPoints + (((_checkpoints.balance[i] * pool.pointsPerShare) / 1e30));
+    }
+  }
+
+  function checkpointsHash(Checkpoint calldata _checkpoints) pure internal returns (bytes32 hash_) {
+    return keccak256(abi.encodePacked(keccak256(abi.encode(_checkpoints.startTime)), keccak256(abi.encode(_checkpoints.endTime)), keccak256(abi.encode(_checkpoints.balance))));
   }
 
   /**
