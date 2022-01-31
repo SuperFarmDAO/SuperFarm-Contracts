@@ -40,6 +40,8 @@ abstract contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
     /** User registry. */
     address public registry;
 
+    Fees fees;
+
     /** Trusted proxy registry contracts. */
     mapping(address => bool) public registries;
 
@@ -48,12 +50,6 @@ abstract contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
 
     /** Orders verified by on-chain approval (alternative to ECDSA signatures so that smart contracts can place orders directly). */
     mapping(bytes32 => bool) public approvedOrders;
-
-    /** The royalty fee for this platform. */
-    uint public minimumPlatformFee; 
-
-    /** The royalty fee address of the platform */
-    address public platformFeeAddress;
 
      /* An ECDSA signature. */ 
     struct Sig {
@@ -111,6 +107,17 @@ abstract contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
         bytes replacementPattern;
         /** Static call extra data. */
         bytes staticExtradata;
+    }
+
+    struct Fees {
+        /** The royalty fee for this platform. */
+        uint minimumPlatformFee; 
+        /** The protocol fee for this platform. */
+        uint minimumProtocolFee;  
+        /** The protocol fee address of the platform */
+        address protocolFeeAddress;
+        /** The royalty fee address of the platform */
+        address platformFeeAddress;
     }
 
     event OrderApproved(bytes32 indexed hash, address indexed maker, address indexed taker, bytes data);
@@ -316,10 +323,18 @@ abstract contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
         /** Calculate amount for seller to receive */
         uint receiveAmount =  requiredAmount;
         uint fee;
+        uint plFee = (requiredAmount * fees.minimumPlatformFee) / 10000;
+        uint prFee = (requiredAmount * fees.minimumProtocolFee) / 10000;
+
         if (requiredAmount > 0){
             /** If paying using a token (not Ether), transfer tokens. */
             if (sell.outline.paymentToken != address(0)){
                 require(msg.value == 0);
+                {
+                    transferTokens(buy.outline.paymentToken, buy.outline.maker, fees.platformFeeAddress, plFee);
+                    transferTokens(buy.outline.paymentToken, buy.outline.maker, fees.protocolFeeAddress, prFee);
+                    receiveAmount -= prFee + plFee;
+                }
                 for(uint256 i = 0; i < sell.addresses.length; i++){
                     fee = (requiredAmount*sell.fees[i])/10000;
                     receiveAmount -= fee;
@@ -329,6 +344,12 @@ abstract contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
             } else {
                 /** Special-case Ether, order must be matched by buyer. */
                 require(msg.value >= requiredAmount);
+                {
+                    payable(fees.platformFeeAddress).transfer(plFee);
+                    payable(fees.protocolFeeAddress).transfer(prFee);
+                    receiveAmount -= prFee + prFee;
+                }
+
                 /** transfer fees */
                 for(uint256 i = 0; i < sell.addresses.length; i++){
                     fee = (requiredAmount*sell.fees[i])/10000;
@@ -356,7 +377,7 @@ abstract contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
      */
     function _ordersMatch(Order memory buy, Order memory sell)
         internal
-        view
+        pure
         returns (bool)
     {
             /** Must be opposite-side. */
@@ -372,14 +393,6 @@ abstract contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
                 return false;
             }
             if(!(buy.outline.taker == address(0) || buy.outline.taker == sell.outline.maker)){
-                return false;
-            }
-            /** Platform fees address is  */
-            if(!(sell.addresses[0] == platformFeeAddress)){
-                return false;
-            }
-            /** One must have platform fee on seller side */
-            if(!(sell.fees[0] >= minimumPlatformFee)){
                 return false;
             }
             /** Must match target. */
