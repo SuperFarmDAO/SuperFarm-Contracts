@@ -25,7 +25,7 @@ import "../../interfaces/ISuperGeneric.sol";
   This code is inspired by and modified from Sushi's Master Chef contract.
   https://github.com/sushiswap/sushiswap/blob/master/contracts/MasterChef.sol
 */
-contract StakerV3 is Sweepable, ReentrancyGuard, IERC721Receiver, ERC1155Holder {
+contract StakerNFT is Sweepable, ReentrancyGuard, IERC721Receiver, ERC1155Holder {
   using SafeERC20 for IERC20;
   using EnumerableSet for EnumerableSet.UintSet;
 
@@ -101,6 +101,9 @@ contract StakerV3 is Sweepable, ReentrancyGuard, IERC721Receiver, ERC1155Holder 
     uint256 rate;
   }
 
+  // actual pool id
+  uint256 lastPoolId;
+
   /// The total number of 'EmissionPoint' as token emission events in the schedule.
   uint256 public tokenEmissionEventsCount;
 
@@ -151,8 +154,7 @@ contract StakerV3 is Sweepable, ReentrancyGuard, IERC721Receiver, ERC1155Holder 
 
   enum StakingAssetType {
     ERC1155, 
-    ERC721,
-    ERC20
+    ERC721
   }
 
   /**
@@ -167,6 +169,16 @@ contract StakerV3 is Sweepable, ReentrancyGuard, IERC721Receiver, ERC1155Holder 
     uint256 pointsPerShare;
     uint256[] boostInfo;
     AssetConfigurationInfo asset;
+  }
+
+  
+  struct TransferData {
+    StakingAssetType assetType;
+    address from;
+    address to;
+    address assetAddress;
+    uint256[] ids;
+    uint256[] amounts;
   }
 
   /**
@@ -207,8 +219,6 @@ contract StakerV3 is Sweepable, ReentrancyGuard, IERC721Receiver, ERC1155Holder 
     uint256[] startTime;
     uint256[] endTime;
     uint256[] balance;
-    // Sig sig;
-    // bytes32 hash;
   }
 
   /**  
@@ -242,7 +252,7 @@ contract StakerV3 is Sweepable, ReentrancyGuard, IERC721Receiver, ERC1155Holder 
     @param IOUTokenId Arrays of id's of IOUtoken 
    */
   struct StakedAsset {
-    address assetAddress;
+    // address assetAddress;
     uint256[] id;
     uint256[] amounts;
     uint256[] IOUTokenId;
@@ -342,17 +352,11 @@ contract StakerV3 is Sweepable, ReentrancyGuard, IERC721Receiver, ERC1155Holder 
   /// Items staked in this contract.
   uint256 public totalItemStakes;
 
-  /// Event for depositing Fungible assets.
-  event DepositERC20(address indexed user, uint256 indexed _poolId, uint256 amount);
-
   /// Event for depositing NonFungible assets.
-  event DepositNFT(address indexed user, uint256 indexed _poolId, uint256[] amount, uint256[] itemIds, address collection);
-
-  /// Event for withdrawing Fungible assets.
-  event WithdrawERC20(address indexed user, uint256 indexed _poolId, uint256 amount);
+  event Deposit(address indexed user, uint256 indexed _poolId, uint256[] amount, uint256[] itemIds, address collection);
 
     /// Event for withdrawing NonFungible assets.
-  event WithdrawNFT(address indexed user, uint256 indexed _poolId, uint256[] amount, uint256[] itemIds, address collection);
+  event Withdraw(address indexed user, uint256 indexed _poolId, uint256[] amount, uint256[] itemIds, address collection);
 
   /// Event for claiming rewards from Fungible assets.
   event Claim(address indexed user, uint256 indexed _poolId, uint256 tokenRewards, uint256 pointRewards);
@@ -506,15 +510,6 @@ contract StakerV3 is Sweepable, ReentrancyGuard, IERC721Receiver, ERC1155Holder 
     return poolAssets.length;
   }
 
-  /**
-    Returns the amount of token that has not been disbursed by the StakerV2 yet.
-    @return the amount of token that has not been disbursed by the StakerV2 yet.
-  */
-  function getRemainingToken() external view returns (uint256) {
-
-    return IERC20(token).balanceOf(address(this));
-  }
-
    /** 
     Create or edit boosters in batch with boost parameters
     @param _ids array of booster IDs.
@@ -557,7 +552,7 @@ contract StakerV3 is Sweepable, ReentrancyGuard, IERC721Receiver, ERC1155Holder 
     an existing one.
     @param _addPoolStruct struct, which we use to create new pool
   */
-  function addPool(AddPoolStruct calldata _addPoolStruct) external hasValidPermit(UNIVERSAL, ADD_POOL) {
+  function addPool(AddPoolStruct memory _addPoolStruct) external hasValidPermit(UNIVERSAL, ADD_POOL) {
 
     require(tokenEmissionEventsCount > 0 && pointEmissionEventsCount > 0,
       "Emissions required.");
@@ -584,27 +579,24 @@ contract StakerV3 is Sweepable, ReentrancyGuard, IERC721Receiver, ERC1155Holder 
         lastRewardEvent: lastRewardEvent,
         boostInfo: _addPoolStruct.boostInfo
       });
+      lastPoolId++;
     } else {
-      addPool(_addPoolStruct.id, _addPoolStruct.boostInfo, _addPoolStruct.tokenStrength, _addPoolStruct.pointStrength);
-    }
-  }
-
-  function addPool(uint256 _id, uint256[] calldata _boostInfo, uint256 _tokenStrength, uint256 _pointStrength) private {
-      totalTokenStrength = (totalTokenStrength - poolInfo[_id].tokenStrength) + _tokenStrength;
-      poolInfo[_id].tokenStrength = _tokenStrength;
-      totalPointStrength = (totalPointStrength - poolInfo[_id].pointStrength) + _pointStrength;
-      poolInfo[_id].pointStrength = _pointStrength;
+      totalTokenStrength = (totalTokenStrength - poolInfo[_addPoolStruct.id].tokenStrength) + _addPoolStruct.tokenStrength;
+      poolInfo[_addPoolStruct.id].tokenStrength = _addPoolStruct.tokenStrength;
+      totalPointStrength = (totalPointStrength - poolInfo[_addPoolStruct.id].pointStrength) + _addPoolStruct.pointStrength;
+      poolInfo[_addPoolStruct.id].pointStrength = _addPoolStruct.pointStrength;
 
       // Append boosters by avoid writing to storage directly in a loop to avoid costs
-      uint256[] memory boosters = new uint256[](poolInfo[_id].boostInfo.length + _boostInfo.length);
-      for (uint256 i = 0; i < poolInfo[_id].boostInfo.length; i++) {
-        boosters[i] = poolInfo[_id].boostInfo[i];
+      uint256[] memory boosters = new uint256[](poolInfo[_addPoolStruct.id].boostInfo.length + _addPoolStruct.boostInfo.length);
+      for (uint256 i = 0; i < poolInfo[_addPoolStruct.id].boostInfo.length; i++) {
+        boosters[i] = poolInfo[_addPoolStruct.id].boostInfo[i];
       }
-      for (uint256 i = 0; i < _boostInfo.length; i++) {
-        boosters[i + poolInfo[_id].boostInfo.length] = _boostInfo[i];
+      for (uint256 i = 0; i < _addPoolStruct.boostInfo.length; i++) {
+        boosters[i + poolInfo[_addPoolStruct.id].boostInfo.length] = _addPoolStruct.boostInfo[i];
       }
-      PoolInfo storage pool = poolInfo[_id];
+      PoolInfo storage pool = poolInfo[_addPoolStruct.id];
       pool.boostInfo = boosters; // Appended boosters
+    }
   }
 
   /**
@@ -679,7 +671,7 @@ contract StakerV3 is Sweepable, ReentrancyGuard, IERC721Receiver, ERC1155Holder 
   */
   function getPendingTokens(uint256 _id, address _user) public view returns (uint256) {
 
-    PoolInfo storage pool = poolInfo[_id];
+    PoolInfo memory pool = poolInfo[_id];
     UserInfo storage user = userInfo[_id][_user];
     uint256 tokensPerShare = pool.tokensPerShare;
     uint256 tokenBoostedDeposit = pool.tokenBoostedDeposit;
@@ -703,7 +695,7 @@ contract StakerV3 is Sweepable, ReentrancyGuard, IERC721Receiver, ERC1155Holder 
   */
   function getPendingPoints(uint256 _id, address _user) public view returns (uint256) {
 
-    PoolInfo storage pool = poolInfo[_id];
+    PoolInfo memory pool = poolInfo[_id];
     UserInfo storage user = userInfo[_id][_user];
     uint256 pointsPerShare = pool.pointsPerShare;
     uint256 pointBoostedDeposit = pool.pointBoostedDeposit;
@@ -725,7 +717,7 @@ contract StakerV3 is Sweepable, ReentrancyGuard, IERC721Receiver, ERC1155Holder 
 
     uint256 concreteTotal = userPoints[_user];
     uint256 pendingTotal = 0;
-    for (uint256 i = 0; i < poolAssets.length; ++i) {
+    for (uint256 i = 0; i < lastPoolId; ++i) {
       uint256 _pendingPoints = getPendingPoints(i, _user);
       pendingTotal = pendingTotal + _pendingPoints;
     }
@@ -741,135 +733,45 @@ contract StakerV3 is Sweepable, ReentrancyGuard, IERC721Receiver, ERC1155Holder 
 
     uint256 concreteTotal = userPoints[_user];
     uint256 pendingTotal = 0;
-    for (uint256 i = 0; i < poolAssets.length; ++i) {
+    for (uint256 i = 0; i < lastPoolId; ++i) {
       uint256 _pendingPoints = getPendingPoints(i, _user);
       pendingTotal = pendingTotal + _pendingPoints;
     }
     return concreteTotal + pendingTotal;
   }
 
-  /**
-    Return the total number of points that the user has ever spent.
-    @return the total number of points that the user has ever spent.
-  */
-  function getSpentPoints(address _user) external view returns (uint256) {
-    
-    return userSpentPoints[_user];
-  }
-
-  function checkBalance(AssetConfigurationInfo memory _asset, address account) internal view returns (uint256) {
-      if (_asset.assetType == StakingAssetType.ERC20) {
-          return IERC20(_asset.assetAddress).balanceOf(account);
-      } else if (_asset.assetType == StakingAssetType.ERC1155) {
-          return ISuperGeneric(_asset.assetAddress).balanceOf(account);
-      } else if (_asset.assetType == StakingAssetType.ERC721) {
-          return ISuperGeneric(_asset.assetAddress).balanceOf(account);
-      }
-      return 0;
-  }
-
-
-  /**
-    Private function for the correct transfer of assets to the user
-
-    @param _poolId Pool id
-    @param _asset The structure in which the information about the asset is stored
-    @param user User information
-   */
-  function genericTransfer(uint256 _poolId, StakedAsset memory _asset, UserInfo storage user) internal {
-      // UserInfo storage user = userInfo[_poolId][msg.sender];
-      PoolInfo memory pool = poolInfo[_poolId];
-      // StakedNFT memory stakedNft;
-
-      if (pool.asset.assetType == StakingAssetType.ERC20) {
-          IERC20(_asset.assetAddress).transfer(msg.sender, _asset.amounts[0]);
-          emit WithdrawERC20(msg.sender, _poolId, _asset.amounts[0]);
-      } else if (pool.asset.assetType == StakingAssetType.ERC1155) {
-          ISuperGeneric(_asset.assetAddress).safeBatchTransferFrom(address(this), msg.sender, user.asset.id, user.asset.amounts, "");
-          ISuperGeneric(IOUTokenAddress).burnBatch(msg.sender, user.asset.IOUTokenId);
-          emit WithdrawNFT(msg.sender, _poolId, user.asset.amounts, user.asset.id, user.asset.assetAddress);
-          delete user.asset;
-      } else if (pool.asset.assetType == StakingAssetType.ERC721) {
-          require(ISuperGeneric(IOUTokenAddress).balanceOf(msg.sender) > 0, "Balance of IOU token must be > 0");
-          ISuperGeneric(_asset.assetAddress).safeBatchTransferFrom(address(this), msg.sender, user.asset.id, "");
-          ISuperGeneric(IOUTokenAddress).burnBatch(msg.sender, user.asset.IOUTokenId);
-          emit WithdrawNFT(msg.sender, _poolId, user.asset.amounts, user.asset.id, user.asset.assetAddress);
-          delete user.asset;
-          // require(ISuperGeneric(IOUTokenAddress).balanceOf(msg.sender) > 0, "Balance of IOU token must be > 0");
-
-      }
-  }
-
-
-  /**
-    Private function for the correct transfer of assets from the user
-
-    @param _poolId Pool id
-    @param _asset The structure in which the information about the asset is stored
-    @param user User information
-   */
-  function genericTransferFrom(uint256 _poolId, StakedAsset memory _asset, UserInfo storage user) internal {
-      // UserInfo storage user = userInfo[_poolId][msg.sender];
-      PoolInfo memory pool = poolInfo[_poolId];
-
-      // StakedNFT memory stakedNft;
-      if (pool.asset.assetType == StakingAssetType.ERC20) {
-          IERC20(_asset.assetAddress).transferFrom(msg.sender, address(this), _asset.amounts[0]);
-          user.asset = _asset;
-          emit DepositERC20(msg.sender, _poolId, _asset.amounts[0]);
-      } else if (pool.asset.assetType == StakingAssetType.ERC1155) {
-          ISuperGeneric(_asset.assetAddress).safeBatchTransferFrom(msg.sender, address(this), _asset.id, _asset.amounts, "");
-          _asset.IOUTokenId = new uint[](_asset.amounts.length);
-          for (uint i = 0; i < _asset.amounts.length; i++) {
-            _asset.IOUTokenId[i] = nextIOUTokenId;
-            nextIOUTokenId++;
-          }
-          ISuperGeneric(IOUTokenAddress).mintBatch(msg.sender, _asset.IOUTokenId, "");
-          user.asset = _asset;
-          emit DepositNFT(msg.sender, _poolId, _asset.amounts, _asset.id, _asset.assetAddress);
-
-
-      } else if (pool.asset.assetType == StakingAssetType.ERC721) {
-        ISuperGeneric(_asset.assetAddress).safeBatchTransferFrom(msg.sender, address(this), _asset.id, "");
-        _asset.IOUTokenId = new uint[](_asset.amounts.length);
-
-        for (uint i = 0; i < _asset.amounts.length; i++) {
-          _asset.IOUTokenId[i] = nextIOUTokenId;
-          nextIOUTokenId++;
-        }
-        ISuperGeneric(IOUTokenAddress).mintBatch(msg.sender, _asset.IOUTokenId, "");
-        user.asset = _asset;        
-        emit DepositNFT(msg.sender, _poolId, _asset.amounts, _asset.id, _asset.assetAddress);
-
-      }
+  function genericTransfer(TransferData memory _transfer) internal returns (bool) {
+    if (_transfer.assetType == StakingAssetType.ERC1155) {
+       ISuperGeneric(_transfer.assetAddress).safeBatchTransferFrom(_transfer.from, _transfer.to, _transfer.ids, _transfer.amounts, "");
+       return true;
+    } else if (_transfer.assetType == StakingAssetType.ERC721) {
+      ISuperGeneric(_transfer.assetAddress).safeBatchTransferFrom(_transfer.from, _transfer.to, _transfer.ids, "");
+      return true;
+    }
+    return false;
   }
 
    /**
     Update the pool corresponding to the specified token address.
     @param _id the id of pool to update the corresponding pool for.
   */
-  function updatePool(uint256 _id, uint256 _startTime, uint256 _endTime) internal {
+  function updatePool(uint256 _id) internal {
 
     PoolInfo storage pool = poolInfo[_id];
     if (block.timestamp <= pool.lastRewardEvent) {
       return;
     }
 
-    if (_startTime == 0 || _endTime == 0) {
-        _startTime = pool.lastRewardEvent;
-        _endTime = block.timestamp;
-    }
-
-    uint256 poolTokenSupply = checkBalance(pool.asset, address(this));
+    uint256 poolTokenSupply = ISuperGeneric(pool.asset.assetAddress).balanceOf(address(this));
     if (poolTokenSupply <= 0) {
       pool.lastRewardEvent = block.timestamp;
       return;
     }
 
     // Calculate token and point rewards for this pool.
-    uint256 totalEmittedTokens = getTotalEmittedTokens(_startTime, _endTime);
+    uint256 totalEmittedTokens = getTotalEmittedTokens(pool.lastRewardEvent, block.timestamp);
     uint256 tokensReward = ((totalEmittedTokens * pool.tokenStrength) / totalTokenStrength) * 1e12;
-    uint256 totalEmittedPoints = getTotalEmittedPoints(_startTime, _endTime);
+    uint256 totalEmittedPoints = getTotalEmittedPoints(pool.lastRewardEvent, block.timestamp);
     uint256 pointsReward = ((totalEmittedPoints * pool.pointStrength) / totalPointStrength) * 1e30;
 
     // Directly pay developers their corresponding share of tokens and points.
@@ -941,14 +843,14 @@ contract StakerV3 is Sweepable, ReentrancyGuard, IERC721Receiver, ERC1155Holder 
         return 0;
     } else if (poolInfo[_id].boostInfo.length == 0) {
         return _unboosted;
-    } else if (itemUserInfo[_msgSender()].boosterIds.length() == 0) {
+    } else if (itemUserInfo[msg.sender].boosterIds.length() == 0) {
         return _unboosted;
     }
 
     _boosted = _unboosted;
     BoostInfo memory booster;
     PoolInfo memory pool = poolInfo[_id];
-    ItemUserInfo storage staker =  itemUserInfo[_msgSender()];
+    ItemUserInfo storage staker =  itemUserInfo[msg.sender];
 
     // Iterate through all the boosters that the pool supports
     for(uint256 i = 0; i < pool.boostInfo.length; i++) {
@@ -970,50 +872,84 @@ contract StakerV3 is Sweepable, ReentrancyGuard, IERC721Receiver, ERC1155Holder 
     @param _poolId the pool id.
     @param _asset asset user wants to deposit
   */
-  function deposit(uint256 _poolId, StakedAsset calldata _asset) external nonReentrant {
+  function deposit(uint256 _poolId, StakedAsset memory _asset) external nonReentrant {
 
     PoolInfo storage pool = poolInfo[_poolId];
-    // StakedAsset storage asset = _asset;
     require(pool.tokenStrength > 0 || pool.pointStrength > 0,
       "Inactive pool.");
-    uint256 amount = calculateAmounts(_asset.amounts);
-
-    require(pool.asset.assetAddress == _asset.assetAddress, "Wrong collection");
+    uint256 amount;
+    for (uint256 i = 0; i < _asset.amounts.length; i++) {
+      amount += _asset.amounts[i];
+    }
     UserInfo storage user = userInfo[_poolId][msg.sender];
 
-    updatePool(_poolId, 0, 0);
+    updatePool(_poolId);
 
-    genericTransferFrom(_poolId, _asset, user);
+    require(genericTransfer(
+      TransferData({
+        assetType: pool.asset.assetType,
+        from: msg.sender,
+        to: address(this),
+        assetAddress: pool.asset.assetAddress,
+        ids:  user.asset.id,
+        amounts: user.asset.amounts
+      })), 
+    "0x1a");
+
+    _asset.IOUTokenId = new uint[](_asset.amounts.length);
+      for (uint i = 0; i < _asset.amounts.length; i++) {
+        _asset.IOUTokenId[i] = nextIOUTokenId;
+        nextIOUTokenId++;
+      }
+    ISuperGeneric(IOUTokenAddress).mintBatch(msg.sender, _asset.IOUTokenId, "");
+    user.asset = _asset;
+
+    // genericTransferFrom(_poolId, _asset, user);
 
     updateDeposits(amount, _poolId, pool, user, 0);
+    emit Deposit(msg.sender, _poolId, _asset.amounts, _asset.id, pool.asset.assetAddress);
+
   }
 
   /**
     Withdraw some particular assets from a particular pool on the Staker.
-    @param _id the id of pool, withdraw tokens from.
+    @param _poolId the id of pool, withdraw tokens from.
     @param _asset asset user wants to withdraw
   */
-  function withdraw(uint256 _id, StakedAsset calldata _asset) external nonReentrant {
+  function withdraw(uint256 _poolId, StakedAsset memory _asset) external nonReentrant {
 
-    PoolInfo storage pool = poolInfo[_id];
-    UserInfo storage user = userInfo[_id][msg.sender];
-    uint256 amount = calculateAmounts(_asset.amounts);
+    PoolInfo storage pool = poolInfo[_poolId];
+    UserInfo storage user = userInfo[_poolId][msg.sender];
+
+    uint256 amount;
+    for (uint256 i = 0; i < _asset.amounts.length; i++) {
+      amount += _asset.amounts[i];
+    }
     require(user.amount >= amount,
       "Invalid amount.");
 
-    updatePool(_id, 0, 0);
+    updatePool(_poolId);
 
     // pool.token.safeTransfer(msg.sender, _amount);
-    genericTransfer(_id, _asset, user);
-    updateDeposits(amount, _id, pool, user, 1);
+    require(ISuperGeneric(IOUTokenAddress).balanceOf(msg.sender) > 0, "Balance of IOU token must be > 0");
 
-    // emit Withdraw(msg.sender, _id, _amount);
-  }
+    require(genericTransfer(
+      TransferData({
+        assetType: pool.asset.assetType,
+        from: address(this),
+        to: msg.sender,
+        assetAddress: pool.asset.assetAddress,
+        ids:  user.asset.id,
+        amounts: user.asset.amounts
+      })), 
+    "0x1a");
+    
+    ISuperGeneric(IOUTokenAddress).burnBatch(msg.sender, user.asset.IOUTokenId);
+    updateDeposits(amount, _poolId, pool, user, 1);
 
-  function calculateAmounts(uint256[] calldata _amounts) pure private returns (uint256 amount) {
-    for (uint256 i = 0; i < _amounts.length; i++) {
-      amount += _amounts[i];
-    }
+    emit Withdraw(msg.sender, _poolId, user.asset.amounts, user.asset.id, pool.asset.assetAddress);
+    delete user.asset;
+
   }
 
   /**
@@ -1026,7 +962,7 @@ contract StakerV3 is Sweepable, ReentrancyGuard, IERC721Receiver, ERC1155Holder 
     uint256 pendingTokens;
     uint256 pendingPoints;
 
-    updatePool(_id, 0, 0);
+    updatePool(_id);
     if (user.amount > 0) {
       pendingTokens = ((user.tokenBoostedAmount * pool.tokensPerShare) / 1e12) - user.tokenPaid;
       pendingPoints = ((user.pointBoostedAmount * pool.pointsPerShare) / 1e30) - user.pointPaid;
@@ -1044,50 +980,32 @@ contract StakerV3 is Sweepable, ReentrancyGuard, IERC721Receiver, ERC1155Holder 
     emit Claim(msg.sender, _id, _tokenRewards, _pointRewards);
   }
 
-  // mapping (address => uint256) claimedAt;
-
-  struct Checkpoint2 {
-    uint256[] startTime;
-    uint256[] endTime;
-    uint256[] balance;
-  }
-
   /**
     Claim accumulated token and point rewards from the Staker.
     @param _id The id of pool to claim rewards from.
     @param _checkpoints Information about what time intervals to count rewards
    */
-  function claim(uint256 _id, bytes32 _hash, Sig calldata sig, Checkpoint calldata _checkpoints) external {
+  function claim(uint256 _id, bytes32 _hash, Sig calldata sig, Checkpoint memory _checkpoints) external {
     require(_checkpoints.startTime.length == _checkpoints.endTime.length);
     UserInfo storage user = userInfo[_id][msg.sender];
-    // PoolInfo storage pool = poolInfo[_id];
+    PoolInfo storage pool = poolInfo[_id];
     // NftHoldingInfo memory holdingInfo = pool.holdingInfo;
     uint256 pendingTokens;
     uint256 pendingPoints;
     // uint256 endTime;
     // claimedAt[msg.sender]
     require(admin == ecrecover(_hash, sig.v, sig.r, sig.s), "Signed not by admin");
-    bytes32 messageHash = keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", checkpointsHash(_checkpoints)));
-    require(messageHash == _hash, "Invalid hashed message");
+    // bytes32 messageHash = keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", checkpointsHash(_checkpoints)));
+    require(keccak256(abi.encodePacked(keccak256(abi.encode(_checkpoints.startTime)), keccak256(abi.encode(_checkpoints.endTime)), keccak256(abi.encode(_checkpoints.balance)))) == _hash, "Invalid hashed message");
 
-
-    // for (uint256 i = 0; i < _checkpoints.length; i++) {
-    //   require(admin == ecrecover(_checkpoints[i].hash, _checkpoints[i].sig.v, _checkpoints[i].sig.r, _checkpoints[i].sig.s), "Signed not by admin");
-
-    //   bytes32 messageHash = keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", keccak256(abi.encodePacked(_checkpoints[i].startTime, _checkpoints[i].endTime, _checkpoints[i].balance))));
-    //   require(messageHash == _checkpoints[i].hash, "Invalid hashed message");
-
-    //   endTime = _checkpoints[i].endTime == 0 ? block.timestamp : _checkpoints[i].endTime;
-     
-
-    //   updatePool(_id, _checkpoints[i].startTime, endTime);
-
-      
-    //   pendingTokens = pendingTokens + (((_checkpoints[i].balance * pool.tokensPerShare) / 1e12));
-    //   pendingPoints = pendingPoints + (((_checkpoints[i].balance * pool.pointsPerShare) / 1e30));
-    // }
     
-    (pendingTokens, pendingTokens) = calculateRewardsForHolders(_checkpoints, _id);
+    // (pendingTokens, pendingTokens) = calculateRewardsForHolders(_checkpoints, _id);
+    for (uint256 i = 0; i < _checkpoints.startTime.length; i++) {
+      // endTime = _checkpoints.endTime[i] == 0 ? block.timestamp : _checkpoints.endTime[i];
+      // updatePool(_poolId, _checkpoints.startTime[i], endTime);
+      pendingTokens = pendingTokens + (((_checkpoints.balance[i] * pool.tokensPerShare) / 1e12));
+      pendingPoints = pendingPoints + (((_checkpoints.balance[i] * pool.pointsPerShare) / 1e30));
+    }
     pendingTokens = pendingTokens - user.tokenPaid;
     pendingPoints = pendingPoints - user.pointPaid;
     totalTokenDisbursed = totalTokenDisbursed + pendingTokens;
@@ -1106,21 +1024,21 @@ contract StakerV3 is Sweepable, ReentrancyGuard, IERC721Receiver, ERC1155Holder 
     emit Claim(msg.sender, _id, _tokenRewards, _pointRewards);
   }
 
-  function calculateRewardsForHolders(Checkpoint calldata _checkpoints, uint256 _poolId) internal returns (uint256 pendingTokens, uint256 pendingPoints) {
-    uint256 endTime;
-    PoolInfo memory pool = poolInfo[_poolId];
+  // function calculateRewardsForHolders(Checkpoint memory _checkpoints, uint256 _poolId) internal view returns (uint256 pendingTokens, uint256 pendingPoints) {
+  //   uint256 endTime;
+  //   PoolInfo memory pool = poolInfo[_poolId];
 
-    for (uint256 i = 0; i < _checkpoints.startTime.length; i++) {
-      endTime = _checkpoints.endTime[i] == 0 ? block.timestamp : _checkpoints.endTime[i];
-      updatePool(_poolId, _checkpoints.startTime[i], endTime);
-      pendingTokens = pendingTokens + (((_checkpoints.balance[i] * pool.tokensPerShare) / 1e12));
-      pendingPoints = pendingPoints + (((_checkpoints.balance[i] * pool.pointsPerShare) / 1e30));
-    }
-  }
+  //   for (uint256 i = 0; i < _checkpoints.startTime.length; i++) {
+  //     endTime = _checkpoints.endTime[i] == 0 ? block.timestamp : _checkpoints.endTime[i];
+  //     // updatePool(_poolId, _checkpoints.startTime[i], endTime);
+  //     pendingTokens = pendingTokens + (((_checkpoints.balance[i] * pool.tokensPerShare) / 1e12));
+  //     pendingPoints = pendingPoints + (((_checkpoints.balance[i] * pool.pointsPerShare) / 1e30));
+  //   }
+  // }
 
-  function checkpointsHash(Checkpoint calldata _checkpoints) pure internal returns (bytes32 hash_) {
-    return keccak256(abi.encodePacked(keccak256(abi.encode(_checkpoints.startTime)), keccak256(abi.encode(_checkpoints.endTime)), keccak256(abi.encode(_checkpoints.balance))));
-  }
+  // function checkpointsHash(Checkpoint memory _checkpoints) pure internal returns (bytes32 hash_) {
+  //   return keccak256(abi.encodePacked(keccak256(abi.encode(_checkpoints.startTime)), keccak256(abi.encode(_checkpoints.endTime)), keccak256(abi.encode(_checkpoints.balance))));
+  // }
 
   /**
     Private helper function to check if Item staker is eligible for a booster.
@@ -1162,7 +1080,7 @@ contract StakerV3 is Sweepable, ReentrancyGuard, IERC721Receiver, ERC1155Holder 
     @param _poolId the pool that will be staked in.
     @param _boosterId the booster that accepts these Items.
   */
-  function stakeItemsBatch(uint256[] calldata _ids, uint256[] calldata _amounts, address _contract, uint256 _poolId, uint256 _boosterId) external nonReentrant {
+  function stakeItemsBatch(uint256[] memory _ids, uint256[] memory _amounts, address _contract, uint256 _poolId, uint256 _boosterId) external nonReentrant {
 
     require(_ids.length == _amounts.length, 
       "Length Mismatch");
@@ -1183,9 +1101,9 @@ contract StakerV3 is Sweepable, ReentrancyGuard, IERC721Receiver, ERC1155Holder 
     UserInfo storage user = userInfo[_poolId][msg.sender];
 
     if (ISuperGeneric(_contract).supportsInterface(INTERFACE_ERC721)) {
-        ISuperGeneric(_contract).safeBatchTransferFrom(_msgSender(), address(this), _ids, "");
+        ISuperGeneric(_contract).safeBatchTransferFrom(msg.sender, address(this), _ids, "");
     } else if (ISuperGeneric(_contract).supportsInterface(INTERFACE_ERC1155)) {
-        ISuperGeneric(_contract).safeBatchTransferFrom(_msgSender(), address(this), _ids, _amounts, "");
+        ISuperGeneric(_contract).safeBatchTransferFrom(msg.sender, address(this), _ids, _amounts, "");
     } else {
         revert("Unsupported Contract.");
     }
@@ -1200,7 +1118,7 @@ contract StakerV3 is Sweepable, ReentrancyGuard, IERC721Receiver, ERC1155Holder 
 
     totalItemStakes += _ids.length;
 
-    updatePool(_poolId, 0, 0);
+    updatePool(_poolId);
     updateDeposits(0, _poolId, pool, user, 2); // 2 = PlaceHolder
 
     emit StakeItemBatch(msg.sender, _poolId, _boosterId);
@@ -1228,11 +1146,11 @@ contract StakerV3 is Sweepable, ReentrancyGuard, IERC721Receiver, ERC1155Holder 
       _ids[i] = staker.tokenIds[_boosterId].at(i);
       _amounts[i] = staker.amounts[_ids[i]];
     }
-
+    // genericTransfer(_poolId, asset, user);
     if (ISuperGeneric(externalContract).supportsInterface(INTERFACE_ERC721)) {
-        ISuperGeneric(externalContract).safeBatchTransferFrom(address(this), _msgSender(), _ids, "");
+        ISuperGeneric(externalContract).safeBatchTransferFrom(address(this), msg.sender, _ids, "");
     } else if (ISuperGeneric(externalContract).supportsInterface(INTERFACE_ERC1155)) {
-        ISuperGeneric(externalContract).safeBatchTransferFrom(address(this), _msgSender(), _ids, _amounts, "");
+        ISuperGeneric(externalContract).safeBatchTransferFrom(address(this), msg.sender, _ids, _amounts, "");
     } else {
         revert("Unsupported Contract.");
     }
@@ -1246,7 +1164,7 @@ contract StakerV3 is Sweepable, ReentrancyGuard, IERC721Receiver, ERC1155Holder 
 
     totalItemStakes -= _ids.length;
 
-    updatePool(_poolId, 0, 0);
+    updatePool(_poolId);
     updateDeposits(0, _poolId, pool, user, 2); // 2 = PlaceHolder
 
     emit UnstakeItemBatch(msg.sender, _poolId, _boosterId);
@@ -1313,6 +1231,4 @@ contract StakerV3 is Sweepable, ReentrancyGuard, IERC721Receiver, ERC1155Holder 
 
     return this.onERC721Received.selector;
   }
-
-
 }
