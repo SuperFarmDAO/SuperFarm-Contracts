@@ -495,7 +495,10 @@ abstract contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
 
         /** Execute asset transfer call through proxy. */ 
         // CHECK 
-        bool[] memory results = proxy.call(sell.outline.targets, sell.outline.callTypes, sell.calldataPointers, sell.data);
+        bool[] memory results = new bool[](sell.outline.targets.length);
+        for (uint i = 0; i < sell.outline.targets.length; i++) {
+            results[i] = proxy.call(sell.outline.targets[i], sell.outline.callTypes[i], ArrayUtils.bytesSlice(sell.calldataPointers[i], (sell.calldataPointers[i]-1), sell.data));
+        } 
 
         /** Static calls are intentionally done after the effectful call so they can check resulting state. */
 

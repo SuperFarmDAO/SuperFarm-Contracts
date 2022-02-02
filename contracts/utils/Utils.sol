@@ -530,4 +530,10 @@ library ArrayUtils {
         return sum;
     }
     
+    function bytesSlice(uint start, uint end, bytes calldata data)
+    internal pure 
+    returns (bytes memory)
+    {
+        return data[start:end];
+    }
 }
