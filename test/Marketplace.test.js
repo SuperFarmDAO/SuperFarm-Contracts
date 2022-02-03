@@ -53,12 +53,83 @@ describe("SuperFarm Marketplace", function(){
         expect(await registry.proxies(bob.address)).to.not.be.eq(utils.NULL_ADDRESS)
     })
 
+    it("SetPermit: FeeConfig", async function(){
+        let universal = marketplace.UNIVERSAL();
+        let right = marketplace.FEE_CONFIG();
+        expect(await marketplace.setPermit(bob.address, universal, right, ethers.constants.MaxUint256)).to.be.ok
+        expect(await marketplace.connect(bob).changeMinimumProtocolFee(100)).to.be.ok;
+        await expect(marketplace.connect(alice).changeMinimumProtocolFee(100)).to.be.revertedWith("P1")
+    })
+
+    it("Markeplace: cancel order", async function(){
+        let salt = 1;
+        let abi = ["function transferFrom(address from,address to,uint256 tokenId)"]
+        let iface = new ethers.utils.Interface(abi)
+        let dataSell = iface.encodeFunctionData("transferFrom", [bob.address, utils.NULL_ADDRESS, 1]);
+        let time = await utils.getCurrentTime()
+        let orderToInvalidate = utils.makeOrder(
+            ethers.utils.parseEther("1"),
+            [],
+            time, 
+            time + 200, 
+            salt, 
+            [200, 300, 400], // 100 = 1% in basis points
+            [creator.address, royaltyOwner1.address, royaltyOwner2.address],
+            marketplace.address, 
+            bob.address, // Seller
+            1, 
+            utils.NULL_ADDRESS, 
+            0, 
+            0,
+            erc721.address, 
+            utils.NULL_ADDRESS, 
+            weth.address, 
+            dataSell, 
+            utils.replacementPatternSell, 
+            0x0 
+        )
+        let signatureInvalidate = await bob._signTypedData(domain, utils.OrderType, orderToInvalidate);
+        let sigInvalidate = ethers.utils.splitSignature(signatureInvalidate);
+        let hash = await marketplace.hashToSign(orderToInvalidate)
+
+        expect(await marketplace.cancelledOrFinalized(hash)).to.be.false
+        await expect( marketplace.connect(alice).cancelOrder_(orderToInvalidate, {v: 0, r: "0x0000000000000000000000000000000000000000000000000000000000000000", s: "0x0000000000000000000000000000000000000000000000000000000000000000"})).to.be.revertedWith("Marketplace: you don't have rights to cancel this order.")
+        await expect( marketplace.connect(alice).cancelOrder_(orderToInvalidate, sigInvalidate)).to.emit(marketplace, "OrderCancelled").withArgs(hash, alice.address, orderToInvalidate.data)
+        expect(await marketplace.connect(bob).cancelOrder_(orderToInvalidate, sigInvalidate)).to.not.emit
+        expect(await marketplace.cancelledOrFinalized(hash)).to.be.true
+
+    })
+
     it("Marketplace: erc721 for erc20", async function(){
         let salt = 1;
         let abi = ["function transferFrom(address from,address to,uint256 tokenId)"]
         let iface = new ethers.utils.Interface(abi)
         let dataSell = iface.encodeFunctionData("transferFrom", [bob.address, utils.NULL_ADDRESS, 1]);
         let time = await utils.getCurrentTime()
+        let orderToInvalidate = utils.makeOrder(
+            ethers.utils.parseEther("1"),
+            [],
+            time, 
+            time + 200, 
+            salt, 
+            [200, 300, 400], // 100 = 1% in basis points
+            [creator.address, royaltyOwner1.address, royaltyOwner2.address],
+            marketplace.address, 
+            bob.address, // Seller
+            1, 
+            utils.NULL_ADDRESS, 
+            0, 
+            0,
+            erc721.address, 
+            utils.NULL_ADDRESS, 
+            weth.address, 
+            dataSell, 
+            utils.replacementPatternSell, 
+            0x0 
+        )
+        let signatureInvalidate = await bob._signTypedData(domain, utils.OrderType, orderToInvalidate);
+        let sigInvalidate = ethers.utils.splitSignature(signatureInvalidate);
+        let hash = await marketplace.hashToSign(orderToInvalidate)
         let orderSell = utils.makeOrder(
             ethers.utils.parseEther("1"),
             [],
@@ -116,10 +187,12 @@ describe("SuperFarm Marketplace", function(){
         await erc721.connect(bob).approve(proxy, 1)
         await weth.connect(alice).approve(transferProxy.address, ethers.utils.parseEther("1"))
 
-        console.log((await weth.balanceOf(alice.address)).toString(), "  alice")
-
         // BOOM ! Atomic Match
-        await marketplace.connect(alice).atomicMatch_(orderBuy, sigBuy, orderSell, sigSell, [], [])
+        expect(await marketplace.cancelledOrFinalized(hash)).to.be.false
+
+        await marketplace.connect(alice).atomicMatch_(orderBuy, sigBuy, orderSell, sigSell, [orderToInvalidate], [sigInvalidate])
+
+        expect(await marketplace.cancelledOrFinalized(hash)).to.be.true
         
         // Confirm NFT transfers
         expect(await erc721.balanceOf(alice.address)).to.be.eq("2")

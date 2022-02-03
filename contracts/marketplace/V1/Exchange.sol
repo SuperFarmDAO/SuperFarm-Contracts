@@ -67,6 +67,10 @@ abstract contract Exchange is ExchangeCore {
         fees.platformFeeAddress = newPlatformFeeAddress;
     }
 
+    function getFees() external view returns(Fees memory){
+        return fees;
+    }
+
     /**
      * @dev Call calculateFinalPrice 
      */
@@ -118,10 +122,10 @@ abstract contract Exchange is ExchangeCore {
     /**
      * @dev Call approveOrder
      */
-    function approveOrder_(Order calldata order)
+    function approveOrder_(Order calldata order, bool orderbookInclusionDesired)
         external
     {
-        return _approveOrder(order);
+        return _approveOrder(order, orderbookInclusionDesired);
     }
 
     /**
