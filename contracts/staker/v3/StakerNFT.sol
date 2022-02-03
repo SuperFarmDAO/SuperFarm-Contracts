@@ -186,9 +186,7 @@ contract StakerNFT is Sweepable, ReentrancyGuard, IERC721Receiver, ERC1155Holder
 
     @param startTime Beginning of holding
     @param endTime Ending of holding
-    @param balance Holding balance
-    @param sig User's signature
-    @param hash User's hashed message
+    @param balance Holding balance. 1000 = 1
    */
   struct Checkpoint {
     uint256[] startTime;
@@ -771,17 +769,17 @@ contract StakerNFT is Sweepable, ReentrancyGuard, IERC721Receiver, ERC1155Holder
     if (_user.amount > 0) {
       uint256 pendingTokens = ((_user.tokenBoostedAmount * _pool.tokensPerShare) / 1e12) - _user.tokenPaid;
       uint256 pendingPoints = ((_user.pointBoostedAmount * _pool.pointsPerShare) / 1e30) - _user.pointPaid;
-      _user.tokenRewards += pendingTokens;
-      _user.pointRewards += pendingPoints;
+      _user.tokenRewards += pendingTokens / 1000;
+      _user.pointRewards += pendingPoints / 1000;
       totalTokenDisbursed = totalTokenDisbursed + pendingTokens;
       _pool.tokenBoostedDeposit -= _user.tokenBoostedAmount;
       _pool.pointBoostedDeposit -= _user.pointBoostedAmount;
     }
 
     if (_isDeposit == 0) { // Flag for Deposit
-      _user.amount += _amount;
+      _user.amount += _amount * 1000;
     } else if(_isDeposit == 1) { // Flag for Withdraw
-      _user.amount -= _amount;
+      _user.amount -= _amount * 1000;
     }
     
     _user.tokenBoostedAmount = applyBoosts(_user.amount, _poolId, true);
@@ -838,9 +836,6 @@ contract StakerNFT is Sweepable, ReentrancyGuard, IERC721Receiver, ERC1155Holder
     @param _asset asset user wants to deposit
   */
   function deposit(uint256 _poolId, uint256 _boosterId ,StakedAsset memory _asset) external nonReentrant {
-
-    require(genericTransfer(msg.sender, address(this), _asset.assetAddress, _asset.id, _asset.amounts), "0x9E");
-
     PoolInfo memory pool = poolInfo[_poolId];
     if (_boosterId != 0) {
       bool exists;
@@ -868,19 +863,24 @@ contract StakerNFT is Sweepable, ReentrancyGuard, IERC721Receiver, ERC1155Holder
     } else {
       require(pool.tokenStrength > 0 || pool.pointStrength > 0,
         "0x1E");
+      UserInfo storage user = userInfo[_poolId][msg.sender];
       uint256 amount;
-      _asset.IOUTokenId = new uint[](_asset.amounts.length);
+  
       for (uint256 i = 0; i < _asset.amounts.length; i++) {
         amount += _asset.amounts[i];
-        _asset.IOUTokenId[i] = nextIOUTokenId;
+        user.asset.amounts.push(_asset.amounts[i]);
+        user.asset.id.push(_asset.id[i]);
+        user.asset.IOUTokenId.push(nextIOUTokenId);
         nextIOUTokenId++;
       }
       ISuperGeneric(IOUTokenAddress).mintBatch(msg.sender, _asset.IOUTokenId, "");
-      userInfo[_poolId][msg.sender].asset = _asset;
+      // user.asset = _asset;
       updatePool(_poolId);
       updateDeposits(amount, _poolId, 0);
       emit Deposit(msg.sender, _poolId, _asset.amounts, _asset.id, pool.assetAddress);
     }
+    require(genericTransfer(msg.sender, address(this), _asset.assetAddress, _asset.id, _asset.amounts), "0x9E");
+
   }
 
   /**
@@ -925,7 +925,7 @@ contract StakerNFT is Sweepable, ReentrancyGuard, IERC721Receiver, ERC1155Holder
       for (uint256 i = 0; i < _asset.amounts.length; i++) {
         amount += _asset.amounts[i];
       }
-      require(user.amount >= amount,
+      require(user.amount / 1000 >= amount,
         "0x1Z");
 
 
@@ -964,15 +964,15 @@ contract StakerNFT is Sweepable, ReentrancyGuard, IERC721Receiver, ERC1155Holder
       pendingPoints = ((user.pointBoostedAmount * pool.pointsPerShare) / 1e30) - user.pointPaid;
       totalTokenDisbursed = totalTokenDisbursed + pendingTokens;
     }
-    uint256 _tokenRewards = user.tokenRewards + pendingTokens;
-    uint256 _pointRewards = user.pointRewards + pendingPoints;
+    uint256 _tokenRewards = user.tokenRewards + pendingTokens / 1000;
+    uint256 _pointRewards = user.pointRewards + pendingPoints / 1000;
     IERC20(token).safeTransfer(msg.sender, _tokenRewards);
     userPoints[msg.sender] = userPoints[msg.sender] + _pointRewards;
     user.tokenRewards = 0;
     user.pointRewards = 0;
 
-    user.tokenPaid = (user.tokenBoostedAmount * pool.tokensPerShare) / 1e12;
-    user.pointPaid = (user.pointBoostedAmount * pool.pointsPerShare) / 1e30;
+    user.tokenPaid = ((user.tokenBoostedAmount * pool.tokensPerShare) / 1e12) / 1000;
+    user.pointPaid = ((user.pointBoostedAmount * pool.pointsPerShare) / 1e30) / 1000;
     emit Claim(msg.sender, _id, _tokenRewards, _pointRewards);
   }
 
