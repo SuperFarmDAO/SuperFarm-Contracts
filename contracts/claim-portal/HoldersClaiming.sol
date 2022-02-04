@@ -8,26 +8,33 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import "../assets/erc721/interfaces/ISuper721.sol";
 import "../assets/erc1155/interfaces/ISuper1155.sol";
-import "../access/PermitControl.sol";
-import "hardhat/console.sol";
+import "../base/Sweepable.sol";
 
 /**
-  @title A token vesting contract for streaming claims.
-  @author SuperFarm
+  @title Token claiming contract, for holders of particular nft.
   @author Nikita Elunin
-  This vesting contract allows users to claim vested tokens with every block.
 */
-contract HolderClaiming is PermitControl, ReentrancyGuard {
+contract HolderClaiming is Sweepable, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
     bytes32 public constant CREATE_POOL = keccak256("CREATE_POOL");
 
-    address public service;
 
-    /// The token to disburse in vesting.
-    IERC20 public rewardToken;
+    address immutable public service;
 
-    /// reward is reward per second
+
+
+    /**
+    A structure characterizing the pool from which users will be branded.
+
+    @param startTime Start time of the pool
+    @param endTime End time of the pool
+    @param rewardPerSec Amount of rewards the user receives in 1 second
+    @param totalAmountClaimed The total Amount of rewards taken by users
+    @param rewardTokenAmount Amount of rewards to be distributed to holders
+    @param hashes mapping (hash => bool) Used hashes
+    @param rewardToken Reward token address
+    */
     struct Pool {
         uint256 startTime;
         uint256 endTime;
@@ -35,15 +42,27 @@ contract HolderClaiming is PermitControl, ReentrancyGuard {
         uint256 totalAmountClaimed;
         uint256 rewardTokenAmount;
         mapping(bytes32 => bool) hashes;
+        IERC20 rewardToken;
     }
 
+    /**
+    The structure that is used to create the pool
+    */
     struct PoolCreationStruct {
         uint256 startTime;
         uint256 endTime;
         uint256 rewardPerSec;
         uint256 rewardTokenAmount;
+        IERC20 rewardToken;
     }
 
+    /**
+    The structure stores the checkpoints when the user held the NFT
+    
+    @param startTime Beginning of holding
+    @param endTime Ending of holding
+    @param balance Holding balance
+    */
     struct Checkpoint {
         uint256[] startTime;
         uint256[] endTime;
@@ -62,41 +81,52 @@ contract HolderClaiming is PermitControl, ReentrancyGuard {
     /// PoolId, starting with 0
     uint256 nextPoolId;
 
-    // A mapping of addresses to the claim received.
+    // A mapping of id's to pool
     mapping(uint256 => Pool) private pools;
 
 
     /// An event for tracking a user claiming some of their vested tokens.
     event Claim(address indexed beneficiary, uint256 amount, uint256 timestamp);
 
-    /// An event that indicates that contract receives ether for rewards.
-    event Receive(address caller, uint256 amount);
 
     /**
-    Construct a new VestStream by providing it a token to disburse.
-    @param _rewardToken The token to vest to claimants in this contract.
+    @param _service Admin's address
     */
-    constructor(IERC20 _rewardToken, address _service) {
-        rewardToken = _rewardToken;
+    constructor(address _service) {
         service = _service;
-        // uint256 MAX_INT = 2**256 - 1;
-        // rewardToken.approve(address(this), MAX_INT);
+    }
+
+    function version() external virtual override pure returns (uint256) {
+        return 1;
     }
 
 
+    /**
+    The function is used to create a new pool
 
-
+    @param _struct The structure that is used to create the pool
+     */
     function addPool(PoolCreationStruct calldata _struct) external hasValidPermit(UNIVERSAL, CREATE_POOL) {
-        
-        // require();
+
         pools[nextPoolId].startTime = _struct.startTime;
         pools[nextPoolId].endTime = _struct.endTime;
         pools[nextPoolId].rewardPerSec = _struct.rewardPerSec;
         pools[nextPoolId].rewardTokenAmount = _struct.rewardTokenAmount;
+        pools[nextPoolId].rewardToken = _struct.rewardToken;
 
         nextPoolId++;
-        rewardToken.safeTransferFrom(msg.sender, address(this), _struct.rewardTokenAmount);
+        _struct.rewardToken.safeTransferFrom(msg.sender, address(this), _struct.rewardTokenAmount);
     }
+
+    /**
+    The function is used to claim
+
+    @param _poolId Id of pool
+    @param _hash Message signed by admin
+    @param sig Signature
+    @param _checkpoints See struct Checkpoint.
+
+    */
 
     function claim(uint256 _poolId, bytes32 _hash, Sig calldata sig, Checkpoint memory _checkpoints) external nonReentrant {
         require(_poolId < nextPoolId, "Wrong pool id");
@@ -122,24 +152,15 @@ contract HolderClaiming is PermitControl, ReentrancyGuard {
         pool.totalAmountClaimed += rewardAmount;
         pool.rewardTokenAmount -= rewardAmount;
         pool.hashes[_hash] = true;
-        rewardToken.safeTransfer(msg.sender, rewardAmount);
+        pool.rewardToken.safeTransfer(msg.sender, rewardAmount);
 
         emit Claim(msg.sender, rewardAmount, block.timestamp);
     }
 
+    /**
+    Internal function for verifying purposes
+     */
     function prefixedHash(bytes32 _hash) pure internal returns (bytes32) {
         return keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", _hash));
-    }
-
-
-    
-
-    /**
-    Sweep all of a particular ERC-20 token from the contract.
-    @param _token The token to sweep the balance from.
-    */
-    function sweep(IERC20 _token) external onlyOwner {
-        uint256 balance = _token.balanceOf(address(this));
-        _token.safeTransferFrom(address(this), msg.sender, balance);
     }
 }

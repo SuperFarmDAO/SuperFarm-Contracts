@@ -17,7 +17,7 @@ describe("Holder", function () {
         Holder = await ethers.getContractFactory("HolderClaiming");
         MockERC20 = await ethers.getContractFactory("MockERC20");
         erc20 = await MockERC20.deploy();
-        holder = await Holder.deploy(erc20.address, service.address);
+        holder = await Holder.deploy(service.address);
 
         CREATE_POOL_RIGHT = await holder.CREATE_POOL();
         UNIVERSAL = await holder.UNIVERSAL();
@@ -43,7 +43,7 @@ describe("Holder", function () {
     });
 
     it("Shoud deploy everything correctly", async function() {
-        expect(await holder.rewardToken()).to.equal(erc20.address);
+        // expect(await holder.rewardToken()).to.equal(erc20.address);
         expect(await holder.service()).to.equal(service.address);
     });
 
@@ -54,7 +54,8 @@ describe("Holder", function () {
                 startTime: currentTime,
                 endTime: currentTime + 100,
                 rewardPerSec: (await ethers.utils.parseEther("1")),
-                rewardTokenAmount: (await ethers.utils.parseEther("10000000"))
+                rewardTokenAmount: (await ethers.utils.parseEther("10000000")),
+                rewardToken: erc20.address
             };
 
             await expect(holder.connect(user_two).addPool(poolCreationStruct)).to.be.revertedWith("P1");
@@ -65,7 +66,8 @@ describe("Holder", function () {
                 startTime: currentTime,
                 endTime: currentTime + 100,
                 rewardPerSec: (await ethers.utils.parseEther("1")),
-                rewardTokenAmount: (await ethers.utils.parseEther("10000000"))
+                rewardTokenAmount: (await ethers.utils.parseEther("10000000")),
+                rewardToken: erc20.address
             };
             await holder.connect(owner).addPool(poolCreationStruct);
 
@@ -81,7 +83,8 @@ describe("Holder", function () {
                 startTime: currentTime + 1000,
                 endTime: currentTime + 1100,
                 rewardPerSec: (await ethers.utils.parseEther("1")),
-                rewardTokenAmount: (await ethers.utils.parseEther("10000000"))
+                rewardTokenAmount: (await ethers.utils.parseEther("10000000")),
+                rewardToken: erc20.address
             };
             await holder.connect(owner).addPool(poolCreationStruct);
 
@@ -104,7 +107,8 @@ describe("Holder", function () {
                 startTime: currentTime,
                 endTime: currentTime + 100,
                 rewardPerSec: (await ethers.utils.parseEther("1")),
-                rewardTokenAmount: (await ethers.utils.parseEther("10000000"))
+                rewardTokenAmount: (await ethers.utils.parseEther("10000000")),
+                rewardToken: erc20.address
             };
             await holder.connect(owner).addPool(poolCreationStruct);
 
@@ -127,7 +131,8 @@ describe("Holder", function () {
                 startTime: currentTime - 10,
                 endTime: currentTime + 100,
                 rewardPerSec: (await ethers.utils.parseEther("1")),
-                rewardTokenAmount: (await ethers.utils.parseEther("10000000"))
+                rewardTokenAmount: (await ethers.utils.parseEther("10000000")),
+                rewardToken: erc20.address
             };
             await holder.connect(owner).addPool(poolCreationStruct);
             let checkpoint = {
@@ -149,7 +154,8 @@ describe("Holder", function () {
                 startTime: currentTime - 10,
                 endTime: currentTime + 100,
                 rewardPerSec: (await ethers.utils.parseEther("1")),
-                rewardTokenAmount: (await ethers.utils.parseEther("10000000"))
+                rewardTokenAmount: (await ethers.utils.parseEther("10000000")),
+                rewardToken: erc20.address
             };
             await holder.connect(owner).addPool(poolCreationStruct);
             let checkpoint = {
@@ -175,7 +181,8 @@ describe("Holder", function () {
                 startTime: currentTime - 10,
                 endTime: currentTime + 100,
                 rewardPerSec: (await ethers.utils.parseEther("1")),
-                rewardTokenAmount: (await ethers.utils.parseEther("1"))
+                rewardTokenAmount: (await ethers.utils.parseEther("1")),
+                rewardToken: erc20.address
             };
             await holder.connect(owner).addPool(poolCreationStruct);
             let checkpoint = {
@@ -196,7 +203,8 @@ describe("Holder", function () {
                 startTime: currentTime - 10,
                 endTime: currentTime + 100,
                 rewardPerSec: (await ethers.utils.parseEther("1")),
-                rewardTokenAmount: (await ethers.utils.parseEther("10000000"))
+                rewardTokenAmount: (await ethers.utils.parseEther("10000000")),
+                rewardToken: erc20.address
             };
             await holder.connect(owner).addPool(poolCreationStruct);
             let checkpoint = {
