@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity 0.8.8;
+pragma solidity ^0.8.8;
 
-import "@openzeppelin/contracts/utils/cryptography/draft-EIP712.sol";
-import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import "../../libraries/EIP712.sol";
 
 import "./Token.sol";
 
@@ -101,26 +100,30 @@ contract ClaimableToken is Token, EIP712 {
     bytes32 _r,
     bytes32 _s
   ) private view returns (bool) {
-    bytes32 digest = ECDSA.toEthSignedMessageHash(
-      keccak256(
-        abi.encodePacked(
-          ECDSA.toTypedDataHash(
-            _domainSeparatorV4(),
-            keccak256(
-              abi.encode(
-                MINT_TYPEHASH,
-                _claimant,
-                _amount
-              )
-            )
-          )
-        )
-      )
-    );
+    
 
     // The claim is validated if it was signed by our authorized signer.
-    return ecrecover(digest, _v, _r, _s) == signer;
+    return ecrecover(_hashToSign(_claimant, _amount), _v, _r, _s) == signer;
   }
+
+  function _hashToSign( address _claimant,
+    uint256 _amount)
+        internal
+        view
+        returns (bytes32)
+    {
+       return keccak256(abi.encodePacked(
+            "\x19\x01",
+            DOMAIN_SEPARATOR,
+            keccak256(
+                abi.encode(
+                    MINT_TYPEHASH,
+                    _claimant,
+                    _amount
+                )
+            )
+        ));
+    }
 
   /**
     Allow a caller to claim any of their available tokens if
