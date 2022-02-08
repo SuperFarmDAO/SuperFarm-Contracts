@@ -24,4 +24,8 @@ interface ISuper721 {
         external
         view
         returns (uint256[] memory);
+
+    function groupMintCount (uint256) external view returns (uint256);
+
+    function mintBatch(address _recipient, uint256[] calldata _ids, bytes memory _data) external;
 }

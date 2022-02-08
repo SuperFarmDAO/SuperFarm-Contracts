@@ -210,8 +210,8 @@ contract Super721 is PermitControl, ERC165Storage, IERC721 {
     bool initialized;
     string name;
     SupplyType supplyType;
-    uint256 supplyData;
     BurnType burnType;
+    uint256 supplyData;
     uint256 burnData;
     uint256 circulatingSupply;
     uint256 mintCount;
@@ -483,6 +483,15 @@ contract Super721 is PermitControl, ERC165Storage, IERC721 {
     require(_owner != address(0),
       "Super721::balanceOf: balance query for the zero address");
     return totalBalances[_owner];
+  }
+
+  /**
+    A low overhead helper function that specifically retrieves a groups current
+    mint count from its itemGroup data
+    @param _groupId The id of the group data being returned
+  */
+  function groupMintCount(uint256 _groupId) external view returns ( uint256 ) {
+    return itemGroups[_groupId].mintCount;
   }
 
   /**
