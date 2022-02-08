@@ -40,55 +40,12 @@ describe('ClaimableToken', function () {
 
 	// Verify that claimants may claim tokens with valid signatures.
 	it('should allow claimants to claim', async () => {
-	//	const network = await ethers.getDefaultProvider().getNetwork();
-
-		// Retrieve the network chain ID.
-		//let chainId = network.chainId;
-
-		// Construct the domain separator for this contract.
-		// let domainSeparator = ethers.utils.keccak256(
-		// 	ethers.utils.defaultAbiCoder.encode(
-		// 		[ 'bytes32', 'bytes32', 'bytes32', 'uint256', 'address' ],
-		// 		[
-		// 			ethers.utils.keccak256(ethers.utils.toUtf8Bytes('EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)')),
-		// 			ethers.utils.keccak256(ethers.utils.toUtf8Bytes(NAME)),
-		// 			ethers.utils.keccak256(ethers.utils.toUtf8Bytes('1')),
-		// 			chainId,
-		// 			claimableToken.address
-		// 		]
-		// 	)
-		// );
-        const domain = {
-            name: NAME,
-            version: "1",
-            chainId: network.config.chainId,
-            verifyingContract: claimableToken.address
-        }
-
-		// // Construct the mint typehash.
-		// let MINT_TYPEHASH = ethers.utils.keccak256(
-		// 	ethers.utils.toUtf8Bytes('mint(address _to,uint256 _amount)')
-		// );
-
-// 		// Construct a digest to give Bob tokens.
-// 		let digest = ethers.utils.keccak256(
-// 			ethers.utils.solidityPack(
-// 				[ 'bytes1', 'bytes1', 'bytes32', 'bytes32' ],
-// 				[
-// 					'0x19',
-// 					'0x01',
-// 					domainSeparator,
-// 					ethers.utils.keccak256(
-// 						ethers.utils.defaultAbiCoder.encode(
-// 							[ 'bytes32', 'address', 'uint256' ],
-// 							[ MINT_TYPEHASH, bob.address, ethers.utils.parseEther('1000') ]
-// 						)
-// 					)
-// 				]
-// 			)
-// 		);
-// 		let signedDigest = await dev.signer.signMessage(digest);
-// console.log('manual', signedDigest)
+		const domain = {
+			name: NAME,
+			version: "1",
+			chainId: network.config.chainId,
+			verifyingContract: claimableToken.address
+		};
 
 		// Our signer can now sign the digest to produce an executable signature.
 		let signature = await dev.signer._signTypedData(
@@ -105,10 +62,8 @@ describe('ClaimableToken', function () {
 			}
 		);
 		let { v, r, s } = ethers.utils.splitSignature(signature);
-// console.log('ethers', signature)
 
 		// Bob should be able to execute this signature.
-		// I can't get this working with either signature. :C
 		let bobBalance = await claimableToken.balanceOf(bob.address);
 		bobBalance.should.be.equal(0);
 		await claimableToken.connect(bob.signer).claim(

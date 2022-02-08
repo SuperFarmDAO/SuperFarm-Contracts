@@ -2,14 +2,14 @@
 pragma solidity ^0.8.8;
 
 import "../../libraries/EIP712.sol";
-
 import "./Token.sol";
 
 /**
-  @title A version of the SuperFarm Token which may be claimed via signatures
+  @title A version of the Token contract which may be claimed via signatures
   that were produced off-chain. This token is intended to be issued as part of a
   claimable airdrop.
   @author Tim Clancy
+  @author Rostislav Khlebnikov
 
   This token contract was developed at a time when airdrops based on off-chain
   activity like OpenSea trading volume were very popular.
@@ -100,30 +100,23 @@ contract ClaimableToken is Token, EIP712 {
     bytes32 _r,
     bytes32 _s
   ) private view returns (bool) {
-    
+    bytes32 digest = keccak256(
+      abi.encodePacked(
+        "\x19\x01",
+        DOMAIN_SEPARATOR,
+        keccak256(
+          abi.encode(
+            MINT_TYPEHASH,
+            _claimant,
+            _amount
+          )
+        )
+      )
+    );
 
     // The claim is validated if it was signed by our authorized signer.
-    return ecrecover(_hashToSign(_claimant, _amount), _v, _r, _s) == signer;
+    return ecrecover(digest, _v, _r, _s) == signer;
   }
-
-  function _hashToSign( address _claimant,
-    uint256 _amount)
-        internal
-        view
-        returns (bytes32)
-    {
-       return keccak256(abi.encodePacked(
-            "\x19\x01",
-            DOMAIN_SEPARATOR,
-            keccak256(
-                abi.encode(
-                    MINT_TYPEHASH,
-                    _claimant,
-                    _amount
-                )
-            )
-        ));
-    }
 
   /**
     Allow a caller to claim any of their available tokens if
