@@ -40,7 +40,7 @@ abstract contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
     /** User registry. */
     address public registry;
 
-    Fees fees;
+    Fees internal fees;
 
     /** Trusted proxy registry contracts. */
     mapping(address => bool) public registries;
@@ -120,7 +120,7 @@ abstract contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
         address platformFeeAddress;
     }
 
-    event OrderApproved(bytes32 indexed hash, address indexed maker, address indexed taker, bytes data);
+    event OrderApproved(bytes32 indexed hash, address indexed maker, address indexed taker, bytes data, bool orderbookInclusionDesired);
     event OrderCancelled(bytes32 indexed hash, address indexed maker, bytes data);
     event OrdersMatched (bytes32 buyHash, bytes32 sellHash, address indexed maker, address indexed taker, bytes data);
     
@@ -330,32 +330,47 @@ abstract contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
             /** If paying using a token (not Ether), transfer tokens. */
             if (sell.outline.paymentToken != address(0)){
                 require(msg.value == 0);
-                {
-                    transferTokens(buy.outline.paymentToken, buy.outline.maker, fees.platformFeeAddress, plFee);
-                    transferTokens(buy.outline.paymentToken, buy.outline.maker, fees.protocolFeeAddress, prFee);
+                {   
+                    if(fees.platformFeeAddress != address(0)) {
+                        transferTokens(buy.outline.paymentToken, buy.outline.maker, fees.platformFeeAddress, plFee);
+                    }
+                     if(fees.protocolFeeAddress != address(0)) {
+                        transferTokens(buy.outline.paymentToken, buy.outline.maker, fees.protocolFeeAddress, prFee);
+                    }
                     receiveAmount -= prFee + plFee;
                 }
-                for(uint256 i = 0; i < sell.addresses.length; i++){
-                    fee = (requiredAmount*sell.fees[i])/10000;
-                    receiveAmount -= fee;
-                    transferTokens(buy.outline.paymentToken, buy.outline.maker, sell.addresses[i], fee);
-                }
+                    for(uint256 i = 0; i < sell.addresses.length; i++){
+                        fee = (requiredAmount*sell.fees[i])/10000;
+                        if (fee != 0 || sell.addresses[i] != address(0) ){
+                            receiveAmount -= fee;
+                            transferTokens(buy.outline.paymentToken, buy.outline.maker, sell.addresses[i], fee);
+                        }
+                    }
+                
                 transferTokens(sell.outline.paymentToken, buy.outline.maker, sell.outline.maker, receiveAmount);
             } else {
                 /** Special-case Ether, order must be matched by buyer. */
                 require(msg.value >= requiredAmount);
                 {
-                    payable(fees.platformFeeAddress).transfer(plFee);
-                    payable(fees.protocolFeeAddress).transfer(prFee);
+                    if (fees.platformFeeAddress != address(0)) {
+                        payable(fees.platformFeeAddress).transfer(plFee);
+                    }
+                    if (fees.protocolFeeAddress != address(0)) {
+                        payable(fees.protocolFeeAddress).transfer(prFee);
+                    }
                     receiveAmount -= prFee + prFee;
                 }
 
                 /** transfer fees */
+                
                 for(uint256 i = 0; i < sell.addresses.length; i++){
                     fee = (requiredAmount*sell.fees[i])/10000;
-                    receiveAmount -= fee;
-                    payable(sell.addresses[i]).transfer(fee);
+                    if (fee != 0 || sell.addresses[i] != address(0) ){
+                        receiveAmount -= fee;
+                        payable(sell.addresses[i]).transfer(fee);
+                    }
                 }
+            
                 payable(sell.outline.maker).transfer(receiveAmount);
 
                 /** Allow overshoot for variable-price auctions, refund difference. */
@@ -465,19 +480,14 @@ abstract contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
         /** Access the passthrough AuthenticatedProxy. */
         AuthenticatedProxy proxy= AuthenticatedProxy(payable(delegateProxy));
         
-        /** EFFECTS */
-
-        /** Mark previously signed or approved orders as finalized. */
-        cancelledOrFinalized[buyHash] = true;
-        cancelledOrFinalized[sellHash] = true;
     
         /** INTERACTIONS */
 
-        /** Execute funds transfer and pay fees. */
-        uint price = executeFundsTransfer(buy, sell);
-
         /** Execute asset transfer call through proxy. */
         require(proxy.call(sell.outline.target, sell.outline.callType, sell.data));
+
+        /** Execute funds transfer and pay fees. */
+        uint price = executeFundsTransfer(buy, sell);
 
         /** Static calls are intentionally done after the effectful call so they can check resulting state. */
 
@@ -491,6 +501,13 @@ abstract contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
             require(staticCall(sell.staticTarget, sell.data, sell.staticExtradata));
         }
 
+         /** EFFECTS */
+
+        /** Mark previously signed or approved orders as finalized. */
+        cancelledOrFinalized[buyHash] = true;
+        cancelledOrFinalized[sellHash] = true;
+
+        /** Invalidate parallel listings */
         if (additionalSales.length > 0){
             require(additionalSales.length == sigs.length, "Marketplace: wrong arguments for invalidation.");
             for(uint i; i < additionalSales.length; i++){
@@ -548,7 +565,7 @@ abstract contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
      * @dev Approve an order and optionally mark it for orderbook inclusion. Must be called by the maker of the order
      * @param order Order to approve
      */
-    function _approveOrder(Order memory order)
+    function _approveOrder(Order calldata order, bool orderbookInclusionDesired)
         internal
     {
         /** CHECKS */
@@ -565,11 +582,10 @@ abstract contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
         require(!approvedOrders[hash]);
 
         /** EFFECTS */
-    
-         /** Mark order as approved. */
+
         approvedOrders[hash] = true;
   
-        emit OrderApproved(hash, order.outline.maker, order.outline.taker, order.data);
+        emit OrderApproved(hash, order.outline.maker, order.outline.taker, order.data, orderbookInclusionDesired);
     }
 
     /**
@@ -577,7 +593,7 @@ abstract contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
      * @param order Order to cancel
      * @param sig ECDSA signature
      */
-    function _cancelOrder(Order memory order, Sig memory sig) 
+    function _cancelOrder(Order calldata order, Sig calldata sig) 
         internal
     {
         /** CHECKS */
@@ -586,14 +602,17 @@ abstract contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
         bytes32 hash = _hashToSign(order);
         
         /** Assert sender is authorized to cancel order. */
-        require(msg.sender == order.outline.maker || authenticateOrder(hash, order.outline.maker, sig));
+        require(msg.sender == order.outline.maker || authenticateOrder(hash, order.outline.maker, sig), "Marketplace: you don't have rights to cancel this order.");
 
         /** EFFECTS */
       
         /** Mark order as cancelled, preventing it from being matched. */
-        cancelledOrFinalized[hash] = true;
+        if (!cancelledOrFinalized[hash]){
 
-        /** Log cancel event. */
-        emit OrderCancelled(hash, msg.sender, order.data);
+            cancelledOrFinalized[hash] = true;
+
+             /** Log cancel event. */
+            emit OrderCancelled(hash, msg.sender, order.data);
+        }
     }
 }
