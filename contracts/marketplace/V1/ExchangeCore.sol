@@ -51,6 +51,9 @@ abstract contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
     /** Orders verified by on-chain approval (alternative to ECDSA signatures so that smart contracts can place orders directly). */
     mapping(bytes32 => bool) public approvedOrders;
 
+    /** Order's item should be finalised after atomic match. */
+    mapping(bytes32 => mapping(address => bool)) public finallizedItems;
+
      /* An ECDSA signature. */ 
     struct Sig {
         /* v parameter */
@@ -124,7 +127,7 @@ abstract contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
 
     event OrderApproved(bytes32 indexed hash, address indexed maker, address indexed taker, bytes data);
     event OrderCancelled(bytes32 indexed hash, address indexed maker, bytes data);
-    event OrdersMatched (bytes32 buyHash, bytes32 sellHash, address indexed maker, address indexed taker, bytes data, bool[] results);
+    event OrdersMatched (bytes32 buyHash, bytes32 sellHash, address indexed maker, address indexed taker, bytes data);
     
     constructor(string memory name, string memory version) EIP712(name, version){}
 
@@ -400,28 +403,44 @@ abstract contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
             if(!(buy.outline.taker == address(0) || buy.outline.taker == sell.outline.maker)){
                 return false;
             }
-            /** Must match targets lengths. */
-            if(!(buy.outline.targets.length == sell.outline.targets.length)){
+            /** Must match maker/taker targets and calltype lengths. */
+            if(!(buy.outline.targets.length == buy.outline.callTypes.length)){
                 return false;
             }
-            /** Must match targets. */
-            for (uint i = 0; i < sell.outline.targets.length; i++) {
-                if(!(buy.outline.targets[i] == sell.outline.targets[i])){
-                    return false;
-                }
-            }
-            /** Must match callTypes lengths */
-            if(!(buy.outline.callTypes.length == sell.outline.callTypes.length)){
+            if(!(sell.outline.targets.length == sell.outline.callTypes.length)){
                 return false;
-            }
-            /** Must match callType. */
-            for (uint i = 0; i < sell.outline.callTypes.length; i++) {
-                if(!(buy.outline.callTypes[i] == sell.outline.callTypes[i])){
-                    return false;
-                }
             }
             return true;
     }
+
+    /**
+     * @dev Check that  
+     * @param buy Buy-side order
+     * @param sell Sell-side order
+     * @param buyHash Hash of buy-side order
+     * @param sellHash Hash of sell-side order
+     * @return Whether or not targets in orders can be matched 
+     */
+    function _targetsMatch(Order memory buy, Order memory sell, bytes32 buyHash, bytes32 sellHash) internal returns(bool) {
+         /** Targets in order of smaller length should match within all targets in other order */
+        uint numberMatched = 0;
+        for (uint i = 0; i < buy.outline.targets.length; i++) {
+            for (uint j = 0; j < sell.outline.targets.length; j++) {
+                if((buy.outline.targets[i] == sell.outline.targets[j])
+                    && !(finallizedItems[sellHash][sell.outline.targets[j]] || finallizedItems[buyHash][buy.outline.targets[i]])){
+                    finallizedItems[sellHash][sell.outline.targets[j]] = true;
+                    finallizedItems[buyHash][buy.outline.targets[i]] = true;
+                    numberMatched++;
+                }
+            }
+        }
+        // number of matched should equal one of targets length 
+        if(buy.outline.targets.length <= sell.outline.targets.length) {
+            return (numberMatched == buy.outline.targets.length);
+        } else {
+            return (numberMatched == sell.outline.targets.length);
+        }
+    } 
 
     /**
      * @dev Atomically match two orders, ensuring validity of the match, and execute all associated state transitions. Protected against reentrancy by a contract-global lock.
@@ -461,14 +480,14 @@ abstract contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
         /** Authenticate sell order. */
         require(authenticateOrder(sellHash, sell.outline.maker, sigSell), "Marketplace: can not autheticate buy order.");
    
-        /** Must match calldata after replacement, if specified. */
+        /** Must match calldata after replacement, if specified. */         // CHECK it shouldn't work
         if (buy.replacementPattern.length > 0) {
             ArrayUtils.guardedArrayReplace(buy.data, sell.data, buy.replacementPattern);
         }
         if (sell.replacementPattern.length > 0) {
             ArrayUtils.guardedArrayReplace(sell.data, buy.data, sell.replacementPattern);
         }
-        require(ArrayUtils.arrayEq(buy.data, sell.data), "Marketplace: orders function call is not matched.");
+        require(ArrayUtils.arrayEq(buy.data, sell.data), "Marketplace: orders function call is not matched."); // TO_ASK remove ?? 
         
         /** Retrieve delegateProxy contract. */
         address delegateProxy = IProxyRegistry(registry).proxies(sell.outline.maker);
@@ -484,9 +503,20 @@ abstract contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
         
         /** EFFECTS */
 
+        /** check that all targets from */
+        require(_targetsMatch(buy, sell, buyHash, sellHash), "Marketplace: targets in orders are not matched");
+ 
         /** Mark previously signed or approved orders as finalized. */
-        cancelledOrFinalized[buyHash] = true;
-        cancelledOrFinalized[sellHash] = true;
+        if (buy.outline.targets.length == sell.outline.targets.length) {
+            cancelledOrFinalized[buyHash] = true;
+            cancelledOrFinalized[sellHash] = true;
+        }
+        if (buy.outline.targets.length < sell.outline.targets.length) { 
+            cancelledOrFinalized[buyHash] = true;
+        }
+        if (buy.outline.targets.length > sell.outline.targets.length) { 
+            cancelledOrFinalized[sellHash] = true;
+        }
     
         /** INTERACTIONS */
 
@@ -494,10 +524,9 @@ abstract contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
         uint price = executeFundsTransfer(buy, sell);
 
         /** Execute asset transfer call through proxy. */ 
-        // CHECK 
-        bool[] memory results = new bool[](sell.outline.targets.length);
+        // TODO transfer for on smallest array
         for (uint i = 0; i < sell.outline.targets.length; i++) {
-            results[i] = proxy.call(sell.outline.targets[i], sell.outline.callTypes[i], ArrayUtils.bytesSlice(sell.calldataPointers[i], (sell.calldataPointers[i]-1), sell.data));
+            require(proxy.call(sell.outline.targets[i], sell.outline.callTypes[i], sell.data), "Marketplace: transaction of assets failed");
         } 
 
         /** Static calls are intentionally done after the effectful call so they can check resulting state. */
@@ -522,7 +551,7 @@ abstract contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
         /** Log match */
         bytes memory settledParameters = abi.encode(price, sell.outline.targets, buy.data);
 
-        emit OrdersMatched(buyHash, sellHash,sell.outline.maker, buy.outline.maker, settledParameters, results);
+        emit OrdersMatched(buyHash, sellHash,sell.outline.maker, buy.outline.maker, settledParameters);
     }
 
     /**
