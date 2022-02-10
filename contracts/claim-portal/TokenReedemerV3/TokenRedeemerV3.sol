@@ -7,6 +7,7 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "../../assets/erc1155/interfaces/ISuper1155.sol";
 import "../../assets/erc721/interfaces/ISuper721.sol";
 import "../../interfaces/ISuperGeneric.sol";
+import "hardhat/console.sol";
 
 
 /**
@@ -35,9 +36,9 @@ contract TokenRedeemerV3 is Ownable, ReentrancyGuard {
   struct RedemptionConfig {
     uint256 groupIdOut;
     uint256 amountOut;
+    address tokenOut;
     bool burnOnRedemption;
     bool customBurn;
-    address tokenOut;
     Requirement[] requirements;
     mapping(address => bool) redeemed;
   }
@@ -51,9 +52,9 @@ contract TokenRedeemerV3 is Ownable, ReentrancyGuard {
   struct RedemptionConfigStructCreation {
     uint256 groupIdOut;
     uint256 amountOut;
+    address tokenOut;
     bool burnOnRedemption;
     bool customBurn;
-    address tokenOut;
     Requirement[] requirements;
   }
 
@@ -83,24 +84,33 @@ contract TokenRedeemerV3 is Ownable, ReentrancyGuard {
     burnAddress = _burnAddress;
   }
 
-  function setRedemptionConfig(RedemptionConfigStructCreation calldata _data, uint256 _configId) internal {
+  function setRedemptionConfig(RedemptionConfigStructCreation calldata _data, uint256 _configId) public {
     require(_data.groupIdOut != 0, "TokenRedeemer::setRedemptionConfig: group id cannot be zero");
     require(_data.amountOut != 0, "TokenRedeemer::setRedemptionConfig: amount out cannot be zero");
     require(_data.tokenOut != address(0), "TokenRedeemer::setRedemptionConfig: token out cannot be zero address");
     require(_data.requirements.length > 0, "TokenRedeemer::setRedemptionConfig: must specify requirements");
+    // uint256 length = _data.requirements.length;
+    // Requirement[] memory reqs = new Requirement[](length);
 
-    for(uint i = 0; i < _data.requirements.length; ++i) {
+    for(uint i = 0; i < _data.requirements.length; i++) {
         require(_data.requirements[i].collection != address(0), "TokenRedeemer::redeem: required token cannot be zero");
         require(_data.requirements[i].tokenId.length > 0);
         require(_data.requirements[i].amounts.length == _data.requirements[i].tokenId.length);
-      }
+        redemptionConfigs[_configId].requirements.push(_data.requirements[i]);
 
+      // for (uint j = 0; j < _data.requirements[i].amounts.length; j++) {
+      //   redemptionConfigs[_configId].requirements[i].amounts.push(_data.requirements[i].amounts[j]);
+      //   redemptionConfigs[_configId].requirements[i].tokenId.push(_data.requirements[i].tokenId[j]);
+      // }
+      }
     redemptionConfigs[_configId].groupIdOut = _data.groupIdOut;
     redemptionConfigs[_configId].amountOut = _data.amountOut;
     redemptionConfigs[_configId].burnOnRedemption = _data.burnOnRedemption;
     redemptionConfigs[_configId].customBurn = _data.customBurn;
-    redemptionConfigs[_configId].requirements = _data.requirements;
+    // redemptionConfigs[_configId].requirements = reqs;
     redemptionConfigs[_configId].tokenOut = _data.tokenOut;
+
+   
 
 
 
@@ -114,22 +124,25 @@ contract TokenRedeemerV3 is Ownable, ReentrancyGuard {
 
     @param _configId The address of the token being received
   */
-  function redeem(uint256 _configId) public nonReentrant {
+  function redeem(uint256 _configId) external nonReentrant {
 
 
     RedemptionConfig storage config = redemptionConfigs[_configId];
     require(!config.redeemed[msg.sender]);
     Requirement[] memory req = config.requirements;
+    bool burnOnRedemption = config.burnOnRedemption;
+    bool customBurn = config.customBurn;
 
     require(checkBalances(req), "TokenRedeemer::redeem: msg sender is not token owner");
-    
+    uint256[] memory tokenToBurnIds;
+    uint256[] memory tokenToBurnAmounts;
     for (uint i = 0; i < req.length; i++) {
-      uint256[] memory tokenToBurnIds = req[i].tokenId;
-      uint256[] memory tokenToBurnAmounts = req[i].amounts;
+      tokenToBurnIds = req[i].tokenId;
+      tokenToBurnAmounts = req[i].amounts;
       address tokenToBurn = req[i].collection;
 
-      if (config.burnOnRedemption) {
-        if (config.customBurn) {
+      if (burnOnRedemption) {
+        if (customBurn) {
           genericTransfer(msg.sender, burnAddress, tokenToBurn, tokenToBurnIds, tokenToBurnAmounts);
         } else {
           genericBurn(tokenToBurn, tokenToBurnIds, tokenToBurnAmounts);
