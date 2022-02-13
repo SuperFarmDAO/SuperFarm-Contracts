@@ -24,12 +24,12 @@ abstract contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
 
     bytes32 public constant OUTLINE_TYPEHASH =
         keccak256(
-            "Outline(uint256 basePrice,uint256 listingTime,uint256 expirationTime,address exchange,address maker,uint8 side,address taker,uint8 saleKind,address[] targets,uint8 callType,address paymentToken)"
+            "Outline(uint256 basePrice,uint256 listingTime,uint256 expirationTime,address exchange,address maker,uint8 side,address taker,uint8 saleKind,address[] targets,uint8[] callTypes,address paymentToken)"
         );
 
     bytes32 public constant ORDER_TYPEHASH =
         keccak256(
-            "Order(Outline outline,uint256[] extra,uint256 salt,uint256[] fees,uint256[] calldataPointers,address[] addresses,address staticTarget,bytes data,bytes replacementPattern,bytes staticExtradata)Outline(uint256 basePrice,uint256 listingTime,uint256 expirationTime,address exchange,address maker,uint8 side,address taker,uint8 saleKind,address target,uint8 callType,address paymentToken)"
+            "Order(Outline outline,uint256[] extra,uint256 salt,uint256[] fees,uint256[] dataPointers,address[] addresses,address staticTarget,bytes data,bytes replacementPattern,bytes staticExtradata)Outline(uint256 basePrice,uint256 listingTime,uint256 expirationTime,address exchange,address maker,uint8 side,address taker,uint8 saleKind,address[] targets,uint8[] callTypes,address paymentToken)"
         );
 
     bytes4 constant internal EIP_1271_MAGICVALUE = 0x20c13b0b;
@@ -100,8 +100,8 @@ abstract contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
         uint256 salt;
         /** Royalty fees*/ 
         uint256[] fees;
-        /** Pointers for spliting calldata*/
-        uint256[] calldataPointers;
+        /** Pointers for spliting calldata*/            // CHECK is it needed?
+        uint256[] dataPointers;
         /** Royalty fees receivers*/ 
         address[] addresses; 
         /** Static call target, zero-address for no static call. */
@@ -187,7 +187,7 @@ abstract contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
                 keccak256(abi.encodePacked(order.extra)),
                 order.salt,
                 keccak256(abi.encodePacked(order.fees)),
-                keccak256(abi.encodePacked(order.calldataPointers)),
+                keccak256(abi.encodePacked(order.dataPointers)), 
                 keccak256(abi.encodePacked(order.addresses)),
                 order.staticTarget,
                 keccak256(order.data),
@@ -213,8 +213,8 @@ abstract contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
                     outline.side,
                     outline.taker,
                     outline.saleKind,
-                    outline.targets,
-                    outline.callTypes,
+                    keccak256(abi.encodePacked(outline.targets)),
+                    keccak256(abi.encodePacked(outline.callTypes)),
                     outline.paymentToken
                 )
             );
@@ -424,20 +424,38 @@ abstract contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
     function _targetsMatch(Order memory buy, Order memory sell, bytes32 buyHash, bytes32 sellHash) internal returns(bool) {
          /** Targets in order of smaller length should match within all targets in other order */
         uint numberMatched = 0;
-        for (uint i = 0; i < buy.outline.targets.length; i++) {
-            for (uint j = 0; j < sell.outline.targets.length; j++) {
-                if((buy.outline.targets[i] == sell.outline.targets[j])
-                    && !(finallizedItems[sellHash][sell.outline.targets[j]] || finallizedItems[buyHash][buy.outline.targets[i]])){
-                    finallizedItems[sellHash][sell.outline.targets[j]] = true;
-                    finallizedItems[buyHash][buy.outline.targets[i]] = true;
-                    numberMatched++;
-                }
-            }
-        }
+        // reduce the number of checks in inner loop 
+        uint innerLoopLast = 0;
         // number of matched should equal one of targets length 
         if(buy.outline.targets.length <= sell.outline.targets.length) {
+            for (uint i = 0; i < buy.outline.targets.length; i++) {
+                for (uint j = innerLoopLast; j < sell.outline.targets.length; j++) {
+                    if((buy.outline.targets[i] == sell.outline.targets[j])
+                        && !(finallizedItems[sellHash][sell.outline.targets[j]] || finallizedItems[buyHash][buy.outline.targets[i]])){
+                        finallizedItems[sellHash][sell.outline.targets[j]] = true;
+                        finallizedItems[buyHash][buy.outline.targets[i]] = true;
+                        numberMatched++;
+                        innerLoopLast = j + 1; // start from next element 
+                        break;
+                    }
+                }
+            }
+            // return true if all targets in buy order matches
             return (numberMatched == buy.outline.targets.length);
         } else {
+            for (uint i = 0; i < sell.outline.targets.length; i++) {
+                for (uint j = innerLoopLast; j < buy.outline.targets.length; j++) {
+                    if((sell.outline.targets[i] == buy.outline.targets[j])
+                        && !(finallizedItems[sellHash][sell.outline.targets[j]] || finallizedItems[buyHash][buy.outline.targets[i]])){
+                        finallizedItems[sellHash][sell.outline.targets[j]] = true;
+                        finallizedItems[buyHash][buy.outline.targets[i]] = true;
+                        numberMatched++;
+                        innerLoopLast = j + 1; // start from next element 
+                        break;
+                    }
+                }
+            }
+            // return true if all targets in sell order matches
             return (numberMatched == sell.outline.targets.length);
         }
     } 
@@ -478,7 +496,7 @@ abstract contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
         require(authenticateOrder(buyHash, buy.outline.maker, sigBuy), "Marketplace: can not autheticate buy order.");
 
         /** Authenticate sell order. */
-        require(authenticateOrder(sellHash, sell.outline.maker, sigSell), "Marketplace: can not autheticate buy order.");
+        require(authenticateOrder(sellHash, sell.outline.maker, sigSell), "Marketplace: can not autheticate sell order.");
    
         /** Must match calldata after replacement, if specified. */         // CHECK it shouldn't work
         if (buy.replacementPattern.length > 0) {
@@ -487,7 +505,7 @@ abstract contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
         if (sell.replacementPattern.length > 0) {
             ArrayUtils.guardedArrayReplace(sell.data, buy.data, sell.replacementPattern);
         }
-        require(ArrayUtils.arrayEq(buy.data, sell.data), "Marketplace: orders function call is not matched."); // TO_ASK remove ?? 
+        // require(ArrayUtils.arrayEq(buy.data, sell.data), "Marketplace: orders function call is not matched."); // TO_ASK remove ?? 
         
         /** Retrieve delegateProxy contract. */
         address delegateProxy = IProxyRegistry(registry).proxies(sell.outline.maker);
@@ -524,10 +542,8 @@ abstract contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
         uint price = executeFundsTransfer(buy, sell);
 
         /** Execute asset transfer call through proxy. */ 
-        // TODO transfer for on smallest array
-        for (uint i = 0; i < sell.outline.targets.length; i++) {
-            require(proxy.call(sell.outline.targets[i], sell.outline.callTypes[i], sell.data), "Marketplace: transaction of assets failed");
-        } 
+        // CHECK
+        require(proxy.call(sell.outline.targets, sell.outline.callTypes, sell.data, sell.dataPointers), "Marketplace: transaction of assets failed");
 
         /** Static calls are intentionally done after the effectful call so they can check resulting state. */
 

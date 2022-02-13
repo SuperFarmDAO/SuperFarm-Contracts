@@ -47,14 +47,15 @@ export function makeOrder(
     _expirationTime, 
     _salt,
     _fees, 
+    _dataPointers,
     _addresses, 
     _exchange, 
     _maker,
     _side,
     _taker, 
     _saleKind,
-    _callType,
-    _target,
+    _callTypes,
+    _targets,
     _staticTarget,
     _paymentToken,
     _data,
@@ -71,13 +72,14 @@ export function makeOrder(
             side: _side,
             taker: _taker,
             saleKind: _saleKind,
-            target: _target,
-            callType: _callType,
+            targets: _targets,
+            callTypes: _callTypes,
             paymentToken: _paymentToken
         },
         extra: _extra,
         salt: _salt,
         fees: _fees,
+        dataPointers: _dataPointers,
         addresses: _addresses,
         staticTarget: _staticTarget,
         data: _data,
@@ -152,6 +154,10 @@ export const OrderType = {
             type: "uint256[]"
         },
         {
+            name: "dataPointers",
+            type: "uint256[]"
+        },
+        {
             name: "addresses",
             type: "address[]"
         },
@@ -206,12 +212,12 @@ export const OrderType = {
             type: "uint8"
         },
         {
-            name: "target",
-            type: "address"
+            name: "targets",
+            type: "address[]"
         },
         {
-            name: "callType",
-            type: "uint8"
+            name: "callTypes",
+            type: "uint8[]"
         },
         {
             name: "paymentToken",

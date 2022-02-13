@@ -5,6 +5,7 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 
 import "./TokenRecipient.sol";
 import "../interfaces/IProxyRegistry.sol";
+import "hardhat/console.sol";
 
 /**
   @title An ownable call-delegating proxy which can receive tokens and only make
@@ -98,6 +99,32 @@ contract AuthenticatedProxy is Ownable, TokenRecipient {
       return success;
     }
     return false;
+  }
+
+  function call(address[] calldata _targets, CallType[] calldata _types, bytes calldata _data,uint[] calldata pointers) public
+    returns (bool) {
+    require(_msgSender() == owner()
+      || (!revoked && IProxyRegistry(registry).authorizedCallers(_msgSender())),
+      "AuthenticatedProxy: not owner, not authorized by an unrevoked registry");
+
+    uint start = 0;
+    console.logBytes(_data);
+    console.logUint(pointers[0]);
+    for (uint256 i = 0; i < _targets.length; i++) {
+      // The call is authorized to be performed, now select a type and return.
+      uint end = pointers[i];
+      if (_types[i] == CallType.Call) {
+        (bool success, ) = _targets[i].call(_data[start:end]);
+        require(success, "AuthenticatedProxy: call finished unsuccessful");
+
+      } else if (_types[i] == CallType.DelegateCall) {
+        (bool success, ) = _targets[i].delegatecall(_data[start:end]);
+        require(success, "AuthenticatedProxy: delegateCall finished unsuccessful");
+      }
+      start = end + 1;
+      // return false;
+    } 
+    return true;
   }
 
   /**

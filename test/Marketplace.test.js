@@ -66,14 +66,15 @@ describe("SuperFarm Marketplace", function(){
             time + 100, 
             salt, 
             [200, 300, 400], // 100 = 1% in basis points
+            [dataSell.length-3], // Check that works 
             [creator.address, royaltyOwner1.address, royaltyOwner2.address],
             marketplace.address, 
             bob.address, // Seller
             1, 
             utils.NULL_ADDRESS, 
             0, 
-            0,
-            erc721.address, 
+            [0],
+            [erc721.address], 
             utils.NULL_ADDRESS, 
             weth.address, 
             dataSell, 
@@ -89,20 +90,23 @@ describe("SuperFarm Marketplace", function(){
             await utils.getCurrentTime() + 100, 
             salt, 
             [], 
+            [dataBuy.length-3],
             [], 
             marketplace.address, 
             alice.address, // Buyer
             0, 
             utils.NULL_ADDRESS, 
             0, 
-            0,
-            erc721.address, 
+            [0],
+            [erc721.address], 
             utils.NULL_ADDRESS, 
             weth.address, 
             dataBuy, 
             utils.replacementPatternBuy, 
             0x0 
-        )
+        );
+        console.log(`legnth of data for Buy is ${dataBuy.length}`);
+        console.log(`data for call is ${dataBuy}`);
         // Sign Orders
         let signatureSell = await bob._signTypedData(domain, utils.OrderType, orderSell);
         let signatureBuy = await alice._signTypedData(domain, utils.OrderType, orderBuy);
@@ -150,14 +154,15 @@ describe("SuperFarm Marketplace", function(){
             salt, 
             // Different combination of fees and addresses were checked!
             [200, 300, 400], // 100 = 1% in basis points
+            [], // TODO
             [creator.address, royaltyOwner2.address, royaltyOwner1.address], 
             marketplace.address, 
             bob.address, // Seller
             1, 
             utils.NULL_ADDRESS, 
             1, // DecreasingPrice
-            0,
-            erc721.address, 
+            [0],
+            [erc721.address], 
             utils.NULL_ADDRESS, 
             weth.address, 
             dataSell, 
@@ -173,14 +178,15 @@ describe("SuperFarm Marketplace", function(){
             time + 1000, 
             salt, 
             [], 
+            [], // TODO
             [], 
             marketplace.address, 
             alice.address, // Buyer
             0, 
             utils.NULL_ADDRESS, 
             1, 
-            0,
-            erc721.address, 
+            [0],
+            [erc721.address], 
             utils.NULL_ADDRESS, 
             weth.address, 
             dataBuy, 
@@ -239,14 +245,15 @@ describe("SuperFarm Marketplace", function(){
             time + 1000, 
             salt, 
             [200, 300, 400], // 100 = 1% in basis points
+            [], // TODO
             [creator.address, royaltyOwner2.address, royaltyOwner1.address],
             marketplace.address, 
             bob.address, // Seller
             1, 
             utils.NULL_ADDRESS, 
             0,
-            0,
-            erc721.address, 
+            [0],
+            [erc721.address], 
             utils.NULL_ADDRESS, 
             utils.NULL_ADDRESS, 
             dataSell, 
@@ -262,14 +269,15 @@ describe("SuperFarm Marketplace", function(){
             time + 1000, 
             salt, 
             [], 
+            [], // TODO
             [], 
             marketplace.address, 
             alice.address, // Buyer
             0, 
             utils.NULL_ADDRESS, 
             0, 
-            0,
-            erc721.address, 
+            [0],
+            [erc721.address], 
             utils.NULL_ADDRESS, 
             utils.NULL_ADDRESS, 
             dataBuy, 
@@ -314,14 +322,15 @@ describe("SuperFarm Marketplace", function(){
             time + 1000, 
             salt, 
             [200, 300, 400], // 100 = 1% in basis points
+            [], // TODO
             [creator.address, royaltyOwner2.address, royaltyOwner1.address],
             marketplace.address, 
             bob.address, // Seller
             1, 
             utils.NULL_ADDRESS, 
             2,
-            0,
-            erc721.address, 
+            [0],
+            [erc721.address], 
             utils.NULL_ADDRESS, 
             utils.NULL_ADDRESS, 
             dataSell, 
@@ -337,14 +346,15 @@ describe("SuperFarm Marketplace", function(){
             time + 1000, 
             salt, 
             [], 
+            [], // TODO
             [], 
             marketplace.address, 
             alice.address, // Buyer
             0, 
             utils.NULL_ADDRESS, 
             2, 
-            0,
-            erc721.address, 
+            [0],
+            [erc721.address], 
             utils.NULL_ADDRESS, 
             utils.NULL_ADDRESS, 
             dataBuy, 
@@ -389,14 +399,15 @@ describe("SuperFarm Marketplace", function(){
             time + 1000, 
             salt, 
             [200, 300, 400], // 100 = 1% in basis points
+            [], // TODO
             [creator.address, royaltyOwner2.address, royaltyOwner1.address],
             marketplace.address, 
             bob.address, // Seller
             1, 
             utils.NULL_ADDRESS, 
             3,
-            0,
-            erc721.address, 
+            [0],
+            [erc721.address], 
             utils.NULL_ADDRESS, 
             utils.NULL_ADDRESS, 
             dataSell, 
@@ -412,14 +423,15 @@ describe("SuperFarm Marketplace", function(){
             time + 1000, 
             salt, 
             [], 
+            [], // TODO
             [], 
             marketplace.address, 
             alice.address, // Buyer
             0, 
             utils.NULL_ADDRESS, 
             3, 
-            0,
-            erc721.address, 
+            [0],
+            [erc721.address], 
             utils.NULL_ADDRESS, 
             utils.NULL_ADDRESS, 
             dataBuy, 
@@ -451,4 +463,8 @@ describe("SuperFarm Marketplace", function(){
         expect(await erc721.balanceOf(bob.address)).to.be.eq("0")
     });
 
+    // TODO later 
+    // t("Sell 2 different erc721 at one time", async function () {});
+    // t("Buy 2 different erc721 at one time", async function () {});
+    // t("Revert if orders are not fullfilled 2 different erc721 at one time", async function () {});
 });
