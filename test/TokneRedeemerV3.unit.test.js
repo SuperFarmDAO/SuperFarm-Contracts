@@ -78,19 +78,19 @@ describe("TokenRedeemerV3", function () {
 
         await super1155.connect(owner).mintBatch(user_one.address, [shiftedItemGroupId], ["2"], "0x02");
 
-        let balance = await super1155.balanceOf(user_one.address, itemGroupId);
+        let balance = await super1155.balanceOf(user_one.address, shiftedItemGroupId.add(1));
         console.log(balance)
 
 
         let config = {
-            groupIdOut: shiftedItemGroupId,
+            groupIdOut: itemGroupId.add(1),
             amountOut: 1,
             tokenOut: super721.address,
             burnOnRedemption: false,
             customBurn: false,
             requirements: [{
                 collection: super1155.address,
-                tokenId: [shiftedItemGroupId],
+                tokenId: [shiftedItemGroupId.add(1)],
                 amounts: [1]
             }]
         }
