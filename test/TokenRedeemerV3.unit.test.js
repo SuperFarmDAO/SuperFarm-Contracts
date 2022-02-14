@@ -51,7 +51,7 @@ describe("TokenRedeemerV3", function () {
         mintRight = await super721.MINT();
 
 
-        await super721.connect(owner).configureGroup(itemGroupId, {
+        await super721.connect(owner).configureGroup(shiftedItemGroupId, {
             name: 'NFT',
             supplyType: 0,
             supplyData: 20000,
