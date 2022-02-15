@@ -320,15 +320,25 @@ describe('===Super721Lite===', function () {
             });
             expect(await ethers.utils.getAddress(t.substring(t.length - 40, t.length))).to.be.equal(signer1.address);
 
-             // Signer1 now owns 4th index
-             abi = ["function ownerOf(uint256)"];
-             interfaced = new ethers.utils.Interface(abi);
-             callData = interfaced.encodeFunctionData("ownerOf", [4]);
-             t = await ethers.provider.call({
-                 to: super721LiteProxy1.address,
-                 data: callData
-             });
-             expect(await ethers.utils.getAddress(t.substring(t.length - 40, t.length))).to.be.equal(signer1.address);
+            // Signer1 now owns 4th index
+            abi = ["function ownerOf(uint256)"];
+            interfaced = new ethers.utils.Interface(abi);
+            callData = interfaced.encodeFunctionData("ownerOf", [4]);
+            t = await ethers.provider.call({
+                to: super721LiteProxy1.address,
+                data: callData
+            });
+            expect(await ethers.utils.getAddress(t.substring(t.length - 40, t.length))).to.be.equal(signer1.address);
+
+            // Check whether the interfaces were registered
+            abi = ["function supportsInterface(bytes4 interfaceId)"];
+            interfaced = new ethers.utils.Interface(abi);
+            callData = interfaced.encodeFunctionData("supportsInterface", [0x80ac58cd]);
+            t = await ethers.provider.call({
+                to: super721LiteProxy1.address,
+                data: callData
+            });
+            expect(await ethers.BigNumber.from(t)).to.be.equal(1);
         });
     });
 });

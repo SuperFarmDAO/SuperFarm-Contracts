@@ -97,8 +97,11 @@ PermitControlds, ERC165Storage, IERC1155, IERC1155MetadataURI {
     A function that needs to be called immediately after deployment.
     Sets the owner of the newly deployed proxy.
   */
-  function initialize() public initializer {
+  function initialize(address _owner) public initializer {
       __Ownable_init_unchained();
+      _registerInterface(Super1155LiteBlueprint.INTERFACE_ERC1155);
+      _registerInterface(Super1155LiteBlueprint.INTERFACE_ERC1155_METADATA_URI);
+      transferOwnership(_owner);
   }
 
   /**

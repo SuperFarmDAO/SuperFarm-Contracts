@@ -33,21 +33,11 @@ contract Super721LiteProxy {
     Super721LiteBlueprint.Super721LiteStateVariables
       storage b = Super721LiteBlueprint.super721LiteStateVariables();
     
-    // Execute all the delegate calls
-    bool resultant = true;
-    (bool success,) = _implementation.delegatecall(abi.encodeWithSignature("initialize()")); // Deployer owns
-    resultant = success && resultant;
-    (success,) = _implementation.delegatecall(abi.encodeWithSignature("registerInterface(bytes4)", Super721LiteBlueprint._INTERFACE_ID_ERC721)); 
-    resultant = success && resultant;
-    (success,) = _implementation.delegatecall(abi.encodeWithSignature("registerInterface(bytes4)", Super721LiteBlueprint._INTERFACE_ID_ERC721_METADATA)); 
-    resultant = success && resultant;
-    (success,) = _implementation.delegatecall(abi.encodeWithSignature("registerInterface(bytes4)", Super721LiteBlueprint._INTERFACE_ID_ERC721_ENUMERABLE)); 
-    resultant = success && resultant;
-    (success,) = _implementation.delegatecall(abi.encodeWithSignature("transferOwnership(address)", _owner)); // Owner owns
-    resultant = success && resultant;
+    // Execute a delegate call for initialization
+    (bool success,) = _implementation.delegatecall(abi.encodeWithSignature("initialize(address)", _owner));
 
     // Represents collective succuess
-    require(resultant, "Delegate call failed");
+    require(success, "Delegate call failed");
 
     // If deployment is success, store constructor parameters
     b.name = _name;

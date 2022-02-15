@@ -115,8 +115,12 @@ PermitControlds, ERC165Storage, IERC721, IERC721Enumerable, IERC721Metadata {
     A function that needs to be called immediately after deployment.
     Sets the owner of the newly deployed proxy.
   */
-  function initialize() external initializer {
-      __Ownable_init_unchained();
+  function initialize(address _owner) external initializer {
+    __Ownable_init_unchained();
+    _registerInterface(Super721LiteBlueprint._INTERFACE_ID_ERC721);
+    _registerInterface(Super721LiteBlueprint._INTERFACE_ID_ERC721_METADATA);
+    _registerInterface(Super721LiteBlueprint._INTERFACE_ID_ERC721_ENUMERABLE);
+    transferOwnership(_owner);
   }
 
 /**
