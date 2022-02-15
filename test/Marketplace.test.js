@@ -66,7 +66,7 @@ describe("SuperFarm Marketplace", function(){
             time + 100, 
             salt, 
             [200, 300, 400], // 100 = 1% in basis points
-            [dataSell.length-3], // Check that works 
+            [(dataSell.length-2)/2], // Check that works 
             [creator.address, royaltyOwner1.address, royaltyOwner2.address],
             marketplace.address, 
             bob.address, // Seller
@@ -90,7 +90,7 @@ describe("SuperFarm Marketplace", function(){
             await utils.getCurrentTime() + 100, 
             salt, 
             [], 
-            [dataBuy.length-3],
+            [(dataBuy.length-2)/2],
             [], 
             marketplace.address, 
             alice.address, // Buyer
@@ -105,8 +105,6 @@ describe("SuperFarm Marketplace", function(){
             utils.replacementPatternBuy, 
             0x0 
         );
-        console.log(`legnth of data for Buy is ${dataBuy.length}`);
-        console.log(`data for call is ${dataBuy}`);
         // Sign Orders
         let signatureSell = await bob._signTypedData(domain, utils.OrderType, orderSell);
         let signatureBuy = await alice._signTypedData(domain, utils.OrderType, orderBuy);
@@ -154,7 +152,7 @@ describe("SuperFarm Marketplace", function(){
             salt, 
             // Different combination of fees and addresses were checked!
             [200, 300, 400], // 100 = 1% in basis points
-            [], // TODO
+            [(dataSell.length-2)/2],
             [creator.address, royaltyOwner2.address, royaltyOwner1.address], 
             marketplace.address, 
             bob.address, // Seller
@@ -178,7 +176,7 @@ describe("SuperFarm Marketplace", function(){
             time + 1000, 
             salt, 
             [], 
-            [], // TODO
+            [(dataBuy.length-2)/2], 
             [], 
             marketplace.address, 
             alice.address, // Buyer
@@ -245,7 +243,7 @@ describe("SuperFarm Marketplace", function(){
             time + 1000, 
             salt, 
             [200, 300, 400], // 100 = 1% in basis points
-            [], // TODO
+            [(dataSell.length-2)/2], 
             [creator.address, royaltyOwner2.address, royaltyOwner1.address],
             marketplace.address, 
             bob.address, // Seller
@@ -269,7 +267,7 @@ describe("SuperFarm Marketplace", function(){
             time + 1000, 
             salt, 
             [], 
-            [], // TODO
+            [(dataBuy.length-2)/2], 
             [], 
             marketplace.address, 
             alice.address, // Buyer
@@ -322,7 +320,7 @@ describe("SuperFarm Marketplace", function(){
             time + 1000, 
             salt, 
             [200, 300, 400], // 100 = 1% in basis points
-            [], // TODO
+            [(dataSell.length-2)/2], 
             [creator.address, royaltyOwner2.address, royaltyOwner1.address],
             marketplace.address, 
             bob.address, // Seller
@@ -346,7 +344,7 @@ describe("SuperFarm Marketplace", function(){
             time + 1000, 
             salt, 
             [], 
-            [], // TODO
+            [(dataBuy.length-2)/2], 
             [], 
             marketplace.address, 
             alice.address, // Buyer
@@ -399,7 +397,7 @@ describe("SuperFarm Marketplace", function(){
             time + 1000, 
             salt, 
             [200, 300, 400], // 100 = 1% in basis points
-            [], // TODO
+            [(dataSell.length-2)/2], 
             [creator.address, royaltyOwner2.address, royaltyOwner1.address],
             marketplace.address, 
             bob.address, // Seller
@@ -423,7 +421,7 @@ describe("SuperFarm Marketplace", function(){
             time + 1000, 
             salt, 
             [], 
-            [], // TODO
+            [(dataBuy.length-2)/2], 
             [], 
             marketplace.address, 
             alice.address, // Buyer

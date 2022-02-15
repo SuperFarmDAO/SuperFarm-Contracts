@@ -5,7 +5,6 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 
 import "./TokenRecipient.sol";
 import "../interfaces/IProxyRegistry.sol";
-import "hardhat/console.sol";
 
 /**
   @title An ownable call-delegating proxy which can receive tokens and only make
@@ -108,8 +107,6 @@ contract AuthenticatedProxy is Ownable, TokenRecipient {
       "AuthenticatedProxy: not owner, not authorized by an unrevoked registry");
 
     uint start = 0;
-    console.logBytes(_data);
-    console.logUint(pointers[0]);
     for (uint256 i = 0; i < _targets.length; i++) {
       // The call is authorized to be performed, now select a type and return.
       uint end = pointers[i];
