@@ -25,7 +25,7 @@ let super1155, Super1155;
 describe("TokenRedeemerV3", function () {
     before(async function() {
         [owner, user_one, user_two, user_three] = await ethers.getSigners();
-        TokenRedeemer = await ethers.getContractFactory("TokenRedeemerV3");
+        TokenRedeemer = await ethers.getContractFactory("TokenRedeemer");
         tr = await TokenRedeemer.deploy(NULL_ADDRESS);
 
         Super1155 = await ethers.getContractFactory("Super1155");
@@ -51,7 +51,7 @@ describe("TokenRedeemerV3", function () {
         mintRight = await super721.MINT();
 
 
-        await super721.connect(owner).configureGroup(shiftedItemGroupId, {
+        await super721.connect(owner).configureGroup(itemGroupId, {
             name: 'NFT',
             supplyType: 0,
             supplyData: 20000,
@@ -76,6 +76,9 @@ describe("TokenRedeemerV3", function () {
             burnData: 0
         });
 
+        await super721.connect(owner).mintBatch(user_one.address, [shiftedItemGroupId], ethers.utils.id('a'));
+
+
         await super1155.connect(owner).mintBatch(user_one.address, [shiftedItemGroupId], ["2"], "0x02");
 
         let balance = await super1155.balanceOf(user_one.address, shiftedItemGroupId.add(1));
@@ -83,7 +86,7 @@ describe("TokenRedeemerV3", function () {
 
 
         let config = {
-            groupIdOut: itemGroupId.add(1),
+            groupIdOut: itemGroupId,
             amountOut: 1,
             tokenOut: super721.address,
             burnOnRedemption: false,
@@ -110,5 +113,7 @@ describe("TokenRedeemerV3", function () {
     it("Shoud redeem a token", async function() {
        await tr.connect(user_one).redeem(0);
     });
+
+    // it("Shoud ")
 });
 

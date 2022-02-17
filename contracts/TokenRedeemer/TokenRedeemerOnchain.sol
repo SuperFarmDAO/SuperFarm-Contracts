@@ -4,12 +4,10 @@ pragma solidity ^0.8.8;
 import "./V3/ClaimOnchain.sol";
 
 /**
- * @title SuperMarketplace
- * @author Rostislav Khlebnikov
+ * @title TokenRedeemerV3
+ * @author Elunin Nikita
  */
-contract SuperMarketplace is ClaimOnchain {
-
-   
+contract TokenRedeemer is ClaimOnchain {
     constructor (address burnAddress) ClaimOnchain(burnAddress){
         setPermit(msg.sender, UNIVERSAL, CREATE_CONFIG, type(uint256).max);
     }

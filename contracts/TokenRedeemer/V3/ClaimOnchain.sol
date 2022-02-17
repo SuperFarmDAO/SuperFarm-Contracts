@@ -8,7 +8,7 @@ import "../../access/PermitControl.sol";
 import "../../assets/erc1155/interfaces/ISuper1155.sol";
 import "../../assets/erc721/interfaces/ISuper721.sol";
 import "../../interfaces/ISuperGeneric.sol";
-import "hardhat/console.sol";
+// import "hardhat/console.sol";
 
 /**
   @title TokenRedeemer: a contract for redeeming ERC-1155 token claims with
@@ -146,40 +146,37 @@ abstract contract ClaimOnchain is PermitControl, ReentrancyGuard {
             allowed,
             "TokenRedeemer::redeem: msg sender is not token owner"
         );
-        uint256[] memory tokenToBurnIds;
-        uint256[] memory tokenToBurnAmounts;
+        
         for (uint256 i = 0; i < req.length; i++) {
-            tokenToBurnIds = req[i].tokenId;
-            tokenToBurnAmounts = req[i].amounts;
-            address tokenToBurn = req[i].collection;
 
             if (burnOnRedemption) {
                 if (customBurn) {
                     genericTransfer(
                         msg.sender,
                         burnAddress,
-                        tokenToBurn,
-                        tokenToBurnIds,
-                        tokenToBurnAmounts
+                        req[i].collection,
+                        req[i].tokenId,
+                        req[i].amounts
                     );
                 } else {
                     genericBurn(
-                        tokenToBurn,
-                        tokenToBurnIds,
-                        tokenToBurnAmounts
+                        req[i].collection,
+                        req[i].tokenId,
+                        req[i].amounts
                     );
                 }
             }
         }
 
-        uint256 mintCount = ISuper721(config.tokenOut).groupMintCount(
-            config.groupIdOut
-        );
+        uint256 mintCount = ISuper721(config.tokenOut).groupMintCount(config.groupIdOut);
+        // console.log("Mint count: ", mintCount);
         uint256[] memory ids = new uint256[](mintableAmount);
 
+        uint256 newgroupIdPrep = config.groupIdOut << 128;
         for (uint256 i = 0; i < mintableAmount; i++) {
-            ids[i] = mintCount + i + 1;
+            ids[i] = newgroupIdPrep + mintCount + i + 1;
             // amounts[i] = uint256(1);
+            // console.log("id for mint: ", ids[i]);
         }
         config.redeemed[msg.sender] = true;
         ISuper721(config.tokenOut).mintBatch(msg.sender, ids, "");
@@ -220,13 +217,13 @@ abstract contract ClaimOnchain is PermitControl, ReentrancyGuard {
             : false;
         if (!isErc721) {
             ISuperGeneric(_assetAddress).burnBatch(
-                address(this),
+                msg.sender,
                 _ids,
                 _amounts
             );
             return true;
         } else if (isErc721) {
-            ISuperGeneric(_assetAddress).burnBatch(address(this), _ids);
+            ISuperGeneric(_assetAddress).burnBatch(msg.sender, _ids);
             return true;
         }
         return false;
