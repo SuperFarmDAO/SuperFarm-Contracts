@@ -333,17 +333,18 @@ abstract contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
                 {   
                     if(fees.platformFeeAddress != address(0)) {
                         transferTokens(buy.outline.paymentToken, buy.outline.maker, fees.platformFeeAddress, plFee);
+                        receiveAmount -= plFee;
                     }
                      if(fees.protocolFeeAddress != address(0)) {
                         transferTokens(buy.outline.paymentToken, buy.outline.maker, fees.protocolFeeAddress, prFee);
+                        receiveAmount -= prFee;
                     }
-                    receiveAmount -= prFee + plFee;
                 }
                     for(uint256 i = 0; i < sell.addresses.length; i++){
                         fee = (requiredAmount*sell.fees[i])/10000;
                         if (fee != 0 || sell.addresses[i] != address(0) ){
-                            receiveAmount -= fee;
                             transferTokens(buy.outline.paymentToken, buy.outline.maker, sell.addresses[i], fee);
+                            receiveAmount -= fee;
                         }
                     }
                 
@@ -354,11 +355,12 @@ abstract contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
                 {
                     if (fees.platformFeeAddress != address(0)) {
                         payable(fees.platformFeeAddress).transfer(plFee);
+                        receiveAmount -= plFee;
                     }
                     if (fees.protocolFeeAddress != address(0)) {
                         payable(fees.protocolFeeAddress).transfer(prFee);
+                        receiveAmount -= prFee;
                     }
-                    receiveAmount -= prFee + prFee;
                 }
 
                 /** transfer fees */
@@ -366,8 +368,8 @@ abstract contract ExchangeCore is ReentrancyGuard, EIP712, PermitControl {
                 for(uint256 i = 0; i < sell.addresses.length; i++){
                     fee = (requiredAmount*sell.fees[i])/10000;
                     if (fee != 0 || sell.addresses[i] != address(0) ){
-                        receiveAmount -= fee;
                         payable(sell.addresses[i]).transfer(fee);
+                        receiveAmount -= fee;
                     }
                 }
             
