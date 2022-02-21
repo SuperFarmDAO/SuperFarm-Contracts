@@ -15,6 +15,8 @@ import "../../interfaces/ISuperGeneric.sol";
     optional burns.
   @author 0xthrpw
   @author Tim Clancy
+  @author Nikita Elunin
+
 
   This contract allows a specific ERC-1155 token of a given group ID to be
   redeemed or burned in exchange for a new token from a new group in an
@@ -130,11 +132,11 @@ abstract contract ClaimOnchain is PermitControl, ReentrancyGuard {
     tokens group id, determines the appropriate exchange token and amount, if
     necessary burns the deposited token and mints the receipt token(s)
 
-    @param _configId The address of the token being received
+    @param _configId ConfigId from w
   */
     function redeem(uint256 _configId) external nonReentrant {
         RedemptionConfig storage config = redemptionConfigs[_configId];
-        require(!config.redeemed[msg.sender]);
+        require(!config.redeemed[msg.sender], "User already redeemed");
         Requirement[] memory req = config.requirements;
         bool burnOnRedemption = config.burnOnRedemption;
         bool customBurn = config.customBurn;
@@ -169,14 +171,11 @@ abstract contract ClaimOnchain is PermitControl, ReentrancyGuard {
         }
 
         uint256 mintCount = ISuper721(config.tokenOut).groupMintCount(config.groupIdOut);
-        // console.log("Mint count: ", mintCount);
         uint256[] memory ids = new uint256[](mintableAmount);
 
         uint256 newgroupIdPrep = config.groupIdOut << 128;
         for (uint256 i = 0; i < mintableAmount; i++) {
             ids[i] = newgroupIdPrep + mintCount + i + 1;
-            // amounts[i] = uint256(1);
-            // console.log("id for mint: ", ids[i]);
         }
         config.redeemed[msg.sender] = true;
         ISuper721(config.tokenOut).mintBatch(msg.sender, ids, "");
@@ -189,7 +188,6 @@ abstract contract ClaimOnchain is PermitControl, ReentrancyGuard {
         view
         returns (bool allowed, uint256 amount)
     {
-        // uint256[] memory amounts = new uint256[](requirements.length);
         allowed = true;
         amount = requirements[0].amounts[0];
         for (uint256 i = 0; i < requirements.length; i++) {
