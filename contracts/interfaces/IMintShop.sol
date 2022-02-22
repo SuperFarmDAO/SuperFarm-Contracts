@@ -42,10 +42,10 @@ interface IMintShop {
         Allow the shop owner or an approved manager to set the array of items known to this shop.
         @param _items The array of Super1155 addresses.
     */
-    function setItems(ISuper1155[] memory _items) external;
+    // function setItems(ISuper1155[] memory _items) external;
 
     /// The public identifier for the right to set new items.
-    function SET_ITEMS() external view returns (bytes32); 
+    // function SET_ITEMS() external view returns (bytes32); 
 
     /// The public identifier for the right to manage item pools.
     function POOL() external view returns (bytes32); 
