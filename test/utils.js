@@ -1,4 +1,4 @@
-import {ethers, network} from "hardhat";
+import {ethers, network} from 'hardhat';
 
 export const NULL_ADDRESS = '0x0000000000000000000000000000000000000000';
 
@@ -9,17 +9,17 @@ export async function getCurrentTime(){
 }
 
 export async function evm_increaseTime(seconds){
-    await network.provider.send("evm_increaseTime", [seconds]);
-    await network.provider.send("evm_mine");
+    await network.provider.send('evm_increaseTime', [seconds]);
+    await network.provider.send('evm_mine');
 }
 
 /*=======================MARKETPLACE===========================*/
-export const replacementPatternBuy = "0x00000000ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
-export const replacementPatternSell = "0x000000000000000000000000000000000000000000000000000000000000000000000000ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff0000000000000000000000000000000000000000000000000000000000000000";
+export const replacementPatternBuy = '0x00000000ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000';
+export const replacementPatternSell = '0x000000000000000000000000000000000000000000000000000000000000000000000000ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff0000000000000000000000000000000000000000000000000000000000000000';
 export const mint = {
     weth: {
-        bob: ethers.utils.parseEther("100"),
-        alice: ethers.utils.parseEther("10")
+        bob: ethers.utils.parseEther('100'),
+        alice: ethers.utils.parseEther('10')
     },
     erc721:{
         bob: 1,
@@ -44,14 +44,14 @@ export function makeOrder(
     _basePrice,
     _extra,
     _listingTime,
-    _expirationTime, 
+    _expirationTime,
     _salt,
-    _fees, 
-    _addresses, 
-    _exchange, 
+    _fees,
+    _addresses,
+    _exchange,
     _maker,
     _side,
-    _taker, 
+    _taker,
     _saleKind,
     _callType,
     _target,
@@ -59,7 +59,7 @@ export function makeOrder(
     _paymentToken,
     _data,
     _replacementPattern,
-    _staticExtraData) 
+    _staticExtraData)
     {
     return {
             outline: {
@@ -87,9 +87,9 @@ export function makeOrder(
 }
 
 async function withTestTokens(){
-    const TestERC1155 = await ethers.getContractFactory("TestERC1155");
-    const TestERC721 = await ethers.getContractFactory("TestERC721");
-    const TestWrappedEther = await ethers.getContractFactory("wETH");
+    const TestERC1155 = await ethers.getContractFactory('TestERC1155');
+    const TestERC721 = await ethers.getContractFactory('TestERC721');
+    const TestWrappedEther = await ethers.getContractFactory('wETH');
 
     const erc1155 = await TestERC1155.deploy();
     await erc1155.deployed()
@@ -102,8 +102,8 @@ async function withTestTokens(){
 }
 
 async function withProxies(){
-    const Registry = await ethers.getContractFactory("SuperProxyRegistry");
-    const TokenTransferProxy = await ethers.getContractFactory("SuperTokenTransferProxy");
+    const Registry = await ethers.getContractFactory('SuperProxyRegistry');
+    const TokenTransferProxy = await ethers.getContractFactory('SuperTokenTransferProxy');
 
     const registry = await Registry.deploy();
     await registry.deployed()
@@ -117,11 +117,11 @@ export const withContracts = async function(platformFeeAddress, minimumPlatformF
     const [erc1155, erc721, weth] = await withTestTokens();
     const[registry, transferProxy] = await withProxies();
 
-    const Marketplace = await ethers.getContractFactory("SuperMarketplace");
+    const Marketplace = await ethers.getContractFactory('SuperMarketplace');
 
     const marketplace = await Marketplace.deploy(
         registry.address,
-        ethers.utils.defaultAbiCoder.encode(["string"],["\x19Ethereum Signed Message:\n"]),
+        ethers.utils.defaultAbiCoder.encode(['string'],['\x19Ethereum Signed Message:\n']),
         transferProxy.address,
         platformFeeAddress,
         minimumPlatformFee,
@@ -136,86 +136,86 @@ export const withContracts = async function(platformFeeAddress, minimumPlatformF
 export const OrderType = {
     Order: [
         {
-            name: "outline",
-            type: "Outline"
+            name: 'outline',
+            type: 'Outline'
         },
         {
-            name: "extra",
-            type: "uint256[]"
+            name: 'extra',
+            type: 'uint256[]'
         },
         {
-            name: "salt",
-            type: "uint256"
+            name: 'salt',
+            type: 'uint256'
         },
         {
-            name: "fees",
-            type: "uint256[]"
+            name: 'fees',
+            type: 'uint256[]'
         },
         {
-            name: "addresses",
-            type: "address[]"
+            name: 'addresses',
+            type: 'address[]'
         },
         {
-            name: "staticTarget",
-            type: "address"
+            name: 'staticTarget',
+            type: 'address'
         },
         {
-            name: "data",
-            type: "bytes"
+            name: 'data',
+            type: 'bytes'
         },
         {
-            name: "replacementPattern",
-            type: "bytes"
+            name: 'replacementPattern',
+            type: 'bytes'
         },
         {
-            name: "staticExtradata",
-            type: "bytes"
+            name: 'staticExtradata',
+            type: 'bytes'
         }
     ],
     Outline: [
         {
-            name: "basePrice",
-            type: "uint256"
+            name: 'basePrice',
+            type: 'uint256'
         },
         {
-            name: "listingTime",
-            type: "uint256"
+            name: 'listingTime',
+            type: 'uint256'
         },
         {
-            name: "expirationTime",
-            type: "uint256"
+            name: 'expirationTime',
+            type: 'uint256'
         },
         {
-            name: "exchange",
-            type: "address"
+            name: 'exchange',
+            type: 'address'
         },
         {
-            name: "maker",
-            type: "address"
+            name: 'maker',
+            type: 'address'
         },
         {
-            name: "side",
-            type: "uint8"
+            name: 'side',
+            type: 'uint8'
         },
         {
-            name: "taker",
-            type: "address"
+            name: 'taker',
+            type: 'address'
         },
         {
-            name: "saleKind",
-            type: "uint8"
+            name: 'saleKind',
+            type: 'uint8'
         },
         {
-            name: "target",
-            type: "address"
+            name: 'target',
+            type: 'address'
         },
         {
-            name: "callType",
-            type: "uint8"
+            name: 'callType',
+            type: 'uint8'
         },
         {
-            name: "paymentToken",
-            type: "address"
+            name: 'paymentToken',
+            type: 'address'
         },
     ]
 }
@@ -237,16 +237,16 @@ export const expandLeaves = function (balances) {
 
 
 export const hash = function(index, address, allowance) {
-    return ethers.utils.solidityKeccak256(["uint256", "address", "uint256"], [index, address, allowance]);
+    return ethers.utils.solidityKeccak256(['uint256', 'address', 'uint256'], [index, address, allowance]);
 
 }
 
 // Get hashes of leaf nodes
 export const getLeaves = function(balances) {
     var leaves = expandLeaves(balances);
-    
+
     return leaves.map(function(leaf) {
-        return ethers.utils.solidityKeccak256(["uint256", "address", "uint256"], [leaf.index, leaf.address, leaf.allowance]);
+        return ethers.utils.solidityKeccak256(['uint256', 'address', 'uint256'], [leaf.index, leaf.address, leaf.allowance]);
     });
 }
 
@@ -273,7 +273,7 @@ export const computeMerkleProof = function(index, address) {
         if ((path % 2) == 1) {
             proof.push(leaves[path - 1])
         } else {
-            if (typeof leaves[path + 1] != "undefined")
+            if (typeof leaves[path + 1] != 'undefined')
                 proof.push(leaves[path + 1])
             else
                 proof.push(leaves[path])
@@ -294,8 +294,8 @@ export const reduceMerkleBranches = function(leaves) {
 
     while (leaves.length) {
         var left = leaves.shift();
-        var right = (leaves.length === 0) ? left: leaves.shift();
-        output.push(ethers.utils.solidityKeccak256(["bytes32", "bytes32"], [left, right]));
+        var right = (leaves.length === 0) ? left : leaves.shift();
+        output.push(ethers.utils.solidityKeccak256(['bytes32', 'bytes32'], [left, right]));
     }
     output.forEach(function(leaf) {
         leaves.push(leaf);
@@ -318,3 +318,73 @@ export const getIndex = function(balances, address) {
 }
 
 /*=======================MERKLE UTILS (with allowances)===========================*/
+
+
+/*=================================SUPER TOKENS===============================*/
+export const withSuperTokens = async function(
+    ownerAddress721,
+    name721 = 'Super721',
+    symbol721 = 'S721',
+    metadataURI721 = '://ipfs/uri/',
+    contractURI721 = '://ipfs/uri/',
+    proxyRegistryAddress721 = ethers.constants.AddressZero,
+    ownerAddress1155 = ownerAddress721,
+    name1155 = 'Super1155',
+    metadataURI_1155 = '://ipfs/uri/',
+    contractURI_1155 = '://ipfs/uri/',
+    proxyRegistryAddress1155 = ethers.constants.AddressZero
+) {
+    const Super721 = await ethers.getContractFactory('Super721');
+    const Super1155 = await ethers.getContractFactory('Super1155');
+
+    let super721 = await Super721.deploy(
+        ownerAddress721,
+        name721,
+        symbol721,
+        metadataURI721,
+        contractURI721,
+        proxyRegistryAddress721
+    );
+    let super1155 = await Super1155.deploy(
+        ownerAddress1155,
+        name1155,
+        metadataURI_1155,
+        contractURI_1155,
+        proxyRegistryAddress1155
+    );
+
+    return [super721, super1155];
+}
+
+// ENUMS in Super721
+const S721SupplyType = Object.freeze({
+    Capped: 0,
+    Uncapped: 1,
+    Flexible: 2
+});
+
+const S721BurnType = Object.freeze({
+    None: 0,
+    Burnable: 1,
+    Replenishable: 2
+});
+
+// ENUMS in Super1155
+const S1155SupplyType = Object.freeze({
+    Capped: 0 ,
+    Uncapped: 1 ,
+    Flexible: 2 
+});
+
+const S1155ItemType = Object.freeze({
+    Nonfungible: 0,
+    Fungible: 1,
+    Semifungible: 2
+  });
+
+const S1155BurnType = Object.freeze({
+    None: 0,
+    Burnable: 1,
+    Replenishable: 2
+});
+/*=================================SUPER TOKENS===============================*/

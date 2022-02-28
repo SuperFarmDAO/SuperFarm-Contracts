@@ -110,10 +110,14 @@ abstract contract ClaimOnchain is PermitControl, ReentrancyGuard {
                 _data.requirements[i].collection != address(0),
                 "TokenRedeemer::redeem: required token cannot be zero"
             );
-            require(_data.requirements[i].tokenId.length > 0);
+            require(
+                _data.requirements[i].tokenId.length > 0, 
+                "TokenRedeemer::redeem: required tokenId cannot be zero"
+            );
             require(
                 _data.requirements[i].amounts.length ==
-                    _data.requirements[i].tokenId.length
+                    _data.requirements[i].tokenId.length, 
+                "TokenRedeemer::redeem: required tokenId and amounts should be same length"
             );
             redemptionConfigs[_configId].requirements.push(
                 _data.requirements[i]
