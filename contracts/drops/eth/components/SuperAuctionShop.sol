@@ -9,7 +9,6 @@ import "../../../base/Sweepable.sol";
 import "../../../assets/erc1155/interfaces/ISuper1155.sol";
 import "../../../assets/erc721/interfaces/ISuper721.sol";
 import "../../../interfaces/IStaker.sol";
-import "../../../interfaces/IMintShop.sol";
 import "../../../libraries/merkle/SuperMerkleAccess.sol";
 import "../../../libraries/DFStorage.sol";
 
@@ -25,10 +24,9 @@ import "../../../libraries/DFStorage.sol";
   This launchpad contract sells new items by minting them into existence. It
   cannot be used to sell items that already exist.
 */
-contract MintShop1155 is
+abstract contract MintShop1155 is
     Sweepable,
     ReentrancyGuard,
-    IMintShop,
     SuperMerkleAccess
 {
     using SafeERC20 for IERC20;
@@ -119,7 +117,7 @@ contract MintShop1155 is
   */
     struct Pool {
         uint256 currentPoolVersion;
-        DFStorage.PoolInput config;
+        Config config;
         mapping(address => uint256) purchaseCounts;
         mapping(bytes32 => uint256) itemCaps;
         mapping(bytes32 => uint256) itemMinted;
@@ -127,6 +125,43 @@ contract MintShop1155 is
         mapping(bytes32 => mapping(uint256 => DFStorage.Price)) itemPrices;
         uint256[] itemGroups;
         Whitelist[] whiteLists;
+    }
+
+    struct Config {
+        string name;
+        uint256 startTime;
+        uint256 endTime;
+        uint256 purchaseLimit;
+        uint256 singlePurchaseLimit;
+        address collection;
+        PoolRequirement requirement;
+    }
+
+    struct Config2 {
+        uint256 startTime;
+        uint256 endTime;
+        uint256 totalCap;
+        uint256 callerCap;
+        uint256 transactionCap;
+        uint256 startingPrice;
+        uint256 endingPrice;
+        uint256 tickDuration;
+        uint256 tickAmount;
+    }
+
+    struct PoolRequirement {
+        AccessType requiredType;
+        address[] requiredAsset;
+        uint256 requiredAmount;
+        uint256[] requiredId;
+    }
+
+    enum AccessType {
+        Public,
+        TokenRequired,
+        ItemRequired,
+        PointRequired,
+        ItemRequired721
     }
 
     /**
@@ -168,7 +203,7 @@ contract MintShop1155 is
       pool.
   */
     struct PoolOutput {
-        DFStorage.PoolInput config;
+        Config config;
         string itemMetadataUri;
         PoolItem[] items;
     }
@@ -245,7 +280,7 @@ contract MintShop1155 is
     event PoolUpdated(
         address indexed updater,
         uint256 poolId,
-        DFStorage.PoolInput indexed pool,
+        Config indexed pool,
         uint256[] groupIds,
         uint256[] caps,
         DFStorage.Price[][] indexed prices
@@ -419,7 +454,7 @@ contract MintShop1155 is
       item.
   */
     function addPool(
-        DFStorage.PoolInput calldata _pool,
+        Config calldata _pool,
         uint256[] calldata _groupIds,
         uint256[] calldata _issueNumberOffsets,
         uint256[] calldata _caps,
@@ -456,7 +491,7 @@ contract MintShop1155 is
   */
     function updatePool(
         uint256 _id,
-        DFStorage.PoolInput calldata _config,
+        Config calldata _config,
         uint256[] calldata _groupIds,
         uint256[] calldata _issueNumberOffsets,
         uint256[] calldata _caps,
@@ -537,7 +572,7 @@ contract MintShop1155 is
         }
     }
 
-    function updatePoolConfig(uint256 _id, DFStorage.PoolInput calldata _config)
+    function updatePoolConfig(uint256 _id, Config calldata _config)
         external
         hasValidPermit(UNIVERSAL, POOL)
     {
@@ -760,11 +795,11 @@ contract MintShop1155 is
         // pool. Verify that any possible ERC-20 requirements are met.
         uint256 amount;
 
-        DFStorage.PoolRequirement memory poolRequirement = pools[_id]
+        PoolRequirement memory poolRequirement = pools[_id]
             .config
             .requirement;
         if (
-            poolRequirement.requiredType == DFStorage.AccessType.TokenRequired
+            poolRequirement.requiredType == AccessType.TokenRequired
         ) {
             // bytes data
             for (uint256 i = 0; i < poolRequirement.requiredAsset.length; i++) {
@@ -775,7 +810,7 @@ contract MintShop1155 is
             return amount >= poolRequirement.requiredAmount;
             // Verify that any possible Staker point threshold requirements are met.
         } else if (
-            poolRequirement.requiredType == DFStorage.AccessType.PointRequired
+            poolRequirement.requiredType == AccessType.PointRequired
         ) {
             // IStaker requiredStaker = IStaker(poolRequirement.requiredAsset[0]);
             return
@@ -787,8 +822,7 @@ contract MintShop1155 is
         // Verify that any possible ERC-1155 ownership requirements are met.
         if (poolRequirement.requiredId.length == 0) {
             if (
-                poolRequirement.requiredType ==
-                DFStorage.AccessType.ItemRequired
+                poolRequirement.requiredType == AccessType.ItemRequired
             ) {
                 for (
                     uint256 i = 0;
@@ -800,8 +834,7 @@ contract MintShop1155 is
                 }
                 return amount >= poolRequirement.requiredAmount;
             } else if (
-                poolRequirement.requiredType ==
-                DFStorage.AccessType.ItemRequired721
+                poolRequirement.requiredType == AccessType.ItemRequired721
             ) {
                 for (
                     uint256 i = 0;
@@ -816,8 +849,7 @@ contract MintShop1155 is
             }
         } else {
             if (
-                poolRequirement.requiredType ==
-                DFStorage.AccessType.ItemRequired
+                poolRequirement.requiredType == AccessType.ItemRequired
             ) {
                 // ISuper1155 requiredItem = ISuper1155(poolRequirement.requiredAsset[0]);
                 for (
@@ -839,8 +871,7 @@ contract MintShop1155 is
                 }
                 return amount >= poolRequirement.requiredAmount;
             } else if (
-                poolRequirement.requiredType ==
-                DFStorage.AccessType.ItemRequired721
+                poolRequirement.requiredType == AccessType.ItemRequired721
             ) {
                 for (
                     uint256 i = 0;
