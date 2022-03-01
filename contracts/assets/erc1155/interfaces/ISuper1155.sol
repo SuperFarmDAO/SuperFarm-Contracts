@@ -281,4 +281,7 @@ interface ISuper1155 {
     this contract to further item minting.
   */
   function lock() external;
+
+  function transferOwnership(address newOwner) external;
+
 }
