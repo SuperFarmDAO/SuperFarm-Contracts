@@ -7,9 +7,9 @@ import "@openzeppelin/contracts/token/ERC721/extensions/IERC721Metadata.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 
-import "../../access/PermitControlds.sol";
-import "../../proxy/StubProxyRegistry.sol";
-import "../../utils/Utils.sol";
+import "../../../access/PermitControlds.sol";
+import "../../../proxy/StubProxyRegistry.sol";
+import "../../../utils/Utils.sol";
 import "./Super721LiteBlueprint.sol";
 
 /**

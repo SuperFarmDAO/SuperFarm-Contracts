@@ -2,7 +2,7 @@
 pragma solidity ^0.8.7;
 
 import "./BlueprintSuper1155.sol";
-import "../../../drops/eth/SuperDropFactoryds/ILinkProxy.sol";
+import "../../../diamonds/drops/eth/SuperDropFactoryds/ILinkProxy.sol";
 
 /** 
   @title A diamond standard proxy storage for Super1155

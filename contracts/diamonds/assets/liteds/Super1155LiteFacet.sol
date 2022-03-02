@@ -7,8 +7,8 @@ import "@openzeppelin/contracts/token/ERC1155/extensions/IERC1155MetadataURI.sol
 import "@openzeppelin/contracts/token/ERC1155/IERC1155Receiver.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 
-import "../../access/PermitControlds.sol";
-import "../../proxy/StubProxyRegistry.sol";
+import "../../../access/PermitControlds.sol";
+import "../../../proxy/StubProxyRegistry.sol";
 import "./Super1155LiteBlueprint.sol";
 /**
   @title  A lite ERC-1155 item creation contract.

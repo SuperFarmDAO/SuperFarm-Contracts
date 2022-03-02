@@ -3,13 +3,13 @@ pragma solidity ^0.8.8;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 
-import "../../../assets/erc1155/diamond/ISuper1155.sol";
-import "../../../assets/erc1155/diamond/StorageSuper1155.sol";
-import "../../../assets/erc1155/diamond/BlueprintSuper1155.sol";
+import "../../../../assets/erc1155/diamond/ISuper1155.sol";
+import "../../../../assets/erc1155/diamond/StorageSuper1155.sol";
+import "../../../../assets/erc1155/diamond/BlueprintSuper1155.sol";
 import "../SuperMintShop1155ds/IMintShop.sol";
 import "../SuperMintShop1155ds/StorageSuperMintShop1155.sol";
 import "../SuperMintShop1155ds/BlueprintSuperMintShop1155.sol";
-import "../../../interfaces/IPermitControl.sol";
+import "../../../../interfaces/IPermitControl.sol";
 import "./BlueprintSuperDropFactory.sol";
 
 /**
