@@ -154,7 +154,11 @@ abstract contract ClaimOnchain is PermitControl, ReentrancyGuard {
         );
         
         for (uint256 i = 0; i < req.length; i++) {
+        uint256[] memory tokenId = new uint256[](req[i].tokenId.length);
 
+            for (uint j = 0; j < req[i].tokenId.length; j++) {
+                tokenId[j] = req[i].tokenId[j] << 128;
+            }
             if (burnOnRedemption) {
                 if (customBurn) {
                     genericTransfer(
@@ -167,7 +171,7 @@ abstract contract ClaimOnchain is PermitControl, ReentrancyGuard {
                 } else {
                     genericBurn(
                         req[i].collection,
-                        req[i].tokenId,
+                        tokenId,
                         req[i].amounts
                     );
                 }
