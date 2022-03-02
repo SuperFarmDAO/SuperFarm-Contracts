@@ -51,7 +51,7 @@ contract SuperDropFactory is Ownable {
     @param _linkProxy the address of authenticated proxy.
   */
     constructor(address _dropFactoryOwner, address _linkProxy) {
-        _transferOwnership(_dropFactoryOwner);
+        transferOwnership(_dropFactoryOwner);
 
         linkProxy = _linkProxy;
     }

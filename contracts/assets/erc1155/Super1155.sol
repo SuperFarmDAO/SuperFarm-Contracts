@@ -83,7 +83,7 @@ contract Super1155 is
     string public name;
 
     /// Variable that is needed to lock the transfer, and unlock it after the auction.
-    bool transferLocked = true;
+    bool transferLocked = false;
 
     /**
     The ERC-1155 URI for tracking item metadata, supporting {id} substitution.
@@ -1130,11 +1130,11 @@ contract Super1155 is
     /**
     Allow the item collection owner or an associated manager to update transfer state.
   */
-    function unlockTransfers()
+    function setTransferState(bool _state)
         external
         hasValidPermit(UNIVERSAL, TRANSFER_LOCK)
     {
-        transferLocked = false;
+        transferLocked = _state;
     }
 
     /**
