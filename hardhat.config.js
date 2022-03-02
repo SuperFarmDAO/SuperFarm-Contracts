@@ -76,6 +76,15 @@ module.exports = {
 					}
 				}
 			},
+			{
+				version: '0.8.11',
+				settings: {
+					optimizer: {
+						enabled: true,
+						runs: 0
+					}
+				}
+			}
 		]
 	},
 	networks: {
@@ -122,31 +131,31 @@ module.exports = {
 			chainId: 137,
 			gasPrice: "auto",
 			accounts: [ `0x${DEPLOYER_PRIVATE_KEY}` ]
-		}, 
+		},
 		mumbai: {
 			url: "https://rpc-mumbai.maticvigil.com",
 			chainId: 80001,
 			gasPrice: "auto",
 			accounts: [ `0x${DEPLOYER_PRIVATE_KEY}` ]
-		}, 
+		},
 		avalanche: {
 			url: "https://api.avax.network/ext/bc/C/rpc",
 			chainId: 43114,
 			gasPrice: "auto",
 			accounts: [ `0x${DEPLOYER_PRIVATE_KEY}` ]
-		}, 
+		},
 		avalanche_fuji: {
 			url: "https://api.avax-test.network/ext/bc/C/rpc",
 			chainId: 43113,
 			gasPrice: "auto",
 			accounts: [ `0x${DEPLOYER_PRIVATE_KEY}` ]
-		}, 
+		},
 		fantom_testnet:{
 			url: "https://rpc.testnet.fantom.network/",
 			chainId: 4002,
 			gasPrice: "auto",
 			accounts: [ `0x${DEPLOYER_PRIVATE_KEY}` ]
-		}, 
+		},
 		fantom:{
 			url: "https://rpc.ftm.tools/",
 			chainId: 250,
