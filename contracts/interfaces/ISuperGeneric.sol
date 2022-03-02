@@ -57,6 +57,11 @@ interface ISuperGeneric is IERC165 {
         view
         returns (uint256[] memory);
 
+    function balanceOfGroup(address _owner, uint256 _id) 
+        external
+        view
+        returns (uint256);
+
     function mintBatch(address _recipient, uint256[] calldata _ids,
         bytes memory _data)
         external;

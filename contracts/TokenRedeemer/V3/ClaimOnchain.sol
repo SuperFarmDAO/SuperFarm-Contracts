@@ -173,6 +173,7 @@ abstract contract ClaimOnchain is PermitControl, ReentrancyGuard {
                 }
             }
         }
+        // TODO add fail
 
         uint256 mintCount = ISuper721(config.tokenOut).groupMintCount(config.groupIdOut);
         uint256[] memory ids = new uint256[](mintableAmount);
@@ -196,9 +197,21 @@ abstract contract ClaimOnchain is PermitControl, ReentrancyGuard {
         amount = requirements[0].amounts[0];
         for (uint256 i = 0; i < requirements.length; i++) {
             for (uint256 j = 0; j < requirements[i].tokenId.length; j++) {
-                uint256 balanceOfSender = ISuperGeneric(
-                    requirements[i].collection
-                ).balanceOf(msg.sender, requirements[i].tokenId[j]);
+                // CHECK check depends on which token is in requirements 
+                bool isERC721 = ISuperGeneric(requirements[i].collection).supportsInterface(
+                    INTERFACE_ERC721
+                ) ? true : false;
+                uint256 balanceOfSender;
+                if (isERC721) {
+                    balanceOfSender = ISuperGeneric(
+                        requirements[i].collection
+                    ).balanceOf(msg.sender);
+                } else {
+                    balanceOfSender = ISuperGeneric(
+                        requirements[i].collection
+                    ).balanceOf(msg.sender, requirements[i].tokenId[j]);
+                }
+                // TODO what if not Super721 and Super1155 
                 if (balanceOfSender < requirements[i].amounts[j]) {
                     allowed = false;
                     break;

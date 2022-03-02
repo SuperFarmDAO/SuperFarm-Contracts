@@ -357,32 +357,32 @@ export const withSuperTokens = async function(
 }
 
 // ENUMS in Super721
-const S721SupplyType = Object.freeze({
+export const S721SupplyType = Object.freeze({
     Capped: 0,
     Uncapped: 1,
     Flexible: 2
 });
 
-const S721BurnType = Object.freeze({
+export const S721BurnType = Object.freeze({
     None: 0,
     Burnable: 1,
     Replenishable: 2
 });
 
 // ENUMS in Super1155
-const S1155SupplyType = Object.freeze({
-    Capped: 0 ,
-    Uncapped: 1 ,
+export const S1155SupplyType = Object.freeze({
+    Capped: 0,
+    Uncapped: 1,
     Flexible: 2 
 });
 
-const S1155ItemType = Object.freeze({
+export const S1155ItemType = Object.freeze({
     Nonfungible: 0,
     Fungible: 1,
     Semifungible: 2
   });
 
-const S1155BurnType = Object.freeze({
+export const S1155BurnType = Object.freeze({
     None: 0,
     Burnable: 1,
     Replenishable: 2
