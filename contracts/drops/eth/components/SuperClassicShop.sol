@@ -25,7 +25,7 @@ import "../../../libraries/DFStorage.sol";
   This launchpad contract sells new items by minting them into existence. It
   cannot be used to sell items that already exist.
 */
-contract MintShop1155 is
+contract SuperClassicShop is
     Sweepable,
     ReentrancyGuard,
     IMintShop,

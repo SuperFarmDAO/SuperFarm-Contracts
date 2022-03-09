@@ -24,7 +24,7 @@ import "../../../libraries/DFStorage.sol";
   This launchpad contract sells new items by minting them into existence. It
   cannot be used to sell items that already exist.
 */
-abstract contract MintShop1155 is
+abstract contract SuperAuctionShop is
     Sweepable,
     ReentrancyGuard,
     SuperMerkleAccess
@@ -118,23 +118,23 @@ abstract contract MintShop1155 is
     struct Pool {
         uint256 currentPoolVersion;
         Config config;
+        uint256[] itemGroups;
+        Whitelist[] whiteLists;
         mapping(address => uint256) purchaseCounts;
         mapping(bytes32 => uint256) itemCaps;
         mapping(bytes32 => uint256) itemMinted;
         mapping(bytes32 => uint256) itemPricesLength;
         mapping(bytes32 => mapping(uint256 => DFStorage.Price)) itemPrices;
-        uint256[] itemGroups;
-        Whitelist[] whiteLists;
     }
 
     struct Config {
-        string name;
         uint256 startTime;
         uint256 endTime;
         uint256 purchaseLimit;
-        uint256 singlePurchaseLimit;
+        uint256 transactionPurchaseCap;
         address collection;
         PoolRequirement requirement;
+        string name;
     }
 
     struct Config2 {
@@ -147,6 +147,7 @@ abstract contract MintShop1155 is
         uint256 endingPrice;
         uint256 tickDuration;
         uint256 tickAmount;
+        address collection;
     }
 
     struct PoolRequirement {
@@ -583,6 +584,274 @@ abstract contract MintShop1155 is
         pools[_id].config = _config;
     }
 
+    function isEligible(
+        DFStorage.WhiteListInput calldata _whiteList,
+        uint256 _id
+    ) public view returns (bool) {
+        return
+            ((
+                super.verify(
+                    _whiteList.whiteListId,
+                    _whiteList.index,
+                    keccak256(
+                        abi.encodePacked(
+                            _whiteList.index,
+                            msg.sender,
+                            _whiteList.allowance
+                        )
+                    ),
+                    _whiteList.merkleProof
+                )
+            ) &&
+                !pools[_id].whiteLists[_whiteList.whiteListId].minted[
+                    msg.sender
+                ]) ||
+            (block.timestamp >= pools[_id].config.startTime &&
+                block.timestamp <= pools[_id].config.endTime);
+    }
+
+    function currentPrice(
+        uint256 startPrice,
+        uint256 finalPrice,
+        uint256 _id
+    ) public view returns (uint256) {
+        if (block.timestamp <= pools[_id].config.startTime) {
+            return startPrice;
+        }
+        return
+            block.timestamp >= pools[_id].config.endTime
+                ? finalPrice
+                : finalPrice +
+                    ((startPrice - finalPrice) *
+                        (pools[_id].config.endTime - block.timestamp)) /
+                    (pools[_id].config.endTime - pools[_id].config.startTime);
+    }
+
+    function sellingHelper(
+        uint256 _id,
+        bytes32 itemKey,
+        uint256 _assetIndex,
+        uint256 _amount,
+        bool _whiteListPrice,
+        uint256 _accesListId
+    ) private {
+        // Process payment for the user, checking to sell for Staker points.
+        if (_whiteListPrice) {
+            SuperMerkleAccess.AccessList storage accessList = SuperMerkleAccess
+                .accessRoots[_accesListId];
+            uint256 price = accessList.price * _amount;
+            if (accessList.token == address(0)) {
+                require(msg.value >= price, "0x9B");
+                (bool success, ) = payable(paymentReceiver).call{
+                    value: msg.value
+                }("");
+                require(success, "0x0C");
+                pools[_id].whiteLists[_accesListId].minted[msg.sender] = true;
+            } else {
+                require(
+                    IERC20(accessList.token).balanceOf(msg.sender) >= price,
+                    "0x1C"
+                );
+                IERC20(accessList.token).safeTransferFrom(
+                    msg.sender,
+                    paymentReceiver,
+                    price
+                );
+                pools[_id].whiteLists[_accesListId].minted[msg.sender] = true;
+            }
+        } else {
+            DFStorage.Price storage sellingPair = pools[_id].itemPrices[
+                itemKey
+            ][_assetIndex];
+            if (sellingPair.assetType == DFStorage.AssetType.Point) {
+                IStaker(sellingPair.asset).spendPoints(
+                    msg.sender,
+                    sellingPair.price * _amount
+                );
+
+                // Process payment for the user with a check to sell for Ether.
+            } else if (sellingPair.assetType == DFStorage.AssetType.Ether) {
+                uint256 etherPrice = sellingPair.price * _amount;
+                require(msg.value >= etherPrice, "0x9B");
+                (bool success, ) = payable(paymentReceiver).call{
+                    value: msg.value
+                }("");
+                // transfer leftovers back
+                uint256 diff = msg.value - sellingPair.price;
+                bool refund = true;
+                if (diff > 0) {
+                    (refund, ) = payable(msg.sender).call{value: diff}("");
+                    require(success && refund, "0x0C");
+                }
+
+                // Process payment for the user with a check to sell for an ERC-20 token.
+            } else if (sellingPair.assetType == DFStorage.AssetType.Token) {
+                uint256 tokenPrice = sellingPair.price * _amount;
+                require(
+                    IERC20(sellingPair.asset).balanceOf(msg.sender) >=
+                        tokenPrice,
+                    "0x1C"
+                );
+                IERC20(sellingPair.asset).safeTransferFrom(
+                    msg.sender,
+                    paymentReceiver,
+                    tokenPrice
+                );
+
+                // Otherwise, error out because the payment type is unrecognized.
+            } else {
+                revert("0x0");
+            }
+        }
+    }
+
+    /**
+     * Private function to avoid a stack-too-deep error.
+     */
+    function checkRequirments(uint256 _id) private view returns (bool) {
+        // Verify that the user meets any requirements gating participation in this
+        // pool. Verify that any possible ERC-20 requirements are met.
+        uint256 amount;
+
+        PoolRequirement memory poolRequirement = pools[_id].config.requirement;
+        if (poolRequirement.requiredType == AccessType.TokenRequired) {
+            // bytes data
+            for (uint256 i = 0; i < poolRequirement.requiredAsset.length; i++) {
+                amount += IERC20(poolRequirement.requiredAsset[i]).balanceOf(
+                    msg.sender
+                );
+            }
+            return amount >= poolRequirement.requiredAmount;
+            // Verify that any possible Staker point threshold requirements are met.
+        } else if (poolRequirement.requiredType == AccessType.PointRequired) {
+            // IStaker requiredStaker = IStaker(poolRequirement.requiredAsset[0]);
+            return
+                IStaker(poolRequirement.requiredAsset[0]).getAvailablePoints(
+                    msg.sender
+                ) >= poolRequirement.requiredAmount;
+        }
+
+        // Verify that any possible ERC-1155 ownership requirements are met.
+        if (poolRequirement.requiredId.length == 0) {
+            if (poolRequirement.requiredType == AccessType.ItemRequired) {
+                for (
+                    uint256 i = 0;
+                    i < poolRequirement.requiredAsset.length;
+                    i++
+                ) {
+                    amount += ISuper1155(poolRequirement.requiredAsset[i])
+                        .totalBalances(msg.sender);
+                }
+                return amount >= poolRequirement.requiredAmount;
+            } else if (
+                poolRequirement.requiredType == AccessType.ItemRequired721
+            ) {
+                for (
+                    uint256 i = 0;
+                    i < poolRequirement.requiredAsset.length;
+                    i++
+                ) {
+                    amount += ISuper721(poolRequirement.requiredAsset[i])
+                        .balanceOf(msg.sender);
+                }
+                // IERC721 requiredItem = IERC721(poolRequirement.requiredAsset[0]);
+                return amount >= poolRequirement.requiredAmount;
+            }
+        } else {
+            if (poolRequirement.requiredType == AccessType.ItemRequired) {
+                // ISuper1155 requiredItem = ISuper1155(poolRequirement.requiredAsset[0]);
+                for (
+                    uint256 i = 0;
+                    i < poolRequirement.requiredAsset.length;
+                    i++
+                ) {
+                    for (
+                        uint256 j = 0;
+                        j < poolRequirement.requiredAsset.length;
+                        j++
+                    ) {
+                        amount += ISuper1155(poolRequirement.requiredAsset[i])
+                            .balanceOf(
+                                msg.sender,
+                                poolRequirement.requiredId[j]
+                            );
+                    }
+                }
+                return amount >= poolRequirement.requiredAmount;
+            } else if (
+                poolRequirement.requiredType == AccessType.ItemRequired721
+            ) {
+                for (
+                    uint256 i = 0;
+                    i < poolRequirement.requiredAsset.length;
+                    i++
+                ) {
+                    for (
+                        uint256 j = 0;
+                        j < poolRequirement.requiredAsset.length;
+                        j++
+                    ) {
+                        amount += ISuper721(poolRequirement.requiredAsset[i])
+                            .balanceOfGroup(
+                                msg.sender,
+                                poolRequirement.requiredId[j]
+                            );
+                    }
+                }
+                return amount >= poolRequirement.requiredAmount;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Private function to avoid a stack-too-deep error.
+     */
+    function mintingHelper(
+        uint256 _groupId,
+        uint256 _id,
+        bytes32 _itemKey,
+        uint256 _amount,
+        uint256 _newCirculatingTotal,
+        uint256 _userPoolPurchaseAmount,
+        uint256 _userGlobalPurchaseAmount
+    ) private {
+        // If payment is successful, mint each of the user's purchased items.
+        uint256[] memory itemIds = new uint256[](_amount);
+        uint256[] memory amounts = new uint256[](_amount);
+
+        uint256 nextIssueNumber = nextItemIssues[_itemKey];
+        {
+            uint256 shiftedGroupId = _groupId << 128;
+
+            for (uint256 i = 1; i <= _amount; i++) {
+                uint256 itemId = (shiftedGroupId + nextIssueNumber) + i;
+                itemIds[i - 1] = itemId;
+                amounts[i - 1] = 1;
+            }
+        }
+        // Update the tracker for available item issue numbers.
+        nextItemIssues[_itemKey] = nextIssueNumber + _amount;
+
+        // Update the count of circulating items from this pool.
+        pools[_id].itemMinted[_itemKey] = _newCirculatingTotal;
+
+        // Update the pool's count of items that a user has purchased.
+        pools[_id].purchaseCounts[msg.sender] = _userPoolPurchaseAmount;
+
+        // Update the global count of items that a user has purchased.
+        globalPurchaseCounts[msg.sender] = _userGlobalPurchaseAmount;
+
+        ISuper1155(pools[_id].config.collection).mintBatch(
+            msg.sender,
+            itemIds,
+            amounts,
+            ""
+        );
+
+        emit ItemPurchased(msg.sender, _id, itemIds, amounts);
+    }
+
     /**
     Allow a buyer to purchase an item from a pool.
 
@@ -603,13 +872,12 @@ abstract contract MintShop1155 is
         require(_amount > 0, "0x0B");
         require(
             _id < nextPoolId &&
-                pools[_id].config.singlePurchaseLimit >= _amount,
+                pools[_id].config.transactionPurchaseCap >= _amount,
             "0x1B"
         );
 
         bool whiteListed;
         if (pools[_id].whiteLists.length != 0) {
-           
             whiteListed =
                 super.verify(
                     _whiteList.whiteListId,
@@ -687,264 +955,5 @@ abstract contract MintShop1155 is
         );
 
         // Emit an event indicating a successful purchase.
-    }
-
-    function isEligible(
-        DFStorage.WhiteListInput calldata _whiteList,
-        uint256 _id
-    ) public view returns (bool) {
-        return
-            ((
-                super.verify(
-                    _whiteList.whiteListId,
-                    _whiteList.index,
-                    keccak256(
-                        abi.encodePacked(
-                            _whiteList.index,
-                            msg.sender,
-                            _whiteList.allowance
-                        )
-                    ),
-                    _whiteList.merkleProof
-                )
-            ) &&
-                !pools[_id].whiteLists[_whiteList.whiteListId].minted[
-                    msg.sender
-                ]) ||
-            (block.timestamp >= pools[_id].config.startTime &&
-                block.timestamp <= pools[_id].config.endTime);
-    }
-
-    function sellingHelper(
-        uint256 _id,
-        bytes32 itemKey,
-        uint256 _assetIndex,
-        uint256 _amount,
-        bool _whiteListPrice,
-        uint256 _accesListId
-    ) private {
-        // Process payment for the user, checking to sell for Staker points.
-        if (_whiteListPrice) {
-            SuperMerkleAccess.AccessList storage accessList = SuperMerkleAccess
-                .accessRoots[_accesListId];
-            uint256 price = accessList.price * _amount;
-            if (accessList.token == address(0)) {
-                require(msg.value >= price, "0x9B");
-                (bool success, ) = payable(paymentReceiver).call{
-                    value: msg.value
-                }("");
-                require(success, "0x0C");
-                pools[_id].whiteLists[_accesListId].minted[msg.sender] = true;
-            } else {
-                require(
-                    IERC20(accessList.token).balanceOf(msg.sender) >= price,
-                    "0x1C"
-                );
-                IERC20(accessList.token).safeTransferFrom(
-                    msg.sender,
-                    paymentReceiver,
-                    price
-                );
-                pools[_id].whiteLists[_accesListId].minted[msg.sender] = true;
-            }
-        } else {
-            DFStorage.Price storage sellingPair = pools[_id].itemPrices[
-                itemKey
-            ][_assetIndex];
-            if (sellingPair.assetType == DFStorage.AssetType.Point) {
-                IStaker(sellingPair.asset).spendPoints(
-                    msg.sender,
-                    sellingPair.price * _amount
-                );
-
-                // Process payment for the user with a check to sell for Ether.
-            } else if (sellingPair.assetType == DFStorage.AssetType.Ether) {
-                uint256 etherPrice = sellingPair.price * _amount;
-                require(msg.value >= etherPrice, "0x9B");
-                (bool success, ) = payable(paymentReceiver).call{
-                    value: msg.value
-                }("");
-                require(success, "0x0C");
-
-                // Process payment for the user with a check to sell for an ERC-20 token.
-            } else if (sellingPair.assetType == DFStorage.AssetType.Token) {
-                uint256 tokenPrice = sellingPair.price * _amount;
-                require(
-                    IERC20(sellingPair.asset).balanceOf(msg.sender) >=
-                        tokenPrice,
-                    "0x1C"
-                );
-                IERC20(sellingPair.asset).safeTransferFrom(
-                    msg.sender,
-                    paymentReceiver,
-                    tokenPrice
-                );
-
-                // Otherwise, error out because the payment type is unrecognized.
-            } else {
-                revert("0x0");
-            }
-        }
-    }
-
-    /**
-     * Private function to avoid a stack-too-deep error.
-     */
-    function checkRequirments(uint256 _id) private view returns (bool) {
-        // Verify that the user meets any requirements gating participation in this
-        // pool. Verify that any possible ERC-20 requirements are met.
-        uint256 amount;
-
-        PoolRequirement memory poolRequirement = pools[_id]
-            .config
-            .requirement;
-        if (
-            poolRequirement.requiredType == AccessType.TokenRequired
-        ) {
-            // bytes data
-            for (uint256 i = 0; i < poolRequirement.requiredAsset.length; i++) {
-                amount += IERC20(poolRequirement.requiredAsset[i]).balanceOf(
-                    msg.sender
-                );
-            }
-            return amount >= poolRequirement.requiredAmount;
-            // Verify that any possible Staker point threshold requirements are met.
-        } else if (
-            poolRequirement.requiredType == AccessType.PointRequired
-        ) {
-            // IStaker requiredStaker = IStaker(poolRequirement.requiredAsset[0]);
-            return
-                IStaker(poolRequirement.requiredAsset[0]).getAvailablePoints(
-                    msg.sender
-                ) >= poolRequirement.requiredAmount;
-        }
-
-        // Verify that any possible ERC-1155 ownership requirements are met.
-        if (poolRequirement.requiredId.length == 0) {
-            if (
-                poolRequirement.requiredType == AccessType.ItemRequired
-            ) {
-                for (
-                    uint256 i = 0;
-                    i < poolRequirement.requiredAsset.length;
-                    i++
-                ) {
-                    amount += ISuper1155(poolRequirement.requiredAsset[i])
-                        .totalBalances(msg.sender);
-                }
-                return amount >= poolRequirement.requiredAmount;
-            } else if (
-                poolRequirement.requiredType == AccessType.ItemRequired721
-            ) {
-                for (
-                    uint256 i = 0;
-                    i < poolRequirement.requiredAsset.length;
-                    i++
-                ) {
-                    amount += ISuper721(poolRequirement.requiredAsset[i])
-                        .balanceOf(msg.sender);
-                }
-                // IERC721 requiredItem = IERC721(poolRequirement.requiredAsset[0]);
-                return amount >= poolRequirement.requiredAmount;
-            }
-        } else {
-            if (
-                poolRequirement.requiredType == AccessType.ItemRequired
-            ) {
-                // ISuper1155 requiredItem = ISuper1155(poolRequirement.requiredAsset[0]);
-                for (
-                    uint256 i = 0;
-                    i < poolRequirement.requiredAsset.length;
-                    i++
-                ) {
-                    for (
-                        uint256 j = 0;
-                        j < poolRequirement.requiredAsset.length;
-                        j++
-                    ) {
-                        amount += ISuper1155(poolRequirement.requiredAsset[i])
-                            .balanceOf(
-                                msg.sender,
-                                poolRequirement.requiredId[j]
-                            );
-                    }
-                }
-                return amount >= poolRequirement.requiredAmount;
-            } else if (
-                poolRequirement.requiredType == AccessType.ItemRequired721
-            ) {
-                for (
-                    uint256 i = 0;
-                    i < poolRequirement.requiredAsset.length;
-                    i++
-                ) {
-                    for (
-                        uint256 j = 0;
-                        j < poolRequirement.requiredAsset.length;
-                        j++
-                    ) {
-                        amount += ISuper721(poolRequirement.requiredAsset[i])
-                            .balanceOfGroup(
-                                msg.sender,
-                                poolRequirement.requiredId[j]
-                            );
-                    }
-                }
-                return amount >= poolRequirement.requiredAmount;
-            }
-        }
-        return true;
-    }
-
-    /**
-     * Private function to avoid a stack-too-deep error.
-     */
-    function mintingHelper(
-        uint256 _groupId,
-        uint256 _id,
-        bytes32 _itemKey,
-        uint256 _amount,
-        uint256 _newCirculatingTotal,
-        uint256 _userPoolPurchaseAmount,
-        uint256 _userGlobalPurchaseAmount
-    ) private {
-        // If payment is successful, mint each of the user's purchased items.
-        uint256[] memory itemIds = new uint256[](_amount);
-        uint256[] memory amounts = new uint256[](_amount);
-        // bytes32 key = keccak256(
-        //     abi.encodePacked(
-        //         pools[_id].config.collection,
-        //         pools[_id].currentPoolVersion,
-        //         _groupId
-        //     )
-        // );
-        uint256 nextIssueNumber = nextItemIssues[_itemKey];
-        {
-            uint256 shiftedGroupId = _groupId << 128;
-
-            for (uint256 i = 1; i <= _amount; i++) {
-                uint256 itemId = (shiftedGroupId + nextIssueNumber) + i;
-                itemIds[i - 1] = itemId;
-                amounts[i - 1] = 1;
-            }
-        }
-        // Update the tracker for available item issue numbers.
-        nextItemIssues[_itemKey] = nextIssueNumber + _amount;
-
-        // Update the count of circulating items from this pool.
-        pools[_id].itemMinted[_itemKey] = _newCirculatingTotal;
-
-        // Update the pool's count of items that a user has purchased.
-        pools[_id].purchaseCounts[msg.sender] = _userPoolPurchaseAmount;
-
-        // Update the global count of items that a user has purchased.
-        globalPurchaseCounts[msg.sender] = _userGlobalPurchaseAmount;
-
-        ISuper1155(pools[_id].config.collection).mintBatch(msg.sender, itemIds, amounts, "");
-
-        // Mint the items.
-        // items[_itemIndex].mintBatch(msg.sender, itemIds, amounts, "");
-
-        emit ItemPurchased(msg.sender, _id, itemIds, amounts);
     }
 }
