@@ -159,9 +159,10 @@ abstract contract ClaimOnchain is PermitControl, ReentrancyGuard {
             for (uint j = 0; j < req[i].tokenId.length; j++) {
                 tokenId[j] = req[i].tokenId[j] << 128;
             }
+            bool success;
             if (burnOnRedemption) {
                 if (customBurn) {
-                    genericTransfer(
+                    success = genericTransfer(
                         msg.sender,
                         burnAddress,
                         req[i].collection,
@@ -169,15 +170,15 @@ abstract contract ClaimOnchain is PermitControl, ReentrancyGuard {
                         req[i].amounts
                     );
                 } else {
-                    genericBurn(
+                    success = genericBurn(
                         req[i].collection,
                         tokenId,
                         req[i].amounts
                     );
                 }
+                require(success, "TokenRedeemer::redeem:");
             }
         }
-        // TODO add fail
 
         uint256 mintCount = ISuper721(config.tokenOut).groupMintCount(config.groupIdOut);
         uint256[] memory ids = new uint256[](mintableAmount);
@@ -201,7 +202,6 @@ abstract contract ClaimOnchain is PermitControl, ReentrancyGuard {
         amount = requirements[0].amounts[0];
         for (uint256 i = 0; i < requirements.length; i++) {
             for (uint256 j = 0; j < requirements[i].tokenId.length; j++) {
-                // CHECK check depends on which token is in requirements 
                 bool isERC721 = ISuperGeneric(requirements[i].collection).supportsInterface(
                     INTERFACE_ERC721
                 ) ? true : false;
@@ -215,7 +215,6 @@ abstract contract ClaimOnchain is PermitControl, ReentrancyGuard {
                         requirements[i].collection
                     ).balanceOf(msg.sender, requirements[i].tokenId[j]);
                 }
-                // TODO what if not Super721 and Super1155 
                 if (balanceOfSender < requirements[i].amounts[j]) {
                     allowed = false;
                     break;

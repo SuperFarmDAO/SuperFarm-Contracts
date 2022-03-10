@@ -8,31 +8,35 @@ import {BigNumber} from "ethers";
 import 'chai/register-should';
 import * as utils from "./utils.js"
 
-let owner, user_one, user_two, burnAddress;
-let TokenRedeemer, tr, Super721, super721;
-let snaphotId;
-let currentTime;
-const NULL_ADDRESS = '0x0000000000000000000000000000000000000000';
-const originalUri = "://ipfs/uri/";
-const originalUri721 = "://ipfs/uri/";
-let itemGroupId = ethers.BigNumber.from(1);
-let itemGroupId2 = ethers.BigNumber.from(2);
-let shiftedItemGroupId = itemGroupId.shl(128);
-let shiftedItemGroupId2 = itemGroupId2.shl(128);
-
-let mintRight;
-let UNIVERSAL;
-let super1155, Super1155;
-
-let configStandart;
 
 describe("TokenRedeemerV3", function () {
+	
+	let owner, user_one, user_two, burnAddress;
+	let TokenRedeemer, tr, Super721, super721;
+	let snaphotId;
+	let currentTime;
+	let itemGroupId = ethers.BigNumber.from(1);
+	let itemGroupId2 = ethers.BigNumber.from(2);
+	let shiftedItemGroupId = itemGroupId.shl(128);
+	let shiftedItemGroupId2 = itemGroupId2.shl(128);
+	
+	let mintRight;
+	let UNIVERSAL;
+	let super1155;
+	let proxyRegistry;
+	let configStandart;
+	
 	before(async function() {
 		[owner, user_one, user_two, burnAddress] = await ethers.getSigners();
 		TokenRedeemer = await ethers.getContractFactory("TokenRedeemer");
 		tr = await TokenRedeemer.deploy(burnAddress.address);
 
+        this.ProxyRegistry = await ethers.getContractFactory("ProxyRegistry");
+		proxyRegistry = await proxyRegistry.deploy();
+		// TODO Proxy staff
+
 		[super721, super1155] = await utils.withSuperTokens(owner.address);
+
 		mintRight = await super721.MINT();
 
 
@@ -76,7 +80,7 @@ describe("TokenRedeemerV3", function () {
 		let balance721 = await super721.balanceOf(user_one.address);
 		console.log("balance of user_one on Super721 contract ", balance721)
 		// TEST setting approval for all 
-		super1155.connect(user_one).setApprovalForAll(burnAddress.address, true);
+		super1155.connect(user_one).setApprovalForAll(tr.address, true);
 
 		let balance = await super1155.balanceOf(user_one.address, shiftedItemGroupId.add(1));
 		console.log("balance of user_one SHGroupID1", balance);
@@ -102,14 +106,13 @@ describe("TokenRedeemerV3", function () {
 			customBurn: false,
 			requirements: [{
 				collection: super1155.address,
-				tokenId: [shiftedItemGroupId.add(1), shiftedItemGroupId2.add(1)],
-				amounts: [1, 2]
+				tokenId: [shiftedItemGroupId.add(1)/*, shiftedItemGroupId2.add(1)*/],
+				amounts: [1/*, 2*/]
 			}]
 		}
 
 		await tr.connect(owner).setRedemptionConfig(config, 0);
 
-		
 		let BURN = await super721.BURN();
 
 		await super721.connect(owner).setPermit(
@@ -174,7 +177,7 @@ describe("TokenRedeemerV3", function () {
 	it('Shoud revert: required token cannot be zero', async function() {
 		let config = JSON.parse(JSON.stringify(configStandart)); ;
 		config.requirements = [{
-			collection: NULL_ADDRESS,
+			collection: ethers.constants.AddressZero,
 			tokenId: [shiftedItemGroupId.add(1), shiftedItemGroupId.add(2)],
 			amounts: [1, 2]
 		}];
@@ -253,7 +256,12 @@ describe("TokenRedeemerV3", function () {
 		let config = JSON.parse(JSON.stringify(configStandart));
 		config.burnOnRedemption = true;
 		await tr.connect(owner).setRedemptionConfig(config, 0);
+		// CHECK that token burn and balances|ownership of tokens
 		await tr.connect(user_one).redeem(0);
+	});
+
+	it("Should revert if trying to burn not rigth token in requirements", async function () {
+		
 	});
 
 	// TODO approve burn address for transfer 
@@ -262,7 +270,11 @@ describe("TokenRedeemerV3", function () {
         let config = JSON.parse(JSON.stringify(configStandart));
 		config.burnOnRedemption = true;
 		config.customBurn = true;
-		// TODO add 721 items in requirements 
+		config.requirements = [{
+			collection: super721.address,
+			tokenId: [shiftedItemGroupId.add(1)],
+			amounts: [1]
+		}];
 		await tr.connect(owner).setRedemptionConfig(config, 0);
 		await tr.connect(user_one).redeem(0);
     });
