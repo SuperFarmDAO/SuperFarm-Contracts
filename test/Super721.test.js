@@ -8,6 +8,8 @@ const NULL_ADDRESS = '0x0000000000000000000000000000000000000000';
 const DECIMALS = 2;
 
 const AMT = 150
+let snapshotId;
+let currentTime;
 
 ///////////////////////////////////////////////////////////
 // SEE https://hardhat.org/tutorial/testing-contracts.html
@@ -69,6 +71,15 @@ describe('===Super721===', function () {
         UNIVERSAL = await super721.UNIVERSAL();
     });
 
+	beforeEach(async function() {
+		currentTime = await (await ethers.provider.getBlock()).timestamp;
+		snapshotId = await network.provider.send("evm_snapshot");
+	});
+
+	afterEach(async function() {
+		await network.provider.send("evm_revert", [snapshotId]);
+	});
+
     // Test cases
 
     //////////////////////////////
@@ -117,7 +128,7 @@ describe('===Super721===', function () {
 
             await expect(
                 super721.connect(owner).setURI("://ipfs/newuri/")
-            ).to.be.revertedWith("Super721::setURI: the collection URI has been permanently locked");
+            ).to.be.revertedWith('CollectionURILocked');
 
             expect(await super721.metadataUri()).to.equal(originalUri);
         });
@@ -215,7 +226,7 @@ describe('===Super721===', function () {
         it('Reverts: querying balance of address(0)', async () => {
             await expect(
                 super721.balanceOfGroup(NULL_ADDRESS, 1)
-            ).to.be.revertedWith("Super721::balanceOf: balance query for the zero address");
+            ).to.be.revertedWith('BalanceGroupQueryForZeroAddress');
         });
 
         it('returns the balanceOfGroup other addresses', async () => {
@@ -272,7 +283,7 @@ describe('===Super721===', function () {
         it('Reverts: setting approval status for self', async () => {
             await expect(
                 super721.setApprovalForAll(deployer.address, true)
-            ).to.be.revertedWith("Super721::balanceOf: setting approval status for self");
+            ).to.be.revertedWith('SetApprovalForSelf');
         });
 
         it('uses operatorApprovals except when the operator is registered in the proxyRegistry', async () => {
@@ -376,18 +387,18 @@ describe('===Super721===', function () {
                     mockERC721Receiver1.address,
                     [2],
                     ethers.utils.id('b'))
-            ).to.be.revertedWith("Super721::safeBatchTransferFrom: insufficient balance for transfer");
+            ).to.be.revertedWith('SafeBatchTransferInsufficientBalance');
         });
         it('Reverts: transfer to the 0 address', async () => {
             await expect(
                 super721.safeBatchTransferFrom(signer1.address, NULL_ADDRESS, [1], ethers.utils.id('a'))
-            ).to.be.revertedWith("Super721::safeBatchTransferFrom: transfer to the zero address");
+            ).to.be.revertedWith('SafeBatchTransferToZeroAddress');
         });
         it('Reverts: caller is not owner nor approved', async () => {
             // not owner or approved
             await expect(
                 super721.connect(signer3).safeBatchTransferFrom(signer1.address, super721.address, [1], ethers.utils.id('a'))
-            ).to.be.revertedWith("Super721::safeBatchTransferFrom: caller is not owner nor approved");
+            ).to.be.revertedWith('SafeBatchTransferNotOwnerOrApproved');
         });
         it('transfers in batches, safely', async () => {
             let MockERC721Receiver1 = await ethers.getContractFactory("MockERC721Receiver1");
@@ -413,7 +424,7 @@ describe('===Super721===', function () {
 
             await expect(
                 super721.connect(owner).burnBatch(signer1.address, [shiftedItemGroupId2])
-            ).to.be.revertedWith("Super721::burn: burn amount exceeds balance");
+            ).to.be.revertedWith('BurnBatchBurnAmountExceedBalance');
 
             // MINT
             await super721.connect(owner).mintBatch(deployer.address, [shiftedItemGroupId, shiftedItemGroupId2], ethers.utils.id('a'));
@@ -535,18 +546,18 @@ describe('===Super721===', function () {
         it('Reverts: transfer to the 0 address', async () => {
             await expect(
                 super721["safeTransferFrom(address,address,uint256)"](signer1.address, NULL_ADDRESS, 1)
-            ).to.be.revertedWith("Super721::_safeTransferFrom : transfer to the zero address");
+            ).to.be.revertedWith('SafeTransferToZeroAddress');
         });
         it('Reverts: call is not owner nor approved', async () => {
             // not owner
             await expect(
                 super721["safeTransferFrom(address,address,uint256)"](signer1.address, super721.address, 1)
-            ).to.be.revertedWith("Super721::_safeTransferFrom : caller is not owner nor approved");
+            ).to.be.revertedWith('SafeTransferCallerNotOwnerOrApproved');
 
             // not approved
             await expect(
                 super721.connect(signer3)["safeTransferFrom(address,address,uint256)"](signer1.address, super721.address, 1)
-            ).to.be.revertedWith("Super721::_safeTransferFrom : caller is not owner nor approved");
+            ).to.be.revertedWith('SafeTransferCallerNotOwnerOrApproved');
         });
         it('should safeTransferFrom', async () => {
             await super721.connect(owner).configureGroup(itemGroupId, {
@@ -568,7 +579,7 @@ describe('===Super721===', function () {
 
             await expect(
                 super721.connect(owner).burnBatch(signer1.address, [shiftedItemGroupId2])
-            ).to.be.revertedWith("Super721::burn: burn amount exceeds balance");
+            ).to.be.revertedWith('BurnBatchBurnAmountExceedBalance');
 
             // MINT
             await super721.connect(owner).mintBatch(deployer.address, [shiftedItemGroupId, shiftedItemGroupId2], ethers.utils.id('a'));
@@ -663,14 +674,14 @@ describe('===Super721===', function () {
                     deployer.address,
                     signer2.address,
                     shiftedItemGroupId,
-            )).to.be.revertedWith("Super721::transferForm: transfer caller is not owner nor approved");
+            )).to.be.revertedWith('TransferFromCallerIsNotOwner');
 
             await expect(
                 super721.transferFrom(
                     deployer.address,
                     signer2.address,
                     shiftedItemGroupId2,
-            )).to.be.revertedWith("Super721::getApproved: operator query for nonexistent token");
+            )).to.be.revertedWith('IsApprovedOrOwnerQueryNonExictentToken');
 
             await super721.transferFrom(
                 deployer.address,
@@ -692,12 +703,12 @@ describe('===Super721===', function () {
         it('Reverts: no right', async () => {
             await expect(
                 super721.burnBatch(signer1.address, [1])
-            ).to.be.revertedWith("Super721::burnBatch: you do not have the right to burn that item");
+            ).to.be.revertedWith('BurnBatchDoNotHaveRightToBurnItem');
         });
         it('Reverts: non-existent group', async () => {
             await expect(
                 super721.connect(owner).burnBatch(signer1.address, [1])
-            ).to.be.revertedWith("Super721::_burnChecker: you cannot burn a non-existent item group");
+            ).to.be.revertedWith('BurnCheckerNonExistentItemGroup');
         });
         it('Reverts: burn limit exceeded', async () => {
             await super721.connect(owner).configureGroup(itemGroupId, {
@@ -710,12 +721,12 @@ describe('===Super721===', function () {
 
             await expect(
                 super721.connect(owner).burnBatch(signer1.address, [shiftedItemGroupId])
-            ).to.be.revertedWith("Super721::_burnChecker you may not exceed the burn limit on this item group");
+            ).to.be.revertedWith('BurnCheckerExceedBurnLimitOnItemGroup');
         });
         it('Reverts: burn zero address', async () => {
             await expect(
                 super721.connect(owner).burnBatch(NULL_ADDRESS, [shiftedItemGroupId])
-            ).to.be.revertedWith("Super721::burnBatch: burn from the zero address");
+            ).to.be.revertedWith('BurnBatchFromZeroAddress');
         });
         it('Reverts: item is not burnable', async () => {
             await super721.connect(owner).configureGroup(itemGroupId2, {
@@ -793,7 +804,7 @@ describe('===Super721===', function () {
 
             await expect(
                 super721.connect(owner).burnBatch(signer1.address, [shiftedItemGroupId, shiftedItemGroupId2])
-            ).to.be.revertedWith("Super721::burn: burn amount exceeds balance");
+            ).to.be.revertedWith('BurnBatchBurnAmountExceedBalance');
 
             // MINT
             await super721.connect(owner).mintBatch(
@@ -806,8 +817,8 @@ describe('===Super721===', function () {
             expect(await super721.circulatingSupply(shiftedItemGroupId)).to.equal(1);
             expect(await super721.burnCount(shiftedItemGroupId)).to.equal(0);
             let genericTokensGroup = await super721.itemGroups(itemGroupId);
-            expect(genericTokensGroup[6]).to.equal(1); // circulatingSupply;
-            expect(genericTokensGroup[8]).to.equal(0); // burnCount;
+            expect(genericTokensGroup['circulatingSupply']).to.equal(1); // circulatingSupply;
+            expect(genericTokensGroup['burnCount']).to.equal(0); // burnCount;
 
             expect(await super721.balanceOfGroup(signer1.address, shiftedItemGroupId2)).to.equal(1);
             expect(await super721.groupBalances(itemGroupId2, signer1.address)).to.equal(1);
@@ -815,8 +826,8 @@ describe('===Super721===', function () {
             expect(await super721.circulatingSupply(shiftedItemGroupId2)).to.equal(1);
             expect(await super721.burnCount(shiftedItemGroupId2)).to.equal(0);
             let NFTTokenGroup = await super721.itemGroups(itemGroupId2);
-            expect(NFTTokenGroup[6]).to.equal(1); // circulatingSupply;
-            expect(NFTTokenGroup[8]).to.equal(0); // burnCount;
+            expect(NFTTokenGroup['circulatingSupply']).to.equal(1); // circulatingSupply;
+            expect(NFTTokenGroup['burnCount']).to.equal(0); // burnCount;
 
             // BURN
             await super721.connect(owner).burnBatch(
@@ -828,8 +839,8 @@ describe('===Super721===', function () {
             expect(await super721.groupBalances(itemGroupId, signer1.address)).to.equal(0);
             expect(await super721.totalBalances(signer1.address)).to.equal(0);
             genericTokensGroup = await super721.itemGroups(itemGroupId);
-            expect(genericTokensGroup[6]).to.equal(0); // circulatingSupply;
-            expect(genericTokensGroup[8]).to.equal(1); // burnCount;
+            expect(genericTokensGroup['circulatingSupply']).to.equal(0); // circulatingSupply;
+            expect(genericTokensGroup['burnCount']).to.equal(1); // burnCount;
             expect(await super721.circulatingSupply(shiftedItemGroupId)).to.equal(0);
             expect(await super721.burnCount(shiftedItemGroupId)).to.equal(1);
 
@@ -839,8 +850,8 @@ describe('===Super721===', function () {
             expect(await super721.circulatingSupply(shiftedItemGroupId2)).to.equal(0);
             expect(await super721.burnCount(shiftedItemGroupId2)).to.equal(1);
             NFTTokenGroup = await super721.itemGroups(itemGroupId2);
-            expect(NFTTokenGroup[6]).to.equal(0); // circulatingSupply;
-            expect(NFTTokenGroup[8]).to.equal(1); // burnCount;*/
+            expect(NFTTokenGroup['circulatingSupply']).to.equal(0); // circulatingSupply;
+            expect(NFTTokenGroup['burnCount']).to.equal(1); // burnCount;*/
         });
     });
 
@@ -854,7 +865,7 @@ describe('===Super721===', function () {
                     burnType: 1,
                     burnData: 20000
                 })
-            ).to.be.revertedWith("Super721::configureGroup: group ID 0 is invalid");
+            ).to.be.revertedWith('ConfigureGroupID0');
         });
 
         it('Reverts: sender does not have the right', async () => {
@@ -880,7 +891,7 @@ describe('===Super721===', function () {
                     burnType: 1,
                     burnData: 20000
                 })
-            ).to.be.revertedWith("Super721::configureGroup: the collection is locked so groups cannot be created");
+            ).to.be.revertedWith('ConfigureGroupCollectionIsLocked');
         });
 
         it('Reverts: cannot change a capped to uncap', async () => {
@@ -900,7 +911,7 @@ describe('===Super721===', function () {
                     burnType: 1,
                     burnData: 20000
                 })
-            ).to.be.revertedWith("Super721::configureGroup: you may not uncap a capped supply type");
+            ).to.be.revertedWith('ConfigureGroupUncapCapped');
         });
 
         it('Reverts: cannot increase supply of a capped group', async () => {
@@ -920,7 +931,7 @@ describe('===Super721===', function () {
                     burnType: 1,
                     burnData: 20000
                 })
-            ).to.be.revertedWith("Super721::configureGroup: you may not increase the supply of a capped type");
+            ).to.be.revertedWith('ConfigureGroupIncreaseSupply');
         });
 
         it('Reverts: cannot decrease supply below circulating supply', async () => {
@@ -942,7 +953,7 @@ describe('===Super721===', function () {
                     burnType: 1,
                     burnData: 20000
                 })
-            ).to.be.revertedWith("Super721::configureGroup: you may not decrease supply below the circulating amount");
+            ).to.be.revertedWith('ConfigureGroupDecreaseSupplyOfCiculatingAmount');
         });
 
         it('allows configuring a group when there is permission for GROUP circumstance', async () => {
@@ -985,15 +996,15 @@ describe('===Super721===', function () {
             });
 
             let frenBurgersGroup = await super721.itemGroups(itemGroupId);
-            expect(frenBurgersGroup[0]).to.equal(true); // initialized;
-            expect(frenBurgersGroup[1]).to.equal('FrenBurgers'); // name;
-            expect(frenBurgersGroup[2]).to.equal(1); // supplyType;
-            expect(frenBurgersGroup[3]).to.equal(20000); // supplyData;
-            expect(frenBurgersGroup[4]).to.equal(0); // burnType;
-            expect(frenBurgersGroup[5]).to.equal(10000); // burnData;
-            expect(frenBurgersGroup[6]).to.equal(0); // circulatingSupply;
-            expect(frenBurgersGroup[7]).to.equal(0); // mintCount;
-            expect(frenBurgersGroup[8]).to.equal(0); // burnCount;
+            expect(frenBurgersGroup['initialized']).to.equal(true); // initialized;
+            expect(frenBurgersGroup['name']).to.equal('FrenBurgers'); // name;
+            expect(frenBurgersGroup['supplyType']).to.equal(1); // supplyType;
+            expect(frenBurgersGroup['supplyData']).to.equal(20000); // supplyData;
+            expect(frenBurgersGroup['burnType']).to.equal(0); // burnType;
+            expect(frenBurgersGroup['burnData']).to.equal(10000); // burnData;
+            expect(frenBurgersGroup['circulatingSupply']).to.equal(0); // circulatingSupply;
+            expect(frenBurgersGroup['mintCount']).to.equal(0); // mintCount;
+            expect(frenBurgersGroup['burnCount']).to.equal(0); // burnCount;
 
             // reconfiguring before minting
             // SupplyType can be changed from NOT Capped to anything
@@ -1006,15 +1017,15 @@ describe('===Super721===', function () {
             });
 
             frenBurgersGroup = await super721.itemGroups(itemGroupId);
-            expect(frenBurgersGroup[0]).to.equal(true); // initialized;
-            expect(frenBurgersGroup[1]).to.equal('BestFrenBurgers'); // name;
-            expect(frenBurgersGroup[2]).to.equal(0); // supplyType;
-            expect(frenBurgersGroup[3]).to.equal(20000); // supplyData;
-            expect(frenBurgersGroup[4]).to.equal(0); // burnType; // TODO: change this?, Update: Why ?
-            expect(frenBurgersGroup[5]).to.equal(10000); // burnData;
-            expect(frenBurgersGroup[6]).to.equal(0); // circulatingSupply;
-            expect(frenBurgersGroup[7]).to.equal(0); // mintCount;
-            expect(frenBurgersGroup[8]).to.equal(0); // burnCount;
+            expect(frenBurgersGroup['initialized']).to.equal(true); // initialized;
+            expect(frenBurgersGroup['name']).to.equal('BestFrenBurgers'); // name;
+            expect(frenBurgersGroup['supplyType']).to.equal(0); // supplyType;
+            expect(frenBurgersGroup['supplyData']).to.equal(20000); // supplyData;
+            expect(frenBurgersGroup['burnType']).to.equal(0); // burnType; // TODO: change this?, Update: Why ?
+            expect(frenBurgersGroup['burnData']).to.equal(10000); // burnData;
+            expect(frenBurgersGroup['circulatingSupply']).to.equal(0); // circulatingSupply;
+            expect(frenBurgersGroup['mintCount']).to.equal(0); // mintCount;
+            expect(frenBurgersGroup['burnCount']).to.equal(0); // burnCount;
 
 
             // minting an item and then reconfiguring
@@ -1036,15 +1047,15 @@ describe('===Super721===', function () {
             });
 
             frenBurgersGroup = await super721.itemGroups(itemGroupId);
-            expect(frenBurgersGroup[0]).to.equal(true); // initialized;
-            expect(frenBurgersGroup[1]).to.equal('BestFrenBurgers'); // name;
-            expect(frenBurgersGroup[2]).to.equal(0); // supplyType;
-            expect(frenBurgersGroup[3]).to.equal(1); // supplyData;
-            expect(frenBurgersGroup[4]).to.equal(0); // burnType; // TODO: change this?
-            expect(frenBurgersGroup[5]).to.equal(10000); // burnData;
-            expect(frenBurgersGroup[6]).to.equal(1); // circulatingSupply;
-            expect(frenBurgersGroup[7]).to.equal(1); // mintCount;
-            expect(frenBurgersGroup[8]).to.equal(0); // burnCount;
+            expect(frenBurgersGroup['initialized']).to.equal(true); // initialized;
+            expect(frenBurgersGroup['name']).to.equal('BestFrenBurgers'); // name;
+            expect(frenBurgersGroup['supplyType']).to.equal(0); // supplyType;
+            expect(frenBurgersGroup['supplyData']).to.equal(1); // supplyData;
+            expect(frenBurgersGroup['burnType']).to.equal(0); // burnType; // TODO: change this?
+            expect(frenBurgersGroup['burnData']).to.equal(10000); // burnData;
+            expect(frenBurgersGroup['circulatingSupply']).to.equal(1); // circulatingSupply;
+            expect(frenBurgersGroup['mintCount']).to.equal(1); // mintCount;
+            expect(frenBurgersGroup['burnCount']).to.equal(0); // burnCount;
         });
     });
 
@@ -1116,7 +1127,7 @@ describe('===Super721===', function () {
     describe("balanceOf", function () {
         it('Reverts: query for Zero address', async () => {
             await expect(super721.balanceOf(NULL_ADDRESS)
-            ).to.be.revertedWith("Super721::balanceOf: balance query for the zero address");
+            ).to.be.revertedWith('BalanceQueryForZeroAddress');
         });
 
         it('returns the balanceOf of tokens for an address', async () => {
@@ -1159,7 +1170,7 @@ describe('===Super721===', function () {
     describe("balanceOfBatch", function () {
         it('Reverts: accounts and ids mismatch', async () => {
             await expect(super721.balanceOfBatch([signer2.address], [shiftedItemGroupId2, shiftedItemGroupId2.add(1)])
-            ).to.be.revertedWith("Super721::balanceOfBatch: accounts and ids length mismatch");
+            ).to.be.revertedWith('BalanceBatchLeghtsMissmatched');
         });
         it('returns the balanceOf of tokens for arrays addresses and indexes', async () => {
             await super721.connect(owner).configureGroup(itemGroupId, {
@@ -1220,19 +1231,19 @@ describe('===Super721===', function () {
         it('Reverts: sender is not current owner', async () => {
             await expect(
                 super721.approve(signer2.address, tokenId)
-            ).to.be.revertedWith("Super721::approve: approve caller is not owner nor approved for all");
+            ).to.be.revertedWith('ApprovalCallerIsNotOwnerOrApprovedForAll');
         });
 
         it('Reverts: approving current owner', async () => {
             await expect(
                 super721.connect(signer1).approve(signer1.address, tokenId)
-            ).to.be.revertedWith("Super721::approve: approval to current owner");
+            ).to.be.revertedWith('ApprovalToCurrentOwner');
         });
 
         it('approves when owner approves another address', async () => {
             await expect(
                 super721.getApproved(4)
-            ).to.be.revertedWith("Super721::getApproved: approved query for nonexistent token");
+            ).to.be.revertedWith('GetApprovedQueryNonExictentToken');
             expect(await super721.getApproved(tokenId)).to.equal(NULL_ADDRESS);
             await super721.connect(signer1).approve(signer2.address, tokenId);
             expect(await super721.getApproved(tokenId)).to.equal(signer2.address);
@@ -1294,7 +1305,7 @@ describe('===Super721===', function () {
         it('Reverts: mintBatch to address(0)', async () => {
             await expect(
                 super721.mintBatch(NULL_ADDRESS, [shiftedItemGroupId], ethers.utils.id('a'))
-            ).to.be.revertedWith("Super721::mintBatch: mint to the zero address");
+            ).to.be.revertedWith('MintToZeroAddress');
         });
 
         it('Reverts: token already exists"', async () => {
@@ -1310,13 +1321,13 @@ describe('===Super721===', function () {
 
             await expect(
                 super721.connect(owner).mintBatch(signer1.address, [shiftedItemGroupId], ethers.utils.id('a'))
-            ).to.be.revertedWith("Super721::_mintChecker: token already exists");
+            ).to.be.revertedWith('MintExistingToken');
         });
 
         it('Reverts: mint to non existent group"', async () => {
             await expect(
                 super721.connect(owner).mintBatch(signer1.address, [shiftedItemGroupId], ethers.utils.id('a'))
-            ).to.be.revertedWith("Super721::_mintChecker: you cannot mint a non-existent item group");
+            ).to.be.revertedWith('MintNonExistentItemGroup');
         });
 
         it('Reverts: cannot mint beyond cap', async () => {
@@ -1331,7 +1342,7 @@ describe('===Super721===', function () {
             await super721.connect(owner).mintBatch(signer1.address, [shiftedItemGroupId], ethers.utils.id('a'))
             await expect(
                 super721.connect(owner).mintBatch(signer1.address, [shiftedItemGroupId.add(1)], ethers.utils.id('a'))
-                ).to.be.revertedWith("Super721::_mintChecker: you cannot mint a group beyond its cap");
+                ).to.be.revertedWith('MintGroupBeyondCap');
         });
         it('should mint if there is a persmission for the group of the item', async () => {
             let groupCirumstance = "0x0000000000000000000000000000000000000000000000000000000000000001"
@@ -1384,7 +1395,7 @@ describe('===Super721===', function () {
 
             await expect(
                 super721.connect(signer1).mintBatch(signer1.address, [shiftedItemGroupId], ethers.utils.id('a'))
-            ).to.be.revertedWith("Super721::mintBatch: you do not have the right to mint that item");
+            ).to.be.revertedWith('MintDontHaveRigthToMint');
 
             await super721.connect(owner).setPermit(
                 signer1.address,
@@ -1396,16 +1407,16 @@ describe('===Super721===', function () {
             let originalBalance = await super721.balanceOfGroup(signer1.address, shiftedItemGroupId);
             let originalGroupBalance = await super721.groupBalances(itemGroupId, signer1.address);
             let originalTotalBalance = await super721.totalBalances(signer1.address);
-            let originalCirculatingSupply = (await super721.itemGroups(itemGroupId))[6];
-            let originalMintCount = (await super721.itemGroups(itemGroupId))[7];
+            let originalCirculatingSupply = (await super721.itemGroups(itemGroupId))["circulatingSupply"];
+            let originalMintCount = (await super721.itemGroups(itemGroupId))["mintCount"];
             expect(originalBalance).to.equal(0);
             expect(originalGroupBalance).to.equal(0);
             expect(originalTotalBalance).to.equal(0);
             expect(originalCirculatingSupply).to.equal(0);
             await super721.connect(signer1).mintBatch(signer1.address, [shiftedItemGroupId], ethers.utils.id('a'));
             expect(await super721.balanceOfGroup(signer1.address, shiftedItemGroupId)).to.equal(originalBalance.add(1));
-            expect((await super721.itemGroups(itemGroupId))[6]).to.equal(originalCirculatingSupply.add(1));
-            expect((await super721.itemGroups(itemGroupId))[7]).to.equal(originalMintCount.add(1));
+            expect((await super721.itemGroups(itemGroupId))["circulatingSupply"]).to.equal(originalCirculatingSupply.add(1));
+            expect((await super721.itemGroups(itemGroupId))["mintCount"]).to.equal(originalMintCount.add(1));
 
             expect(
                 await super721.groupBalances(itemGroupId, signer1.address)
@@ -1428,7 +1439,7 @@ describe('===Super721===', function () {
 
             await expect(
                 super721.connect(signer2).mintBatch(signer1.address, [shiftedItemGroupId2], ethers.utils.id('a'))
-            ).to.be.revertedWith("Super721::mintBatch: you do not have the right to mint that item");
+            ).to.be.revertedWith('MintDontHaveRigthToMint');
 
             await super721.connect(owner).setPermit(
                 signer2.address,
@@ -1440,16 +1451,16 @@ describe('===Super721===', function () {
             let originalBalance2 = await super721.balanceOfGroup(signer1.address, shiftedItemGroupId2);
             let originalGroupBalance2 = await super721.groupBalances(itemGroupId2, signer1.address);
             let originalTotalBalance2 = await super721.totalBalances(signer1.address);
-            let originalCirculatingSupply2 = (await super721.itemGroups(itemGroupId2))[6];
-            let originalMintCount2 = (await super721.itemGroups(itemGroupId2))[7];
+            let originalCirculatingSupply2 = (await super721.itemGroups(itemGroupId2))['circulatingSupply'];
+            let originalMintCount2 = (await super721.itemGroups(itemGroupId2))['mintCount'];
             expect(originalBalance2).to.equal(0);
             expect(originalGroupBalance2).to.equal(0);
             expect(originalTotalBalance2).to.equal(1);
             expect(originalCirculatingSupply2).to.equal(0);
             await super721.connect(signer2).mintBatch(signer1.address, [shiftedItemGroupId2], ethers.utils.id('a'));
             expect(await super721.balanceOfGroup(signer1.address, shiftedItemGroupId2)).to.equal(originalBalance2.add(1));
-            expect((await super721.itemGroups(itemGroupId2))[6]).to.equal(originalCirculatingSupply2.add(1));
-            expect((await super721.itemGroups(itemGroupId2))[7]).to.equal(originalMintCount2.add(1));
+            expect((await super721.itemGroups(itemGroupId2))['circulatingSupply']).to.equal(originalCirculatingSupply2.add(1));
+            expect((await super721.itemGroups(itemGroupId2))['mintCount']).to.equal(originalMintCount2.add(1));
         });
     });
 
@@ -1465,7 +1476,7 @@ describe('===Super721===', function () {
 
             await expect(
                 super721.connect(owner).setMetadata(1, 'mettaDatum')
-            ).to.be.revertedWith("Super721::setMetadata: you cannot edit this metadata because it is frozen");
+            ).to.be.revertedWith('SetMetadataThatFrozen');
         });
 
         it('allows setMetadata when there is permission to the GROUP circumstance', async () => {
@@ -1548,7 +1559,7 @@ describe('===Super721===', function () {
                 deployer.address,
                 [shiftedItemGroupId.add(1)],
                 ethers.utils.id('a')
-            )).to.be.revertedWith("Super721::_mintChecker: you cannot mint a group beyond its cap");
+            )).to.be.revertedWith('MintGroupBeyondCap');
 
             // Burning must fail
             await expect(
@@ -1587,7 +1598,7 @@ describe('===Super721===', function () {
                     deployer.address,
                     [shiftedItemGroupId.add(2)],
                     ethers.utils.id('a')
-            )).to.be.revertedWith("Super721::_mintChecker: you cannot mint a group beyond its cap");
+            )).to.be.revertedWith('MintGroupBeyondCap');
 
             // Check circulating supply, mintcount, burncount
             let group = await super721.itemGroups(itemGroupId);
@@ -1610,7 +1621,7 @@ describe('===Super721===', function () {
                     deployer.address,
                     [shiftedItemGroupId],
                     ethers.utils.id('a'))
-                ).to.be.revertedWith("Super721::_mintChecker: token already exists");
+                ).to.be.revertedWith('MintExistingToken');
 
             // Burn one more item
             await super721.connect(owner).burnBatch(deployer.address, [shiftedItemGroupId.add(1)]);
@@ -1627,12 +1638,12 @@ describe('===Super721===', function () {
                     deployer.address,
                     [shiftedItemGroupId.add(1)],
                     ethers.utils.id('a'))
-                ).to.be.revertedWith("Super721::_mintChecker: token already exists");
+                ).to.be.revertedWith('MintExistingToken');
 
             // Burning must fail since it reached the burnData limit
             await expect(
                 super721.connect(owner).burnBatch(deployer.address, [shiftedItemGroupId])
-            ).to.be.revertedWith("Super721::_burnChecker you may not exceed the burn limit on this item group");
+            ).to.be.revertedWith('BurnCheckerExceedBurnLimitOnItemGroup');
         });
         
         it('should test BurnType=Replenishable group. can be minted | can be burned | can be reminted', async () => {
@@ -1665,7 +1676,7 @@ describe('===Super721===', function () {
                     deployer.address,
                     [shiftedItemGroupId.add(2)],
                     ethers.utils.id('a')
-            )).to.be.revertedWith("Super721::_mintChecker: you cannot mint a group beyond its cap");
+            )).to.be.revertedWith('MintGroupBeyondCap');
 
             // Check circulating supply, mintcount, burncount
             let group = await super721.itemGroups(itemGroupId);
@@ -1700,7 +1711,7 @@ describe('===Super721===', function () {
                     deployer.address,
                     [shiftedItemGroupId.add(2)],
                     ethers.utils.id('a')
-            )).to.be.revertedWith("Super721::_mintChecker: you cannot mint a group beyond its cap");
+            )).to.be.revertedWith('MintGroupBeyondCap');
 
             // Burn one more item
             await super721.connect(owner).burnBatch(deployer.address, [shiftedItemGroupId.add(1)]);
@@ -1729,7 +1740,7 @@ describe('===Super721===', function () {
                     deployer.address,
                     [shiftedItemGroupId.add(1)],
                     ethers.utils.id('a'))
-                ).to.be.revertedWith("Super721::_mintChecker: token already exists");
+                ).to.be.revertedWith('MintExistingToken');
         });
     });
     

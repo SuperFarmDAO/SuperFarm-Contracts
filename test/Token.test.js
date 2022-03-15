@@ -45,7 +45,7 @@ describe('Token', function () {
 			const expiry = 0;
 			await expect(
 				token.connect(alice.signer).delegateBySig(delegatee, nonce, expiry, 0, '0xbad0bad0bad0bad0bad0bad0bad0bad0bad0bad0bad0bad0bad0bad0bad0bad0', '0xbad0bad0bad0bad0bad0bad0bad0bad0bad0bad0bad0bad0bad0bad0bad0bad0')
-			).to.be.revertedWith('Invalid signature.');
+			).to.be.revertedWith('InvalidSignature');
 		});
 
 		// Verify that a correct nonce is required for signatories.
@@ -75,7 +75,7 @@ describe('Token', function () {
 			const sig = await ethers.utils.splitSignature(rawSig);
 			await expect(
 				token.connect(alice.signer).delegateBySig(delegatee, nonce, expiry, sig.v, sig.r, sig.s)
-			).to.be.revertedWith('Invalid nonce.');
+			).to.be.revertedWith('InavalidNonce');
 		});
 
 		// Verify that an unexpired signature is required.
@@ -105,7 +105,7 @@ describe('Token', function () {
 			const sig = await ethers.utils.splitSignature(rawSig);
 			await expect(
 				token.connect(alice.signer).delegateBySig(delegatee, nonce, expiry, sig.v, sig.r, sig.s)
-			).to.be.revertedWith('Signature expired.');
+			).to.be.revertedWith('SignatureExpired');
 		});
 
 		// Verify that signature-based delegation works correctly.
@@ -241,7 +241,7 @@ describe('Token', function () {
 		it('should revert for unfinalized blocks', async () => {
 			await expect(
 				token.connect(alice.signer).getPriorVotes(alice.address, 1e9)
-			).to.be.revertedWith('The specified block is not yet finalized.');
+			).to.be.revertedWith('SpecifiedBlockNumberIsNotFinalized');
 		});
 
 		// Verify that vote counting correctly returns from checkpoint blocks.

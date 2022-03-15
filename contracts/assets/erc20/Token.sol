@@ -4,6 +4,15 @@ pragma solidity ^0.8.7;
 import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Capped.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
+/* 
+  error codes
+*/
+error BurnAmountExceedAllowance();
+error InvalidSignature();
+error InavalidNonce();
+error SignatureExpired();
+error SpecifiedBlockNumberIsNotFinalized();
+
 /**
   @title A basic ERC-20 token with voting functionality.
   @author Tim Clancy
@@ -51,8 +60,9 @@ contract Token is ERC20Capped, Ownable {
    * `amount`.
    */
   function burnFrom(address account, uint256 amount) public virtual {
-      require(amount >= allowance(account, _msgSender()),
-        "ERC20: burn amount exceeds allowance");
+      if(amount < allowance(account, _msgSender())) {
+        revert BurnAmountExceedAllowance();
+      }
       uint256 decreasedAllowance = allowance(account, _msgSender()) - amount;
 
       _approve(account, _msgSender(), decreasedAllowance);
@@ -165,9 +175,15 @@ contract Token is ERC20Capped, Ownable {
         structHash));
 
     address signatory = ecrecover(digest, v, r, s);
-    require(signatory != address(0), "Invalid signature.");
-    require(nonce == nonces[signatory]++, "Invalid nonce.");
-    require(block.timestamp <= expiry, "Signature expired.");
+    if(signatory == address(0)) {
+      revert InvalidSignature();
+    }
+    if(nonce != nonces[signatory]++) {
+      revert InavalidNonce();
+    }
+    if(block.timestamp > expiry) {
+      revert SignatureExpired();
+    }
     return _delegate(signatory, delegatee);
   }
 
@@ -191,7 +207,9 @@ contract Token is ERC20Capped, Ownable {
     @return The number of votes the account had as of the given block.
   */
   function getPriorVotes(address account, uint blockNumber) external view returns (uint256) {
-    require(blockNumber < block.number, "The specified block is not yet finalized.");
+    if(blockNumber >= block.number) {
+      revert SpecifiedBlockNumberIsNotFinalized();
+    }
 
     uint32 nCheckpoints = numCheckpoints[account];
     if (nCheckpoints == 0) {
@@ -298,7 +316,9 @@ contract Token is ERC20Capped, Ownable {
     @return The number `n` limited to 32 bits.
   */
   function safe32(uint n, string memory errorMessage) internal pure returns (uint32) {
-    require(n < 2**32, errorMessage);
+    if(n >= 2**32) {
+      revert (errorMessage);
+    }
     return uint32(n);
   }
 
