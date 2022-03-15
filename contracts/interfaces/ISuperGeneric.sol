@@ -10,7 +10,7 @@ import "@openzeppelin/contracts/utils/introspection/IERC165.sol";
  */
 interface ISuperGeneric is IERC165 {
     /// ERC1155 functions
-    
+
     /**
         Mint a batch of tokens into existence and send them to the `_recipient`
         address. In order to mint an item, its item group must first have been
@@ -23,26 +23,32 @@ interface ISuperGeneric is IERC165 {
         @param _amounts The amount of each corresponding item ID to create.
         @param _data Any associated data to use on items minted in this transaction.
     */
-    function mintBatch (address _recipient, uint256[] memory _ids, uint256[] memory _amounts, bytes memory _data) external;
-
-    function safeBatchTransferFrom(
-        address _from, 
-        address _to,
-        uint256[] memory _ids, 
-        uint256[] memory _amounts, 
+    function mintBatch(
+        address _recipient,
+        uint256[] memory _ids,
+        uint256[] memory _amounts,
         bytes memory _data
     ) external;
 
-   function burnBatch(
+    function safeBatchTransferFrom(
+        address _from,
+        address _to,
+        uint256[] memory _ids,
+        uint256[] memory _amounts,
+        bytes memory _data
+    ) external;
+
+    function burnBatch(
         address _burner,
         uint256[] memory _ids,
         uint256[] memory _amounts
     ) external;
 
-
     /// Balace of ERC1155
-    function balanceOf (address _owner, uint256 _id) external view returns (uint256);
-
+    function balanceOf(address _owner, uint256 _id)
+        external
+        view
+        returns (uint256);
 
     /// ERC721 functions
     /**
@@ -56,19 +62,23 @@ interface ISuperGeneric is IERC165 {
         view
         returns (uint256[] memory);
 
-    function mintBatch(address _recipient, uint256[] calldata _ids,
-        bytes memory _data)
-        external;
+    function mintBatch(
+        address _recipient,
+        uint256[] calldata _ids,
+        bytes memory _data
+    ) external;
 
     function burnBatch(address _burner, uint256[] memory _ids) external;
 
-    /** 
+    function ownerOf(uint256 tokenId) external view returns (address);
+
+    /**
      * @dev safeBatchTransferFrom is not included in Original Openzeppelin IERC721.
-    */
+     */
     function safeBatchTransferFrom(
-        address _from, 
+        address _from,
         address _to,
-        uint256[] memory _ids, 
+        uint256[] memory _ids,
         bytes memory _data
     ) external;
 }
