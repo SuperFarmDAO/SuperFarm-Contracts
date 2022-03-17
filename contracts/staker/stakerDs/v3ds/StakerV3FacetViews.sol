@@ -8,11 +8,11 @@ import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 import "@openzeppelin/contracts/token/ERC1155/utils/ERC1155Holder.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
-import "../../base/Sweepableds.sol";
-import "../../interfaces/ISuperGeneric.sol";
+import "../../../base/Sweepableds.sol";
+import "../../../interfaces/ISuperGeneric.sol";
 // import "../../assets/erc721/interfaces/ISuper721.sol";
 
-import "./StakerV3Blueprint.sol";
+import "../StakerBlueprint.sol";
 
 /**
  * @title An asset staking contract.
@@ -45,10 +45,10 @@ contract StakerV3FacetViews is
     function getItemsUserInfo(address _itemUserAddress, uint256 _boosterId)
         external
         view
-        returns (StakerV3Blueprint.GetItemUserInfo memory)
+        returns (StakerBlueprint.GetItemUserInfo memory)
     {
-        StakerV3Blueprint.StakerV3StateVariables storage b = StakerV3Blueprint
-            .stakerV3StateVariables();
+        StakerBlueprint.StakerStateVariables storage b = StakerBlueprint
+            .stakerStateVariables();
 
         uint256 length = b
             .itemUserInfo[_itemUserAddress]
@@ -66,7 +66,7 @@ contract StakerV3FacetViews is
             ];
         }
 
-        StakerV3Blueprint.GetItemUserInfo memory _userInfo = StakerV3Blueprint
+        StakerBlueprint.GetItemUserInfo memory _userInfo = StakerBlueprint
             .GetItemUserInfo({
                 boosterId: _boosterId,
                 tokenIds: _tokenIds,
@@ -81,8 +81,8 @@ contract StakerV3FacetViews is
      * @return developers array of developers addresses.
      */
     function getDeveloperAddresses() external view returns (address[] memory) {
-        StakerV3Blueprint.StakerV3StateVariables storage b = StakerV3Blueprint
-            .stakerV3StateVariables();
+        StakerBlueprint.StakerStateVariables storage b = StakerBlueprint
+            .stakerStateVariables();
 
         uint256 developerAddressLength = b.developerAddresses.length();
         address[] memory developers = new address[](developerAddressLength);
@@ -97,8 +97,8 @@ contract StakerV3FacetViews is
         view
         returns (uint256 share)
     {
-        StakerV3Blueprint.StakerV3StateVariables storage b = StakerV3Blueprint
-            .stakerV3StateVariables();
+        StakerBlueprint.StakerStateVariables storage b = StakerBlueprint
+            .stakerStateVariables();
         share = b.developerShares[developer];
     }
 
@@ -107,8 +107,8 @@ contract StakerV3FacetViews is
      * @return the length of the staking pool array.
      */
     function getPoolCount() external view returns (uint256) {
-        StakerV3Blueprint.StakerV3StateVariables storage b = StakerV3Blueprint
-            .stakerV3StateVariables();
+        StakerBlueprint.StakerStateVariables storage b = StakerBlueprint
+            .stakerStateVariables();
 
         return b.poolAssets.length;
     }
@@ -118,8 +118,8 @@ contract StakerV3FacetViews is
      * @return the count of active boosters at staking.
      */
     function getBoostersCount() external view returns (uint256) {
-        StakerV3Blueprint.StakerV3StateVariables storage b = StakerV3Blueprint
-            .stakerV3StateVariables();
+        StakerBlueprint.StakerStateVariables storage b = StakerBlueprint
+            .stakerStateVariables();
 
         return b.activeBoosters;
     }
@@ -131,10 +131,10 @@ contract StakerV3FacetViews is
     function getBoosterInfo(uint256 id)
         external
         view
-        returns (StakerV3Blueprint.BoostInfo memory _boostInfo)
+        returns (StakerBlueprint.BoostInfo memory _boostInfo)
     {
-        StakerV3Blueprint.StakerV3StateVariables storage b = StakerV3Blueprint
-            .stakerV3StateVariables();
+        StakerBlueprint.StakerStateVariables storage b = StakerBlueprint
+            .stakerStateVariables();
 
         _boostInfo = b.boostInfo[id];
     }

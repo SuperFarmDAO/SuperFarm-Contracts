@@ -48,8 +48,7 @@ describe("===Stakerv3ds===", function () {
     stakerV3FacetCore,
     stakerV3FacetStaking,
     stakerV3FacetViews,
-    stakerV3dsProxy,
-    teststakerV3dsProxy;
+    stakerV3dsProxy;
   const originalUri = "://ipfs/uri/";
   const originalUri721 = "://ipfs/uri/";
   const originalUri1155 = "://ipfs/uri/";
@@ -59,6 +58,7 @@ describe("===Stakerv3ds===", function () {
   let shiftedItemGroupId2 = itemGroupId2.shl(128);
   let itemGroupId3 = ethers.BigNumber.from(3);
   let shiftedItemGroupId3 = itemGroupId3.shl(128);
+  let stakerName = "StakerV3ds";
 
   before(async function () {
     this.MockCoreFacet = await ethers.getContractFactory(
@@ -73,8 +73,7 @@ describe("===Stakerv3ds===", function () {
     this.MockERC721 = await ethers.getContractFactory("TestERC721");
     this.MockERC1155 = await ethers.getContractFactory("TestERC1155");
     this.MockERC20 = await ethers.getContractFactory("MockERC20");
-    this.StakerV3Proxy = await ethers.getContractFactory("StakerV3Proxy");
-    this.testStakerV3Proxy = await ethers.getContractFactory("StakerV3Proxy");
+    this.StakerV3Proxy = await ethers.getContractFactory("StakerProxy");
     this.StakerV3FacetCore = await ethers.getContractFactory(
       "StakerV3FacetCore"
     );
@@ -192,6 +191,7 @@ describe("===Stakerv3ds===", function () {
       rewardToken.address,
       admin.address,
       IOUToken.address,
+      stakerName,
       allSelectors,
       addressesForSelectors
     );
@@ -207,31 +207,33 @@ describe("===Stakerv3ds===", function () {
       //  decrease length of selectors array by 1;
       await allSelectors.pop();
       await expect(
-        this.testStakerV3Proxy.deploy(
+        this.StakerV3Proxy.deploy(
           stakerV3FacetCore.address,
           owner.address,
           rewardToken.address,
           admin.address,
           IOUToken.address,
+          stakerName,
           allSelectors,
           addressesForSelectors
         )
       ).to.be.revertedWith(
-        "StakerV3Proxy::Constructor: mismatch of arrays lengths."
+        "StakerProxy::Constructor: mismatch of arrays lengths."
       );
     });
     it("Reverts: wrong implemintation given", async function () {
       await expect(
-        this.testStakerV3Proxy.deploy(
+        this.StakerV3Proxy.deploy(
           stakerV3FacetStaking.address,
           owner.address,
           rewardToken.address,
           admin.address,
           IOUToken.address,
+          stakerName,
           allSelectors,
           addressesForSelectors
         )
-      ).to.be.revertedWith("StakerV3Proxy::Constructor: Delegate call failed");
+      ).to.be.revertedWith("StakerProxy::Constructor: Delegate call failed");
     });
     it("Reverts: invalid selector of the function for delegate call", async function () {
       // generate data for sendTransaction with invalid selector
@@ -247,7 +249,7 @@ describe("===Stakerv3ds===", function () {
           to: stakerV3dsProxy.address,
           data: callData,
         })
-      ).to.be.revertedWith("StakerV3Proxy::fallback: No implementation found");
+      ).to.be.revertedWith("StakerProxy::fallback: No implementation found");
     });
   });
 
@@ -2361,7 +2363,7 @@ describe("===Stakerv3ds===", function () {
         );
         const testCallData2String = testCallData2.data.toString();
 
-        IOUToken.connect(signer1).transferFrom(
+        await IOUToken.connect(signer1).transferFrom(
           signer1.address,
           signer2.address,
           0

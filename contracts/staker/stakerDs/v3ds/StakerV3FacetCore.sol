@@ -8,12 +8,11 @@ import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 import "@openzeppelin/contracts/token/ERC1155/utils/ERC1155Holder.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
-import "../../base/Sweepableds.sol";
-import "../../interfaces/ISuperGeneric.sol";
+import "../../../base/Sweepableds.sol";
+import "../../../interfaces/ISuperGeneric.sol";
 // import "../../assets/erc721/interfaces/ISuper721.sol";
 
-import "./StakerV3Blueprint.sol";
-import "hardhat/console.sol";
+import "../StakerBlueprint.sol";
 
 /**
  * @title An asset staking contract.
@@ -55,10 +54,10 @@ contract StakerV3FacetCore is
      */
     function addDeveloper(address _developerAddress, uint256 _share)
         external
-        hasValidPermit(UNIVERSAL, StakerV3Blueprint.ADD_DEVELOPER)
+        hasValidPermit(UNIVERSAL, StakerBlueprint.ADD_DEVELOPER)
     {
-        StakerV3Blueprint.StakerV3StateVariables storage b = StakerV3Blueprint
-            .stakerV3StateVariables();
+        StakerBlueprint.StakerStateVariables storage b = StakerBlueprint
+            .stakerStateVariables();
 
         require(b.canAlterDevelopers, "0x1A");
         b.developerAddresses.add(_developerAddress);
@@ -72,10 +71,10 @@ contract StakerV3FacetCore is
      */
     function lockDevelopers()
         external
-        hasValidPermit(UNIVERSAL, StakerV3Blueprint.LOCK_DEVELOPERS)
+        hasValidPermit(UNIVERSAL, StakerBlueprint.LOCK_DEVELOPERS)
     {
-        StakerV3Blueprint.StakerV3StateVariables storage b = StakerV3Blueprint
-            .stakerV3StateVariables();
+        StakerBlueprint.StakerStateVariables storage b = StakerBlueprint
+            .stakerStateVariables();
 
         b.canAlterDevelopers = false;
     }
@@ -91,8 +90,8 @@ contract StakerV3FacetCore is
     function updateDeveloper(address _newDeveloperAddress, uint256 _newShare)
         external
     {
-        StakerV3Blueprint.StakerV3StateVariables storage b = StakerV3Blueprint
-            .stakerV3StateVariables();
+        StakerBlueprint.StakerStateVariables storage b = StakerBlueprint
+            .stakerStateVariables();
 
         uint256 developerShare = b.developerShares[msg.sender];
         require(developerShare > 0, "0x2A");
@@ -102,7 +101,11 @@ contract StakerV3FacetCore is
             delete b.developerShares[msg.sender];
         } else {
             if (_newDeveloperAddress != msg.sender) {
-                require(b.developerShares[_newDeveloperAddress] == 0, "0x4A");
+                require(
+                    b.developerShares[_newDeveloperAddress] == 0 ||
+                        _newDeveloperAddress == address(0),
+                    "0x4A"
+                );
                 delete b.developerShares[msg.sender];
                 b.developerAddresses.remove(msg.sender);
                 b.developerAddresses.add(_newDeveloperAddress);
@@ -120,31 +123,39 @@ contract StakerV3FacetCore is
      * @param _pointSchedule an array of EmissionPoints defining the point schedule.
      */
     function setEmissions(
-        StakerV3Blueprint.EmissionPoint[] memory _tokenSchedule,
-        StakerV3Blueprint.EmissionPoint[] memory _pointSchedule
-    ) external hasValidPermit(UNIVERSAL, StakerV3Blueprint.SET_EMISSIONS) {
-        StakerV3Blueprint.StakerV3StateVariables storage b = StakerV3Blueprint
-            .stakerV3StateVariables();
+        StakerBlueprint.EmissionPoint[] memory _tokenSchedule,
+        StakerBlueprint.EmissionPoint[] memory _pointSchedule
+    ) external hasValidPermit(UNIVERSAL, StakerBlueprint.SET_EMISSIONS) {
+        StakerBlueprint.StakerStateVariables storage b = StakerBlueprint
+            .stakerStateVariables();
 
-        require(_tokenSchedule.length > 0, "0x2B");
-        require(b.canAlterTokenEmissionSchedule, "0x1B");
-        b.tokenEmissionEventsCount = _tokenSchedule.length;
-        for (uint256 i; i < b.tokenEmissionEventsCount; i++) {
-            b.tokenEmissionEvents[i] = _tokenSchedule[i];
-            if (b.earliestTokenEmissionEvent > _tokenSchedule[i].timeStamp) {
-                b.earliestTokenEmissionEvent = _tokenSchedule[i].timeStamp;
+        if (_tokenSchedule.length > 0) {
+            require(b.canAlterTokenEmissionSchedule, "0x1B");
+            b.tokenEmissionEventsCount = _tokenSchedule.length;
+            for (uint256 i; i < b.tokenEmissionEventsCount; i++) {
+                b.tokenEmissionEvents[i] = _tokenSchedule[i];
+                if (
+                    b.earliestTokenEmissionEvent > _tokenSchedule[i].timeStamp
+                ) {
+                    b.earliestTokenEmissionEvent = _tokenSchedule[i].timeStamp;
+                }
             }
         }
+        require(b.tokenEmissionEventsCount > 0, "0x2B");
 
-        require(_pointSchedule.length > 0, "0x4B");
-        require(b.canAlterPointEmissionSchedule, "0x3B");
-        b.pointEmissionEventsCount = _pointSchedule.length;
-        for (uint256 i; i < b.pointEmissionEventsCount; i++) {
-            b.pointEmissionEvents[i] = _pointSchedule[i];
-            if (b.earliestPointEmissionEvent > _pointSchedule[i].timeStamp) {
-                b.earliestPointEmissionEvent = _pointSchedule[i].timeStamp;
+        if (_pointSchedule.length > 0) {
+            require(b.canAlterPointEmissionSchedule, "0x3B");
+            b.pointEmissionEventsCount = _pointSchedule.length;
+            for (uint256 i; i < b.pointEmissionEventsCount; i++) {
+                b.pointEmissionEvents[i] = _pointSchedule[i];
+                if (
+                    b.earliestPointEmissionEvent > _pointSchedule[i].timeStamp
+                ) {
+                    b.earliestPointEmissionEvent = _pointSchedule[i].timeStamp;
+                }
             }
         }
+        require(b.pointEmissionEventsCount > 0, "0x4B");
     }
 
     /**
@@ -154,10 +165,10 @@ contract StakerV3FacetCore is
      */
     function lockTokenEmissions()
         external
-        hasValidPermit(UNIVERSAL, StakerV3Blueprint.LOCK_TOKEN_EMISSIONS)
+        hasValidPermit(UNIVERSAL, StakerBlueprint.LOCK_TOKEN_EMISSIONS)
     {
-        StakerV3Blueprint.StakerV3StateVariables storage b = StakerV3Blueprint
-            .stakerV3StateVariables();
+        StakerBlueprint.StakerStateVariables storage b = StakerBlueprint
+            .stakerStateVariables();
 
         b.canAlterTokenEmissionSchedule = false;
     }
@@ -169,10 +180,10 @@ contract StakerV3FacetCore is
      */
     function lockPointEmissions()
         external
-        hasValidPermit(UNIVERSAL, StakerV3Blueprint.LOCK_POINT_EMISSIONS)
+        hasValidPermit(UNIVERSAL, StakerBlueprint.LOCK_POINT_EMISSIONS)
     {
-        StakerV3Blueprint.StakerV3StateVariables storage b = StakerV3Blueprint
-            .stakerV3StateVariables();
+        StakerBlueprint.StakerStateVariables storage b = StakerBlueprint
+            .stakerStateVariables();
 
         b.canAlterPointEmissionSchedule = false;
     }
@@ -185,10 +196,10 @@ contract StakerV3FacetCore is
      */
     function configureBoostersBatch(
         uint256[] memory _ids,
-        StakerV3Blueprint.BoostInfo[] memory _boostInfo
-    ) external hasValidPermit(UNIVERSAL, StakerV3Blueprint.CONFIGURE_BOOSTERS) {
-        StakerV3Blueprint.StakerV3StateVariables storage b = StakerV3Blueprint
-            .stakerV3StateVariables();
+        StakerBlueprint.BoostInfo[] memory _boostInfo
+    ) external hasValidPermit(UNIVERSAL, StakerBlueprint.CONFIGURE_BOOSTERS) {
+        StakerBlueprint.StakerStateVariables storage b = StakerBlueprint
+            .stakerStateVariables();
 
         require(_boostInfo.length > 0, "0x1C");
         require(_ids.length == _boostInfo.length, "0x1Z");
@@ -206,9 +217,9 @@ contract StakerV3FacetCore is
             );
             require(
                 _boostInfo[i].typeOfAsset ==
-                    StakerV3Blueprint.PoolAssetType.ERC721 ||
+                    StakerBlueprint.PoolAssetType.ERC721 ||
                     _boostInfo[i].typeOfAsset ==
-                    StakerV3Blueprint.PoolAssetType.ERC1155,
+                    StakerBlueprint.PoolAssetType.ERC1155,
                 "StakerV3FacetCore::configureBoostersBatch: asset type can't be ERC20 in this staker"
             );
 
@@ -224,7 +235,7 @@ contract StakerV3FacetCore is
                 b.activeBoosters--;
             }
 
-            b.boostInfo[_ids[i]] = StakerV3Blueprint.BoostInfo({
+            b.boostInfo[_ids[i]] = StakerBlueprint.BoostInfo({
                 multiplier: _boostInfo[i].multiplier,
                 amountRequired: _boostInfo[i].amountRequired,
                 groupRequired: _boostInfo[i].groupRequired,
@@ -240,12 +251,12 @@ contract StakerV3FacetCore is
      * an existing one.
      * @param _addPoolStruct struct, which we use to create new pool
      */
-    function addPool(StakerV3Blueprint.AddPoolStruct memory _addPoolStruct)
+    function addPool(StakerBlueprint.AddPoolStruct memory _addPoolStruct)
         external
-        hasValidPermit(UNIVERSAL, StakerV3Blueprint.ADD_POOL)
+        hasValidPermit(UNIVERSAL, StakerBlueprint.ADD_POOL)
     {
-        StakerV3Blueprint.StakerV3StateVariables storage b = StakerV3Blueprint
-            .stakerV3StateVariables();
+        StakerBlueprint.StakerStateVariables storage b = StakerBlueprint
+            .stakerStateVariables();
 
         require(
             b.tokenEmissionEventsCount > 0 && b.pointEmissionEventsCount > 0,
@@ -262,9 +273,9 @@ contract StakerV3FacetCore is
         );
         require(
             _addPoolStruct.typeOfAsset ==
-                StakerV3Blueprint.PoolAssetType.ERC721 ||
+                StakerBlueprint.PoolAssetType.ERC721 ||
                 _addPoolStruct.typeOfAsset ==
-                StakerV3Blueprint.PoolAssetType.ERC1155,
+                StakerBlueprint.PoolAssetType.ERC1155,
             "StakerV3FacetCore::addPool: asset type can't be ERC20 in this staker"
         );
 
@@ -279,7 +290,9 @@ contract StakerV3FacetCore is
         uint256 lastRewardEvent = lastTokenRewardTime > lastPointRewardTime
             ? lastTokenRewardTime
             : lastPointRewardTime;
-        if (address(b.poolInfo[_addPoolStruct.id].assetAddress) == address(0)) {
+        if (
+            address(b.poolInfoV3[_addPoolStruct.id].assetAddress) == address(0)
+        ) {
             b.poolAssets.push(_addPoolStruct.assetAddress);
             b.totalTokenStrength =
                 b.totalTokenStrength +
@@ -287,7 +300,7 @@ contract StakerV3FacetCore is
             b.totalPointStrength =
                 b.totalPointStrength +
                 _addPoolStruct.pointStrength;
-            b.poolInfo[_addPoolStruct.id] = StakerV3Blueprint.PoolInfo({
+            b.poolInfoV3[_addPoolStruct.id] = StakerBlueprint.PoolInfo({
                 assetAddress: _addPoolStruct.assetAddress,
                 tokenStrength: _addPoolStruct.tokenStrength,
                 tokenBoostedDeposit: 0,
@@ -299,39 +312,38 @@ contract StakerV3FacetCore is
                 boostInfo: _addPoolStruct.boostInfo,
                 typeOfAsset: _addPoolStruct.typeOfAsset
             });
-            b.lastPoolId++;
         } else {
             b.totalTokenStrength =
                 (b.totalTokenStrength -
-                    b.poolInfo[_addPoolStruct.id].tokenStrength) +
+                    b.poolInfoV3[_addPoolStruct.id].tokenStrength) +
                 _addPoolStruct.tokenStrength;
-            b.poolInfo[_addPoolStruct.id].tokenStrength = _addPoolStruct
+            b.poolInfoV3[_addPoolStruct.id].tokenStrength = _addPoolStruct
                 .tokenStrength;
             b.totalPointStrength =
                 (b.totalPointStrength -
-                    b.poolInfo[_addPoolStruct.id].pointStrength) +
+                    b.poolInfoV3[_addPoolStruct.id].pointStrength) +
                 _addPoolStruct.pointStrength;
-            b.poolInfo[_addPoolStruct.id].pointStrength = _addPoolStruct
+            b.poolInfoV3[_addPoolStruct.id].pointStrength = _addPoolStruct
                 .pointStrength;
 
             // Append boosters by avoid writing to storage directly in a loop to avoid costs
             uint256[] memory boosters = new uint256[](
-                b.poolInfo[_addPoolStruct.id].boostInfo.length +
+                b.poolInfoV3[_addPoolStruct.id].boostInfo.length +
                     _addPoolStruct.boostInfo.length
             );
             for (
                 uint256 i;
-                i < b.poolInfo[_addPoolStruct.id].boostInfo.length;
+                i < b.poolInfoV3[_addPoolStruct.id].boostInfo.length;
                 i++
             ) {
-                boosters[i] = b.poolInfo[_addPoolStruct.id].boostInfo[i];
+                boosters[i] = b.poolInfoV3[_addPoolStruct.id].boostInfo[i];
             }
             for (uint256 i; i < _addPoolStruct.boostInfo.length; i++) {
                 boosters[
-                    i + b.poolInfo[_addPoolStruct.id].boostInfo.length
+                    i + b.poolInfoV3[_addPoolStruct.id].boostInfo.length
                 ] = _addPoolStruct.boostInfo[i];
             }
-            StakerV3Blueprint.PoolInfo storage pool = b.poolInfo[
+            StakerBlueprint.PoolInfo storage pool = b.poolInfoV3[
                 _addPoolStruct.id
             ];
             pool.boostInfo = boosters; // Appended boosters

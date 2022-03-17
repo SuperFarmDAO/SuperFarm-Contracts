@@ -12,7 +12,7 @@ import "../base/Sweepableds.sol";
 import "../interfaces/ISuperGeneric.sol";
 // import "../../assets/erc721/interfaces/ISuper721.sol";
 
-import "../staker/v3ds/StakerV3Blueprint.sol";
+import "../staker/stakerDs/StakerBlueprint.sol";
 import "hardhat/console.sol";
 
 /**
