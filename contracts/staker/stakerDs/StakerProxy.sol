@@ -1,19 +1,18 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8.7;
 
-import "./StakerV3Blueprint.sol";
-import "hardhat/console.sol";
+import "./StakerBlueprint.sol";
 
 /**
- * @title A diamond standard proxy storage for StakerV3
+ * @title A diamond standard proxy storage for Staker
  * @author Qazawat Zirak
- * A proxy storage for a StakerV3. It is the main entry point for
+ * A proxy storage for a Staker. It is the main entry point for
  * contract calls. Every call to proxy storage will be delegated to
- * StakerV3 contract address. Storage is reflected in this contract.
+ * Staker contract address. Storage is reflected in this contract.
  */
-contract StakerV3Proxy {
+contract StakerProxy {
     /**
-     * Construct a new Super721Lite item collection proxy.
+     * Construct a new staker proxy.
      * @param _implementation The address of the logic contract.
      * @param _owner The address of the administrator governing this contract.
      * @param _token The address of the disburse token.
@@ -26,16 +25,17 @@ contract StakerV3Proxy {
         address _token,
         address _admin,
         address _IOUTokenAddress,
+        string memory _name,
         bytes4[] memory _selectors,
         address[] memory _addresses
     ) {
         require(
             _selectors.length == _addresses.length,
-            "StakerV3Proxy::Constructor: mismatch of arrays lengths."
+            "StakerProxy::Constructor: mismatch of arrays lengths."
         );
 
-        StakerV3Blueprint.StakerV3StateVariables storage b = StakerV3Blueprint
-            .stakerV3StateVariables();
+        StakerBlueprint.StakerStateVariables storage b = StakerBlueprint
+            .stakerStateVariables();
 
         // Execute a delegate call for initialization
         (bool success, ) = _implementation.delegatecall(
@@ -43,12 +43,13 @@ contract StakerV3Proxy {
         );
 
         // Represents collective succuess
-        require(success, "StakerV3Proxy::Constructor: Delegate call failed");
+        require(success, "StakerProxy::Constructor: Delegate call failed");
 
         // If deployment is success, store constructor parameters
         b.IOUTokenAddress = _IOUTokenAddress;
         b.admin = _admin;
         b.token = _token;
+        b.name = _name;
         b.canAlterDevelopers = true;
         b.canAlterTokenEmissionSchedule = true;
         b.canAlterPointEmissionSchedule = true;
@@ -62,13 +63,13 @@ contract StakerV3Proxy {
 
     fallback() external payable {
         // Load variables related to DiamondProxy from this contract's memory
-        StakerV3Blueprint.StakerV3StateVariables storage b = StakerV3Blueprint
-            .stakerV3StateVariables();
+        StakerBlueprint.StakerStateVariables storage b = StakerBlueprint
+            .stakerStateVariables();
 
         address _implementation = b.implementations[msg.sig];
         require(
             _implementation != address(0),
-            "StakerV3Proxy::fallback: No implementation found"
+            "StakerProxy::fallback: No implementation found"
         );
 
         // Execute external function from facet using delegatecall and return any value.

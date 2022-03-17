@@ -9,7 +9,7 @@ import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import "../interfaces/ISuperGeneric.sol";
 // import "../../assets/erc721/interfaces/ISuper721.sol";
 
-import "../staker/v3ds/StakerV3Blueprint.sol";
+import "../staker/stakerDs/StakerBlueprint.sol";
 import "hardhat/console.sol";
 
 /**
@@ -81,8 +81,8 @@ contract TestStakerV3FacetCore {
      * @param _pointSchedule an array of EmissionPoints defining the point schedule.
      */
     function setEmissions(
-        StakerV3Blueprint.EmissionPoint[] memory _tokenSchedule,
-        StakerV3Blueprint.EmissionPoint[] memory _pointSchedule
+        StakerBlueprint.EmissionPoint[] memory _tokenSchedule,
+        StakerBlueprint.EmissionPoint[] memory _pointSchedule
     ) external returns (bytes memory) {
         return msg.data;
     }
@@ -113,7 +113,7 @@ contract TestStakerV3FacetCore {
      */
     function configureBoostersBatch(
         uint256[] memory _ids,
-        StakerV3Blueprint.BoostInfo[] memory _boostInfo
+        StakerBlueprint.BoostInfo[] memory _boostInfo
     ) external returns (bytes memory) {
         return msg.data;
     }
@@ -123,7 +123,7 @@ contract TestStakerV3FacetCore {
      * an existing one.
      * @param _addPoolStruct struct, which we use to create new pool
      */
-    function addPool(StakerV3Blueprint.AddPoolStruct memory _addPoolStruct)
+    function addPool(StakerBlueprint.AddPoolStruct memory _addPoolStruct)
         external
         returns (bytes memory)
     {

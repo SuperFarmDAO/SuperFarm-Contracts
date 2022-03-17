@@ -11,7 +11,6 @@ import "@openzeppelin/contracts/utils/Address.sol";
 import "../../access/PermitControl.sol";
 import "../../proxy/StubProxyRegistry.sol";
 import "../../utils/Utils.sol";
-import "hardhat/console.sol";
 
 /**
   @title An ERC-721 item creation contract.

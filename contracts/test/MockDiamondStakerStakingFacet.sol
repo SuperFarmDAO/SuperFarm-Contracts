@@ -12,7 +12,7 @@ import "../base/Sweepableds.sol";
 import "../interfaces/ISuperGeneric.sol";
 // import "../../assets/erc721/interfaces/ISuper721.sol";
 
-import "../staker/v3ds/StakerV3Blueprint.sol";
+import "../staker/stakerDs/StakerBlueprint.sol";
 import "hardhat/console.sol";
 
 /**
@@ -252,7 +252,7 @@ contract TestStakerV3FacetStaking is
     function deposit(
         uint256 _poolId,
         uint256 _boosterId,
-        StakerV3Blueprint.StakedAsset memory _asset
+        StakerBlueprint.StakedAsset memory _asset
     ) external returns (bytes memory) {
         return msg.data;
     }
@@ -264,7 +264,7 @@ contract TestStakerV3FacetStaking is
      */
     function withdraw(
         uint256 _poolId,
-        StakerV3Blueprint.StakedAsset memory _asset,
+        StakerBlueprint.StakedAsset memory _asset,
         uint256 _boosterId
     ) external returns (bytes memory) {
         return msg.data;

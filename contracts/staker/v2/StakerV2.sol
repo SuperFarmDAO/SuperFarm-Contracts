@@ -10,7 +10,6 @@ import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
 import "../../base/Sweepable.sol";
 import "../../interfaces/ISuperGeneric.sol";
-import "hardhat/console.sol";
 
 /**
   @title An asset staking contract.
@@ -204,7 +203,7 @@ contract StakerV2 is
     @param Points boost is applied on the points.
     @param Both boost is applied on both.
   */
-    enum AssetType {
+    enum BoosterAssetType {
         Tokens,
         Points,
         Both
@@ -218,14 +217,14 @@ contract StakerV2 is
     @param groupRequired (optional) specifies a group from Items contract 
       as requirement for the boost. If 0, then any group or item.
     @param contractRequired contract that the required assets belong to.
-    @param assetType enum that specifies Tokens/Points to boost or both.
+    @param BoosterAssetType enum that specifies Tokens/Points to boost or both.
   */
     struct BoostInfo {
         uint256 multiplier;
         uint256 amountRequired;
         uint256 groupRequired;
         address contractRequired;
-        AssetType assetType;
+        BoosterAssetType assetType;
     }
 
     /// Mapping of Booster ID to its 'BoostInfo'.
@@ -796,8 +795,6 @@ contract StakerV2 is
         }
 
         // Update the pool rewards per share to pay users the amount remaining.
-        console.log("darova");
-        console.log(poolInfo[_token].tokenBoostedDeposit);
         pool.tokensPerShare =
             pool.tokensPerShare +
             (tokensReward / poolInfo[_token].tokenBoostedDeposit);
@@ -887,11 +884,13 @@ contract StakerV2 is
         for (uint256 i = 0; i < pool.boostInfo.length; i++) {
             booster = boostInfo[pool.boostInfo[i]];
             if (staker.boosterIds.contains(pool.boostInfo[i])) {
-                if (booster.assetType == AssetType.Tokens && _isToken) {
+                if (booster.assetType == BoosterAssetType.Tokens && _isToken) {
                     _boosted += (_unboosted * booster.multiplier) / 10000;
-                } else if (booster.assetType == AssetType.Points && !_isToken) {
+                } else if (
+                    booster.assetType == BoosterAssetType.Points && !_isToken
+                ) {
                     _boosted += (_unboosted * booster.multiplier) / 10000;
-                } else if (booster.assetType == AssetType.Both) {
+                } else if (booster.assetType == BoosterAssetType.Both) {
                     _boosted += (_unboosted * booster.multiplier) / 10000;
                 }
             }
@@ -911,8 +910,6 @@ contract StakerV2 is
         );
         UserInfo storage user = userInfo[_token][msg.sender];
 
-        console.log("deposit");
-        console.log(poolInfo[_token].tokenBoostedDeposit);
         updatePool(_token);
         updateDeposits(_amount, _token, pool, user, 0);
 
@@ -986,7 +983,7 @@ contract StakerV2 is
         BoostInfo memory booster = boostInfo[_boosterId];
         uint256 totalAmount = 0;
 
-        for (uint256 i = 0; i < _amounts.length; i++) {
+        for (uint256 i = 0; i < _amounts.length; ++i) {
             totalAmount += _amounts[i];
         }
         if (booster.multiplier == 0) {
