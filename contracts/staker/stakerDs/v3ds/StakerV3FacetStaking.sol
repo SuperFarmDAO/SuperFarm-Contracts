@@ -12,7 +12,6 @@ import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
 import "../../../base/Sweepableds.sol";
 import "../../../interfaces/ISuperGeneric.sol";
-// import "../../assets/erc721/interfaces/ISuper721.sol";
 
 import "../StakerBlueprint.sol";
 
@@ -37,6 +36,19 @@ contract StakerV3FacetStaking is
     using SafeERC20 for IERC20;
     using EnumerableSet for EnumerableSet.UintSet;
     using EnumerableSet for EnumerableSet.AddressSet;
+
+    error AssetArrayLengthsMismatch();
+    error InvalidInfoStakeForBoost();
+    error IncativePool();
+    error InvalidAssetToStake();
+    error NotStaked();
+    error InvalidAmount();
+    error IOUTokenFromDifferentPool();
+    error NotAnOwnerOfIOUToken();
+    error NotAnAdmin();
+    error MismatchArgumentsAndHash();
+    error HashUsed();
+    error NotApprovedPointSpender();
 
     /// Event for depositing NonFungible assets.
     event Deposit(
@@ -227,86 +239,37 @@ contract StakerV3FacetStaking is
 
     /**
      * Return the number of points that the user has available to spend.
+     * @param _user the user whose available points we want to get.
      * @return the number of points that the user has available to spend.
      */
     function getAvailablePoints(address _user) public view returns (uint256) {
         StakerBlueprint.StakerStateVariables storage b = StakerBlueprint
             .stakerStateVariables();
 
-        //uint256 currentTotal = b.userPoints[_user];
-        uint256 pendingTotal = 0;
+        uint256 pendingTotal;
         for (uint256 i; i < b.poolAssets.length; i++) {
             uint256 _pendingPoints = getPendingPoints(i, _user);
             pendingTotal += _pendingPoints;
         }
-        //uint256 spentTotal = b.userSpentPoints[_user];
         return (b.userPoints[_user] + pendingTotal) - b.userSpentPoints[_user];
     }
 
     /**
      * Return the total number of points that the user has ever accrued.
+     * @param _user the user whose total points we want to get.
      * @return the total number of points that the user has ever accrued.
      */
     function getTotalPoints(address _user) external view returns (uint256) {
         StakerBlueprint.StakerStateVariables storage b = StakerBlueprint
             .stakerStateVariables();
 
-        //uint256 concreteTotal = b.userPoints[_user];
-        uint256 pendingTotal = 0;
+        uint256 pendingTotal;
         for (uint256 i; i < b.poolAssets.length; i++) {
             uint256 _pendingPoints = getPendingPoints(i, _user);
-            pendingTotal = pendingTotal + _pendingPoints;
+            pendingTotal += _pendingPoints;
         }
         return b.userPoints[_user] + pendingTotal;
     }
-
-    // /**
-    //  * Private function for the correct transfer of assets from the user
-    //  *
-    //  * @param _from address from which transfer shuold be made.
-    //  * @param _to address of receiver of transfered amount.
-    //  * @param _assetAddress address of asset that should be transfered.
-    //  * @param _ids array of ids of asset that should be transfered.
-    //  * @param _amounts array of amounts of items that should be transfered.
-    //  * @return flag that indicates an succesful of transfer.
-    //  */
-    // function genericTransfer(
-    //     address _from,
-    //     address _to,
-    //     address _assetAddress,
-    //     uint256[] memory _ids,
-    //     uint256[] memory _amounts
-    // ) internal returns (bool) {
-    //     bool isErc721 = ISuperGeneric(_assetAddress).supportsInterface(
-    //         StakerBlueprint.INTERFACE_ERC721
-    //     )
-    //         ? true
-    //         : false;
-
-    //     if (isErc721) {
-    //         for (uint256 i; i < _amounts.length; i++) {
-    //             if (_amounts[i] != 1) {
-    //                 return false;
-    //             }
-    //         }
-    //         ISuperGeneric(_assetAddress).safeBatchTransferFrom(
-    //             _from,
-    //             _to,
-    //             _ids,
-    //             ""
-    //         );
-    //         return true;
-    //     } else {
-    //         ISuperGeneric(_assetAddress).safeBatchTransferFrom(
-    //             _from,
-    //             _to,
-    //             _ids,
-    //             _amounts,
-    //             ""
-    //         );
-    //         return true;
-    //     }
-    // }
 
     /**
      * Update the pool corresponding to the specified token address.
@@ -318,14 +281,6 @@ contract StakerV3FacetStaking is
 
         StakerBlueprint.PoolInfo storage pool = b.poolInfoV3[_poolId];
 
-        // unnecessary check ------------------------------------------
-        // if (block.timestamp <= pool.lastRewardEvent) {
-        //     return;
-        // }
-
-        // uint256 poolTokenSupply = ISuperGeneric(pool.assetAddress).balanceOf(
-        //     address(this)
-        // );
         if (pool.tokenBoostedDeposit == 0) {
             pool.lastRewardEvent = block.timestamp;
             return;
@@ -405,15 +360,13 @@ contract StakerV3FacetStaking is
             }
         }
 
-        (_user.tokenBoostedAmount, _user.pointBoostedAmount) = applyBoostsV2(
-            _user.amount,
+        (_user.tokenBoostedAmount, _user.pointBoostedAmount) = applyBoosts(
             _user.amount,
             _poolId
         );
-        // _user.pointBoostedAmount = applyBoosts(_user.amount, _poolId, false);
         _pool.tokenBoostedDeposit += _user.tokenBoostedAmount;
         _pool.pointBoostedDeposit += _user.pointBoostedAmount;
-        ////////???????????????????????????????????????????????????????
+
         _user.tokenPaid =
             (_user.tokenBoostedAmount * _pool.tokensPerShare) /
             1e12;
@@ -422,79 +375,20 @@ contract StakerV3FacetStaking is
             1e30;
     }
 
-    // /**
-    //  * Private helper function that applies boosts on deposits for Item staking.
-    //  * (amount * multiplier ) / 10000, where multiplier is in basis points.
-    //  * (20 * 20000) / 10000 = 40 => 2x boost
-    //  * @param _unboosted value that needs to have boosts applied to.
-    //  * @param _poolId Id of the pool.
-    //  * @param _isToken is true if '_unboosted' argument is of token type.
-    //  * @return _boosted return value with applied boosts.
-    //  */
-    // function applyBoosts(
-    //     uint256 _unboosted,
-    //     uint256 _poolId,
-    //     bool _isToken
-    // ) internal view returns (uint256 _boosted) {
-    //     StakerBlueprint.StakerStateVariables storage b = StakerBlueprint
-    //         .stakerStateVariables();
-
-    //     StakerBlueprint.PoolInfo memory pool = b.poolInfoV3[_poolId];
-    //     StakerBlueprint.ItemUserInfo storage staker = b.itemUserInfo[
-    //         msg.sender
-    //     ];
-
-    //     if (_unboosted == 0) {
-    //         return 0;
-    //     } else if (pool.boostInfo.length == 0) {
-    //         return _unboosted;
-    //     } else if (staker.boosterIds.length() == 0) {
-    //         return _unboosted;
-    //     }
-
-    //     _boosted = _unboosted;
-    //     StakerBlueprint.BoostInfo memory booster;
-
-    //     // Iterate through all the boosters that the pool supports
-    //     for (uint256 i; i < pool.boostInfo.length; i++) {
-    //         booster = b.boostInfo[pool.boostInfo[i]];
-    //         if (staker.boosterIds.contains(pool.boostInfo[i])) {
-    //             if (
-    //                 booster.assetType ==
-    //                 StakerBlueprint.BoosterAssetType.Tokens &&
-    //                 _isToken
-    //             ) {
-    //                 _boosted += (_unboosted * booster.multiplier) / 10000;
-    //             } else if (
-    //                 booster.assetType ==
-    //                 StakerBlueprint.BoosterAssetType.Points &&
-    //                 !_isToken
-    //             ) {
-    //                 _boosted += (_unboosted * booster.multiplier) / 10000;
-    //             } else if (
-    //                 booster.assetType == StakerBlueprint.BoosterAssetType.Both
-    //             ) {
-    //                 _boosted += (_unboosted * booster.multiplier) / 10000;
-    //             }
-    //         }
-    //     }
-    // }
-
     /**
      * Private helper function that applies boosts on deposits for Item staking.
      * (amount * multiplier ) / 10000, where multiplier is in basis points.
      * (20 * 20000) / 10000 = 40 => 2x boost
-     * @param _unboostedTokens value that needs to have boosts applied to.
-     * @param _unboostedPoints is true if '_unboosted' argument is of token type.
+     * @param _unboosted value that needs to have boosts applied to.
      * @param _poolId Id of the pool.
-     * @return _boostedTokens return number of tokens with applied boosts.
-     * @return _boostedPoints return number of points with applied boost.
+     * @return _boostedTokens return tokens with applied boosts.
+     * @return _boostedPoints return points with applied boosts.
      */
-    function applyBoostsV2(
-        uint256 _unboostedTokens,
-        uint256 _unboostedPoints,
-        uint256 _poolId
-    ) internal view returns (uint256 _boostedTokens, uint256 _boostedPoints) {
+    function applyBoosts(uint256 _unboosted, uint256 _poolId)
+        internal
+        view
+        returns (uint256 _boostedTokens, uint256 _boostedPoints)
+    {
         StakerBlueprint.StakerStateVariables storage b = StakerBlueprint
             .stakerStateVariables();
 
@@ -503,16 +397,16 @@ contract StakerV3FacetStaking is
             msg.sender
         ];
 
-        if (_unboostedTokens == 0 && _unboostedPoints == 0) {
+        if (_unboosted == 0) {
             return (0, 0);
         } else if (pool.boostInfo.length == 0) {
-            return (_unboostedTokens, _unboostedTokens);
+            return (_unboosted, _unboosted);
         } else if (staker.boosterIds.length() == 0) {
-            return (_unboostedTokens, _unboostedTokens);
+            return (_unboosted, _unboosted);
         }
 
-        _boostedTokens = _unboostedTokens;
-        _boostedPoints = _unboostedPoints;
+        _boostedTokens = _unboosted;
+        _boostedPoints = _unboosted;
 
         // Iterate through all the boosters that the pool supports
         for (uint256 i; i < pool.boostInfo.length; i++) {
@@ -523,22 +417,14 @@ contract StakerV3FacetStaking is
                 if (
                     booster.assetType == StakerBlueprint.BoosterAssetType.Tokens
                 ) {
-                    _boostedTokens +=
-                        (_unboostedTokens * booster.multiplier) /
-                        10000;
+                    _boostedTokens += (_unboosted * booster.multiplier) / 10000;
                 } else if (
                     booster.assetType == StakerBlueprint.BoosterAssetType.Points
                 ) {
-                    _boostedPoints +=
-                        (_unboostedPoints * booster.multiplier) /
-                        10000;
+                    _boostedPoints += (_unboosted * booster.multiplier) / 10000;
                 } else {
-                    _boostedTokens +=
-                        (_unboostedTokens * booster.multiplier) /
-                        10000;
-                    _boostedPoints +=
-                        (_unboostedPoints * booster.multiplier) /
-                        10000;
+                    _boostedTokens += (_unboosted * booster.multiplier) / 10000;
+                    _boostedPoints += (_unboosted * booster.multiplier) / 10000;
                 }
             }
         }
@@ -561,10 +447,9 @@ contract StakerV3FacetStaking is
         StakerBlueprint.PoolAssetType typeOfAsset;
 
         StakerBlueprint.PoolInfo memory pool = b.poolInfoV3[_poolId];
-        require(
-            _asset.id.length == _asset.amounts.length,
-            "StakerV3FacetStaking::deposit: mismatch of id and amounts arrays lentghs"
-        );
+        if (_asset.id.length != _asset.amounts.length) {
+            revert AssetArrayLengthsMismatch();
+        }
         if (_boosterId > 0) {
             bool exists;
             for (uint256 i; i < pool.boostInfo.length; i++) {
@@ -573,16 +458,17 @@ contract StakerV3FacetStaking is
                     break;
                 }
             }
-            require(
-                exists &&
-                    eligible(
-                        _asset.id,
-                        _asset.amounts,
-                        _asset.assetAddress,
-                        _boosterId
-                    ),
-                "0x4Z"
-            );
+            if (
+                !exists ||
+                !eligible(
+                    _asset.id,
+                    _asset.amounts,
+                    _asset.assetAddress,
+                    _boosterId
+                )
+            ) {
+                revert InvalidInfoStakeForBoost();
+            }
 
             typeOfAsset = b.boostInfo[_boosterId].typeOfAsset;
 
@@ -601,22 +487,18 @@ contract StakerV3FacetStaking is
             updateDeposits(0, _poolId, true);
             emit StakeItemBatch(msg.sender, _poolId, _boosterId);
         } else {
-            require(pool.tokenStrength > 0 || pool.pointStrength > 0, "0x1E");
-            require(
-                _asset.assetAddress == pool.assetAddress,
-                "StakerV3FacetStaking::deposit: you can't stake this asset in this pool."
-            );
+            if (pool.tokenStrength == 0) {
+                revert IncativePool();
+            }
+            if (_asset.assetAddress != pool.assetAddress) {
+                revert InvalidAssetToStake();
+            }
+
             typeOfAsset = pool.typeOfAsset;
             StakerBlueprint.UserInfo storage user = b.userInfoV3[_poolId][
                 msg.sender
             ];
             uint256 amount;
-
-            // do u need it???? no
-            // require(
-            //     _asset.IOUTokenId.length == 0,
-            //     "Staker::deposit: ioutokenid length greater than 0"
-            // );
 
             uint256 assetLength = _asset.amounts.length;
             uint256[] memory IOUTokenIdToMint = new uint256[](assetLength);
@@ -624,31 +506,23 @@ contract StakerV3FacetStaking is
             uint256[] memory IOUTokenId;
             for (uint256 i; i < assetLength; i++) {
                 amount += _asset.amounts[i];
-                //ids.push(_asset.id[i]);
-                // user.asset.amounts.push(_asset.amounts[i]);
-                // user.asset.id.push(_asset.id[i]);
-                // user.asset.IOUTokenId.push(IOUTokenCounter);
                 b.IOUIdToStakedAsset[IOUTokenCounter].assetAddress = _asset
                     .assetAddress;
                 b.IOUIdToStakedAsset[IOUTokenCounter].amounts.push(
                     _asset.amounts[i]
                 );
                 b.IOUIdToStakedAsset[IOUTokenCounter].id.push(_asset.id[i]);
-                // b.IOUIdToStakedAsset[IOUTokenCounter].IOUTokenId = IOUTokenId;
                 IOUTokenIdToMint[i] = IOUTokenCounter;
                 IOUTokenCounter++;
             }
 
             b.nextIOUTokenId = IOUTokenCounter;
 
-            //_asset.IOUTokenId = user.asset.IOUTokenId;
             ISuperGeneric(b.IOUTokenAddress).mintBatch(
                 msg.sender,
                 IOUTokenIdToMint,
-                //user.asset.IOUTokenId,
                 ""
             );
-            // user.asset = _asset;
             updatePool(_poolId);
             updateDeposits(amount, _poolId, true);
             emit Deposit(
@@ -659,17 +533,6 @@ contract StakerV3FacetStaking is
                 pool.assetAddress
             );
         }
-        // if (pool.typeOfAsset == StakerBlueprint.PoolAssetType.ERC20) {
-        //     require(
-        //         _asset.amounts.length == 1,
-        //         "StakerV3FacetStaking::deposit: invalid length of amounts array"
-        //     );
-        //     IERC20(_asset.assetAddress).safeTransferFrom(
-        //         msg.sender,
-        //         address(this),
-        //         _asset.amounts[0]
-        //     );
-        // } else
         if (typeOfAsset == StakerBlueprint.PoolAssetType.ERC721) {
             for (uint256 i; i < _asset.amounts.length; i++) {
                 require(
@@ -692,17 +555,6 @@ contract StakerV3FacetStaking is
                 ""
             );
         }
-
-        // require(
-        //     genericTransfer(
-        //         msg.sender,
-        //         address(this),
-        //         _asset.assetAddress,
-        //         _asset.id,
-        //         _asset.amounts
-        //     ),
-        //     "0x9E"
-        // );
     }
 
     /**
@@ -723,10 +575,10 @@ contract StakerV3FacetStaking is
         uint256[] memory amounts;
         StakerBlueprint.PoolAssetType typeOfAsset;
         if (_boosterId > 0) {
-            require(
-                b.itemUserInfo[msg.sender].boosterIds.contains(_boosterId),
-                "0x1G"
-            );
+            if (!b.itemUserInfo[msg.sender].boosterIds.contains(_boosterId)) {
+                revert NotStaked();
+            }
+
             StakerBlueprint.ItemUserInfo storage staker = b.itemUserInfo[
                 msg.sender
             ];
@@ -765,30 +617,36 @@ contract StakerV3FacetStaking is
             for (uint256 i; i < _asset.amounts.length; i++) {
                 amount += _asset.amounts[i];
             }
-            require(user.amount / 1000 >= amount, "0x1Z");
+            if (user.amount / 1000 < amount) {
+                revert InvalidAmount();
+            }
 
-            // pool.token.safeTransfer(msg.sender, _amount);
-            require(
-                ISuperGeneric(b.IOUTokenAddress).balanceOf(msg.sender) > 0,
-                "0x2E"
-            );
+            // if (ISuperGeneric(b.IOUTokenAddress).balanceOf(msg.sender) == 0) {
+
+            // }
+            // require(
+            //     ISuperGeneric(b.IOUTokenAddress).balanceOf(msg.sender) > 0,
+            //     "0x2E"
+            // );
             assetAddress = pool.assetAddress;
 
             ids = new uint256[](_asset.IOUTokenId.length);
             uint256[] memory _ids = new uint256[](_asset.IOUTokenId.length);
             uint256[] memory _amounts = new uint256[](_ids.length);
             for (uint256 i; i < _ids.length; i++) {
-                require(
-                    b.IOUIdToStakedAsset[_asset.IOUTokenId[i]].assetAddress ==
-                        assetAddress,
-                    "StakerV3FacetStaking::withdraw: IOUToken for different asset then pool."
-                );
-                require(
+                if (
+                    b.IOUIdToStakedAsset[_asset.IOUTokenId[i]].assetAddress !=
+                    assetAddress
+                ) {
+                    revert IOUTokenFromDifferentPool();
+                }
+                if (
                     ISuperGeneric(b.IOUTokenAddress).ownerOf(
                         _asset.IOUTokenId[i]
-                    ) == msg.sender,
-                    "StakerV3FacetStaking::withdraw: you are not an owner of that IOUToken."
-                );
+                    ) != msg.sender
+                ) {
+                    revert NotAnOwnerOfIOUToken();
+                }
                 _ids[i] = b.IOUIdToStakedAsset[_asset.IOUTokenId[i]].id[0];
                 _amounts[i] = b
                     .IOUIdToStakedAsset[_asset.IOUTokenId[i]]
@@ -806,20 +664,8 @@ contract StakerV3FacetStaking is
             updateDeposits(amount, _poolId, false);
 
             emit Withdraw(msg.sender, _poolId, amounts, ids, assetAddress);
-            //delete user.asset;
         }
 
-        // if (pool.typeOfAsset == StakerBlueprint.PoolAssetType.ERC20) {
-        //     require(
-        //         _asset.amounts.length == 1,
-        //         "StakerV3FacetStaking::deposit: invalid length of amounts array"
-        //     );
-        //     IERC20(assetAddress).safeTransferFrom(
-        //         address(this),
-        //         msg.sender,
-        //         _asset.amounts[0]
-        //     );
-        // } else
         if (typeOfAsset == StakerBlueprint.PoolAssetType.ERC721) {
             ISuperGeneric(assetAddress).safeBatchTransferFrom(
                 address(this),
@@ -836,19 +682,13 @@ contract StakerV3FacetStaking is
                 ""
             );
         }
-
-        // require(
-        //     genericTransfer(
-        //         address(this),
-        //         msg.sender,
-        //         assetAddress,
-        //         ids,
-        //         amounts
-        //     ),
-        //     "0x9E"
-        // );
     }
 
+    /**
+     * Claim accumulated token and point rewards from the Staker.
+     * @param _poolId The id of pool to claim rewards from.
+     * @param _data bytes with calldata for use by backend, casual users should send empty bytes array.
+     */
     function claim(uint256 _poolId, bytes memory _data) external {
         if (_data.length == 0) {
             _claim(_poolId);
@@ -918,12 +758,12 @@ contract StakerV3FacetStaking is
             StakerBlueprint.Sig memory sig;
             StakerBlueprint.Checkpoint memory _checkpoints;
 
-            sig = StakerBlueprint.Sig({v: _v, r: _r, s: _s});
-            _checkpoints = StakerBlueprint.Checkpoint({
-                startTime: _startTime,
-                endTime: _endTime,
-                balance: _balance
-            });
+            sig.v = _v;
+            sig.r = _r;
+            sig.s = _s;
+            _checkpoints.startTime = _startTime;
+            _checkpoints.endTime = _endTime;
+            _checkpoints.balance = _balance;
             _claim(_poolId, _hash, sig, _checkpoints);
         }
     }
@@ -971,7 +811,6 @@ contract StakerV3FacetStaking is
         user.tokenRewards = 0;
         user.pointRewards = 0;
 
-        /////////////////////////???????????????????????????????????????
         emit Claim(msg.sender, _poolId, _tokenRewards, _pointRewards);
     }
 
@@ -979,20 +818,18 @@ contract StakerV3FacetStaking is
      * Claim accumulated token and point rewards from the Staker.
      * @param _poolId The id of pool to claim rewards from.
      * @param _checkpoints Information about what time intervals to count rewards
+     * @param _sig structure that contains v,r,s parameters of signature.
+     * @param _checkpoints structure that contains info about balance of user at certain periods.
      */
     function _claim(
         uint256 _poolId,
         bytes32 _hash,
-        StakerBlueprint.Sig memory sig,
+        StakerBlueprint.Sig memory _sig,
         StakerBlueprint.Checkpoint memory _checkpoints
     ) internal {
         StakerBlueprint.StakerStateVariables storage b = StakerBlueprint
             .stakerStateVariables();
-        // require(
-        //     _checkpoints.startTime.length == _checkpoints.endTime.length &&
-        //         _checkpoints.startTime.length == _checkpoints.balance.length,
-        //     "StakerV3FacetStaking::claim: mismatch of start time end time or balances arrays lengths."
-        // );
+
         StakerBlueprint.UserInfo storage user = b.userInfoV3[_poolId][
             msg.sender
         ];
@@ -1005,31 +842,25 @@ contract StakerV3FacetStaking is
             abi.encodePacked("\x19Ethereum Signed Message:\n32", _hash)
         );
 
-        require(
-            b.admin == ecrecover(messageDigest, sig.v, sig.r, sig.s),
-            "0x1F"
-        );
+        if (b.admin != ecrecover(messageDigest, _sig.v, _sig.r, _sig.s)) {
+            revert NotAnAdmin();
+        }
 
-        bytes32 someShittyHash = keccak256(
-            abi.encodePacked(
-                _checkpoints.startTime,
-                _checkpoints.endTime,
-                _checkpoints.balance
-            )
-        );
-
-        require(
+        if (
             keccak256(
                 abi.encodePacked(
-                    _checkpoints.startTime,
-                    _checkpoints.endTime,
-                    _checkpoints.balance
+                    keccak256(abi.encodePacked(_checkpoints.startTime)),
+                    keccak256(abi.encodePacked(_checkpoints.endTime)),
+                    keccak256(abi.encodePacked(_checkpoints.balance))
                 )
-            ) == _hash,
-            "0x2F"
-        );
+            ) != _hash
+        ) {
+            revert MismatchArgumentsAndHash();
+        }
 
-        require(!b.hashes[_hash], "0x3F");
+        if (b.hashes[_hash]) {
+            revert HashUsed();
+        }
 
         for (uint256 i; i < _checkpoints.startTime.length; i++) {
             pendingTokens += (
@@ -1123,9 +954,12 @@ contract StakerV3FacetStaking is
         StakerBlueprint.StakerStateVariables storage b = StakerBlueprint
             .stakerStateVariables();
 
-        require(b.approvedPointSpenders[msg.sender], "0x3E");
-        // uint256 _userPoints = getAvailablePoints(_user);
-        require(getAvailablePoints(_user) >= _amount, "0x4E");
+        if (!b.approvedPointSpenders[msg.sender]) {
+            revert NotApprovedPointSpender();
+        }
+        if (getAvailablePoints(_user) < _amount) {
+            revert InvalidAmount();
+        }
         b.userSpentPoints[_user] += _amount;
         emit SpentPoints(msg.sender, _user, _amount);
     }

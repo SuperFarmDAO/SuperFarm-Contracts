@@ -217,9 +217,7 @@ describe("===Stakerv3ds===", function () {
           allSelectors,
           addressesForSelectors
         )
-      ).to.be.revertedWith(
-        "StakerProxy::Constructor: mismatch of arrays lengths."
-      );
+      ).to.be.revertedWith("ArraysLengthsMismatch()");
     });
     it("Reverts: wrong implemintation given", async function () {
       await expect(
@@ -233,7 +231,7 @@ describe("===Stakerv3ds===", function () {
           allSelectors,
           addressesForSelectors
         )
-      ).to.be.revertedWith("StakerProxy::Constructor: Delegate call failed");
+      ).to.be.revertedWith("DelegateCallFails()");
     });
     it("Reverts: invalid selector of the function for delegate call", async function () {
       // generate data for sendTransaction with invalid selector
@@ -249,7 +247,7 @@ describe("===Stakerv3ds===", function () {
           to: stakerV3dsProxy.address,
           data: callData,
         })
-      ).to.be.revertedWith("StakerProxy::fallback: No implementation found");
+      ).to.be.revertedWith("NoImplementation()");
     });
   });
 
@@ -285,7 +283,7 @@ describe("===Stakerv3ds===", function () {
             to: stakerV3dsProxy.address,
             data: testCallData2String,
           })
-        ).to.be.revertedWith("0x1A");
+        ).to.be.revertedWith("CantAlterDevs");
       });
 
       it("Reverts: update developer by person with 0 share", async function () {
@@ -302,7 +300,7 @@ describe("===Stakerv3ds===", function () {
             to: stakerV3dsProxy.address,
             data: testCallData1String,
           })
-        ).to.be.revertedWith("0x2A");
+        ).to.be.revertedWith("ZeroDevShare()");
       });
 
       it("should add new developer", async function () {
@@ -360,32 +358,32 @@ describe("===Stakerv3ds===", function () {
           data: getDevAddressesDataString,
         });
 
-        let decodedShit = utils.decodeResults(
+        let decodedData = utils.decodeResults(
           [viewFacetABI],
           ["getDeveloperAddresses"],
           [devAddresses]
         );
 
-        expect(decodedShit[0][0]).to.be.eq(developer.address);
-        expect(decodedShit[0][1]).to.be.eq(signer1.address);
-        expect(decodedShit[0][2]).to.be.eq(signer2.address);
+        expect(decodedData[0][0]).to.be.eq(developer.address);
+        expect(decodedData[0][1]).to.be.eq(signer1.address);
+        expect(decodedData[0][2]).to.be.eq(signer2.address);
 
         // getDeveloperShare
         const getDevShares1Data = await mockViewFacet
           .connect(owner)
-          .getDeveloperShare(decodedShit[0][0]);
+          .getDeveloperShare(decodedData[0][0]);
         const getDevShares1DataString = getDevShares1Data.toString();
 
         // getDeveloperShare
         const getDevShares2Data = await mockViewFacet
           .connect(owner)
-          .getDeveloperShare(decodedShit[0][1]);
+          .getDeveloperShare(decodedData[0][1]);
         const getDevShares2DataString = getDevShares2Data.toString();
 
         // getDeveloperShare
         const getDevShares3Data = await mockViewFacet
           .connect(owner)
-          .getDeveloperShare(decodedShit[0][2]);
+          .getDeveloperShare(decodedData[0][2]);
         const getDevShares3DataString = getDevShares3Data.toString();
 
         const shareCall1 = await ethers.provider.call({
@@ -403,15 +401,15 @@ describe("===Stakerv3ds===", function () {
           data: getDevShares3DataString,
         });
 
-        decodedShit = utils.decodeResults(
+        decodedData = utils.decodeResults(
           [viewFacetABI, viewFacetABI, viewFacetABI],
           ["getDeveloperShare", "getDeveloperShare", "getDeveloperShare"],
           [shareCall1, shareCall2, shareCall3]
         );
 
-        expect(decodedShit[0]).to.be.eq(developersShare[0]);
-        expect(decodedShit[1]).to.be.eq(developersShare[1]);
-        expect(decodedShit[2]).to.be.eq(developersShare[2]);
+        expect(decodedData[0]).to.be.eq(developersShare[0]);
+        expect(decodedData[1]).to.be.eq(developersShare[1]);
+        expect(decodedData[2]).to.be.eq(developersShare[2]);
       });
 
       it("Reverts: can not increase share", async function () {
@@ -440,7 +438,7 @@ describe("===Stakerv3ds===", function () {
             to: stakerV3dsProxy.address,
             data: testCallData2String,
           })
-        ).to.be.revertedWith("0x3A");
+        ).to.be.revertedWith("CantIncreaseDevShare()");
       });
 
       it("Reverts: can not update developer at address with greater then 0 share", async function () {
@@ -481,7 +479,7 @@ describe("===Stakerv3ds===", function () {
             to: stakerV3dsProxy.address,
             data: testCallData3String,
           })
-        ).to.be.revertedWith("0x4A");
+        ).to.be.revertedWith("InvalidNewAddress()");
       });
 
       it("should update developer address correctly", async function () {
@@ -589,26 +587,26 @@ describe("===Stakerv3ds===", function () {
           data: getDevAddressesDataString,
         });
 
-        let decodedShit = utils.decodeResults(
+        let decodedData = utils.decodeResults(
           [viewFacetABI],
           ["getDeveloperAddresses"],
           [devAddresses]
         );
 
-        expect(decodedShit[0]).to.not.contain(developer.address);
-        expect(decodedShit[0][0]).to.be.eq(signer2.address);
-        expect(decodedShit[0][1]).to.be.eq(signer3.address);
+        expect(decodedData[0]).to.not.contain(developer.address);
+        expect(decodedData[0][0]).to.be.eq(signer2.address);
+        expect(decodedData[0][1]).to.be.eq(signer3.address);
 
         // getDeveloperShare
         const getDevShares1Data = await mockViewFacet
           .connect(owner)
-          .getDeveloperShare(decodedShit[0][0]);
+          .getDeveloperShare(decodedData[0][0]);
         const getDevShares1DataString = getDevShares1Data.toString();
 
         // getDeveloperShare
         const getDevShares2Data = await mockViewFacet
           .connect(owner)
-          .getDeveloperShare(decodedShit[0][1]);
+          .getDeveloperShare(decodedData[0][1]);
         const getDevShares2DataString = getDevShares2Data.toString();
 
         const shareCall1 = await ethers.provider.call({
@@ -621,14 +619,14 @@ describe("===Stakerv3ds===", function () {
           data: getDevShares2DataString,
         });
 
-        decodedShit = utils.decodeResults(
+        decodedData = utils.decodeResults(
           [viewFacetABI, viewFacetABI, viewFacetABI],
           ["getDeveloperShare", "getDeveloperShare"],
           [shareCall1, shareCall2]
         );
 
-        expect(decodedShit[0]).to.be.eq(developersShare[2] - 1000);
-        expect(decodedShit[1]).to.be.eq(developersShare[1]);
+        expect(decodedData[0]).to.be.eq(developersShare[2] - 1000);
+        expect(decodedData[1]).to.be.eq(developersShare[1]);
 
         // execute updateDeveloper()
         await signer2.sendTransaction({
@@ -675,7 +673,7 @@ describe("===Stakerv3ds===", function () {
             to: stakerV3dsProxy.address,
             data: testCallData2String,
           })
-        ).to.be.revertedWith("0x1B");
+        ).to.be.revertedWith("CantAlterTokenEmissionSchedule()");
       });
 
       it("Reverts: alteration of point emissions is locked", async function () {
@@ -715,7 +713,7 @@ describe("===Stakerv3ds===", function () {
             to: stakerV3dsProxy.address,
             data: testCallData2String,
           })
-        ).to.be.revertedWith("0x3B");
+        ).to.be.revertedWith("CantAlterPointEmissionSchedule()");
       });
 
       it("Reverts: token emission schedule must be set", async function () {
@@ -732,7 +730,7 @@ describe("===Stakerv3ds===", function () {
             to: stakerV3dsProxy.address,
             data: testCallData1String,
           })
-        ).to.be.revertedWith("0x2B");
+        ).to.be.revertedWith("ZeroTokenEmissionEvents()");
       });
 
       it("Reverts: point emission schedule must be set", async function () {
@@ -755,7 +753,7 @@ describe("===Stakerv3ds===", function () {
             to: stakerV3dsProxy.address,
             data: testCallData1String,
           })
-        ).to.be.revertedWith("0x4B");
+        ).to.be.revertedWith("ZeroPointEmissionEvents()");
       });
 
       it("should set emissions", async function () {
@@ -849,7 +847,7 @@ describe("===Stakerv3ds===", function () {
             to: stakerV3dsProxy.address,
             data: testCallData1String,
           })
-        ).to.be.revertedWith("0x1C");
+        ).to.be.revertedWith("EmptyBoostInfoArray()");
 
         const testCallData2 = await mockCoreFacet
           .connect(owner)
@@ -874,7 +872,7 @@ describe("===Stakerv3ds===", function () {
             to: stakerV3dsProxy.address,
             data: testCallData2String,
           })
-        ).to.be.revertedWith("0x1E");
+        ).to.be.revertedWith("InvalidConfBoostersInputs()");
       });
 
       it("Reverts: mismatch of ids and boost info arrays leghts", async function () {
@@ -916,7 +914,7 @@ describe("===Stakerv3ds===", function () {
             to: stakerV3dsProxy.address,
             data: testCallData1String,
           })
-        ).to.be.revertedWith("0x1Z");
+        ).to.be.revertedWith("InputLengthsMismatch()");
       });
 
       it("Reverts: you can not configure boost with id 0", async function () {
@@ -958,9 +956,7 @@ describe("===Stakerv3ds===", function () {
             to: stakerV3dsProxy.address,
             data: testCallData1String,
           })
-        ).to.be.revertedWith(
-          "StakerV3FacetCore::configureBoostersBatch: booster id cannot be zero"
-        );
+        ).to.be.revertedWith("BoosterIdZero()");
       });
 
       it("Reverts: you can't set ERC20 as asset for stake", async function () {
@@ -1002,9 +998,7 @@ describe("===Stakerv3ds===", function () {
             to: stakerV3dsProxy.address,
             data: testCallData1String,
           })
-        ).to.be.revertedWith(
-          "StakerV3FacetCore::configureBoostersBatch: asset type can't be ERC20 in this staker"
-        );
+        ).to.be.revertedWith("InvalidConfBoostersAssetType()");
       });
 
       it("should configure boosters correctly", async function () {
@@ -1078,19 +1072,19 @@ describe("===Stakerv3ds===", function () {
           data: getBoosterCountDataString,
         });
 
-        const decodedShit = utils.decodeResults(
+        const decodedData = utils.decodeResults(
           [viewFacetABI, viewFacetABI, viewFacetABI],
           ["getBoosterInfo", "getBoosterInfo", "getBoostersCount"],
           [boostCall1, boostCall2, boostCountCall]
         );
 
         expect(await configOfBoosters[0].multiplier).to.be.eq(
-          decodedShit[0].multiplier
+          decodedData[0].multiplier
         );
         expect(await configOfBoosters[1].multiplier).to.be.eq(
-          decodedShit[1].multiplier
+          decodedData[1].multiplier
         );
-        expect(await decodedShit[2]).to.be.eq(2);
+        expect(await decodedData[2]).to.be.eq(2);
       });
       it("should change existed boosters correctly", async function () {
         const viewFacetABI = await hre.artifacts.readArtifact(
@@ -1209,15 +1203,15 @@ describe("===Stakerv3ds===", function () {
           data: getBoosterCountDataString,
         });
 
-        const decodedShit = utils.decodeResults(
+        const decodedData = utils.decodeResults(
           [viewFacetABI, viewFacetABI, viewFacetABI],
           ["getBoosterInfo", "getBoosterInfo", "getBoostersCount"],
           [boostCall1, boostCall2, boostCountCall]
         );
 
-        expect(await decodedShit[0].multiplier).to.be.eq(0);
-        expect(await decodedShit[1].multiplier).to.be.eq(26000);
-        expect(await decodedShit[2]).to.be.eq(1);
+        expect(await decodedData[0].multiplier).to.be.eq(0);
+        expect(await decodedData[1].multiplier).to.be.eq(26000);
+        expect(await decodedData[2]).to.be.eq(1);
       });
     });
     describe("addPool, overwrtite pool, getPoolCount", function () {
@@ -1241,10 +1235,10 @@ describe("===Stakerv3ds===", function () {
             to: stakerV3dsProxy.address,
             data: testCallData1String,
           })
-        ).to.be.revertedWith("0x1D");
+        ).to.be.revertedWith("EmissionNotSet()");
       });
 
-      it("Reverts: pool token is the disburse token", async function () {
+      it("Reverts: pool token is ERC20 token", async function () {
         const testCallData1 = await mockCoreFacet.connect(owner).setEmissions(
           [
             {
@@ -1286,7 +1280,73 @@ describe("===Stakerv3ds===", function () {
             to: stakerV3dsProxy.address,
             data: testCallData2String,
           })
-        ).to.be.revertedWith("0x2D");
+        ).to.be.reverted;
+      });
+
+      it("Reverts: mismatch typeOfAsset and real asset type", async function () {
+        const testCallData1 = await mockCoreFacet.connect(owner).setEmissions(
+          [
+            {
+              timeStamp: await (await ethers.provider.getBlock()).timestamp,
+              rate: ethers.utils.parseEther("6.6666666666"),
+            },
+          ],
+          [
+            {
+              timeStamp: await (await ethers.provider.getBlock()).timestamp,
+              rate: ethers.utils.parseEther("6.6666666666"),
+            },
+          ]
+        );
+        const testCallData1String = testCallData1.data.toString();
+
+        //setEmissions
+        await owner.sendTransaction({
+          to: stakerV3dsProxy.address,
+          data: testCallData1String,
+        });
+
+        const testCallData2 = await mockCoreFacet.connect(owner).addPool({
+          id: 0,
+          tokenStrength: 10000,
+          pointStrength: 10000,
+          groupId: 0,
+          tokensPerShare: 0,
+          pointsPerShare: 0,
+          boostInfo: [1, 2],
+          assetAddress: super1155.address,
+          typeOfAsset: 1,
+        });
+        const testCallData2String = testCallData2.data.toString();
+
+        //addPool
+        await expect(
+          owner.sendTransaction({
+            to: stakerV3dsProxy.address,
+            data: testCallData2String,
+          })
+        ).to.be.revertedWith("InvalidAsset()");
+
+        const testCallData3 = await mockCoreFacet.connect(owner).addPool({
+          id: 0,
+          tokenStrength: 10000,
+          pointStrength: 10000,
+          groupId: 0,
+          tokensPerShare: 0,
+          pointsPerShare: 0,
+          boostInfo: [1, 2],
+          assetAddress: super721.address,
+          typeOfAsset: 2,
+        });
+        const testCallData3String = testCallData3.data.toString();
+
+        //addPool
+        await expect(
+          owner.sendTransaction({
+            to: stakerV3dsProxy.address,
+            data: testCallData3String,
+          })
+        ).to.be.revertedWith("InvalidAsset()");
       });
 
       it("Reverts: token or point strength of the pool is set to 0 or less", async function () {
@@ -1320,7 +1380,7 @@ describe("===Stakerv3ds===", function () {
           tokensPerShare: 0,
           pointsPerShare: 0,
           boostInfo: [1, 2],
-          assetAddress: depositToken.address,
+          assetAddress: super721.address,
           typeOfAsset: 1,
         });
         const testCallData2String = testCallData2.data.toString();
@@ -1331,7 +1391,7 @@ describe("===Stakerv3ds===", function () {
             to: stakerV3dsProxy.address,
             data: testCallData2String,
           })
-        ).to.be.revertedWith("0x3D");
+        ).to.be.revertedWith("ZeroStrength()");
       });
 
       it("Reverts: ERC20 can't be as asset at pool for stake", async function () {
@@ -1376,9 +1436,7 @@ describe("===Stakerv3ds===", function () {
             to: stakerV3dsProxy.address,
             data: testCallData2String,
           })
-        ).to.be.revertedWith(
-          "StakerV3FacetCore::addPool: asset type can't be ERC20 in this staker"
-        );
+        ).to.be.revertedWith("InvalidTypeOfAsset()");
       });
 
       it("should add a new pool, overwrite it and get pool count", async function () {
@@ -1437,12 +1495,12 @@ describe("===Stakerv3ds===", function () {
           data: getPoolCount1DataString,
         });
 
-        let decodedShit = utils.decodeResults(
+        let decodedData = utils.decodeResults(
           [viewFacetABI],
           ["getPoolCount"],
           [getPoolCall1]
         );
-        expect(await decodedShit[0]).to.be.eq(1);
+        expect(await decodedData[0]).to.be.eq(1);
 
         const testCallData3 = await mockCoreFacet.connect(owner).addPool({
           id: 0,
@@ -1473,12 +1531,12 @@ describe("===Stakerv3ds===", function () {
           data: getPoolCount2DataString,
         });
 
-        decodedShit = utils.decodeResults(
+        decodedData = utils.decodeResults(
           [viewFacetABI],
           ["getPoolCount"],
           [getPoolCall2]
         );
-        expect(await decodedShit[0]).to.be.eq(1);
+        expect(await decodedData[0]).to.be.eq(1);
       });
     });
     describe("onERC721Received", function () {
@@ -1692,7 +1750,7 @@ describe("===Stakerv3ds===", function () {
             to: stakerV3dsProxy.address,
             data: testCallData1String,
           })
-        ).to.be.revertedWith("0x1E");
+        ).to.be.revertedWith("IncativePool()");
       });
 
       it("Reverts: wrong asset deposited", async function () {
@@ -1721,9 +1779,7 @@ describe("===Stakerv3ds===", function () {
             to: stakerV3dsProxy.address,
             data: testCallData1String,
           })
-        ).to.be.revertedWith(
-          "StakerV3FacetStaking::deposit: you can't stake this asset in this pool."
-        );
+        ).to.be.revertedWith("InvalidAssetToStake()");
       });
       it("Reverts: you can't deposit erc721 amounts other than 1", async function () {
         let itemGroupId = ethers.BigNumber.from(1);
@@ -1821,7 +1877,7 @@ describe("===Stakerv3ds===", function () {
             to: stakerV3dsProxy.address,
             data: testCallData1String,
           })
-        ).to.be.revertedWith("0x4Z");
+        ).to.be.revertedWith("InvalidInfoStakeForBoost()");
       });
 
       it("Reverts: mismatch of id and amounts arrays lentghs", async function () {
@@ -1850,9 +1906,7 @@ describe("===Stakerv3ds===", function () {
             to: stakerV3dsProxy.address,
             data: testCallData1String,
           })
-        ).to.be.revertedWith(
-          "StakerV3FacetStaking::deposit: mismatch of id and amounts arrays lentghs"
-        );
+        ).to.be.revertedWith("AssetArrayLengthsMismatch()");
       });
 
       it("Reverts: check that you not eligible to stake in the pool for booster", async function () {
@@ -1884,7 +1938,7 @@ describe("===Stakerv3ds===", function () {
             to: stakerV3dsProxy.address,
             data: testCallData1String,
           })
-        ).to.be.revertedWith("0x4Z");
+        ).to.be.revertedWith("InvalidInfoStakeForBoost()");
 
         // incorrect amounts
         const testCallData2 = await mockStakingFacet
@@ -1903,7 +1957,7 @@ describe("===Stakerv3ds===", function () {
             to: stakerV3dsProxy.address,
             data: testCallData2String,
           })
-        ).to.be.revertedWith("0x4Z");
+        ).to.be.revertedWith("InvalidInfoStakeForBoost()");
 
         // incorrect group id
         const testCallData3 = await mockStakingFacet
@@ -1926,7 +1980,7 @@ describe("===Stakerv3ds===", function () {
             to: stakerV3dsProxy.address,
             data: testCallData3String,
           })
-        ).to.be.revertedWith("0x4Z");
+        ).to.be.revertedWith("InvalidInfoStakeForBoost()");
 
         // setting booster multiplier to 0
         const testCallData4 = await mockCoreFacet
@@ -1974,7 +2028,7 @@ describe("===Stakerv3ds===", function () {
             to: stakerV3dsProxy.address,
             data: testCallData5String,
           })
-        ).to.be.revertedWith("0x4Z");
+        ).to.be.revertedWith("InvalidInfoStakeForBoost()");
       });
 
       it("should stake items at pool for boosters correctly", async function () {
@@ -2023,17 +2077,17 @@ describe("===Stakerv3ds===", function () {
           data: getItemsUserInfoDataString,
         });
 
-        let decodedShit = utils.decodeResults(
+        let decodedData = utils.decodeResults(
           [viewFacetABI],
           ["getItemsUserInfo"],
           [getItemsUserInfo]
         );
 
-        expect(await decodedShit[0].tokenIds[0]).to.be.eq(shiftedItemGroupId2);
-        expect(await decodedShit[0].tokenIds[1]).to.be.eq(
+        expect(await decodedData[0].tokenIds[0]).to.be.eq(shiftedItemGroupId2);
+        expect(await decodedData[0].tokenIds[1]).to.be.eq(
           shiftedItemGroupId2.add(1)
         );
-        expect(await decodedShit[0].tokenIds[2]).to.be.eq(
+        expect(await decodedData[0].tokenIds[2]).to.be.eq(
           shiftedItemGroupId2.add(2)
         );
       });
@@ -2244,7 +2298,7 @@ describe("===Stakerv3ds===", function () {
             to: stakerV3dsProxy.address,
             data: testCallData1String,
           })
-        ).to.be.revertedWith("0x1G");
+        ).to.be.revertedWith("NotStaked()");
       });
 
       it("Reverts: withdraw amount exceeds user's amount on staking", async function () {
@@ -2270,60 +2324,60 @@ describe("===Stakerv3ds===", function () {
             to: stakerV3dsProxy.address,
             data: testCallData1String,
           })
-        ).to.be.revertedWith("0x1Z");
+        ).to.be.revertedWith("InvalidAmount()");
       });
 
-      it("Reverts: withdraw amount exceeds user's amount on staking", async function () {
-        const testCallData1 = await mockStakingFacet.connect(owner).withdraw(
-          0,
-          {
-            assetAddress: super721.address,
-            id: [
-              shiftedItemGroupId2.add(3),
-              shiftedItemGroupId2.add(4),
-              shiftedItemGroupId2.add(5),
-            ],
-            amounts: [1, 1, 1],
-            IOUTokenId: [],
-          },
-          0
-        );
-        const testCallData1String = testCallData1.data.toString();
+      // it("Reverts: withdraw amount exceeds user's amount on staking", async function () {
+      //   const testCallData1 = await mockStakingFacet.connect(owner).withdraw(
+      //     0,
+      //     {
+      //       assetAddress: super721.address,
+      //       id: [
+      //         shiftedItemGroupId2.add(3),
+      //         shiftedItemGroupId2.add(4),
+      //         shiftedItemGroupId2.add(5),
+      //       ],
+      //       amounts: [1, 1, 1],
+      //       IOUTokenId: [],
+      //     },
+      //     0
+      //   );
+      //   const testCallData1String = testCallData1.data.toString();
 
-        //withdraw
-        await expect(
-          owner.sendTransaction({
-            to: stakerV3dsProxy.address,
-            data: testCallData1String,
-          })
-        ).to.be.revertedWith("0x1Z");
-      });
+      //   //withdraw
+      //   await expect(
+      //     owner.sendTransaction({
+      //       to: stakerV3dsProxy.address,
+      //       data: testCallData1String,
+      //     })
+      //   ).to.be.revertedWith("InvalidAmount()");
+      // });
 
-      it("Reverts: balance of IOU token is zero", async function () {
-        const testCallData1 = await mockStakingFacet.connect(owner).withdraw(
-          0,
-          {
-            assetAddress: super721.address,
-            id: [
-              shiftedItemGroupId2.add(3),
-              shiftedItemGroupId2.add(4),
-              shiftedItemGroupId2.add(5),
-            ],
-            amounts: [0, 0, 0],
-            IOUTokenId: [],
-          },
-          0
-        );
-        const testCallData1String = testCallData1.data.toString();
+      // it("Reverts: balance of IOU token is zero", async function () {
+      //   const testCallData1 = await mockStakingFacet.connect(owner).withdraw(
+      //     0,
+      //     {
+      //       assetAddress: super721.address,
+      //       id: [
+      //         shiftedItemGroupId2.add(3),
+      //         shiftedItemGroupId2.add(4),
+      //         shiftedItemGroupId2.add(5),
+      //       ],
+      //       amounts: [0, 0, 0],
+      //       IOUTokenId: [],
+      //     },
+      //     0
+      //   );
+      //   const testCallData1String = testCallData1.data.toString();
 
-        //withdraw
-        await expect(
-          owner.sendTransaction({
-            to: stakerV3dsProxy.address,
-            data: testCallData1String,
-          })
-        ).to.be.revertedWith("0x2E");
-      });
+      //   //withdraw
+      //   await expect(
+      //     owner.sendTransaction({
+      //       to: stakerV3dsProxy.address,
+      //       data: testCallData1String,
+      //     })
+      //   ).to.be.revertedWith("0x2E");
+      // });
 
       it("Reverts: trying to withdraw with incorrect IOUToken id", async function () {
         const testCallData1 = await mockStakingFacet
@@ -2375,9 +2429,7 @@ describe("===Stakerv3ds===", function () {
             to: stakerV3dsProxy.address,
             data: testCallData2String,
           })
-        ).to.be.revertedWith(
-          "StakerV3FacetStaking::withdraw: you are not an owner of that IOUToken."
-        );
+        ).to.be.revertedWith("NotAnOwnerOfIOUToken()");
       });
 
       it("Reverts: trying to withdraw with IOUToken related to other asset", async function () {
@@ -2466,9 +2518,7 @@ describe("===Stakerv3ds===", function () {
             to: stakerV3dsProxy.address,
             data: testCallData3String,
           })
-        ).to.be.revertedWith(
-          "StakerV3FacetStaking::withdraw: IOUToken for different asset then pool."
-        );
+        ).to.be.revertedWith("IOUTokenFromDifferentPool()");
       });
 
       it("should withdraw correctly", async function () {
@@ -2908,7 +2958,7 @@ describe("===Stakerv3ds===", function () {
             to: stakerV3dsProxy.address,
             data: testCallData1String,
           })
-        ).to.be.revertedWith("0x1F");
+        ).to.be.revertedWith("NotAnAdmin()");
       });
 
       it("Reverts: mismatch given arguments with hashed arguments", async function () {
@@ -3011,18 +3061,27 @@ describe("===Stakerv3ds===", function () {
             to: stakerV3dsProxy.address,
             data: testCallData1String,
           })
-        ).to.be.revertedWith("0x2F");
+        ).to.be.revertedWith("MismatchArgumentsAndHash()");
       });
 
       it("Reverts: you can't use same hash", async function () {
         const blockTime = await (await ethers.provider.getBlock()).timestamp;
 
         const signedDataHash = ethers.utils.solidityKeccak256(
-          ["uint256[]", "uint256[]", "uint256[]"],
+          ["bytes", "bytes", "bytes"],
           [
-            [blockTime - 1000, blockTime],
-            [blockTime + 1, blockTime + 1000],
-            [3000, 2000],
+            ethers.utils.solidityKeccak256(
+              ["uint256", "uint256"],
+              [blockTime - 1000, blockTime]
+            ),
+            ethers.utils.solidityKeccak256(
+              ["uint256", "uint256"],
+              [blockTime + 1, blockTime + 1000]
+            ),
+            ethers.utils.solidityKeccak256(
+              ["uint256", "uint256"],
+              [3000, 2000]
+            ),
           ]
         );
 
@@ -3140,18 +3199,27 @@ describe("===Stakerv3ds===", function () {
             to: stakerV3dsProxy.address,
             data: testCallData2String,
           })
-        ).to.be.revertedWith("0x3F");
+        ).to.be.revertedWith("HashUsed()");
       });
 
       it("should claim with checkpoints correctly", async function () {
         const blockTime = await (await ethers.provider.getBlock()).timestamp;
 
         const signedDataHash = ethers.utils.solidityKeccak256(
-          ["uint256[]", "uint256[]", "uint256[]"],
+          ["bytes32", "bytes32", "bytes32"],
           [
-            [blockTime - 1000, blockTime],
-            [blockTime + 1, blockTime + 1000],
-            [3000, 2000],
+            ethers.utils.solidityKeccak256(
+              ["uint256", "uint256"],
+              [blockTime - 1000, blockTime]
+            ),
+            ethers.utils.solidityKeccak256(
+              ["uint256", "uint256"],
+              [blockTime + 1, blockTime + 1000]
+            ),
+            ethers.utils.solidityKeccak256(
+              ["uint256", "uint256"],
+              [3000, 2000]
+            ),
           ]
         );
 
@@ -3283,7 +3351,7 @@ describe("===Stakerv3ds===", function () {
             to: stakerV3dsProxy.address,
             data: testCallData1String,
           })
-        ).to.be.revertedWith("0x3E");
+        ).to.be.revertedWith("NotApprovedPointSpender()");
       });
 
       it("Reverts: amount exceeds available points", async function () {
@@ -3311,7 +3379,7 @@ describe("===Stakerv3ds===", function () {
             to: stakerV3dsProxy.address,
             data: testCallData2String,
           })
-        ).to.be.revertedWith("0x4E");
+        ).to.be.revertedWith("InvalidAmount()");
       });
 
       it("spendPoints should work correctly ", async function () {
@@ -3997,13 +4065,13 @@ describe("===Stakerv3ds===", function () {
           data: getPendingTokens,
         });
 
-        const decodedShit = utils.decodeResults(
+        const decodedData = utils.decodeResults(
           [stakingFacetABI],
           ["getPendingTokens"],
           [getPendingTokensCall]
         );
 
-        expect(await decodedShit[0]).be.closeTo(
+        expect(await decodedData[0]).be.closeTo(
           ethers.utils.parseEther("200"),
           10 ** 15
         );
@@ -4026,13 +4094,13 @@ describe("===Stakerv3ds===", function () {
           data: getPendingTokens,
         });
 
-        const decodedShit = utils.decodeResults(
+        const decodedData = utils.decodeResults(
           [stakingFacetABI],
           ["getPendingPoints"],
           [getPendingTokensCall]
         );
 
-        expect(await decodedShit[0]).be.closeTo(
+        expect(await decodedData[0]).be.closeTo(
           ethers.utils.parseEther("200"),
           10 ** 15
         );
@@ -4082,13 +4150,13 @@ describe("===Stakerv3ds===", function () {
           data: getAvailablePoints,
         });
 
-        let decodedShit = utils.decodeResults(
+        let decodedData = utils.decodeResults(
           [stakingFacetABI],
           ["getAvailablePoints"],
           [getAvailablePointsCall]
         );
 
-        expect(await decodedShit[0]).be.closeTo(
+        expect(await decodedData[0]).be.closeTo(
           ethers.utils.parseEther("150"),
           10 ** 15
         );
@@ -4103,13 +4171,13 @@ describe("===Stakerv3ds===", function () {
           data: getTotalPoints,
         });
 
-        decodedShit = utils.decodeResults(
+        decodedData = utils.decodeResults(
           [stakingFacetABI],
           ["getTotalPoints"],
           [getTotalPointsCall]
         );
 
-        expect(await decodedShit[0]).be.closeTo(
+        expect(await decodedData[0]).be.closeTo(
           ethers.utils.parseEther("200"),
           10 ** 15
         );
@@ -4210,13 +4278,13 @@ describe("===Stakerv3ds===", function () {
           data: getPendingTokens,
         });
 
-        let decodedShit = utils.decodeResults(
+        let decodedData = utils.decodeResults(
           [stakingFacetABI],
           ["getPendingPoints"],
           [getPendingTokensCall]
         );
 
-        expect(await decodedShit[0]).be.closeTo(
+        expect(await decodedData[0]).be.closeTo(
           ethers.utils.parseEther("0"),
           10 ** 15
         );
@@ -4231,13 +4299,13 @@ describe("===Stakerv3ds===", function () {
           data: getPendingPoints,
         });
 
-        decodedShit = utils.decodeResults(
+        decodedData = utils.decodeResults(
           [stakingFacetABI],
           ["getPendingPoints"],
           [getPendingPointsCall]
         );
 
-        expect(await decodedShit[0]).be.closeTo(
+        expect(await decodedData[0]).be.closeTo(
           ethers.utils.parseEther("0"),
           10 ** 15
         );

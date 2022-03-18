@@ -98,10 +98,10 @@ library StakerBlueprint {
         uint256 nextIOUTokenId;
         address token;
         bool canAlterDevelopers;
-        EnumerableSet.AddressSet developerAddresses;
-        mapping(address => uint256) developerShares;
         bool canAlterTokenEmissionSchedule;
         bool canAlterPointEmissionSchedule;
+        EnumerableSet.AddressSet developerAddresses;
+        mapping(address => uint256) developerShares;
         uint256 lastPoolId;
         uint256 tokenEmissionEventsCount;
         uint256 pointEmissionEventsCount;
