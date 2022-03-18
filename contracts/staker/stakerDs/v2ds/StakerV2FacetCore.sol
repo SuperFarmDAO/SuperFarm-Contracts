@@ -94,8 +94,8 @@ contract StakerV2FacetCore is Sweepableds, ReentrancyGuard {
         } else {
             if (_newDeveloperAddress != msg.sender) {
                 require(
-                    b.developerShares[_newDeveloperAddress] == 0 ||
-                        _newDeveloperAddress == address(0),
+                    b.developerShares[_newDeveloperAddress] == 0 &&
+                        _newDeveloperAddress != address(0),
                     "Invalid address"
                 );
                 delete b.developerShares[msg.sender];

@@ -3,6 +3,8 @@ pragma solidity ^0.8.7;
 
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
+import "@openzeppelin/contracts/token/ERC1155/IERC1155.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 import "@openzeppelin/contracts/token/ERC1155/utils/ERC1155Holder.sol";
@@ -36,6 +38,24 @@ contract StakerV3FacetCore is
     using EnumerableSet for EnumerableSet.UintSet;
     using EnumerableSet for EnumerableSet.AddressSet;
 
+    error CantAlterDevs();
+    error ZeroDevShare();
+    error CantIncreaseDevShare();
+    error InvalidNewAddress();
+    error CantAlterTokenEmissionSchedule();
+    error CantAlterPointEmissionSchedule();
+    error ZeroTokenEmissionEvents();
+    error ZeroPointEmissionEvents();
+    error EmptyBoostInfoArray();
+    error InputLengthsMismatch();
+    error BoosterIdZero();
+    error InvalidConfBoostersInputs();
+    error InvalidConfBoostersAssetType();
+    error EmissionNotSet();
+    error ZeroStrength();
+    error InvalidAsset();
+    error InvalidTypeOfAsset();
+
     /**
      * A function that needs to be called immediately after deployment.
      * Sets the owner of the newly deployed proxy.
@@ -59,7 +79,9 @@ contract StakerV3FacetCore is
         StakerBlueprint.StakerStateVariables storage b = StakerBlueprint
             .stakerStateVariables();
 
-        require(b.canAlterDevelopers, "0x1A");
+        if (!b.canAlterDevelopers) {
+            revert CantAlterDevs();
+        }
         b.developerAddresses.add(_developerAddress);
         b.developerShares[_developerAddress] = _share;
     }
@@ -94,18 +116,23 @@ contract StakerV3FacetCore is
             .stakerStateVariables();
 
         uint256 developerShare = b.developerShares[msg.sender];
-        require(developerShare > 0, "0x2A");
-        require(_newShare <= developerShare, "0x3A");
+        if (developerShare == 0) {
+            revert ZeroDevShare();
+        }
+        if (_newShare > developerShare) {
+            revert CantIncreaseDevShare();
+        }
         if (_newShare == 0) {
             b.developerAddresses.remove(msg.sender);
             delete b.developerShares[msg.sender];
         } else {
             if (_newDeveloperAddress != msg.sender) {
-                require(
-                    b.developerShares[_newDeveloperAddress] == 0 ||
-                        _newDeveloperAddress == address(0),
-                    "0x4A"
-                );
+                if (
+                    b.developerShares[_newDeveloperAddress] != 0 ||
+                    _newDeveloperAddress == address(0)
+                ) {
+                    revert InvalidNewAddress();
+                }
                 delete b.developerShares[msg.sender];
                 b.developerAddresses.remove(msg.sender);
                 b.developerAddresses.add(_newDeveloperAddress);
@@ -130,7 +157,9 @@ contract StakerV3FacetCore is
             .stakerStateVariables();
 
         if (_tokenSchedule.length > 0) {
-            require(b.canAlterTokenEmissionSchedule, "0x1B");
+            if (!b.canAlterTokenEmissionSchedule) {
+                revert CantAlterTokenEmissionSchedule();
+            }
             b.tokenEmissionEventsCount = _tokenSchedule.length;
             for (uint256 i; i < b.tokenEmissionEventsCount; i++) {
                 b.tokenEmissionEvents[i] = _tokenSchedule[i];
@@ -141,10 +170,14 @@ contract StakerV3FacetCore is
                 }
             }
         }
-        require(b.tokenEmissionEventsCount > 0, "0x2B");
+        if (b.tokenEmissionEventsCount == 0) {
+            revert ZeroTokenEmissionEvents();
+        }
 
         if (_pointSchedule.length > 0) {
-            require(b.canAlterPointEmissionSchedule, "0x3B");
+            if (!b.canAlterPointEmissionSchedule) {
+                revert CantAlterPointEmissionSchedule();
+            }
             b.pointEmissionEventsCount = _pointSchedule.length;
             for (uint256 i; i < b.pointEmissionEventsCount; i++) {
                 b.pointEmissionEvents[i] = _pointSchedule[i];
@@ -155,7 +188,9 @@ contract StakerV3FacetCore is
                 }
             }
         }
-        require(b.pointEmissionEventsCount > 0, "0x4B");
+        if (b.pointEmissionEventsCount == 0) {
+            revert ZeroPointEmissionEvents();
+        }
     }
 
     /**
@@ -201,48 +236,53 @@ contract StakerV3FacetCore is
         StakerBlueprint.StakerStateVariables storage b = StakerBlueprint
             .stakerStateVariables();
 
-        require(_boostInfo.length > 0, "0x1C");
-        require(_ids.length == _boostInfo.length, "0x1Z");
+        if (_boostInfo.length == 0) {
+            revert EmptyBoostInfoArray();
+        }
+        if (_ids.length != _boostInfo.length) {
+            revert InputLengthsMismatch();
+        }
 
         for (uint256 i; i < _boostInfo.length; i++) {
-            require(
-                _ids[i] > 0,
-                "StakerV3FacetCore::configureBoostersBatch: booster id cannot be zero"
-            );
-            require(
-                _boostInfo[i].multiplier > 0 ||
-                    _boostInfo[i].amountRequired > 0 ||
-                    _boostInfo[i].contractRequired > address(0),
-                "0x1E"
-            );
-            require(
-                _boostInfo[i].typeOfAsset ==
-                    StakerBlueprint.PoolAssetType.ERC721 ||
-                    _boostInfo[i].typeOfAsset ==
-                    StakerBlueprint.PoolAssetType.ERC1155,
-                "StakerV3FacetCore::configureBoostersBatch: asset type can't be ERC20 in this staker"
-            );
-
+            if (_ids[i] == 0) {
+                revert BoosterIdZero();
+            }
             if (
-                b.boostInfo[_ids[i]].multiplier == 0 &&
-                _boostInfo[i].multiplier != 0
+                (_boostInfo[i].multiplier == 0 &&
+                    _boostInfo[i].amountRequired == 0) ||
+                _boostInfo[i].contractRequired == address(0)
             ) {
-                b.activeBoosters++;
-            } else if (
-                b.boostInfo[_ids[i]].multiplier != 0 &&
-                _boostInfo[i].multiplier == 0
+                revert InvalidConfBoostersInputs();
+            }
+            if (
+                _boostInfo[i].typeOfAsset !=
+                StakerBlueprint.PoolAssetType.ERC721 &&
+                _boostInfo[i].typeOfAsset !=
+                StakerBlueprint.PoolAssetType.ERC1155
             ) {
-                b.activeBoosters--;
+                revert InvalidConfBoostersAssetType();
             }
 
-            b.boostInfo[_ids[i]] = StakerBlueprint.BoostInfo({
-                multiplier: _boostInfo[i].multiplier,
-                amountRequired: _boostInfo[i].amountRequired,
-                groupRequired: _boostInfo[i].groupRequired,
-                contractRequired: _boostInfo[i].contractRequired,
-                assetType: _boostInfo[i].assetType,
-                typeOfAsset: _boostInfo[i].typeOfAsset
-            });
+            unchecked {
+                if (
+                    b.boostInfo[_ids[i]].multiplier == 0 &&
+                    _boostInfo[i].multiplier != 0
+                ) {
+                    b.activeBoosters++;
+                } else if (
+                    b.boostInfo[_ids[i]].multiplier != 0 &&
+                    _boostInfo[i].multiplier == 0
+                ) {
+                    b.activeBoosters--;
+                }
+            }
+            b.boostInfo[_ids[i]].multiplier = _boostInfo[i].multiplier;
+            b.boostInfo[_ids[i]].amountRequired = _boostInfo[i].amountRequired;
+            b.boostInfo[_ids[i]].groupRequired = _boostInfo[i].groupRequired;
+            b.boostInfo[_ids[i]].contractRequired = _boostInfo[i]
+                .contractRequired;
+            b.boostInfo[_ids[i]].assetType = _boostInfo[i].assetType;
+            b.boostInfo[_ids[i]].typeOfAsset = _boostInfo[i].typeOfAsset;
         }
     }
 
@@ -258,26 +298,42 @@ contract StakerV3FacetCore is
         StakerBlueprint.StakerStateVariables storage b = StakerBlueprint
             .stakerStateVariables();
 
-        require(
-            b.tokenEmissionEventsCount > 0 && b.pointEmissionEventsCount > 0,
-            "0x1D"
-        );
-        require(
-            address(_addPoolStruct.assetAddress) != address(b.token),
-            "0x2D"
-        );
-        require(
-            _addPoolStruct.tokenStrength > 0 &&
-                _addPoolStruct.pointStrength > 0,
-            "0x3D"
-        );
-        require(
-            _addPoolStruct.typeOfAsset ==
-                StakerBlueprint.PoolAssetType.ERC721 ||
-                _addPoolStruct.typeOfAsset ==
-                StakerBlueprint.PoolAssetType.ERC1155,
-            "StakerV3FacetCore::addPool: asset type can't be ERC20 in this staker"
-        );
+        if (
+            b.tokenEmissionEventsCount == 0 || b.pointEmissionEventsCount == 0
+        ) {
+            revert EmissionNotSet();
+        }
+
+        if (_addPoolStruct.typeOfAsset == StakerBlueprint.PoolAssetType.ERC20) {
+            revert InvalidTypeOfAsset();
+        }
+
+        if (
+            _addPoolStruct.typeOfAsset == StakerBlueprint.PoolAssetType.ERC721
+        ) {
+            if (
+                !IERC721(_addPoolStruct.assetAddress).supportsInterface(
+                    StakerBlueprint.INTERFACE_ERC721
+                )
+            ) {
+                revert InvalidAsset();
+            }
+        } else {
+            if (
+                !IERC1155(_addPoolStruct.assetAddress).supportsInterface(
+                    StakerBlueprint.INTERFACE_ERC1155
+                )
+            ) {
+                revert InvalidAsset();
+            }
+        }
+
+        if (
+            _addPoolStruct.tokenStrength == 0 ||
+            _addPoolStruct.pointStrength == 0
+        ) {
+            revert ZeroStrength();
+        }
 
         uint256 lastTokenRewardTime = block.timestamp >
             b.earliestTokenEmissionEvent
@@ -300,18 +356,24 @@ contract StakerV3FacetCore is
             b.totalPointStrength =
                 b.totalPointStrength +
                 _addPoolStruct.pointStrength;
-            b.poolInfoV3[_addPoolStruct.id] = StakerBlueprint.PoolInfo({
-                assetAddress: _addPoolStruct.assetAddress,
-                tokenStrength: _addPoolStruct.tokenStrength,
-                tokenBoostedDeposit: 0,
-                tokensPerShare: _addPoolStruct.tokensPerShare,
-                pointStrength: _addPoolStruct.pointStrength,
-                pointBoostedDeposit: 0,
-                pointsPerShare: _addPoolStruct.pointsPerShare,
-                lastRewardEvent: lastRewardEvent,
-                boostInfo: _addPoolStruct.boostInfo,
-                typeOfAsset: _addPoolStruct.typeOfAsset
-            });
+
+            b.poolInfoV3[_addPoolStruct.id].assetAddress = _addPoolStruct
+                .assetAddress;
+            b.poolInfoV3[_addPoolStruct.id].tokenStrength = _addPoolStruct
+                .tokenStrength;
+            b.poolInfoV3[_addPoolStruct.id].tokenBoostedDeposit = 0;
+            b.poolInfoV3[_addPoolStruct.id].tokensPerShare = _addPoolStruct
+                .tokensPerShare;
+            b.poolInfoV3[_addPoolStruct.id].pointStrength = _addPoolStruct
+                .pointStrength;
+            b.poolInfoV3[_addPoolStruct.id].pointBoostedDeposit = 0;
+            b.poolInfoV3[_addPoolStruct.id].pointsPerShare = _addPoolStruct
+                .pointsPerShare;
+            b.poolInfoV3[_addPoolStruct.id].lastRewardEvent = lastRewardEvent;
+            b.poolInfoV3[_addPoolStruct.id].boostInfo = _addPoolStruct
+                .boostInfo;
+            b.poolInfoV3[_addPoolStruct.id].typeOfAsset = _addPoolStruct
+                .typeOfAsset;
         } else {
             b.totalTokenStrength =
                 (b.totalTokenStrength -
@@ -343,12 +405,8 @@ contract StakerV3FacetCore is
                     i + b.poolInfoV3[_addPoolStruct.id].boostInfo.length
                 ] = _addPoolStruct.boostInfo[i];
             }
-            StakerBlueprint.PoolInfo storage pool = b.poolInfoV3[
-                _addPoolStruct.id
-            ];
-            pool.boostInfo = boosters; // Appended boosters
+            b.poolInfoV3[_addPoolStruct.id].boostInfo = boosters; // Appended boosters
         }
-        // if (_addPoolStruct.id == 0) {}
     }
 
     function onERC721Received(

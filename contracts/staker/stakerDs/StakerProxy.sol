@@ -11,6 +11,10 @@ import "./StakerBlueprint.sol";
  * Staker contract address. Storage is reflected in this contract.
  */
 contract StakerProxy {
+    error ArraysLengthsMismatch();
+    error DelegateCallFails();
+    error NoImplementation();
+
     /**
      * Construct a new staker proxy.
      * @param _implementation The address of the logic contract.
@@ -29,10 +33,9 @@ contract StakerProxy {
         bytes4[] memory _selectors,
         address[] memory _addresses
     ) {
-        require(
-            _selectors.length == _addresses.length,
-            "StakerProxy::Constructor: mismatch of arrays lengths."
-        );
+        if (_selectors.length != _addresses.length) {
+            revert ArraysLengthsMismatch();
+        }
 
         StakerBlueprint.StakerStateVariables storage b = StakerBlueprint
             .stakerStateVariables();
@@ -43,7 +46,9 @@ contract StakerProxy {
         );
 
         // Represents collective succuess
-        require(success, "StakerProxy::Constructor: Delegate call failed");
+        if (!success) {
+            revert DelegateCallFails();
+        }
 
         // If deployment is success, store constructor parameters
         b.IOUTokenAddress = _IOUTokenAddress;
@@ -67,10 +72,10 @@ contract StakerProxy {
             .stakerStateVariables();
 
         address _implementation = b.implementations[msg.sig];
-        require(
-            _implementation != address(0),
-            "StakerProxy::fallback: No implementation found"
-        );
+
+        if (_implementation == address(0)) {
+            revert NoImplementation();
+        }
 
         // Execute external function from facet using delegatecall and return any value.
         assembly {
