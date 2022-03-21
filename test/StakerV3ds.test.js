@@ -2432,7 +2432,7 @@ describe("===Stakerv3ds===", function () {
         ).to.be.revertedWith("NotAnOwnerOfIOUToken()");
       });
 
-      it("Reverts: trying to withdraw with IOUToken related to other asset", async function () {
+      it("Reverts: trying to withdraw with IOUToken related to other pool", async function () {
         const addPoolCallData = await mockCoreFacet.connect(owner).addPool({
           id: 1,
           tokenStrength: 10000,
@@ -2688,7 +2688,7 @@ describe("===Stakerv3ds===", function () {
         //   await rewardToken.connect(signer1).balanceOf(signer1.address)
         // ).to.be.closeTo(ethers.utils.parseEther("1.0"));
         expect(await rewardToken.balanceOf(signer1.address)).to.be.closeTo(
-          ethers.utils.parseEther("0.2"),
+          ethers.utils.parseEther("200"),
           ethers.utils.parseEther("0.01")
         );
 
@@ -4489,26 +4489,27 @@ describe("===Stakerv3ds===", function () {
       const addDevCallDataString = addDevCallData.data.toString();
 
       // execute addDeveloper
-      await owner.sendTransaction({
-        to: stakerV3dsProxy.address,
-        data: addDevCallDataString,
-      });
+      // await owner.sendTransaction({
+      //   to: stakerV3dsProxy.address,
+      //   data: addDevCallDataString,
+      // });
 
       //await stakerV3FacetCore.connect(owner).initialize(owner.address);
 
-      // Note 6.6666666666 per second is equivalent to 100 per 15 seconds(15 seconds = block time according to Blocks implementation)
+      // Note 10 per second is equivalent to 150 per 15 seconds(15 seconds = block time according to Blocks implementation)
       // Now the rewards must be set based on seconds
+
       const testCallData1 = await mockCoreFacet.connect(owner).setEmissions(
         [
           {
             timeStamp: await (await ethers.provider.getBlock()).timestamp,
-            rate: ethers.utils.parseEther("6.6666666666"),
+            rate: ethers.utils.parseEther("10"),
           },
         ],
         [
           {
             timeStamp: await (await ethers.provider.getBlock()).timestamp,
-            rate: ethers.utils.parseEther("6.6666666666"),
+            rate: ethers.utils.parseEther("10"),
           },
         ]
       );
@@ -4649,6 +4650,7 @@ describe("===Stakerv3ds===", function () {
           amounts: [1, 1, 1],
           IOUTokenId: [],
         });
+      let startOfStaking = await (await ethers.provider.getBlock()).timestamp;
 
       const testCallData4String = testCallData4.data.toString();
 
@@ -4658,11 +4660,30 @@ describe("===Stakerv3ds===", function () {
         data: testCallData4String,
       });
 
+      //User1-Claims
+      const testCallData20 = await mockStakingFacet
+        .connect(signer1)
+        .claim(0, []);
+
+      const testCallData20String = testCallData20.data.toString();
+
+      await network.provider.send("evm_setNextBlockTimestamp", [
+        startOfStaking + 30,
+      ]);
+      await ethers.provider.send("evm_mine", []);
+      //claim
+      await signer1.sendTransaction({
+        to: stakerV3dsProxy.address,
+        data: testCallData20String,
+      });
+      expect(await rewardToken.balanceOf(signer1.address)).to.be.closeTo(
+        ethers.utils.parseEther("300"),
+        ethers.utils.parseEther("0.01")
+      );
+
       expect(await IOUToken.balanceOf(signer1.address)).to.be.eq(3);
       expect(await IOUToken.ownerOf(0)).to.be.eq(signer1.address);
       expect(await IOUToken.ownerOf(1)).to.be.eq(signer1.address);
-      await network.provider.send("evm_increaseTime", [30]);
-      await ethers.provider.send("evm_mine", []);
 
       //User1-StakeITEMS
       const testCallData5 = await mockStakingFacet
@@ -4683,6 +4704,11 @@ describe("===Stakerv3ds===", function () {
         signer1.address
       );
 
+      // +300 rewars for signer1
+      await network.provider.send("evm_setNextBlockTimestamp", [
+        startOfStaking + 60,
+      ]);
+      await ethers.provider.send("evm_mine", []);
       //deposit
       await signer1.sendTransaction({
         to: stakerV3dsProxy.address,
@@ -4718,9 +4744,6 @@ describe("===Stakerv3ds===", function () {
         await super1155.balanceOf(signer2.address, shiftedItemGroupId)
       ).to.be.eq(19);
 
-      await network.provider.send("evm_increaseTime", [30]);
-      await ethers.provider.send("evm_mine", []);
-
       //User2-Deposit
       const testCallData7 = await mockStakingFacet
         .connect(signer2)
@@ -4737,13 +4760,16 @@ describe("===Stakerv3ds===", function () {
 
       const testCallData7String = testCallData7.data.toString();
 
+      // +300 rewards for signer1 (900 summary) and signer 2 is starting staking
+      await network.provider.send("evm_setNextBlockTimestamp", [
+        startOfStaking + 90,
+      ]);
+      await ethers.provider.send("evm_mine", []);
       //deposit
       await signer2.sendTransaction({
         to: stakerV3dsProxy.address,
         data: testCallData7String,
       });
-      await network.provider.send("evm_increaseTime", [15]);
-      await ethers.provider.send("evm_mine", []);
 
       //User1-Claims
       const testCallData8 = await mockStakingFacet
@@ -4752,11 +4778,21 @@ describe("===Stakerv3ds===", function () {
 
       const testCallData8String = testCallData8.data.toString();
 
+      // 900 + about 76 rewards for signer 1
+      await network.provider.send("evm_setNextBlockTimestamp", [
+        startOfStaking + 105,
+      ]);
+      await ethers.provider.send("evm_mine", []);
       //claim
       await signer1.sendTransaction({
         to: stakerV3dsProxy.address,
         data: testCallData8String,
       });
+
+      expect(await rewardToken.balanceOf(signer1.address)).to.be.closeTo(
+        ethers.utils.parseEther("975.9"),
+        ethers.utils.parseEther("0.1")
+      );
 
       expect(await super721.ownerOf(shiftedItemGroupId2.add(5))).to.be.eq(
         stakerV3dsProxy.address
@@ -4789,9 +4825,6 @@ describe("===Stakerv3ds===", function () {
         signer1.address
       );
 
-      await network.provider.send("evm_increaseTime", [15]);
-      await ethers.provider.send("evm_mine", []);
-
       //User2-Withdraw
       const testCallData10 = await mockStakingFacet.connect(signer2).withdraw(
         0,
@@ -4806,6 +4839,10 @@ describe("===Stakerv3ds===", function () {
 
       const testCallData10String = testCallData10.data.toString();
 
+      await network.provider.send("evm_setNextBlockTimestamp", [
+        startOfStaking + 120,
+      ]);
+      await ethers.provider.send("evm_mine", []);
       //withdraw
       await signer2.sendTransaction({
         to: stakerV3dsProxy.address,
@@ -4815,8 +4852,6 @@ describe("===Stakerv3ds===", function () {
       expect(await super721.ownerOf(shiftedItemGroupId2.add(5))).to.be.eq(
         signer1.address
       );
-      await network.provider.send("evm_increaseTime", [15]);
-      await ethers.provider.send("evm_mine", []);
 
       //   //User2-Claims
       const testCallData11 = await mockStakingFacet
@@ -4825,6 +4860,10 @@ describe("===Stakerv3ds===", function () {
 
       const testCallData11String = testCallData11.data.toString();
 
+      await network.provider.send("evm_setNextBlockTimestamp", [
+        startOfStaking + 135,
+      ]);
+      await ethers.provider.send("evm_mine", []);
       //claim
       await signer2.sendTransaction({
         to: stakerV3dsProxy.address,

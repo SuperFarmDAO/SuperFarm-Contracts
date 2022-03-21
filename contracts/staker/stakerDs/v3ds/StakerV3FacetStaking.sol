@@ -14,6 +14,7 @@ import "../../../base/Sweepableds.sol";
 import "../../../interfaces/ISuperGeneric.sol";
 
 import "../StakerBlueprint.sol";
+import "hardhat/console.sol";
 
 /**
  * @title An asset staking contract.
@@ -346,8 +347,8 @@ contract StakerV3FacetStaking is
                 _pool.tokensPerShare) / 1e12) - _user.tokenPaid;
             uint256 pendingPoints = ((_user.pointBoostedAmount *
                 _pool.pointsPerShare) / 1e30) - _user.pointPaid;
-            _user.tokenRewards += pendingTokens / 1000;
-            _user.pointRewards += pendingPoints / 1000;
+            _user.tokenRewards += pendingTokens;
+            _user.pointRewards += pendingPoints;
             b.totalTokenDisbursed += pendingTokens;
             _pool.tokenBoostedDeposit -= _user.tokenBoostedAmount;
             _pool.pointBoostedDeposit -= _user.pointBoostedAmount;
@@ -495,23 +496,22 @@ contract StakerV3FacetStaking is
             }
 
             typeOfAsset = pool.typeOfAsset;
-            StakerBlueprint.UserInfo storage user = b.userInfoV3[_poolId][
-                msg.sender
-            ];
             uint256 amount;
 
             uint256 assetLength = _asset.amounts.length;
             uint256[] memory IOUTokenIdToMint = new uint256[](assetLength);
             uint256 IOUTokenCounter = b.nextIOUTokenId;
-            uint256[] memory IOUTokenId;
             for (uint256 i; i < assetLength; i++) {
                 amount += _asset.amounts[i];
-                b.IOUIdToStakedAsset[IOUTokenCounter].assetAddress = _asset
-                    .assetAddress;
-                b.IOUIdToStakedAsset[IOUTokenCounter].amounts.push(
+                b
+                .IOUIdToStakedAsset[_poolId][IOUTokenCounter]
+                    .assetAddress = _asset.assetAddress;
+                b.IOUIdToStakedAsset[_poolId][IOUTokenCounter].amounts.push(
                     _asset.amounts[i]
                 );
-                b.IOUIdToStakedAsset[IOUTokenCounter].id.push(_asset.id[i]);
+                b.IOUIdToStakedAsset[_poolId][IOUTokenCounter].id.push(
+                    _asset.id[i]
+                );
                 IOUTokenIdToMint[i] = IOUTokenCounter;
                 IOUTokenCounter++;
             }
@@ -609,15 +609,15 @@ contract StakerV3FacetStaking is
 
             emit UnstakeItemBatch(msg.sender, _poolId, _boosterId);
         } else {
-            StakerBlueprint.UserInfo storage user = b.userInfoV3[_poolId][
-                msg.sender
-            ];
+            // StakerBlueprint.UserInfo storage user = b.userInfoV3[_poolId][
+            //     msg.sender
+            // ];
             StakerBlueprint.PoolInfo storage pool = b.poolInfoV3[_poolId];
             uint256 amount;
             for (uint256 i; i < _asset.amounts.length; i++) {
                 amount += _asset.amounts[i];
             }
-            if (user.amount / 1000 < amount) {
+            if (b.userInfoV3[_poolId][msg.sender].amount / 1000 < amount) {
                 revert InvalidAmount();
             }
 
@@ -634,12 +634,13 @@ contract StakerV3FacetStaking is
             uint256[] memory _ids = new uint256[](_asset.IOUTokenId.length);
             uint256[] memory _amounts = new uint256[](_ids.length);
             for (uint256 i; i < _ids.length; i++) {
-                if (
-                    b.IOUIdToStakedAsset[_asset.IOUTokenId[i]].assetAddress !=
-                    assetAddress
-                ) {
-                    revert IOUTokenFromDifferentPool();
-                }
+                // if (
+                //     b
+                //     .IOUIdToStakedAsset[_poolId][_asset.IOUTokenId[i]]
+                //         .assetAddress != assetAddress
+                // ) {
+                //     revert IOUTokenFromDifferentPool();
+                // }
                 if (
                     ISuperGeneric(b.IOUTokenAddress).ownerOf(
                         _asset.IOUTokenId[i]
@@ -647,10 +648,18 @@ contract StakerV3FacetStaking is
                 ) {
                     revert NotAnOwnerOfIOUToken();
                 }
-                _ids[i] = b.IOUIdToStakedAsset[_asset.IOUTokenId[i]].id[0];
+                if (
+                    b
+                        .IOUIdToStakedAsset[_poolId][_asset.IOUTokenId[i]]
+                        .id
+                        .length == 0
+                ) {
+                    revert IOUTokenFromDifferentPool();
+                }
+                _ids[i] = b
+                .IOUIdToStakedAsset[_poolId][_asset.IOUTokenId[i]].id[0];
                 _amounts[i] = b
-                    .IOUIdToStakedAsset[_asset.IOUTokenId[i]]
-                    .amounts[0];
+                .IOUIdToStakedAsset[_poolId][_asset.IOUTokenId[i]].amounts[0];
             }
             ids = _ids;
             amounts = _amounts;
@@ -794,17 +803,15 @@ contract StakerV3FacetStaking is
                 ((user.pointBoostedAmount * pool.pointsPerShare) / 1e30) -
                 user.pointPaid;
             b.totalTokenDisbursed = b.totalTokenDisbursed + pendingTokens;
-            _tokenRewards = user.tokenRewards + pendingTokens / 1000;
-            _pointRewards = user.pointRewards + pendingPoints / 1000;
+            _tokenRewards = user.tokenRewards + pendingTokens;
+            _pointRewards = user.pointRewards + pendingPoints;
             IERC20(b.token).safeTransfer(msg.sender, _tokenRewards);
             b.userPoints[msg.sender] = b.userPoints[msg.sender] + _pointRewards;
 
-            user.tokenPaid =
-                ((user.tokenBoostedAmount * pool.tokensPerShare) / 1e12) /
-                1000;
-            user.pointPaid =
-                ((user.pointBoostedAmount * pool.pointsPerShare) / 1e30) /
-                1000;
+            user.tokenPaid = ((user.tokenBoostedAmount * pool.tokensPerShare) /
+                1e12);
+            user.pointPaid = ((user.pointBoostedAmount * pool.pointsPerShare) /
+                1e30);
         } else {
             IERC20(b.token).safeTransfer(msg.sender, user.tokenRewards);
         }
