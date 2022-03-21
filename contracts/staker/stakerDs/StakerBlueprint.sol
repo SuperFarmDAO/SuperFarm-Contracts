@@ -90,6 +90,9 @@ library StakerBlueprint {
      * @param hashes Signature hashes created for claim function.
      * @param itemUserInfo Collection of Item stakers.
      * @param totalItemStakes Items staked in this contract.
+     * @param IOUIdToStakedAsset Mapping that matches pool id => IOU token id => staked assets.
+     * @param poolTokens Array for enumeration of the pools.
+     * @param name Name of the staker.
      */
     struct StakerStateVariables {
         address admin;
@@ -125,7 +128,7 @@ library StakerBlueprint {
         mapping(bytes32 => bool) hashes;
         mapping(address => ItemUserInfo) itemUserInfo;
         uint256 totalItemStakes;
-        mapping(uint256 => StakedAsset) IOUIdToStakedAsset;
+        mapping(uint256 => mapping(uint256 => StakedAsset)) IOUIdToStakedAsset;
         IERC20[] poolTokens;
         string name;
     }
@@ -143,6 +146,8 @@ library StakerBlueprint {
 
     /**
      * A struct containing the pool info.
+     * @param assetAddress address of asset that should be staked into the pool.
+     * @param typeOfAsset type of asset that is represented in pool.
      * @param tokenStrength the relative token emission strength of this pool.
      * @param tokenBoostedDeposit amount of tokens after boosts are applied.
      * @param tokensPerShare accumulated tokens per share times 1e12.
@@ -150,7 +155,6 @@ library StakerBlueprint {
      * @param pointBoostedDeposit amount of points after boosts are applied.
      * @param pointsPerShare accumulated points per share times 1e12.
      * @param lastRewardEvent record of the time of the last disbursement.
-     * @param assetAddress address of asset that should be staked into the pool.
      * @param boostInfo boosters applied to the pool rewards when eligible. !Must start with 1!
      *
      * 'tokenBoostedDeposit' and 'pointBoostedDeposit' do not change emission
@@ -171,6 +175,15 @@ library StakerBlueprint {
 
     /**
      * An auxiliary structure that is used to create or configure an existing pool
+     * @param id id of the generated boost.
+     * @param tokenStrength the relative token emission strength of this pool.
+     * @param pointStrength the relative point emission strength of this pool.
+     * @param groupId id of the group of tokens that should be staked in this pool.
+     * @param tokensPerShare accumulated tokens per share times 1e12.
+     * @param pointsPerShare accumulated points per share times 1e12.
+     * @param boostInfo boosters applied to the pool rewards when eligible. !Must start with 1!
+     * @param assetAddress address of asset that should be staked into the pool.
+     * @param typeOfAsset type of asset that is represented in pool.
      */
     struct AddPoolStruct {
         uint256 id;
@@ -186,6 +199,9 @@ library StakerBlueprint {
 
     /**
      * A struct which represents the V, R, S variables of a signature.
+     * @param v v part of signature.
+     * @param r r part of signature.
+     * @param s s part of signature.
      */
     struct Sig {
         uint8 v;
@@ -243,9 +259,9 @@ library StakerBlueprint {
 
     /**
      * The type of asset that available to stake in.
-     * @param ERC20
-     * @param ERC721
-     * @param ERC1155
+     * @param ERC20 represents ERC20 token.
+     * @param ERC721 represents ERC721 token.
+     * @param ERC1155 represents ERC1155 token.
      */
     enum PoolAssetType {
         ERC20,
@@ -262,6 +278,7 @@ library StakerBlueprint {
      *   as requirement for the boost. If 0, then any group or item.
      * @param contractRequired contract that the required assets belong to.
      * @param assetType enum that specifies Tokens/Points to boost or both.
+     * @param typeOfAsset type of asset that is represented in booster for stake.
      */
     struct BoostInfo {
         uint256 multiplier;
