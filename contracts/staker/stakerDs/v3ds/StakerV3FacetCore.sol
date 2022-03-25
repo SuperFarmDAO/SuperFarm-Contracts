@@ -374,6 +374,14 @@ contract StakerV3FacetCore is
                 .boostInfo;
             b.poolInfoV3[_addPoolStruct.id].typeOfAsset = _addPoolStruct
                 .typeOfAsset;
+            b.poolInfoV3[_addPoolStruct.id].lockPeriod = _addPoolStruct
+                .lockPeriod;
+            b.poolInfoV3[_addPoolStruct.id].lockAmount = _addPoolStruct
+                .lockAmount;
+            b.poolInfoV3[_addPoolStruct.id].lockMultiplier = _addPoolStruct
+                .lockMultiplier;
+            b.poolInfoV3[_addPoolStruct.id].typeOfBoost = _addPoolStruct
+                .typeOfBoost;
         } else {
             b.totalTokenStrength =
                 (b.totalTokenStrength -
@@ -387,6 +395,15 @@ contract StakerV3FacetCore is
                 _addPoolStruct.pointStrength;
             b.poolInfoV3[_addPoolStruct.id].pointStrength = _addPoolStruct
                 .pointStrength;
+
+            b.poolInfoV3[_addPoolStruct.id].lockPeriod = _addPoolStruct
+                .lockPeriod;
+            b.poolInfoV3[_addPoolStruct.id].lockAmount = _addPoolStruct
+                .lockAmount;
+            b.poolInfoV3[_addPoolStruct.id].lockMultiplier = _addPoolStruct
+                .lockMultiplier;
+            b.poolInfoV3[_addPoolStruct.id].typeOfBoost = _addPoolStruct
+                .typeOfBoost;
 
             // Append boosters by avoid writing to storage directly in a loop to avoid costs
             uint256[] memory boosters = new uint256[](

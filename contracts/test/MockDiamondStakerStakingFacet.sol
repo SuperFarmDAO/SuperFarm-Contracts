@@ -252,7 +252,8 @@ contract TestStakerV3FacetStaking is
     function deposit(
         uint256 _poolId,
         uint256 _boosterId,
-        StakerBlueprint.StakedAsset memory _asset
+        StakerBlueprint.StakedAsset memory _asset,
+        bool isLocking
     ) external returns (bytes memory) {
         return msg.data;
     }
