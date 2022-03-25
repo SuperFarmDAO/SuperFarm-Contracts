@@ -50,6 +50,9 @@ contract StakerV3FacetStaking is
     error MismatchArgumentsAndHash();
     error HashUsed();
     error NotApprovedPointSpender();
+    error InvalidAmountToLock();
+    error TokensAlreadyLocked();
+    error TokenLocked();
 
     /// Event for depositing NonFungible assets.
     event Deposit(
@@ -97,6 +100,16 @@ contract StakerV3FacetStaking is
         address indexed user,
         uint256 amount
     );
+
+    /// An event for tracking when user locking tokens on pool
+    event TokenLock(
+        address indexed user,
+        uint256 indexed poolId,
+        uint256 lockedAt
+    );
+
+    /// An event for tracking when user locking tokens on pool
+    event TokenUnlock(address indexed user, uint256 indexed poolId);
 
     /**
      * Uses the emission schedule to calculate the total amount of staking reward
@@ -288,23 +301,110 @@ contract StakerV3FacetStaking is
         }
 
         // Calculate token and point rewards for this pool.
-        uint256 totalEmittedTokens = getTotalEmittedTokens(
-            pool.lastRewardEvent,
-            block.timestamp
-        );
-        uint256 tokensReward = ((totalEmittedTokens * pool.tokenStrength) /
-            b.totalTokenStrength) * 1e12;
+        uint256 tokensReward;
+        uint256 pointsReward;
 
-        uint256 totalEmittedPoints = getTotalEmittedPoints(
-            pool.lastRewardEvent,
-            block.timestamp
-        );
-        uint256 pointsReward = ((totalEmittedPoints * pool.pointStrength) /
-            b.totalPointStrength) * 1e30;
+        if (b.poolLocks[_poolId].length > b.lockIndex) {
+            for (
+                uint256 i = b.lockIndex;
+                i < b.poolLocks[_poolId].length;
+                i++
+            ) {
+                if (
+                    b.poolLocks[_poolId][i].lockedAt + pool.lockPeriod <
+                    block.timestamp
+                ) {
+                    StakerBlueprint.UserInfo storage _user = b.userInfoV3[
+                        _poolId
+                    ][b.poolLocks[_poolId][i].lockedUser];
+                    StakerBlueprint.ItemUserInfo storage staker = b
+                        .itemUserInfo[b.poolLocks[_poolId][i].lockedUser];
+                    // clearing data for outdated locks
+                    staker.lockedItems[_poolId].lockedIOUIds = new uint256[](0);
+                    delete staker.lockedItems[_poolId].lockedAt;
+                    // calculating rewards for staker that has unlock his tokens
+
+                    tokensReward =
+                        ((getTotalEmittedTokens(
+                            pool.lastRewardEvent,
+                            b.poolLocks[_poolId][i].lockedAt + pool.lockPeriod
+                        ) * pool.tokenStrength) / b.totalTokenStrength) *
+                        1e12;
+
+                    pointsReward =
+                        ((getTotalEmittedPoints(
+                            pool.lastRewardEvent,
+                            b.poolLocks[_poolId][i].lockedAt + pool.lockPeriod
+                        ) * pool.pointStrength) / b.totalPointStrength) *
+                        1e30;
+
+                    pool.tokensPerShare += (tokensReward /
+                        pool.tokenBoostedDeposit);
+                    pool.pointsPerShare += (pointsReward /
+                        pool.pointBoostedDeposit);
+                    pool.lastRewardEvent =
+                        b.poolLocks[_poolId][i].lockedAt +
+                        pool.lockPeriod;
+
+                    delete b.poolLocks[_poolId][i];
+                    emit TokenUnlock(
+                        b.poolLocks[_poolId][i].lockedUser,
+                        _poolId
+                    );
+                    b.lockIndex = i + 1;
+                    // = b.poolLocks[_poolId][
+                    //     b.poolLocks[_poolId].length - 1
+                    // ];
+                    // b.poolLocks[_poolId].pop();
+
+                    _user.tokenRewards +=
+                        (_user.tokenBoostedAmount * (pool.tokensPerShare)) /
+                        1e12 -
+                        _user.tokenPaid;
+                    _user.pointRewards +=
+                        (_user.pointBoostedAmount * (pool.pointsPerShare)) /
+                        1e30 -
+                        _user.pointPaid;
+                    b.totalTokenDisbursed +=
+                        (_user.tokenBoostedAmount * (pool.tokensPerShare)) /
+                        1e12 -
+                        _user.tokenPaid;
+
+                    // calculating totalStaked amount after unlock
+                    pool.tokenBoostedDeposit -= _user.tokenBoostedAmount;
+                    pool.pointBoostedDeposit -= _user.pointBoostedAmount;
+                    (
+                        _user.tokenBoostedAmount,
+                        _user.pointBoostedAmount
+                    ) = applyBoosts(_user.amount, _poolId);
+                    pool.tokenBoostedDeposit += _user.tokenBoostedAmount;
+                    pool.pointBoostedDeposit += _user.pointBoostedAmount;
+
+                    _user.tokenPaid =
+                        (_user.tokenBoostedAmount * (pool.tokensPerShare)) /
+                        1e12;
+                    _user.pointPaid =
+                        (_user.pointBoostedAmount * (pool.pointsPerShare)) /
+                        1e30;
+                }
+                if (i == 0) {
+                    break;
+                }
+            }
+        }
+
+        tokensReward =
+            ((getTotalEmittedTokens(pool.lastRewardEvent, block.timestamp) *
+                pool.tokenStrength) / b.totalTokenStrength) *
+            1e12;
+
+        pointsReward =
+            ((getTotalEmittedPoints(pool.lastRewardEvent, block.timestamp) *
+                pool.pointStrength) / b.totalPointStrength) *
+            1e30;
 
         // Directly pay developers their corresponding share of tokens and points.
-        uint256 developerAddressLength = b.developerAddresses.length();
-        for (uint256 i; i < developerAddressLength; i++) {
+        for (uint256 i; i < b.developerAddresses.length(); i++) {
             address developer = b.developerAddresses.at(i);
             uint256 share = b.developerShares[developer];
             uint256 devTokens = (tokensReward * share) / 100000;
@@ -316,10 +416,8 @@ contract StakerV3FacetStaking is
         }
 
         // Update the pool rewards per share to pay users the amount remaining.
-        pool.tokensPerShare += (tokensReward /
-            b.poolInfoV3[_poolId].tokenBoostedDeposit);
-        pool.pointsPerShare += (pointsReward /
-            b.poolInfoV3[_poolId].pointBoostedDeposit);
+        pool.tokensPerShare += (tokensReward / pool.tokenBoostedDeposit);
+        pool.pointsPerShare += (pointsReward / pool.pointBoostedDeposit);
         pool.lastRewardEvent = block.timestamp;
     }
 
@@ -342,6 +440,7 @@ contract StakerV3FacetStaking is
         StakerBlueprint.UserInfo storage _user = b.userInfoV3[_poolId][
             msg.sender
         ];
+
         if (_user.amount > 0) {
             uint256 pendingTokens = ((_user.tokenBoostedAmount *
                 _pool.tokensPerShare) / 1e12) - _user.tokenPaid;
@@ -400,10 +499,12 @@ contract StakerV3FacetStaking is
 
         if (_unboosted == 0) {
             return (0, 0);
-        } else if (pool.boostInfo.length == 0) {
-            return (_unboosted, _unboosted);
-        } else if (staker.boosterIds.length() == 0) {
-            return (_unboosted, _unboosted);
+        } else if (staker.lockedItems[_poolId].lockedIOUIds.length == 0) {
+            if (pool.boostInfo.length == 0) {
+                return (_unboosted, _unboosted);
+            } else if (staker.boosterIds.length() == 0) {
+                return (_unboosted, _unboosted);
+            }
         }
 
         _boostedTokens = _unboosted;
@@ -429,6 +530,19 @@ contract StakerV3FacetStaking is
                 }
             }
         }
+
+        if (staker.lockedItems[_poolId].lockedIOUIds.length != 0) {
+            if (pool.typeOfBoost == StakerBlueprint.BoosterAssetType.Tokens) {
+                _boostedTokens += (_unboosted * pool.lockMultiplier) / 10000;
+            } else if (
+                pool.typeOfBoost == StakerBlueprint.BoosterAssetType.Points
+            ) {
+                _boostedPoints += (_unboosted * pool.lockMultiplier) / 10000;
+            } else {
+                _boostedTokens += (_unboosted * pool.lockMultiplier) / 10000;
+                _boostedPoints += (_unboosted * pool.lockMultiplier) / 10000;
+            }
+        }
     }
 
     /**
@@ -440,7 +554,8 @@ contract StakerV3FacetStaking is
     function deposit(
         uint256 _poolId,
         uint256 _boosterId,
-        StakerBlueprint.StakedAsset memory _asset
+        StakerBlueprint.StakedAsset memory _asset,
+        bool isLocking
     ) external {
         StakerBlueprint.StakerStateVariables storage b = StakerBlueprint
             .stakerStateVariables();
@@ -498,10 +613,11 @@ contract StakerV3FacetStaking is
             typeOfAsset = pool.typeOfAsset;
             uint256 amount;
 
-            uint256 assetLength = _asset.amounts.length;
-            uint256[] memory IOUTokenIdToMint = new uint256[](assetLength);
+            uint256[] memory IOUTokenIdsToMint = new uint256[](
+                _asset.amounts.length
+            );
             uint256 IOUTokenCounter = b.nextIOUTokenId;
-            for (uint256 i; i < assetLength; i++) {
+            for (uint256 i; i < _asset.amounts.length; i++) {
                 amount += _asset.amounts[i];
                 b
                 .IOUIdToStakedAsset[_poolId][IOUTokenCounter]
@@ -512,7 +628,7 @@ contract StakerV3FacetStaking is
                 b.IOUIdToStakedAsset[_poolId][IOUTokenCounter].id.push(
                     _asset.id[i]
                 );
-                IOUTokenIdToMint[i] = IOUTokenCounter;
+                IOUTokenIdsToMint[i] = IOUTokenCounter;
                 IOUTokenCounter++;
             }
 
@@ -520,11 +636,38 @@ contract StakerV3FacetStaking is
 
             ISuperGeneric(b.IOUTokenAddress).mintBatch(
                 msg.sender,
-                IOUTokenIdToMint,
+                IOUTokenIdsToMint,
                 ""
             );
             updatePool(_poolId);
+
+            if (isLocking) {
+                StakerBlueprint.ItemUserInfo storage staker = b.itemUserInfo[
+                    msg.sender
+                ];
+                if (amount != pool.lockAmount) {
+                    revert InvalidAmountToLock();
+                }
+                if (staker.lockedItems[_poolId].lockedIOUIds.length != 0) {
+                    revert TokensAlreadyLocked();
+                }
+                staker.lockedItems[_poolId].lockedAt = block.timestamp;
+                staker.lockedItems[_poolId].lockedIOUIds = IOUTokenIdsToMint;
+                // for (uint256 i; i < _asset.id.length; i++) {
+                //     staker.lockedItems[_poolId].lockedAt = block.timestamp;
+                //     staker.lockedItems[_poolId].lockedIOUId = IOUTokenIdsToMint;
+                //     staker.lockedItems[_poolId].lockedIds.add(_asset.id[i]);
+                //     staker.lockedItems[_poolId].lockedAmounts[i] = _asset
+                //         .amount[i];
+                // }
+                b.poolLocks[_poolId].push(
+                    StakerBlueprint.PoolLocks(block.timestamp, msg.sender)
+                );
+                emit TokenLock(msg.sender, _poolId, block.timestamp);
+            }
+
             updateDeposits(amount, _poolId, true);
+
             emit Deposit(
                 msg.sender,
                 _poolId,
@@ -557,6 +700,8 @@ contract StakerV3FacetStaking is
         }
     }
 
+    //TODO: think about trading IOUtokens while deopsit locked.
+
     /**
      * Withdraw some particular assets from a particular pool on the Staker.
      * @param _poolId the id of pool, withdraw tokens from.
@@ -574,14 +719,15 @@ contract StakerV3FacetStaking is
         uint256[] memory ids;
         uint256[] memory amounts;
         StakerBlueprint.PoolAssetType typeOfAsset;
+
+        StakerBlueprint.ItemUserInfo storage staker = b.itemUserInfo[
+            msg.sender
+        ];
+
         if (_boosterId > 0) {
             if (!b.itemUserInfo[msg.sender].boosterIds.contains(_boosterId)) {
                 revert NotStaked();
             }
-
-            StakerBlueprint.ItemUserInfo storage staker = b.itemUserInfo[
-                msg.sender
-            ];
 
             uint256[] memory _ids = new uint256[](
                 staker.tokenIds[_boosterId].length()
@@ -612,7 +758,6 @@ contract StakerV3FacetStaking is
             // StakerBlueprint.UserInfo storage user = b.userInfoV3[_poolId][
             //     msg.sender
             // ];
-            StakerBlueprint.PoolInfo storage pool = b.poolInfoV3[_poolId];
             uint256 amount;
             for (uint256 i; i < _asset.amounts.length; i++) {
                 amount += _asset.amounts[i];
@@ -628,7 +773,7 @@ contract StakerV3FacetStaking is
             //     ISuperGeneric(b.IOUTokenAddress).balanceOf(msg.sender) > 0,
             //     "0x2E"
             // );
-            assetAddress = pool.assetAddress;
+            assetAddress = b.poolInfoV3[_poolId].assetAddress;
 
             ids = new uint256[](_asset.IOUTokenId.length);
             uint256[] memory _ids = new uint256[](_asset.IOUTokenId.length);
@@ -663,13 +808,26 @@ contract StakerV3FacetStaking is
             }
             ids = _ids;
             amounts = _amounts;
-            typeOfAsset = pool.typeOfAsset;
+            typeOfAsset = b.poolInfoV3[_poolId].typeOfAsset;
 
             ISuperGeneric(b.IOUTokenAddress).burnBatch(
                 msg.sender,
                 _asset.IOUTokenId
             );
             updatePool(_poolId);
+
+            if (staker.lockedItems[_poolId].lockedIOUIds.length != 0) {
+                uint256[] memory _lockedIOUIds = staker
+                    .lockedItems[_poolId]
+                    .lockedIOUIds;
+                for (uint256 j; j < _lockedIOUIds.length; j++) {
+                    for (uint256 i; i < _asset.IOUTokenId.length; i++) {
+                        if (_asset.IOUTokenId[i] == _lockedIOUIds[j]) {
+                            revert TokenLocked();
+                        }
+                    }
+                }
+            }
             updateDeposits(amount, _poolId, false);
 
             emit Withdraw(msg.sender, _poolId, amounts, ids, assetAddress);

@@ -233,12 +233,10 @@ contract StakerV2FacetCore is Sweepableds, ReentrancyGuard {
      * Allows the contract owner to add a new asset pool to the Staker or overwrite
      * an existing one.
      */
-    function addPool(
-        IERC20 _token,
-        uint256 _tokenStrength,
-        uint256 _pointStrength,
-        uint256[] calldata _boostInfo
-    ) external hasValidPermit(UNIVERSAL, StakerBlueprint.ADD_POOL) {
+    function addPool(StakerBlueprint.AddPoolStruct memory _addPoolStruct)
+        external
+        hasValidPermit(UNIVERSAL, StakerBlueprint.ADD_POOL)
+    {
         StakerBlueprint.StakerStateVariables storage b = StakerBlueprint
             .stakerStateVariables();
 
@@ -246,8 +244,12 @@ contract StakerV2FacetCore is Sweepableds, ReentrancyGuard {
             b.tokenEmissionEventsCount > 0 && b.pointEmissionEventsCount > 0,
             "0x1D"
         );
-        require(address(_token) != b.token, "0x2D");
-        require(_tokenStrength > 0 && _pointStrength > 0, "0x3D");
+        require(_addPoolStruct.assetAddress != b.token, "0x2D");
+        require(
+            _addPoolStruct.tokenStrength > 0 &&
+                _addPoolStruct.pointStrength > 0,
+            "0x3D"
+        );
 
         uint256 lastTokenRewardEvent = block.timestamp >
             b.earliestTokenEmissionEvent
@@ -260,42 +262,59 @@ contract StakerV2FacetCore is Sweepableds, ReentrancyGuard {
         uint256 lastRewardEvent = lastTokenRewardEvent > lastPointRewardEvent
             ? lastTokenRewardEvent
             : lastPointRewardEvent;
+        IERC20 _token = IERC20(_addPoolStruct.assetAddress);
         if (address(b.poolInfo[_token].assetAddress) == address(0)) {
             b.poolTokens.push(_token);
-            b.totalTokenStrength = b.totalTokenStrength + _tokenStrength;
-            b.totalPointStrength = b.totalPointStrength + _pointStrength;
-            b.poolInfo[_token] = StakerBlueprint.PoolInfo({
-                typeOfAsset: StakerBlueprint.PoolAssetType.ERC20,
-                assetAddress: address(_token),
-                tokenStrength: _tokenStrength,
-                tokenBoostedDeposit: 0,
-                tokensPerShare: 0,
-                pointStrength: _pointStrength,
-                pointBoostedDeposit: 0,
-                pointsPerShare: 0,
-                lastRewardEvent: lastRewardEvent,
-                boostInfo: _boostInfo
-            });
+            b.totalTokenStrength =
+                b.totalTokenStrength +
+                _addPoolStruct.tokenStrength;
+            b.totalPointStrength =
+                b.totalPointStrength +
+                _addPoolStruct.pointStrength;
+
+            b.poolInfo[_token].assetAddress = _addPoolStruct.assetAddress;
+            b.poolInfo[_token].tokenStrength = _addPoolStruct.tokenStrength;
+            b.poolInfo[_token].tokenBoostedDeposit = 0;
+            b.poolInfo[_token].tokensPerShare = 0;
+            b.poolInfo[_token].pointStrength = _addPoolStruct.pointStrength;
+            b.poolInfo[_token].pointBoostedDeposit = 0;
+            b.poolInfo[_token].pointsPerShare = 0;
+            b.poolInfo[_token].lastRewardEvent = lastRewardEvent;
+            b.poolInfo[_token].boostInfo = _addPoolStruct.boostInfo;
+            b.poolInfo[_token].typeOfAsset = StakerBlueprint
+                .PoolAssetType
+                .ERC20;
+            b.poolInfo[_token].lockPeriod = _addPoolStruct.lockPeriod;
+            b.poolInfo[_token].lockAmount = _addPoolStruct.lockAmount;
+            b.poolInfo[_token].lockMultiplier = _addPoolStruct.lockMultiplier;
+            b.poolInfo[_token].typeOfBoost = _addPoolStruct.typeOfBoost;
         } else {
             StakerBlueprint.PoolInfo storage pool = b.poolInfo[_token];
             b.totalTokenStrength =
                 (b.totalTokenStrength - pool.tokenStrength) +
-                _tokenStrength;
-            pool.tokenStrength = _tokenStrength;
+                _addPoolStruct.tokenStrength;
+            pool.tokenStrength = _addPoolStruct.tokenStrength;
             b.totalPointStrength =
                 (b.totalPointStrength - pool.pointStrength) +
-                _pointStrength;
-            pool.pointStrength = _pointStrength;
+                _addPoolStruct.pointStrength;
+            pool.pointStrength = _addPoolStruct.pointStrength;
+
+            b.poolInfo[_token].lockPeriod = _addPoolStruct.lockPeriod;
+            b.poolInfo[_token].lockAmount = _addPoolStruct.lockAmount;
+            b.poolInfo[_token].lockMultiplier = _addPoolStruct.lockMultiplier;
+            b.poolInfo[_token].typeOfBoost = _addPoolStruct.typeOfBoost;
 
             // Append boosters by avoid writing to storage directly in a loop to avoid costs
             uint256[] memory boosters = new uint256[](
-                pool.boostInfo.length + _boostInfo.length
+                pool.boostInfo.length + _addPoolStruct.boostInfo.length
             );
             for (uint256 i; i < pool.boostInfo.length; i++) {
                 boosters[i] = pool.boostInfo[i];
             }
-            for (uint256 i; i < _boostInfo.length; i++) {
-                boosters[i + pool.boostInfo.length] = _boostInfo[i];
+            for (uint256 i; i < _addPoolStruct.boostInfo.length; i++) {
+                boosters[i + pool.boostInfo.length] = _addPoolStruct.boostInfo[
+                    i
+                ];
             }
             pool.boostInfo = boosters; // Appended boosters
         }

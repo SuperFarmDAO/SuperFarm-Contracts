@@ -131,8 +131,15 @@ library StakerBlueprint {
         mapping(uint256 => mapping(uint256 => StakedAsset)) IOUIdToStakedAsset;
         IERC20[] poolTokens;
         string name;
+        mapping(uint256 => uint256) lockedBoosted;
+        mapping(uint256 => PoolLocks[]) poolLocks;
+        uint256 lockIndex;
     }
 
+    struct PoolLocks {
+        uint256 lockedAt;
+        address lockedUser;
+    }
     /**
      * This emission schedule maps a timestamp to the amount of tokens or points
      * that should be disbursed starting at that timestamp per-second onwards.
@@ -162,7 +169,6 @@ library StakerBlueprint {
      */
     struct PoolInfo {
         address assetAddress;
-        PoolAssetType typeOfAsset;
         uint256 tokenStrength;
         uint256 tokenBoostedDeposit;
         uint256 tokensPerShare;
@@ -171,6 +177,11 @@ library StakerBlueprint {
         uint256 pointsPerShare;
         uint256 lastRewardEvent;
         uint256[] boostInfo;
+        uint256 lockPeriod;
+        uint256 lockAmount;
+        uint256 lockMultiplier;
+        PoolAssetType typeOfAsset;
+        BoosterAssetType typeOfBoost;
     }
 
     /**
@@ -193,8 +204,12 @@ library StakerBlueprint {
         uint256 tokensPerShare;
         uint256 pointsPerShare;
         uint256[] boostInfo;
+        uint256 lockPeriod;
+        uint256 lockAmount;
+        uint256 lockMultiplier;
         address assetAddress;
         PoolAssetType typeOfAsset;
+        BoosterAssetType typeOfBoost;
     }
 
     /**
@@ -317,6 +332,12 @@ library StakerBlueprint {
         mapping(uint256 => EnumerableSet.UintSet) tokenIds;
         mapping(uint256 => uint256) amounts;
         EnumerableSet.UintSet boosterIds;
+        mapping(uint256 => LockedItems) lockedItems;
+    }
+
+    struct LockedItems {
+        uint256 lockedAt;
+        uint256[] lockedIOUIds;
     }
 
     /**
