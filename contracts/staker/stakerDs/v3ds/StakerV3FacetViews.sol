@@ -1,11 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8.7;
 
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
-import "@openzeppelin/contracts/token/ERC1155/utils/ERC1155Holder.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
 import "../../../base/Sweepableds.sol";
@@ -26,12 +23,7 @@ import "../StakerBlueprint.sol";
  * This code is inspired by and modified from Sushi's Master Chef contract.
  * https://github.com/sushiswap/sushiswap/blob/master/contracts/MasterChef.sol
  */
-contract StakerV3FacetViews is
-    Sweepableds,
-    ReentrancyGuard,
-    ERC1155Holder,
-    IERC721Receiver
-{
+contract StakerV3FacetViews is Sweepableds {
     using SafeERC20 for IERC20;
     using EnumerableSet for EnumerableSet.UintSet;
     using EnumerableSet for EnumerableSet.AddressSet;
@@ -139,12 +131,12 @@ contract StakerV3FacetViews is
         _boostInfo = b.boostInfo[id];
     }
 
-    function onERC721Received(
-        address operator,
-        address from,
-        uint256 tokenId,
-        bytes calldata data
-    ) external override returns (bytes4) {
-        return this.onERC721Received.selector;
-    }
+    // function onERC721Received(
+    //     address operator,
+    //     address from,
+    //     uint256 tokenId,
+    //     bytes calldata data
+    // ) external override returns (bytes4) {
+    //     return this.onERC721Received.selector;
+    // }
 }

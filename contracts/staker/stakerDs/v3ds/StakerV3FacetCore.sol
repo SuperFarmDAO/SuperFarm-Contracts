@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8.7;
 
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@openzeppelin/contracts/token/ERC1155/IERC1155.sol";
@@ -28,12 +27,7 @@ import "../StakerBlueprint.sol";
  * This code is inspired by and modified from Sushi's Master Chef contract.
  * https://github.com/sushiswap/sushiswap/blob/master/contracts/MasterChef.sol
  */
-contract StakerV3FacetCore is
-    Sweepableds,
-    ReentrancyGuard,
-    ERC1155Holder,
-    IERC721Receiver
-{
+contract StakerV3FacetCore is Sweepableds, ERC1155Holder, IERC721Receiver {
     using SafeERC20 for IERC20;
     using EnumerableSet for EnumerableSet.UintSet;
     using EnumerableSet for EnumerableSet.AddressSet;
@@ -380,6 +374,14 @@ contract StakerV3FacetCore is
                 .lockAmount;
             b.poolInfoV3[_addPoolStruct.id].lockMultiplier = _addPoolStruct
                 .lockMultiplier;
+            b
+                .poolInfoV3[_addPoolStruct.id]
+                .compoundInterestTreshold = _addPoolStruct
+                .compoundInterestTreshold;
+            b
+                .poolInfoV3[_addPoolStruct.id]
+                .compoundInterestMultiplier = _addPoolStruct
+                .compoundInterestMultiplier;
             b.poolInfoV3[_addPoolStruct.id].typeOfBoost = _addPoolStruct
                 .typeOfBoost;
         } else {
@@ -402,6 +404,14 @@ contract StakerV3FacetCore is
                 .lockAmount;
             b.poolInfoV3[_addPoolStruct.id].lockMultiplier = _addPoolStruct
                 .lockMultiplier;
+            b
+                .poolInfoV3[_addPoolStruct.id]
+                .compoundInterestTreshold = _addPoolStruct
+                .compoundInterestTreshold;
+            b
+                .poolInfoV3[_addPoolStruct.id]
+                .compoundInterestMultiplier = _addPoolStruct
+                .compoundInterestMultiplier;
             b.poolInfoV3[_addPoolStruct.id].typeOfBoost = _addPoolStruct
                 .typeOfBoost;
 

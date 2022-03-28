@@ -1224,6 +1224,8 @@ describe("===Stakerv3ds===", function () {
           groupId: 0,
           tokensPerShare: 0,
           pointsPerShare: 0,
+          compoundInterestTreshold: ethers.utils.parseEther("1000"),
+          compoundInterestMultiplier: 5000,
           boostInfo: [1, 2],
           assetAddress: super721.address,
           typeOfAsset: 1,
@@ -1273,6 +1275,8 @@ describe("===Stakerv3ds===", function () {
           groupId: 0,
           tokensPerShare: 0,
           pointsPerShare: 0,
+          compoundInterestTreshold: ethers.utils.parseEther("1000"),
+          compoundInterestMultiplier: 5000,
           boostInfo: [1, 2],
           assetAddress: rewardToken.address,
           typeOfAsset: 1,
@@ -1322,6 +1326,8 @@ describe("===Stakerv3ds===", function () {
           groupId: 0,
           tokensPerShare: 0,
           pointsPerShare: 0,
+          compoundInterestTreshold: ethers.utils.parseEther("1000"),
+          compoundInterestMultiplier: 5000,
           boostInfo: [1, 2],
           assetAddress: super1155.address,
           typeOfAsset: 1,
@@ -1347,6 +1353,8 @@ describe("===Stakerv3ds===", function () {
           groupId: 0,
           tokensPerShare: 0,
           pointsPerShare: 0,
+          compoundInterestTreshold: ethers.utils.parseEther("1000"),
+          compoundInterestMultiplier: 5000,
           boostInfo: [1, 2],
           assetAddress: super721.address,
           typeOfAsset: 2,
@@ -1396,6 +1404,8 @@ describe("===Stakerv3ds===", function () {
           groupId: 0,
           tokensPerShare: 0,
           pointsPerShare: 0,
+          compoundInterestTreshold: ethers.utils.parseEther("1000"),
+          compoundInterestMultiplier: 5000,
           boostInfo: [1, 2],
           assetAddress: super721.address,
           typeOfAsset: 1,
@@ -1445,6 +1455,8 @@ describe("===Stakerv3ds===", function () {
           groupId: 0,
           tokensPerShare: 0,
           pointsPerShare: 0,
+          compoundInterestTreshold: ethers.utils.parseEther("1000"),
+          compoundInterestMultiplier: 5000,
           boostInfo: [1, 2],
           assetAddress: depositToken.address,
           typeOfAsset: 0,
@@ -1498,6 +1510,8 @@ describe("===Stakerv3ds===", function () {
           groupId: 0,
           tokensPerShare: 0,
           pointsPerShare: 0,
+          compoundInterestTreshold: ethers.utils.parseEther("1000"),
+          compoundInterestMultiplier: 5000,
           boostInfo: [1],
           assetAddress: super721.address,
           typeOfAsset: 1,
@@ -1538,6 +1552,8 @@ describe("===Stakerv3ds===", function () {
           groupId: 0,
           tokensPerShare: 0,
           pointsPerShare: 0,
+          compoundInterestTreshold: ethers.utils.parseEther("1000"),
+          compoundInterestMultiplier: 5000,
           boostInfo: [2],
           assetAddress: super721.address,
           typeOfAsset: 1,
@@ -1672,6 +1688,8 @@ describe("===Stakerv3ds===", function () {
           groupId: 0,
           tokensPerShare: 0,
           pointsPerShare: 0,
+          compoundInterestTreshold: ethers.utils.parseEther("1000"),
+          compoundInterestMultiplier: 5000,
           boostInfo: [1, 2],
           assetAddress: super721.address,
           typeOfAsset: 1,
@@ -2251,6 +2269,8 @@ describe("===Stakerv3ds===", function () {
           groupId: 0,
           tokensPerShare: 0,
           pointsPerShare: 0,
+          compoundInterestTreshold: ethers.utils.parseEther("1000"),
+          compoundInterestMultiplier: 5000,
           boostInfo: [1, 2],
           assetAddress: super721.address,
           typeOfAsset: 1,
@@ -2517,6 +2537,8 @@ describe("===Stakerv3ds===", function () {
           groupId: 0,
           tokensPerShare: 0,
           pointsPerShare: 0,
+          compoundInterestTreshold: ethers.utils.parseEther("1000"),
+          compoundInterestMultiplier: 5000,
           boostInfo: [1, 2],
           assetAddress: super1155.address,
           typeOfAsset: 2,
@@ -3413,13 +3435,13 @@ describe("===Stakerv3ds===", function () {
         // expect(await rewardToken.balanceOf(signer1.address)).to.be.gt(0);
       });
     });
-    describe("onERC721Received", function () {
-      it("should work correctly", async function () {
-        await stakerV3FacetStaking
-          .connect(owner)
-          .onERC721Received(owner.address, signer1.address, 1, [0x01, 0x02]);
-      });
-    });
+    // describe("onERC721Received", function () {
+    //   it("should work correctly", async function () {
+    //     await stakerV3FacetStaking
+    //       .connect(owner)
+    //       .onERC721Received(owner.address, signer1.address, 1, [0x01, 0x02]);
+    //   });
+    // });
 
     describe("approvePointSpender spendPoints, getPendingPoints, getTotalPoints", function () {
       it("approve should work correctly", async function () {
@@ -3543,6 +3565,8 @@ describe("===Stakerv3ds===", function () {
           groupId: 0,
           tokensPerShare: 0,
           pointsPerShare: 0,
+          compoundInterestTreshold: ethers.utils.parseEther("1000"),
+          compoundInterestMultiplier: 5000,
           boostInfo: [1, 2],
           assetAddress: super721.address,
           typeOfAsset: 1,
@@ -3740,6 +3764,8 @@ describe("===Stakerv3ds===", function () {
           groupId: 0,
           tokensPerShare: 0,
           pointsPerShare: 0,
+          compoundInterestTreshold: ethers.utils.parseEther("1000"),
+          compoundInterestMultiplier: 5000,
           boostInfo: [1, 2],
           assetAddress: super721.address,
           typeOfAsset: 1,
@@ -3871,6 +3897,8 @@ describe("===Stakerv3ds===", function () {
           groupId: 0,
           tokensPerShare: 0,
           pointsPerShare: 0,
+          compoundInterestTreshold: ethers.utils.parseEther("1000"),
+          compoundInterestMultiplier: 5000,
           boostInfo: [],
           assetAddress: super721.address,
           typeOfAsset: 1,
@@ -3983,6 +4011,8 @@ describe("===Stakerv3ds===", function () {
           groupId: 0,
           tokensPerShare: 0,
           pointsPerShare: 0,
+          compoundInterestTreshold: ethers.utils.parseEther("1000"),
+          compoundInterestMultiplier: 5000,
           boostInfo: [],
           assetAddress: super721.address,
           typeOfAsset: 1,
@@ -4084,6 +4114,8 @@ describe("===Stakerv3ds===", function () {
           groupId: 0,
           tokensPerShare: 0,
           pointsPerShare: 0,
+          compoundInterestTreshold: ethers.utils.parseEther("1000"),
+          compoundInterestMultiplier: 5000,
           boostInfo: [1, 2],
           assetAddress: super721.address,
           typeOfAsset: 1,
@@ -4406,6 +4438,8 @@ describe("===Stakerv3ds===", function () {
           groupId: 0,
           tokensPerShare: 0,
           pointsPerShare: 0,
+          compoundInterestTreshold: ethers.utils.parseEther("1000"),
+          compoundInterestMultiplier: 5000,
           boostInfo: [],
           assetAddress: super721.address,
           typeOfAsset: 1,
@@ -4542,6 +4576,8 @@ describe("===Stakerv3ds===", function () {
           groupId: 0,
           tokensPerShare: 0,
           pointsPerShare: 0,
+          compoundInterestTreshold: ethers.utils.parseEther("1000"),
+          compoundInterestMultiplier: 5000,
           boostInfo: [],
           assetAddress: super721.address,
           typeOfAsset: 1,
@@ -4693,6 +4729,8 @@ describe("===Stakerv3ds===", function () {
           groupId: 0,
           tokensPerShare: 0,
           pointsPerShare: 0,
+          compoundInterestTreshold: ethers.utils.parseEther("1000"),
+          compoundInterestMultiplier: 5000,
           boostInfo: [1, 2],
           assetAddress: super721.address,
           typeOfAsset: 1,
@@ -4937,6 +4975,8 @@ describe("===Stakerv3ds===", function () {
           groupId: 0,
           tokensPerShare: 0,
           pointsPerShare: 0,
+          compoundInterestTreshold: ethers.utils.parseEther("1000"),
+          compoundInterestMultiplier: 5000,
           boostInfo: [1, 2],
           assetAddress: super721.address,
           typeOfAsset: 1,
@@ -4952,6 +4992,8 @@ describe("===Stakerv3ds===", function () {
           groupId: 0,
           tokensPerShare: 0,
           pointsPerShare: 0,
+          compoundInterestTreshold: ethers.utils.parseEther("1000"),
+          compoundInterestMultiplier: 5000,
           boostInfo: [1, 2],
           assetAddress: super721.address,
           typeOfAsset: 1,
@@ -5462,6 +5504,147 @@ describe("===Stakerv3ds===", function () {
     });
   });
 
+  describe("Compound interest testing", function () {
+    it("Should work correctly with compound interest pools", async function () {
+      await rewardToken.transfer(
+        stakerV3dsProxy.address,
+        ethers.utils.parseEther("500000")
+      );
+
+      const testCallData1 = await mockCoreFacet.connect(owner).setEmissions(
+        [
+          {
+            timeStamp: await utils.getCurrentTime(),
+            rate: ethers.utils.parseEther("10"),
+          },
+        ],
+        [
+          {
+            timeStamp: await utils.getCurrentTime(),
+            rate: ethers.utils.parseEther("10"),
+          },
+        ]
+      );
+      const testCallData1String = testCallData1.data.toString();
+
+      //setEmissions
+      await owner.sendTransaction({
+        to: stakerV3dsProxy.address,
+        data: testCallData1String,
+      });
+
+      const testCallData2 = await mockCoreFacet.connect(owner).addPool({
+        id: 0,
+        tokenStrength: 10000,
+        pointStrength: 10000,
+        groupId: 0,
+        tokensPerShare: 0,
+        pointsPerShare: 0,
+        compoundInterestTreshold: ethers.utils.parseEther("500"),
+        compoundInterestMultiplier: 5000,
+        boostInfo: [1, 2],
+        assetAddress: super721.address,
+        typeOfAsset: 1,
+        lockPeriod: 0,
+        lockAmount: 0,
+        lockMultiplier: 0,
+        typeOfBoost: 0,
+      });
+      const testCallData2String = testCallData2.data.toString();
+
+      await super721.connect(owner).configureGroup(itemGroupId2, {
+        name: "PEPSI",
+        supplyType: 0,
+        supplyData: 10,
+        burnType: 0,
+        burnData: 0,
+      });
+      await super721
+        .connect(owner)
+        .mintBatch(
+          signer1.address,
+          [
+            shiftedItemGroupId2,
+            shiftedItemGroupId2.add(1),
+            shiftedItemGroupId2.add(2),
+            shiftedItemGroupId2.add(3),
+          ],
+          DATA
+        );
+      await super721
+        .connect(signer1)
+        .setApprovalForAll(stakerV3dsProxy.address, true);
+
+      //addPool
+      await owner.sendTransaction({
+        to: stakerV3dsProxy.address,
+        data: testCallData2String,
+      });
+
+      const testCallData3 = await mockStakingFacet.connect(signer1).deposit(
+        0,
+        0,
+        {
+          assetAddress: super721.address,
+          id: [
+            shiftedItemGroupId2,
+            shiftedItemGroupId2.add(1),
+            shiftedItemGroupId2.add(2),
+          ],
+          amounts: [1, 1, 1],
+          IOUTokenId: [],
+        },
+        false
+      );
+
+      const testCallData3String = testCallData3.data.toString();
+
+      const testCallData4 = await mockStakingFacet
+        .connect(signer1)
+        .claim(0, []);
+
+      const testCallData4String = testCallData4.data.toString();
+
+      let signer1DepTime = await utils.getCurrentTime();
+      //deposit
+      await signer1.sendTransaction({
+        to: stakerV3dsProxy.address,
+        data: testCallData3String,
+      });
+
+      await network.provider.send("evm_setNextBlockTimestamp", [
+        signer1DepTime + 30,
+      ]);
+      await ethers.provider.send("evm_mine", []);
+
+      //claim
+      await signer1.sendTransaction({
+        to: stakerV3dsProxy.address,
+        data: testCallData4String,
+      });
+      // expect(await rewardToken.balanceOf(signer1.address)).to.be.closeTo(
+      //   ethers.utils.parseEther("300"),
+      //   10 ** 15
+      // );
+
+      await network.provider.send("evm_setNextBlockTimestamp", [
+        signer1DepTime + 100,
+      ]);
+      await ethers.provider.send("evm_mine", []);
+
+      //claim
+      await signer1.sendTransaction({
+        to: stakerV3dsProxy.address,
+        data: testCallData4String,
+      });
+      // 300 + 10 * 50 + 10 * 20 * 1.5 = 1100
+      // expect(await rewardToken.balanceOf(signer1.address)).to.be.closeTo(
+      //   ethers.utils.parseEther("1100"),
+      //   10 ** 15
+      // );
+    });
+  });
+
   describe("All", function () {
     it("stakerv3", async function () {
       let itemGroupId = ethers.BigNumber.from(1);
@@ -5561,6 +5744,8 @@ describe("===Stakerv3ds===", function () {
         groupId: 0,
         tokensPerShare: 0,
         pointsPerShare: 0,
+        compoundInterestTreshold: ethers.utils.parseEther("1000"),
+        compoundInterestMultiplier: 5000,
         boostInfo: [1, 2],
         assetAddress: super721.address,
         typeOfAsset: 1,
