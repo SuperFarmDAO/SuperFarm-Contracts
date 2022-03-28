@@ -93,6 +93,10 @@ library StakerBlueprint {
      * @param IOUIdToStakedAsset Mapping that matches pool id => IOU token id => staked assets.
      * @param poolTokens Array for enumeration of the pools.
      * @param name Name of the staker.
+     * @param poolLocks Mapping that contains user's address that locked his deposit and time when
+     *  he locked for each pool.
+     * @param lockIndex Mapping that contains indexex from which start to bypass array of time locked deposits
+     *  for each pool.
      */
     struct StakerStateVariables {
         address admin;
@@ -131,9 +135,8 @@ library StakerBlueprint {
         mapping(uint256 => mapping(uint256 => StakedAsset)) IOUIdToStakedAsset;
         IERC20[] poolTokens;
         string name;
-        mapping(uint256 => uint256) lockedBoosted;
         mapping(uint256 => PoolLocks[]) poolLocks;
-        uint256 lockIndex;
+        mapping(uint256 => uint256) lockIndex;
     }
 
     struct PoolLocks {
@@ -168,7 +171,6 @@ library StakerBlueprint {
      * rate, but used to calculate perShare amount when there are boosters.
      */
     struct PoolInfo {
-        address assetAddress;
         uint256 tokenStrength;
         uint256 tokenBoostedDeposit;
         uint256 tokensPerShare;
@@ -180,6 +182,9 @@ library StakerBlueprint {
         uint256 lockPeriod;
         uint256 lockAmount;
         uint256 lockMultiplier;
+        uint256 compoundInterestTreshold;
+        uint256 compoundInterestMultiplier;
+        address assetAddress;
         PoolAssetType typeOfAsset;
         BoosterAssetType typeOfBoost;
     }
@@ -207,6 +212,8 @@ library StakerBlueprint {
         uint256 lockPeriod;
         uint256 lockAmount;
         uint256 lockMultiplier;
+        uint256 compoundInterestTreshold;
+        uint256 compoundInterestMultiplier;
         address assetAddress;
         PoolAssetType typeOfAsset;
         BoosterAssetType typeOfBoost;

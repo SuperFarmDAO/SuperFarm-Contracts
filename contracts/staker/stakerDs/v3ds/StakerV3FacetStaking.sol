@@ -1,13 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8.7;
 
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@openzeppelin/contracts/token/ERC1155/IERC1155.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
-import "@openzeppelin/contracts/token/ERC1155/utils/ERC1155Holder.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
 import "../../../base/Sweepableds.sol";
@@ -28,12 +25,7 @@ import "hardhat/console.sol";
  * This code is inspired by and modified from Sushi's Master Chef contract.
  * https://github.com/sushiswap/sushiswap/blob/master/contracts/MasterChef.sol
  */
-contract StakerV3FacetStaking is
-    Sweepableds,
-    ReentrancyGuard,
-    ERC1155Holder,
-    IERC721Receiver
-{
+contract StakerV3FacetStaking is Sweepableds {
     using SafeERC20 for IERC20;
     using EnumerableSet for EnumerableSet.UintSet;
     using EnumerableSet for EnumerableSet.AddressSet;
@@ -304,9 +296,9 @@ contract StakerV3FacetStaking is
         uint256 tokensReward;
         uint256 pointsReward;
 
-        if (b.poolLocks[_poolId].length > b.lockIndex) {
+        if (b.poolLocks[_poolId].length > b.lockIndex[_poolId]) {
             for (
-                uint256 i = b.lockIndex;
+                uint256 i = b.lockIndex[_poolId];
                 i < b.poolLocks[_poolId].length;
                 i++
             ) {
@@ -319,6 +311,12 @@ contract StakerV3FacetStaking is
                     ][b.poolLocks[_poolId][i].lockedUser];
                     StakerBlueprint.ItemUserInfo storage staker = b
                         .itemUserInfo[b.poolLocks[_poolId][i].lockedUser];
+
+                    ISuperGeneric(b.IOUTokenAddress).mintBatch(
+                        b.poolLocks[_poolId][i].lockedUser,
+                        staker.lockedItems[_poolId].lockedIOUIds,
+                        ""
+                    );
                     // clearing data for outdated locks
                     staker.lockedItems[_poolId].lockedIOUIds = new uint256[](0);
                     delete staker.lockedItems[_poolId].lockedAt;
@@ -351,7 +349,7 @@ contract StakerV3FacetStaking is
                         b.poolLocks[_poolId][i].lockedUser,
                         _poolId
                     );
-                    b.lockIndex = i + 1;
+                    b.lockIndex[_poolId] = i + 1;
                     // = b.poolLocks[_poolId][
                     //     b.poolLocks[_poolId].length - 1
                     // ];
@@ -531,6 +529,7 @@ contract StakerV3FacetStaking is
             }
         }
 
+        // apply boost for time lock
         if (staker.lockedItems[_poolId].lockedIOUIds.length != 0) {
             if (pool.typeOfBoost == StakerBlueprint.BoosterAssetType.Tokens) {
                 _boostedTokens += (_unboosted * pool.lockMultiplier) / 10000;
@@ -591,7 +590,7 @@ contract StakerV3FacetStaking is
             StakerBlueprint.ItemUserInfo storage staker = b.itemUserInfo[
                 msg.sender
             ];
-            staker.totalItems += _asset.id.length;
+            staker.totalItems = staker.totalItems + _asset.id.length;
             for (uint256 i; i < _asset.id.length; i++) {
                 staker.tokenIds[_boosterId].add(_asset.id[i]);
                 staker.amounts[_asset.id[i]] += _asset.amounts[i];
@@ -634,13 +633,6 @@ contract StakerV3FacetStaking is
 
             b.nextIOUTokenId = IOUTokenCounter;
 
-            ISuperGeneric(b.IOUTokenAddress).mintBatch(
-                msg.sender,
-                IOUTokenIdsToMint,
-                ""
-            );
-            updatePool(_poolId);
-
             if (isLocking) {
                 StakerBlueprint.ItemUserInfo storage staker = b.itemUserInfo[
                     msg.sender
@@ -664,8 +656,14 @@ contract StakerV3FacetStaking is
                     StakerBlueprint.PoolLocks(block.timestamp, msg.sender)
                 );
                 emit TokenLock(msg.sender, _poolId, block.timestamp);
+            } else {
+                ISuperGeneric(b.IOUTokenAddress).mintBatch(
+                    msg.sender,
+                    IOUTokenIdsToMint,
+                    ""
+                );
             }
-
+            updatePool(_poolId);
             updateDeposits(amount, _poolId, true);
 
             emit Deposit(
@@ -678,6 +676,7 @@ contract StakerV3FacetStaking is
         }
         if (typeOfAsset == StakerBlueprint.PoolAssetType.ERC721) {
             for (uint256 i; i < _asset.amounts.length; i++) {
+                // TODO: may be move this checks
                 require(
                     _asset.amounts[i] == 1,
                     "StakerV3FacetStaking::deposit: invalid amount value."
@@ -699,8 +698,6 @@ contract StakerV3FacetStaking is
             );
         }
     }
-
-    //TODO: think about trading IOUtokens while deopsit locked.
 
     /**
      * Withdraw some particular assets from a particular pool on the Staker.
@@ -778,6 +775,21 @@ contract StakerV3FacetStaking is
             ids = new uint256[](_asset.IOUTokenId.length);
             uint256[] memory _ids = new uint256[](_asset.IOUTokenId.length);
             uint256[] memory _amounts = new uint256[](_ids.length);
+
+            updatePool(_poolId);
+
+            if (staker.lockedItems[_poolId].lockedIOUIds.length != 0) {
+                uint256[] memory _lockedIOUIds = staker
+                    .lockedItems[_poolId]
+                    .lockedIOUIds;
+                for (uint256 j; j < _lockedIOUIds.length; j++) {
+                    for (uint256 i; i < _asset.IOUTokenId.length; i++) {
+                        if (_asset.IOUTokenId[i] == _lockedIOUIds[j]) {
+                            revert TokenLocked();
+                        }
+                    }
+                }
+            }
             for (uint256 i; i < _ids.length; i++) {
                 // if (
                 //     b
@@ -809,26 +821,11 @@ contract StakerV3FacetStaking is
             ids = _ids;
             amounts = _amounts;
             typeOfAsset = b.poolInfoV3[_poolId].typeOfAsset;
-
+            updateDeposits(amount, _poolId, false);
             ISuperGeneric(b.IOUTokenAddress).burnBatch(
                 msg.sender,
                 _asset.IOUTokenId
             );
-            updatePool(_poolId);
-
-            if (staker.lockedItems[_poolId].lockedIOUIds.length != 0) {
-                uint256[] memory _lockedIOUIds = staker
-                    .lockedItems[_poolId]
-                    .lockedIOUIds;
-                for (uint256 j; j < _lockedIOUIds.length; j++) {
-                    for (uint256 i; i < _asset.IOUTokenId.length; i++) {
-                        if (_asset.IOUTokenId[i] == _lockedIOUIds[j]) {
-                            revert TokenLocked();
-                        }
-                    }
-                }
-            }
-            updateDeposits(amount, _poolId, false);
 
             emit Withdraw(msg.sender, _poolId, amounts, ids, assetAddress);
         }
@@ -963,6 +960,12 @@ contract StakerV3FacetStaking is
             b.totalTokenDisbursed = b.totalTokenDisbursed + pendingTokens;
             _tokenRewards = user.tokenRewards + pendingTokens;
             _pointRewards = user.pointRewards + pendingPoints;
+
+            (_tokenRewards, _pointRewards) = compoundCalc(
+                _tokenRewards,
+                _pointRewards,
+                pool
+            );
             IERC20(b.token).safeTransfer(msg.sender, _tokenRewards);
             b.userPoints[msg.sender] = b.userPoints[msg.sender] + _pointRewards;
 
@@ -1041,6 +1044,11 @@ contract StakerV3FacetStaking is
 
         uint256 _tokenRewards = user.tokenRewards + pendingTokens;
         uint256 _pointRewards = user.pointRewards + pendingPoints;
+        (_tokenRewards, _pointRewards) = compoundCalc(
+            _tokenRewards,
+            _pointRewards,
+            pool
+        );
         IERC20(b.token).safeTransfer(msg.sender, _tokenRewards);
         b.userPoints[msg.sender] = b.userPoints[msg.sender] + _pointRewards;
         user.tokenRewards = 0;
@@ -1049,6 +1057,32 @@ contract StakerV3FacetStaking is
         user.tokenPaid += pendingTokens;
         user.pointPaid += pendingPoints;
         emit Claim(msg.sender, _poolId, _tokenRewards, _pointRewards);
+    }
+
+    /**
+     * Private helper function for calculate rewards for compound interest
+     * @param tokenRewards current token rewards that user should claim
+     * @param pointRewards curent point rewards that user should claim
+     * @return bossted amount of token and point rewards by compounding interest
+     */
+    function compoundCalc(
+        uint256 tokenRewards,
+        uint256 pointRewards,
+        StakerBlueprint.PoolInfo memory pool
+    ) private returns (uint256, uint256) {
+        if (tokenRewards > pool.compoundInterestTreshold) {
+            tokenRewards +=
+                ((tokenRewards - pool.compoundInterestTreshold) *
+                    pool.compoundInterestMultiplier) /
+                10000;
+        }
+        if (pointRewards > pool.compoundInterestTreshold) {
+            pointRewards +=
+                ((pointRewards - pool.compoundInterestTreshold) *
+                    pool.compoundInterestMultiplier) /
+                10000;
+        }
+        return (tokenRewards, pointRewards);
     }
 
     /**
@@ -1129,12 +1163,12 @@ contract StakerV3FacetStaking is
         emit SpentPoints(msg.sender, _user, _amount);
     }
 
-    function onERC721Received(
-        address operator,
-        address from,
-        uint256 tokenId,
-        bytes calldata data
-    ) external override returns (bytes4) {
-        return this.onERC721Received.selector;
-    }
+    // function onERC721Received(
+    //     address operator,
+    //     address from,
+    //     uint256 tokenId,
+    //     bytes calldata data
+    // ) external override returns (bytes4) {
+    //     return this.onERC721Received.selector;
+    // }
 }
