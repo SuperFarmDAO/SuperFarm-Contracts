@@ -5143,10 +5143,10 @@ describe("===Stakerv3ds===", function () {
             .div(someBig)
         );
 
-        // expect(await rewardToken.balanceOf(signer1.address)).to.be.closeTo(
-        //   signer1Rewards,
-        //   10 ** 15
-        // );
+        expect(await rewardToken.balanceOf(signer1.address)).to.be.closeTo(
+          signer1Rewards,
+          10 ** 15
+        );
         let signer1FirstClaimTime = await (
           await ethers.provider.getBlock()
         ).timestamp;
@@ -5166,10 +5166,10 @@ describe("===Stakerv3ds===", function () {
         ).timestamp;
         // signer 2 share is 1/3 (2000/6000) * 10 * 31 (1 sec past from last tx) +
         // + 10(reward for 1 sec when singer2 deposited first) ~= 113.3333333
-        // expect(await rewardToken.balanceOf(signer2.address)).to.be.closeTo(
-        //   signer2Rewards,
-        //   10 ** 15
-        // );
+        expect(await rewardToken.balanceOf(signer2.address)).to.be.closeTo(
+          signer2Rewards,
+          10 ** 15
+        );
 
         const testCallData3 = await mockStakingFacet.connect(signer3).deposit(
           0,
@@ -5265,10 +5265,10 @@ describe("===Stakerv3ds===", function () {
         // 200 + 10 * 2/3 * 4(time between 1st signer1 claim and 1st signer3 deposit) + 10 *
         // * 4/7(share of signer1 at signer3 1st deposit) * 1 + 1/3(share of signer1 at signer3 2nd deposit) *
         // * 1(second past until 2nd signer1 claim) ~= 235,714285714
-        // expect(await rewardToken.balanceOf(signer1.address)).to.be.closeTo(
-        //   signer1Rewards,
-        //   10 ** 15
-        // );
+        expect(await rewardToken.balanceOf(signer1.address)).to.be.closeTo(
+          signer1Rewards,
+          10 ** 15
+        );
 
         await signer2.sendTransaction({
           to: stakerV3dsProxy.address,
@@ -5283,10 +5283,10 @@ describe("===Stakerv3ds===", function () {
         );
         // 113.333333 + 10 * 1/3 * 3(one less second) + 10 * 2/7 * 1 + 1/6 *
         // * 2(+1 second from last tx) ~= 129.52380949
-        // expect(await rewardToken.balanceOf(signer2.address)).to.be.closeTo(
-        //   signer2Rewards,
-        //   10 ** 15
-        // );
+        expect(await rewardToken.balanceOf(signer2.address)).to.be.closeTo(
+          signer2Rewards,
+          10 ** 15
+        );
 
         // moving to 60 seconds after signer1 time locked
         await network.provider.send("evm_setNextBlockTimestamp", [
@@ -5307,10 +5307,10 @@ describe("===Stakerv3ds===", function () {
             .div(someBig)
         );
         // 235.714285 + 10 * 1/3 * 24(time from last signer1 claim) ~= 315.714285
-        // expect(await rewardToken.balanceOf(signer1.address)).to.be.closeTo(
-        //   signer1Rewards,
-        //   10 ** 15
-        // );
+        expect(await rewardToken.balanceOf(signer1.address)).to.be.closeTo(
+          signer1Rewards,
+          10 ** 15
+        );
 
         signer2Rewards = signer2Rewards.add(
           rewardsPerSecond
@@ -5343,10 +5343,10 @@ describe("===Stakerv3ds===", function () {
 
         // 129.52380949 + 10 * 1/6 * 23(time from last signer2 claim to unlock of signer1 deposit) +
         // 10 * 1/5 ~= 169.857142823
-        // expect(await rewardToken.balanceOf(signer2.address)).to.be.closeTo(
-        //   signer2Rewards,
-        //   10 ** 15
-        // );
+        expect(await rewardToken.balanceOf(signer2.address)).to.be.closeTo(
+          signer2Rewards,
+          10 ** 15
+        );
 
         //claim
         await signer3.sendTransaction({
@@ -5364,10 +5364,10 @@ describe("===Stakerv3ds===", function () {
         // 10 * 1/7 + 10 * 6/12 * 25(seconds from time lock of signer3 to unlock of signer1 deposit) + 10 *
         // * 6 / 10 * 2(time from signer1 unlock) ~=
         // 10 * 1/5 ~= 138.4285714
-        // expect(await rewardToken.balanceOf(signer3.address)).to.be.closeTo(
-        //   signer3Rewards,
-        //   10 ** 15
-        // );
+        expect(await rewardToken.balanceOf(signer3.address)).to.be.closeTo(
+          signer3Rewards,
+          10 ** 15
+        );
 
         await signer1.sendTransaction({
           to: stakerV3dsProxy.address,
@@ -5381,10 +5381,10 @@ describe("===Stakerv3ds===", function () {
             .div(someBig)
         );
         // 315.714285 + 10 * 2/10 * 3 ~= 321.714285714285
-        // expect(await rewardToken.balanceOf(signer1.address)).to.be.closeTo(
-        //   signer1Rewards,
-        //   10 ** 15
-        // );
+        expect(await rewardToken.balanceOf(signer1.address)).to.be.closeTo(
+          signer1Rewards,
+          10 ** 15
+        );
 
         await signer2.sendTransaction({
           to: stakerV3dsProxy.address,
@@ -5398,10 +5398,10 @@ describe("===Stakerv3ds===", function () {
             .div(someBig)
         );
         // 169.857142823 + 10 * 2/10 * 3 ~= 175.85714285714
-        // expect(await rewardToken.balanceOf(signer2.address)).to.be.closeTo(
-        //   signer2Rewards,
-        //   10 ** 15
-        // );
+        expect(await rewardToken.balanceOf(signer2.address)).to.be.closeTo(
+          signer2Rewards,
+          10 ** 15
+        );
 
         await signer3.sendTransaction({
           to: stakerV3dsProxy.address,
@@ -5415,10 +5415,10 @@ describe("===Stakerv3ds===", function () {
             .div(someBig)
         );
         // 138.428571428571 + 10 * 6/10 * 3 ~= 156.428571429
-        // expect(await rewardToken.balanceOf(signer3.address)).to.be.closeTo(
-        //   signer3Rewards,
-        //   10 ** 15
-        // );
+        expect(await rewardToken.balanceOf(signer3.address)).to.be.closeTo(
+          signer3Rewards,
+          10 ** 15
+        );
 
         // moving to 60 seconds after signer1 time locked
         await network.provider.send("evm_setNextBlockTimestamp", [
@@ -5464,10 +5464,10 @@ describe("===Stakerv3ds===", function () {
             .mul(signer1FifthClaimTime - signer3UnlockTime)
             .div(someBig)
         );
-        // expect(await rewardToken.balanceOf(signer1.address)).to.be.closeTo(
-        //   signer1Rewards,
-        //   10 ** 15
-        // );
+        expect(await rewardToken.balanceOf(signer1.address)).to.be.closeTo(
+          signer1Rewards,
+          10 ** 15
+        );
 
         await signer2.sendTransaction({
           to: stakerV3dsProxy.address,
@@ -5480,10 +5480,10 @@ describe("===Stakerv3ds===", function () {
             .mul(signer2FifthClaimTime - signer3UnlockTime)
             .div(someBig)
         );
-        // expect(await rewardToken.balanceOf(signer2.address)).to.be.closeTo(
-        //   signer2Rewards,
-        //   10 ** 15
-        // );
+        expect(await rewardToken.balanceOf(signer2.address)).to.be.closeTo(
+          signer2Rewards,
+          10 ** 15
+        );
 
         await signer3.sendTransaction({
           to: stakerV3dsProxy.address,
@@ -5496,10 +5496,10 @@ describe("===Stakerv3ds===", function () {
             .mul(signer3ThirdClaimTime - signer3UnlockTime)
             .div(someBig)
         );
-        // expect(await rewardToken.balanceOf(signer3.address)).to.be.closeTo(
-        //   signer3Rewards,
-        //   10 ** 15
-        // );
+        expect(await rewardToken.balanceOf(signer3.address)).to.be.closeTo(
+          signer3Rewards,
+          10 ** 15
+        );
       });
     });
   });
