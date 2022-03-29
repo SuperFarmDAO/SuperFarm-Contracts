@@ -45,6 +45,7 @@ contract StakerV3FacetStaking is Sweepableds {
     error InvalidAmountToLock();
     error TokensAlreadyLocked();
     error TokenLocked();
+    error InvalidERC721Amount();
 
     /// Event for depositing NonFungible assets.
     event Deposit(
@@ -295,113 +296,52 @@ contract StakerV3FacetStaking is Sweepableds {
         // Calculate token and point rewards for this pool.
         uint256 tokensReward;
         uint256 pointsReward;
+        // Saving original lastRewardEvent
+        uint256 _lastRewardEvent = pool.lastRewardEvent;
 
         if (b.poolLocks[_poolId].length > b.lockIndex[_poolId]) {
-            for (
-                uint256 i = b.lockIndex[_poolId];
-                i < b.poolLocks[_poolId].length;
-                i++
-            ) {
-                if (
-                    b.poolLocks[_poolId][i].lockedAt + pool.lockPeriod <
-                    block.timestamp
-                ) {
-                    StakerBlueprint.UserInfo storage _user = b.userInfoV3[
-                        _poolId
-                    ][b.poolLocks[_poolId][i].lockedUser];
-                    StakerBlueprint.ItemUserInfo storage staker = b
-                        .itemUserInfo[b.poolLocks[_poolId][i].lockedUser];
-
-                    ISuperGeneric(b.IOUTokenAddress).mintBatch(
-                        b.poolLocks[_poolId][i].lockedUser,
-                        staker.lockedItems[_poolId].lockedIOUIds,
-                        ""
-                    );
-                    // clearing data for outdated locks
-                    staker.lockedItems[_poolId].lockedIOUIds = new uint256[](0);
-                    delete staker.lockedItems[_poolId].lockedAt;
-                    // calculating rewards for staker that has unlock his tokens
-
-                    tokensReward =
-                        ((getTotalEmittedTokens(
-                            pool.lastRewardEvent,
-                            b.poolLocks[_poolId][i].lockedAt + pool.lockPeriod
-                        ) * pool.tokenStrength) / b.totalTokenStrength) *
-                        1e12;
-
-                    pointsReward =
-                        ((getTotalEmittedPoints(
-                            pool.lastRewardEvent,
-                            b.poolLocks[_poolId][i].lockedAt + pool.lockPeriod
-                        ) * pool.pointStrength) / b.totalPointStrength) *
-                        1e30;
-
-                    pool.tokensPerShare += (tokensReward /
-                        pool.tokenBoostedDeposit);
-                    pool.pointsPerShare += (pointsReward /
-                        pool.pointBoostedDeposit);
-                    pool.lastRewardEvent =
-                        b.poolLocks[_poolId][i].lockedAt +
-                        pool.lockPeriod;
-
-                    delete b.poolLocks[_poolId][i];
-                    emit TokenUnlock(
-                        b.poolLocks[_poolId][i].lockedUser,
-                        _poolId
-                    );
-                    b.lockIndex[_poolId] = i + 1;
-                    // = b.poolLocks[_poolId][
-                    //     b.poolLocks[_poolId].length - 1
-                    // ];
-                    // b.poolLocks[_poolId].pop();
-
-                    _user.tokenRewards +=
-                        (_user.tokenBoostedAmount * (pool.tokensPerShare)) /
-                        1e12 -
-                        _user.tokenPaid;
-                    _user.pointRewards +=
-                        (_user.pointBoostedAmount * (pool.pointsPerShare)) /
-                        1e30 -
-                        _user.pointPaid;
-                    b.totalTokenDisbursed +=
-                        (_user.tokenBoostedAmount * (pool.tokensPerShare)) /
-                        1e12 -
-                        _user.tokenPaid;
-
-                    // calculating totalStaked amount after unlock
-                    pool.tokenBoostedDeposit -= _user.tokenBoostedAmount;
-                    pool.pointBoostedDeposit -= _user.pointBoostedAmount;
-                    (
-                        _user.tokenBoostedAmount,
-                        _user.pointBoostedAmount
-                    ) = applyBoosts(_user.amount, _poolId);
-                    pool.tokenBoostedDeposit += _user.tokenBoostedAmount;
-                    pool.pointBoostedDeposit += _user.pointBoostedAmount;
-
-                    _user.tokenPaid =
-                        (_user.tokenBoostedAmount * (pool.tokensPerShare)) /
-                        1e12;
-                    _user.pointPaid =
-                        (_user.pointBoostedAmount * (pool.pointsPerShare)) /
-                        1e30;
-                }
-                // if (i == 0) {
-                //     break;
-                // }
-            }
+            tokenUnlocks(_poolId);
         }
 
         tokensReward =
             ((getTotalEmittedTokens(pool.lastRewardEvent, block.timestamp) *
                 pool.tokenStrength) / b.totalTokenStrength) *
             1e12;
-
         pointsReward =
             ((getTotalEmittedPoints(pool.lastRewardEvent, block.timestamp) *
                 pool.pointStrength) / b.totalPointStrength) *
             1e30;
 
+        // Update the pool rewards per share to pay users the amount remaining.
+        pool.tokensPerShare += (tokensReward / pool.tokenBoostedDeposit);
+        pool.pointsPerShare += (pointsReward / pool.pointBoostedDeposit);
+
+        if (_lastRewardEvent != pool.lastRewardEvent) {
+            tokensReward =
+                ((getTotalEmittedTokens(_lastRewardEvent, block.timestamp) *
+                    pool.tokenStrength) / b.totalTokenStrength) *
+                1e12;
+            pointsReward =
+                ((getTotalEmittedPoints(_lastRewardEvent, block.timestamp) *
+                    pool.pointStrength) / b.totalPointStrength) *
+                1e30;
+        }
         // Directly pay developers their corresponding share of tokens and points.
+        sendDeveloperShares(tokensReward, pointsReward);
+
+        pool.lastRewardEvent = block.timestamp;
+    }
+
+    /**
+     * Private helper function to send developers shares
+     * @param tokensReward amount of tokens that available as rewards.
+     * @param pointsReward amount of points that available as rewards.
+     */
+    function sendDeveloperShares(uint256 tokensReward, uint256 pointsReward)
+        private
+    {
+        StakerBlueprint.StakerStateVariables storage b = StakerBlueprint
+            .stakerStateVariables();
         for (uint256 i; i < b.developerAddresses.length(); i++) {
             address developer = b.developerAddresses.at(i);
             uint256 share = b.developerShares[developer];
@@ -412,11 +352,101 @@ contract StakerV3FacetStaking is Sweepableds {
             IERC20(b.token).safeTransfer(developer, devTokens / 1e12);
             b.userPoints[developer] += (devPoints / 1e30);
         }
+    }
 
-        // Update the pool rewards per share to pay users the amount remaining.
-        pool.tokensPerShare += (tokensReward / pool.tokenBoostedDeposit);
-        pool.pointsPerShare += (pointsReward / pool.pointBoostedDeposit);
-        pool.lastRewardEvent = block.timestamp;
+    /**
+     * Private helper function that unlocks tokens and unboost amounts
+     * @param _poolId id of pool at which we are unlocking tokens.
+     */
+    function tokenUnlocks(uint256 _poolId) private {
+        StakerBlueprint.StakerStateVariables storage b = StakerBlueprint
+            .stakerStateVariables();
+        StakerBlueprint.PoolInfo storage pool = b.poolInfoV3[_poolId];
+        uint256 tokensReward;
+        uint256 pointsReward;
+        for (
+            uint256 i = b.lockIndex[_poolId];
+            i < b.poolLocks[_poolId].length;
+            i++
+        ) {
+            if (
+                b.poolLocks[_poolId][i].lockedAt + pool.lockPeriod <
+                block.timestamp
+            ) {
+                StakerBlueprint.UserInfo storage _user = b.userInfoV3[_poolId][
+                    b.poolLocks[_poolId][i].lockedUser
+                ];
+                StakerBlueprint.ItemUserInfo storage staker = b.itemUserInfo[
+                    b.poolLocks[_poolId][i].lockedUser
+                ];
+
+                ISuperGeneric(b.IOUTokenAddress).mintBatch(
+                    b.poolLocks[_poolId][i].lockedUser,
+                    staker.lockedItems[_poolId].lockedIOUIds,
+                    ""
+                );
+                // clearing data for outdated locks
+                staker.lockedItems[_poolId].lockedIOUIds = new uint256[](0);
+                delete staker.lockedItems[_poolId].lockedAt;
+                // calculating rewards for staker that has unlock his tokens
+
+                tokensReward =
+                    ((getTotalEmittedTokens(
+                        pool.lastRewardEvent,
+                        b.poolLocks[_poolId][i].lockedAt + pool.lockPeriod
+                    ) * pool.tokenStrength) / b.totalTokenStrength) *
+                    1e12;
+                pointsReward =
+                    ((getTotalEmittedPoints(
+                        pool.lastRewardEvent,
+                        b.poolLocks[_poolId][i].lockedAt + pool.lockPeriod
+                    ) * pool.pointStrength) / b.totalPointStrength) *
+                    1e30;
+                pool.tokensPerShare += (tokensReward /
+                    pool.tokenBoostedDeposit);
+                pool.pointsPerShare += (pointsReward /
+                    pool.pointBoostedDeposit);
+                pool.lastRewardEvent =
+                    b.poolLocks[_poolId][i].lockedAt +
+                    pool.lockPeriod;
+
+                delete b.poolLocks[_poolId][i];
+                emit TokenUnlock(b.poolLocks[_poolId][i].lockedUser, _poolId);
+                b.lockIndex[_poolId] = i + 1;
+
+                _user.tokenRewards +=
+                    (_user.tokenBoostedAmount * (pool.tokensPerShare)) /
+                    1e12 -
+                    _user.tokenPaid;
+                _user.pointRewards +=
+                    (_user.pointBoostedAmount * (pool.pointsPerShare)) /
+                    1e30 -
+                    _user.pointPaid;
+                b.totalTokenDisbursed +=
+                    (_user.tokenBoostedAmount * (pool.tokensPerShare)) /
+                    1e12 -
+                    _user.tokenPaid;
+
+                // calculating totalStaked amount after unlock
+                pool.tokenBoostedDeposit -= _user.tokenBoostedAmount;
+                pool.pointBoostedDeposit -= _user.pointBoostedAmount;
+                (
+                    _user.tokenBoostedAmount,
+                    _user.pointBoostedAmount
+                ) = applyBoosts(_user.amount, _poolId);
+                pool.tokenBoostedDeposit += _user.tokenBoostedAmount;
+                pool.pointBoostedDeposit += _user.pointBoostedAmount;
+
+                _user.tokenPaid =
+                    (_user.tokenBoostedAmount * (pool.tokensPerShare)) /
+                    1e12;
+                _user.pointPaid =
+                    (_user.pointBoostedAmount * (pool.pointsPerShare)) /
+                    1e30;
+            } else {
+                break;
+            }
+        }
     }
 
     /**
@@ -645,13 +675,6 @@ contract StakerV3FacetStaking is Sweepableds {
                 }
                 staker.lockedItems[_poolId].lockedAt = block.timestamp;
                 staker.lockedItems[_poolId].lockedIOUIds = IOUTokenIdsToMint;
-                // for (uint256 i; i < _asset.id.length; i++) {
-                //     staker.lockedItems[_poolId].lockedAt = block.timestamp;
-                //     staker.lockedItems[_poolId].lockedIOUId = IOUTokenIdsToMint;
-                //     staker.lockedItems[_poolId].lockedIds.add(_asset.id[i]);
-                //     staker.lockedItems[_poolId].lockedAmounts[i] = _asset
-                //         .amount[i];
-                // }
                 b.poolLocks[_poolId].push(
                     StakerBlueprint.PoolLocks(block.timestamp, msg.sender)
                 );
@@ -677,10 +700,9 @@ contract StakerV3FacetStaking is Sweepableds {
         if (typeOfAsset == StakerBlueprint.PoolAssetType.ERC721) {
             for (uint256 i; i < _asset.amounts.length; i++) {
                 // TODO: may be move this checks
-                require(
-                    _asset.amounts[i] == 1,
-                    "StakerV3FacetStaking::deposit: invalid amount value."
-                );
+                if (_asset.amounts[i] != 1) {
+                    revert InvalidERC721Amount();
+                }
             }
             ISuperGeneric(_asset.assetAddress).safeBatchTransferFrom(
                 msg.sender,
@@ -752,9 +774,6 @@ contract StakerV3FacetStaking is Sweepableds {
 
             emit UnstakeItemBatch(msg.sender, _poolId, _boosterId);
         } else {
-            // StakerBlueprint.UserInfo storage user = b.userInfoV3[_poolId][
-            //     msg.sender
-            // ];
             uint256 amount;
             for (uint256 i; i < _asset.amounts.length; i++) {
                 amount += _asset.amounts[i];
@@ -763,13 +782,6 @@ contract StakerV3FacetStaking is Sweepableds {
                 revert InvalidAmount();
             }
 
-            // if (ISuperGeneric(b.IOUTokenAddress).balanceOf(msg.sender) == 0) {
-
-            // }
-            // require(
-            //     ISuperGeneric(b.IOUTokenAddress).balanceOf(msg.sender) > 0,
-            //     "0x2E"
-            // );
             assetAddress = b.poolInfoV3[_poolId].assetAddress;
 
             ids = new uint256[](_asset.IOUTokenId.length);
@@ -791,13 +803,6 @@ contract StakerV3FacetStaking is Sweepableds {
                 }
             }
             for (uint256 i; i < _ids.length; i++) {
-                // if (
-                //     b
-                //     .IOUIdToStakedAsset[_poolId][_asset.IOUTokenId[i]]
-                //         .assetAddress != assetAddress
-                // ) {
-                //     revert IOUTokenFromDifferentPool();
-                // }
                 if (
                     ISuperGeneric(b.IOUTokenAddress).ownerOf(
                         _asset.IOUTokenId[i]
@@ -1162,13 +1167,4 @@ contract StakerV3FacetStaking is Sweepableds {
         b.userSpentPoints[_user] += _amount;
         emit SpentPoints(msg.sender, _user, _amount);
     }
-
-    // function onERC721Received(
-    //     address operator,
-    //     address from,
-    //     uint256 tokenId,
-    //     bytes calldata data
-    // ) external override returns (bytes4) {
-    //     return this.onERC721Received.selector;
-    // }
 }

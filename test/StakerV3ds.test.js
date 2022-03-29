@@ -1871,9 +1871,7 @@ describe("===Stakerv3ds===", function () {
             to: stakerV3dsProxy.address,
             data: testCallData1String,
           })
-        ).to.be.revertedWith(
-          "StakerV3FacetStaking::deposit: invalid amount value."
-        );
+        ).to.be.revertedWith("InvalidERC721Amount()");
       });
 
       it("should deposit at pool correctly", async function () {
@@ -5494,6 +5492,308 @@ describe("===Stakerv3ds===", function () {
           rewardsPerSecond
             .mul(someBig.mul(shares.sig3).div(shares.sum))
             .mul(signer3ThirdClaimTime - signer3UnlockTime)
+            .div(someBig)
+        );
+        expect(await rewardToken.balanceOf(signer3.address)).to.be.closeTo(
+          signer3Rewards,
+          10 ** 15
+        );
+      });
+      it("multiple unlocks should work correctly", async function () {
+        let shares = {
+          sig1: 0,
+          sig2: 0,
+          sig3: 0,
+          sum: 0,
+        };
+        let rewardsPerSecond = BigNumber.from(ethers.utils.parseEther("10")),
+          lockMultiplier = 2;
+
+        const testCallData6 = await mockStakingFacet.connect(signer2).deposit(
+          0,
+          0,
+          {
+            assetAddress: super721.address,
+            id: [shiftedItemGroupId2.add(7), shiftedItemGroupId2.add(8)],
+            amounts: [1, 1],
+            IOUTokenId: [],
+          },
+          false
+        );
+
+        const testCallData6String = testCallData6.data.toString();
+
+        const testCallData4 = await mockStakingFacet.connect(signer1).deposit(
+          0,
+          0,
+          {
+            assetAddress: super721.address,
+            id: [shiftedItemGroupId2, shiftedItemGroupId2.add(1)],
+            amounts: [1, 1],
+            IOUTokenId: [],
+          },
+          true
+        );
+
+        const testCallData4String = testCallData4.data.toString();
+
+        //deposit
+        await signer2.sendTransaction({
+          to: stakerV3dsProxy.address,
+          data: testCallData6String,
+        });
+        shares.sig2 = 2000;
+        shares.sum = shares.sig1 + shares.sig2 + shares.sig3;
+        let signer2DepTime = await utils.getCurrentTime();
+
+        //deposit
+        let startOfStaking = await utils.getCurrentTime();
+        await signer1.sendTransaction({
+          to: stakerV3dsProxy.address,
+          data: testCallData4String,
+        });
+        // 2000 with time lock bonus multiplier x2
+        shares.sig1 = 2000 * lockMultiplier;
+        shares.sum = shares.sig1 + shares.sig2 + shares.sig3;
+        let signer1DepTime = await utils.getCurrentTime();
+        let signer2Rewards = BigNumber.from(
+          rewardsPerSecond.mul(signer1DepTime - signer2DepTime)
+        );
+
+        const claimCallData = await mockStakingFacet
+          .connect(signer1)
+          .claim(0, []);
+
+        const claimCallDataString = claimCallData.data.toString();
+
+        await network.provider.send("evm_setNextBlockTimestamp", [
+          startOfStaking + 30,
+        ]);
+        await ethers.provider.send("evm_mine", []);
+
+        //claim
+        await signer1.sendTransaction({
+          to: stakerV3dsProxy.address,
+          data: claimCallDataString,
+        });
+
+        // helper var
+        let someBig = ethers.utils.parseEther("1");
+        // signer 1 share with time lock boost is 2/3 (4000/6000) * 10(rewards per second) *
+        // * 30(time of signer1 staked) ~= 200
+        let signer1Rewards = BigNumber.from(
+          rewardsPerSecond
+            .mul(someBig.mul(shares.sig1).div(shares.sum))
+            .mul((await utils.getCurrentTime()) - signer1DepTime)
+            .div(someBig)
+        );
+
+        expect(await rewardToken.balanceOf(signer1.address)).to.be.closeTo(
+          signer1Rewards,
+          10 ** 15
+        );
+        let signer1FirstClaimTime = await (
+          await ethers.provider.getBlock()
+        ).timestamp;
+
+        await signer2.sendTransaction({
+          to: stakerV3dsProxy.address,
+          data: claimCallDataString,
+        });
+        signer2Rewards = signer2Rewards.add(
+          rewardsPerSecond
+            .mul(someBig.mul(shares.sig2).div(shares.sum))
+            .mul((await utils.getCurrentTime()) - signer1DepTime)
+            .div(someBig)
+        );
+        let signer2FirstClaimTime = await (
+          await ethers.provider.getBlock()
+        ).timestamp;
+        // signer 2 share is 1/3 (2000/6000) * 10 * 31 (1 sec past from last tx) +
+        // + 10(reward for 1 sec when singer2 deposited first) ~= 113.3333333
+        expect(await rewardToken.balanceOf(signer2.address)).to.be.closeTo(
+          signer2Rewards,
+          10 ** 15
+        );
+
+        const testCallData3 = await mockStakingFacet.connect(signer3).deposit(
+          0,
+          0,
+          {
+            assetAddress: super721.address,
+            id: [shiftedItemGroupId2.add(4)],
+            amounts: [1],
+            IOUTokenId: [],
+          },
+          false
+        );
+
+        const testCallData3String = testCallData3.data.toString();
+
+        const testCallData7 = await mockStakingFacet.connect(signer3).deposit(
+          0,
+          0,
+          {
+            assetAddress: super721.address,
+            id: [shiftedItemGroupId2.add(5), shiftedItemGroupId2.add(6)],
+            amounts: [1, 1],
+            IOUTokenId: [],
+          },
+          true
+        );
+
+        const testCallData7String = testCallData7.data.toString();
+
+        // 3 seconds have passed since the last claim
+        //deposit
+        await signer3.sendTransaction({
+          to: stakerV3dsProxy.address,
+          data: testCallData3String,
+        });
+        let signer3DepTime = await utils.getCurrentTime();
+        signer1Rewards = signer1Rewards.add(
+          rewardsPerSecond
+            .mul(someBig.mul(shares.sig1).div(shares.sum))
+            .mul(signer3DepTime - signer1FirstClaimTime)
+            .div(someBig)
+        );
+        signer2Rewards = signer2Rewards.add(
+          rewardsPerSecond
+            .mul(someBig.mul(shares.sig2).div(shares.sum))
+            .mul(signer3DepTime - signer2FirstClaimTime)
+            .div(someBig)
+        );
+        shares.sig3 = 1000;
+        shares.sum = shares.sig1 + shares.sig2 + shares.sig3;
+
+        // +1 second (4 overall)
+        //deposit
+        await signer3.sendTransaction({
+          to: stakerV3dsProxy.address,
+          data: testCallData7String,
+        });
+        let signer3TimeLockAt = await utils.getCurrentTime();
+        signer1Rewards = signer1Rewards.add(
+          rewardsPerSecond
+            .mul(someBig.mul(shares.sig1).div(shares.sum))
+            .mul(signer3TimeLockAt - signer3DepTime)
+            .div(someBig)
+        );
+        signer2Rewards = signer2Rewards.add(
+          rewardsPerSecond
+            .mul(someBig.mul(shares.sig2).div(shares.sum))
+            .mul(signer3TimeLockAt - signer3DepTime)
+            .div(someBig)
+        );
+        let signer3Rewards = BigNumber.from(
+          rewardsPerSecond
+            .mul(someBig.mul(shares.sig3).div(shares.sum))
+            .mul(signer3TimeLockAt - signer3DepTime)
+            .div(someBig)
+        );
+
+        shares.sig3 = 3000 * lockMultiplier;
+        shares.sum = shares.sig1 + shares.sig2 + shares.sig3;
+
+        await network.provider.send("evm_setNextBlockTimestamp", [
+          signer1DepTime + 200,
+        ]);
+
+        signer1Rewards = signer1Rewards.add(
+          rewardsPerSecond
+            .mul(someBig.mul(shares.sig1).div(shares.sum))
+            .mul(signer1DepTime + 60 - signer3TimeLockAt)
+            .div(someBig)
+        );
+        signer2Rewards = signer2Rewards.add(
+          rewardsPerSecond
+            .mul(someBig.mul(shares.sig2).div(shares.sum))
+            .mul(signer1DepTime + 60 - signer3TimeLockAt)
+            .div(someBig)
+        );
+        signer3Rewards = signer3Rewards.add(
+          rewardsPerSecond
+            .mul(someBig.mul(shares.sig3).div(shares.sum))
+            .mul(signer1DepTime + 60 - signer3TimeLockAt)
+            .div(someBig)
+        );
+
+        shares.sig1 = 2000;
+        shares.sum = shares.sig1 + shares.sig2 + shares.sig3;
+
+        signer1Rewards = signer1Rewards.add(
+          rewardsPerSecond
+            .mul(someBig.mul(shares.sig1).div(shares.sum))
+            .mul(signer3TimeLockAt + 60 - (signer1DepTime + 60))
+            .div(someBig)
+        );
+        signer2Rewards = signer2Rewards.add(
+          rewardsPerSecond
+            .mul(someBig.mul(shares.sig2).div(shares.sum))
+            .mul(signer3TimeLockAt + 60 - (signer1DepTime + 60))
+            .div(someBig)
+        );
+        signer3Rewards = signer3Rewards.add(
+          rewardsPerSecond
+            .mul(someBig.mul(shares.sig3).div(shares.sum))
+            .mul(signer3TimeLockAt + 60 - (signer1DepTime + 60))
+            .div(someBig)
+        );
+
+        shares.sig3 = 3000;
+        shares.sum = shares.sig1 + shares.sig2 + shares.sig3;
+
+        // move to signer1LockTime + 200 seconds
+        await ethers.provider.send("evm_mine", []);
+
+        await expect(IOUToken.ownerOf(2)).to.be.reverted;
+        expect(await IOUToken.ownerOf(4)).to.be.eq(signer3.address);
+        await expect(IOUToken.ownerOf(5)).to.be.reverted;
+        //claim
+        await signer1.sendTransaction({
+          to: stakerV3dsProxy.address,
+          data: claimCallDataString,
+        });
+        let signer1LastClaim = await utils.getCurrentTime();
+        signer1Rewards = signer1Rewards.add(
+          rewardsPerSecond
+            .mul(someBig.mul(shares.sig1).div(shares.sum))
+            .mul(signer1LastClaim - (signer3TimeLockAt + 60))
+            .div(someBig)
+        );
+        expect(await IOUToken.ownerOf(2)).to.be.eq(signer1.address);
+        expect(await IOUToken.ownerOf(4)).to.be.eq(signer3.address);
+        expect(await IOUToken.ownerOf(5)).to.be.eq(signer3.address);
+        expect(await rewardToken.balanceOf(signer1.address)).to.be.closeTo(
+          signer1Rewards,
+          10 ** 15
+        );
+
+        await signer2.sendTransaction({
+          to: stakerV3dsProxy.address,
+          data: claimCallDataString,
+        });
+        let signer2LastClaim = await utils.getCurrentTime();
+        signer2Rewards = signer2Rewards.add(
+          rewardsPerSecond
+            .mul(someBig.mul(shares.sig2).div(shares.sum))
+            .mul(signer2LastClaim - (signer3TimeLockAt + 60))
+            .div(someBig)
+        );
+        expect(await rewardToken.balanceOf(signer2.address)).to.be.closeTo(
+          signer2Rewards,
+          10 ** 15
+        );
+
+        await signer3.sendTransaction({
+          to: stakerV3dsProxy.address,
+          data: claimCallDataString,
+        });
+        let signer3LastClaim = await utils.getCurrentTime();
+        signer3Rewards = signer3Rewards.add(
+          rewardsPerSecond
+            .mul(someBig.mul(shares.sig3).div(shares.sum))
+            .mul(signer3LastClaim - (signer3TimeLockAt + 60))
             .div(someBig)
         );
         expect(await rewardToken.balanceOf(signer3.address)).to.be.closeTo(
