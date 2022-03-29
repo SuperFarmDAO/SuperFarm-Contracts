@@ -130,13 +130,4 @@ contract StakerV3FacetViews is Sweepableds {
 
         _boostInfo = b.boostInfo[id];
     }
-
-    // function onERC721Received(
-    //     address operator,
-    //     address from,
-    //     uint256 tokenId,
-    //     bytes calldata data
-    // ) external override returns (bytes4) {
-    //     return this.onERC721Received.selector;
-    // }
 }
