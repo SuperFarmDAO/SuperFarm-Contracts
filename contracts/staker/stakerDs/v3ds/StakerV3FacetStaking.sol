@@ -385,9 +385,9 @@ contract StakerV3FacetStaking is Sweepableds {
                         (_user.pointBoostedAmount * (pool.pointsPerShare)) /
                         1e30;
                 }
-                if (i == 0) {
-                    break;
-                }
+                // if (i == 0) {
+                //     break;
+                // }
             }
         }
 
@@ -590,7 +590,7 @@ contract StakerV3FacetStaking is Sweepableds {
             StakerBlueprint.ItemUserInfo storage staker = b.itemUserInfo[
                 msg.sender
             ];
-            staker.totalItems = staker.totalItems + _asset.id.length;
+            staker.totalItems += _asset.id.length;
             for (uint256 i; i < _asset.id.length; i++) {
                 staker.tokenIds[_boosterId].add(_asset.id[i]);
                 staker.amounts[_asset.id[i]] += _asset.amounts[i];
