@@ -241,7 +241,10 @@ contract StakerV1FacetCore is Sweepableds, ReentrancyGuard {
             b.poolInfo[_token].lockPeriod = _addPoolStruct.lockPeriod;
             b.poolInfo[_token].lockAmount = _addPoolStruct.lockAmount;
             b.poolInfo[_token].lockMultiplier = _addPoolStruct.lockMultiplier;
-            b.poolInfo[_token].typeOfBoost = _addPoolStruct.typeOfBoost;
+            b.poolInfo[_token].timeLockTypeOfBoost = _addPoolStruct
+                .timeLockTypeOfBoost;
+            b.poolInfo[_token].compoundTypeOfBoost = _addPoolStruct
+                .compoundTypeOfBoost;
         } else {
             b.totalTokenStrength =
                 (b.totalTokenStrength - b.poolInfo[_token].tokenStrength) +
@@ -255,7 +258,10 @@ contract StakerV1FacetCore is Sweepableds, ReentrancyGuard {
             b.poolInfo[_token].lockPeriod = _addPoolStruct.lockPeriod;
             b.poolInfo[_token].lockAmount = _addPoolStruct.lockAmount;
             b.poolInfo[_token].lockMultiplier = _addPoolStruct.lockMultiplier;
-            b.poolInfo[_token].typeOfBoost = _addPoolStruct.typeOfBoost;
+            b.poolInfo[_token].timeLockTypeOfBoost = _addPoolStruct
+                .timeLockTypeOfBoost;
+            b.poolInfo[_token].compoundTypeOfBoost = _addPoolStruct
+                .compoundTypeOfBoost;
         }
     }
 }

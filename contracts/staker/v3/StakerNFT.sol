@@ -1245,6 +1245,8 @@ contract StakerNFT is
             pendingPoints =
                 pendingPoints +
                 (((_checkpoints.balance[i] * pool.pointsPerShare) / 1e30));
+
+            // TODO: user.tokenPaid maybe should calculate here.
         }
         pendingTokens = pendingTokens - user.tokenPaid;
         pendingPoints = pendingPoints - user.pointPaid;

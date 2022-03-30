@@ -376,14 +376,16 @@ contract StakerV3FacetCore is Sweepableds, ERC1155Holder, IERC721Receiver {
                 .lockMultiplier;
             b
                 .poolInfoV3[_addPoolStruct.id]
-                .compoundInterestTreshold = _addPoolStruct
-                .compoundInterestTreshold;
+                .compoundInterestThreshold = _addPoolStruct
+                .compoundInterestThreshold;
             b
                 .poolInfoV3[_addPoolStruct.id]
                 .compoundInterestMultiplier = _addPoolStruct
                 .compoundInterestMultiplier;
-            b.poolInfoV3[_addPoolStruct.id].typeOfBoost = _addPoolStruct
-                .typeOfBoost;
+            b.poolInfoV3[_addPoolStruct.id].timeLockTypeOfBoost = _addPoolStruct
+                .timeLockTypeOfBoost;
+            b.poolInfoV3[_addPoolStruct.id].compoundTypeOfBoost = _addPoolStruct
+                .compoundTypeOfBoost;
         } else {
             b.totalTokenStrength =
                 (b.totalTokenStrength -
@@ -406,14 +408,16 @@ contract StakerV3FacetCore is Sweepableds, ERC1155Holder, IERC721Receiver {
                 .lockMultiplier;
             b
                 .poolInfoV3[_addPoolStruct.id]
-                .compoundInterestTreshold = _addPoolStruct
-                .compoundInterestTreshold;
+                .compoundInterestThreshold = _addPoolStruct
+                .compoundInterestThreshold;
             b
                 .poolInfoV3[_addPoolStruct.id]
                 .compoundInterestMultiplier = _addPoolStruct
                 .compoundInterestMultiplier;
-            b.poolInfoV3[_addPoolStruct.id].typeOfBoost = _addPoolStruct
-                .typeOfBoost;
+            b.poolInfoV3[_addPoolStruct.id].timeLockTypeOfBoost = _addPoolStruct
+                .timeLockTypeOfBoost;
+            b.poolInfoV3[_addPoolStruct.id].compoundTypeOfBoost = _addPoolStruct
+                .compoundTypeOfBoost;
 
             // Append boosters by avoid writing to storage directly in a loop to avoid costs
             uint256[] memory boosters = new uint256[](
