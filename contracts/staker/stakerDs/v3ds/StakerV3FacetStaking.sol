@@ -296,8 +296,6 @@ contract StakerV3FacetStaking is Sweepableds {
         // Calculate token and point rewards for this pool.
         uint256 tokensReward;
         uint256 pointsReward;
-        // Saving original lastRewardEvent
-        uint256 _lastRewardEvent = pool.lastRewardEvent;
 
         if (b.poolLocks[_poolId].length > b.lockIndex[_poolId]) {
             tokenUnlocks(_poolId);
@@ -312,23 +310,15 @@ contract StakerV3FacetStaking is Sweepableds {
                 pool.pointStrength) / b.totalPointStrength) *
             1e30;
 
+        // Directly pay developers their corresponding share of tokens and points.
+        (tokensReward, pointsReward) = sendDeveloperShares(
+            tokensReward,
+            pointsReward
+        );
+
         // Update the pool rewards per share to pay users the amount remaining.
         pool.tokensPerShare += (tokensReward / pool.tokenBoostedDeposit);
         pool.pointsPerShare += (pointsReward / pool.pointBoostedDeposit);
-
-        if (_lastRewardEvent != pool.lastRewardEvent) {
-            tokensReward =
-                ((getTotalEmittedTokens(_lastRewardEvent, block.timestamp) *
-                    pool.tokenStrength) / b.totalTokenStrength) *
-                1e12;
-            pointsReward =
-                ((getTotalEmittedPoints(_lastRewardEvent, block.timestamp) *
-                    pool.pointStrength) / b.totalPointStrength) *
-                1e30;
-        }
-        // Directly pay developers their corresponding share of tokens and points.
-        sendDeveloperShares(tokensReward, pointsReward);
-
         pool.lastRewardEvent = block.timestamp;
     }
 
@@ -339,6 +329,7 @@ contract StakerV3FacetStaking is Sweepableds {
      */
     function sendDeveloperShares(uint256 tokensReward, uint256 pointsReward)
         private
+        returns (uint256, uint256)
     {
         StakerBlueprint.StakerStateVariables storage b = StakerBlueprint
             .stakerStateVariables();
@@ -352,6 +343,7 @@ contract StakerV3FacetStaking is Sweepableds {
             IERC20(b.token).safeTransfer(developer, devTokens / 1e12);
             b.userPoints[developer] += (devPoints / 1e30);
         }
+        return (tokensReward, pointsReward);
     }
 
     /**
@@ -402,6 +394,12 @@ contract StakerV3FacetStaking is Sweepableds {
                         b.poolLocks[_poolId][i].lockedAt + pool.lockPeriod
                     ) * pool.pointStrength) / b.totalPointStrength) *
                     1e30;
+
+                (tokensReward, pointsReward) = sendDeveloperShares(
+                    tokensReward,
+                    pointsReward
+                );
+
                 pool.tokensPerShare += (tokensReward /
                     pool.tokenBoostedDeposit);
                 pool.pointsPerShare += (pointsReward /
@@ -561,10 +559,14 @@ contract StakerV3FacetStaking is Sweepableds {
 
         // apply boost for time lock
         if (staker.lockedItems[_poolId].lockedIOUIds.length != 0) {
-            if (pool.typeOfBoost == StakerBlueprint.BoosterAssetType.Tokens) {
+            if (
+                pool.timeLockTypeOfBoost ==
+                StakerBlueprint.BoosterAssetType.Tokens
+            ) {
                 _boostedTokens += (_unboosted * pool.lockMultiplier) / 10000;
             } else if (
-                pool.typeOfBoost == StakerBlueprint.BoosterAssetType.Points
+                pool.timeLockTypeOfBoost ==
+                StakerBlueprint.BoosterAssetType.Points
             ) {
                 _boostedPoints += (_unboosted * pool.lockMultiplier) / 10000;
             } else {
@@ -1042,6 +1044,8 @@ contract StakerV3FacetStaking is Sweepableds {
             pendingPoints += (
                 ((_checkpoints.balance[i] * pool.pointsPerShare) / 1e30)
             );
+
+            // TODO: user.tokenPaid maybe should calculate here.
         }
         pendingTokens -= user.tokenPaid;
         pendingPoints -= user.pointPaid;
@@ -1055,7 +1059,7 @@ contract StakerV3FacetStaking is Sweepableds {
             pool
         );
         IERC20(b.token).safeTransfer(msg.sender, _tokenRewards);
-        b.userPoints[msg.sender] = b.userPoints[msg.sender] + _pointRewards;
+        b.userPoints[msg.sender] += _pointRewards;
         user.tokenRewards = 0;
         user.pointRewards = 0;
         b.hashes[_hash] = true;
@@ -1073,19 +1077,33 @@ contract StakerV3FacetStaking is Sweepableds {
     function compoundCalc(
         uint256 tokenRewards,
         uint256 pointRewards,
-        StakerBlueprint.PoolInfo memory pool
-    ) private returns (uint256, uint256) {
-        if (tokenRewards > pool.compoundInterestTreshold) {
-            tokenRewards +=
-                ((tokenRewards - pool.compoundInterestTreshold) *
-                    pool.compoundInterestMultiplier) /
-                10000;
+        StakerBlueprint.PoolInfo storage pool
+    ) private view returns (uint256, uint256) {
+        if (tokenRewards > pool.compoundInterestThreshold) {
+            if (
+                pool.compoundTypeOfBoost ==
+                StakerBlueprint.BoosterAssetType.Tokens ||
+                pool.compoundTypeOfBoost ==
+                StakerBlueprint.BoosterAssetType.Both
+            ) {
+                tokenRewards +=
+                    ((tokenRewards - pool.compoundInterestThreshold) *
+                        pool.compoundInterestMultiplier) /
+                    10000;
+            }
         }
-        if (pointRewards > pool.compoundInterestTreshold) {
-            pointRewards +=
-                ((pointRewards - pool.compoundInterestTreshold) *
-                    pool.compoundInterestMultiplier) /
-                10000;
+        if (pointRewards > pool.compoundInterestThreshold) {
+            if (
+                pool.compoundTypeOfBoost ==
+                StakerBlueprint.BoosterAssetType.Points ||
+                pool.compoundTypeOfBoost ==
+                StakerBlueprint.BoosterAssetType.Both
+            ) {
+                pointRewards +=
+                    ((pointRewards - pool.compoundInterestThreshold) *
+                        pool.compoundInterestMultiplier) /
+                    10000;
+            }
         }
         return (tokenRewards, pointRewards);
     }

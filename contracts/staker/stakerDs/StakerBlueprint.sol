@@ -156,7 +156,6 @@ library StakerBlueprint {
 
     /**
      * A struct containing the pool info.
-     * @param assetAddress address of asset that should be staked into the pool.
      * @param typeOfAsset type of asset that is represented in pool.
      * @param tokenStrength the relative token emission strength of this pool.
      * @param tokenBoostedDeposit amount of tokens after boosts are applied.
@@ -166,6 +165,15 @@ library StakerBlueprint {
      * @param pointsPerShare accumulated points per share times 1e12.
      * @param lastRewardEvent record of the time of the last disbursement.
      * @param boostInfo boosters applied to the pool rewards when eligible. !Must start with 1!
+     * @param lockPeriod the time for which the token will be locked with time locked deposit.
+     * @param lockAmount required amount of tokens for time lock deposit.
+     * @param lockMultiplier multiplier that applies for user's share if time lock deposit is active.
+     * @param compoundInterestThreshold minimum amount of rewards for compound interest multiplier to be applied.
+     * @param compoundInterestMultiplier multiplier that applies for user's rewards if treshold is reached.
+     * @param assetAddress address of asset that should be staked into the pool.
+     * @param typeOfAsset enum that shows which standard the token used in the pool belongs to.
+     * @param timeLockTypeOfBoost enum that specifies Tokens/Points to boost or both by time lock deposit.
+     * @param compoundTypeOfBoost enum that specifies Tokens/Points to boost or both by compound interest.
      *
      * 'tokenBoostedDeposit' and 'pointBoostedDeposit' do not change emission
      * rate, but used to calculate perShare amount when there are boosters.
@@ -182,11 +190,12 @@ library StakerBlueprint {
         uint256 lockPeriod;
         uint256 lockAmount;
         uint256 lockMultiplier;
-        uint256 compoundInterestTreshold;
+        uint256 compoundInterestThreshold;
         uint256 compoundInterestMultiplier;
         address assetAddress;
         PoolAssetType typeOfAsset;
-        BoosterAssetType typeOfBoost;
+        BoosterAssetType timeLockTypeOfBoost;
+        BoosterAssetType compoundTypeOfBoost;
     }
 
     /**
@@ -198,8 +207,15 @@ library StakerBlueprint {
      * @param tokensPerShare accumulated tokens per share times 1e12.
      * @param pointsPerShare accumulated points per share times 1e12.
      * @param boostInfo boosters applied to the pool rewards when eligible. !Must start with 1!
+     * @param lockPeriod the time for which the token will be locked with time locked deposit.
+     * @param lockAmount required amount of tokens for time lock deposit.
+     * @param lockMultiplier multiplier that applies for user's share if time lock deposit is active.
+     * @param compoundInterestThreshold minimum amount of rewards for compound interest multiplier to be applied.
+     * @param compoundInterestMultiplier multiplier that applies for user's rewards if treshold is reached.
      * @param assetAddress address of asset that should be staked into the pool.
-     * @param typeOfAsset type of asset that is represented in pool.
+     * @param typeOfAsset enum that shows which standard the token used in the pool belongs to.
+     * @param timeLockTypeOfBoost enum that specifies Tokens/Points to boost or both by time lock deposit.
+     * @param compoundTypeOfBoost enum that specifies Tokens/Points to boost or both by compound interest.
      */
     struct AddPoolStruct {
         uint256 id;
@@ -212,11 +228,12 @@ library StakerBlueprint {
         uint256 lockPeriod;
         uint256 lockAmount;
         uint256 lockMultiplier;
-        uint256 compoundInterestTreshold;
+        uint256 compoundInterestThreshold;
         uint256 compoundInterestMultiplier;
         address assetAddress;
         PoolAssetType typeOfAsset;
-        BoosterAssetType typeOfBoost;
+        BoosterAssetType timeLockTypeOfBoost;
+        BoosterAssetType compoundTypeOfBoost;
     }
 
     /**

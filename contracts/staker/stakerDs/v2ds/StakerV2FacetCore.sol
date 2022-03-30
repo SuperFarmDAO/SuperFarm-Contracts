@@ -287,7 +287,10 @@ contract StakerV2FacetCore is Sweepableds, ReentrancyGuard {
             b.poolInfo[_token].lockPeriod = _addPoolStruct.lockPeriod;
             b.poolInfo[_token].lockAmount = _addPoolStruct.lockAmount;
             b.poolInfo[_token].lockMultiplier = _addPoolStruct.lockMultiplier;
-            b.poolInfo[_token].typeOfBoost = _addPoolStruct.typeOfBoost;
+            b.poolInfo[_token].timeLockTypeOfBoost = _addPoolStruct
+                .timeLockTypeOfBoost;
+            b.poolInfo[_token].compoundTypeOfBoost = _addPoolStruct
+                .compoundTypeOfBoost;
         } else {
             StakerBlueprint.PoolInfo storage pool = b.poolInfo[_token];
             b.totalTokenStrength =
@@ -302,7 +305,10 @@ contract StakerV2FacetCore is Sweepableds, ReentrancyGuard {
             b.poolInfo[_token].lockPeriod = _addPoolStruct.lockPeriod;
             b.poolInfo[_token].lockAmount = _addPoolStruct.lockAmount;
             b.poolInfo[_token].lockMultiplier = _addPoolStruct.lockMultiplier;
-            b.poolInfo[_token].typeOfBoost = _addPoolStruct.typeOfBoost;
+            b.poolInfo[_token].timeLockTypeOfBoost = _addPoolStruct
+                .timeLockTypeOfBoost;
+            b.poolInfo[_token].compoundTypeOfBoost = _addPoolStruct
+                .compoundTypeOfBoost;
 
             // Append boosters by avoid writing to storage directly in a loop to avoid costs
             uint256[] memory boosters = new uint256[](
