@@ -1,0 +1,7 @@
+{
+    "projectName": "SuperFarmContracts",
+    "namespace": "SuperFarmContracts.Contracts",
+    "lang": 0,
+    "autoCodeGen": true,
+    "projectPath": "../"
+}

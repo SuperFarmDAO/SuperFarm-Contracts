@@ -1,18 +1,59 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8.7;
 
-import "@openzeppelin/contracts/utils/introspection/ERC165Storage.sol";
 import "@openzeppelin/contracts/token/ERC1155/IERC1155.sol";
 import "@openzeppelin/contracts/token/ERC1155/extensions/IERC1155MetadataURI.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC1155/IERC1155Receiver.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
+import '@openzeppelin/contracts/utils/introspection/ERC165.sol';
 
 import "../interfaces/ISuper1155.sol";
 import "../../../access/PermitControl.sol";
 import "../../../proxy/StubProxyRegistry.sol";
 import "./Data.sol";
+
+/**
+  ERROR CODES
+*/
+error CollectionUriHasBeenLocked();
+error ContractURIHasBeenLocked();
+error BalanceQueryForZeroAddress();
+error AccountsAndIdsLengthMismatched();
+error SettingApprovalForSelf();
+error IdsAndAmountsLengthsMismatch();
+error TransferToZeroAddress();
+error CallerIsNotOwnerOrApproved();
+error TransferTimeIsOver();
+error InsufficientBalanceForTransfer();
+error GroupID0IsInvalid();
+error DoNotHaveRightsToConfigureGroup();
+error CollectionIsLockedGroupsCannotBeCreated();
+error MayNotUncapCappedSupplyType();
+error MayNotIncreaseSupplyOfCappedType();
+error MayNotSetTimeCapLessThanSupplyData();
+error CanNotDecreaseSupplyBelowCirculatingAmount();
+error MayNotAlterNonfungibleItems();
+error FungibleItemIsNotUniqueEnoughToChange();
+error SemifungibleItemIsNotUniqueEnoughToChange();
+error CanNotMintNonExistentItemGroup();
+error CanNotMintGroupBeyongItsCap();
+error CanNotMintMoreThanSingleNonfungibleItem();
+error CanNotMintMoreThanAllotedSemifungibleItems();
+error MintToZeroAddress();
+error DoNotHaveRigthsToMintThatItem();
+error CanNotBurnNonExistentItemGroup();
+error CanNotExceedBurnLimitOnThisItemGroup();
+error BurnFromTheZeroAddress();
+error DoNotHaveRigthsToBurn();
+error BurnAmountExceedBalance();
+error DoNotHaveRigthsToSetMetadata();
+error CanNotEditMetadataBecauseItIsFrozen();
+error DoNotHaveRigthsToLockURI();
+error DoNotHaveRigthsToLockGroupURI();
+error ERC1155ReceiverRejectedTokens();
+error TransferToNonERC1155ReceiverImplementer();
 
 /**
   @title An ERC-1155 item creation contract.
@@ -29,8 +70,8 @@ import "./Data.sol";
   July 19th, 2021.
 */
 contract SuperEnjin1155 is
+    ERC165,
     PermitControl,
-    ERC165Storage,
     IERC1155,
     IERC1155MetadataURI
 {
@@ -66,12 +107,6 @@ contract SuperEnjin1155 is
 
     /// The public identifier for the right to disable item creation.
     bytes32 public constant LOCK_CREATION = keccak256("LOCK_CREATION");
-
-    /// @dev Supply the magic number for the required ERC-1155 interface.
-    bytes4 private constant INTERFACE_ERC1155 = 0xd9b67a26;
-
-    /// @dev Supply the magic number for the required ERC-1155 metadata extension.
-    bytes4 private constant INTERFACE_ERC1155_METADATA_URI = 0x0e89341c;
 
     /// @dev A mask for isolating an item's group ID.
     uint256 private constant GROUP_MASK = uint256(type(uint128).max) << 128;
@@ -266,15 +301,11 @@ contract SuperEnjin1155 is
         string memory _contractURI,
         address _proxyRegistryAddress
     ) {
-        // Register the ERC-165 interfaces.
-        _registerInterface(INTERFACE_ERC1155);
-        _registerInterface(INTERFACE_ERC1155_METADATA_URI);
-
         setPermit(_msgSender(), UNIVERSAL, CONFIGURE_GROUP, MAX_INT);
 
-        if (_owner != owner()) {
+        // if (_owner != owner()) {
             transferOwnership(_owner);
-        }
+        // }
         // Continue initialization.
         name = _name;
         metadataUri = _metadataURI;
@@ -282,6 +313,17 @@ contract SuperEnjin1155 is
         proxyRegistryAddress = _proxyRegistryAddress;
     }
 
+     /**
+    EIP165 function. Hardcoded values are INTERFACE_ERC1155 &
+    INTERFACE_ERC1155_METADATA_URI interface ids
+   */
+  function supportsInterface(
+    bytes4 _interfaceId
+  ) public view virtual override(ERC165, IERC165) returns (bool) {
+    return _interfaceId ==  type(IERC1155).interfaceId 
+      || _interfaceId == type(IERC1155MetadataURI).interfaceId 
+      || (super.supportsInterface(_interfaceId));
+  }
     /**
     Return a version number for this contract's interface.
   */
@@ -314,10 +356,9 @@ contract SuperEnjin1155 is
         virtual
         hasValidPermit(UNIVERSAL, SET_URI)
     {
-        require(
-            !uriLocked,
-            "Super1155: the collection URI has been permanently locked"
-        );
+        if(uriLocked) {
+            revert CollectionUriHasBeenLocked();
+        }
         string memory oldURI = metadataUri;
         metadataUri = _uri;
         emit ChangeURI(oldURI, _uri);
@@ -333,10 +374,9 @@ contract SuperEnjin1155 is
         virtual
         hasValidPermit(UNIVERSAL, SET_URI)
     {
-        require(
-            !contractUriLocked,
-            "Super1155: the contract URI has been permanently locked"
-        );
+        if(contractUriLocked) {
+            revert ContractURIHasBeenLocked();
+        }
         string memory oldContractUri = contractURI;
         contractURI = _uri;
         emit ChangeContractURI(oldContractUri, _uri);
@@ -371,10 +411,9 @@ contract SuperEnjin1155 is
         virtual
         returns (uint256)
     {
-        require(
-            _owner != address(0),
-            "ERC1155: balance query for the zero address"
-        );
+        if(_owner == address(0)) {
+            revert BalanceQueryForZeroAddress();
+        }
         return balances[_id][_owner];
     }
 
@@ -391,10 +430,9 @@ contract SuperEnjin1155 is
         virtual
         returns (uint256[] memory)
     {
-        require(
-            _owners.length == _ids.length,
-            "ERC1155: accounts and ids length mismatch"
-        );
+        if(_owners.length != _ids.length) {
+            revert AccountsAndIdsLengthMismatched();
+        }
 
         // Populate and return an array of balances.
         uint256[] memory batchBalances = new uint256[](_owners.length);
@@ -438,11 +476,10 @@ contract SuperEnjin1155 is
     function setApprovalForAll(address _operator, bool _approved)
         external
         virtual
-    {
-        require(
-            _msgSender() != _operator,
-            "ERC1155: setting approval status for self"
-        );
+    { 
+        if(_msgSender() == _operator) {
+            revert SettingApprovalForSelf();
+        }
         operatorApprovals[_msgSender()][_operator] = _approved;
         emit ApprovalForAll(_msgSender(), _operator, _approved);
     }
@@ -513,12 +550,12 @@ contract SuperEnjin1155 is
                 if (
                     response != IERC1155Receiver(_to).onERC1155Received.selector
                 ) {
-                    revert("ERC1155: ERC1155Receiver rejected tokens");
+                    revert ERC1155ReceiverRejectedTokens();
                 }
             } catch Error(string memory reason) {
                 revert(reason);
             } catch {
-                revert("ERC1155: transfer to non ERC1155Receiver implementer");
+                revert TransferToNonERC1155ReceiverImplementer();
             }
         }
     }
@@ -580,15 +617,15 @@ contract SuperEnjin1155 is
         uint256[] memory _amounts,
         bytes memory _data
     ) public virtual {
-        require(
-            _ids.length == _amounts.length,
-            "ERC1155: ids and amounts length mismatch"
-        );
-        require(_to != address(0), "ERC1155: transfer to the zero address");
-        require(
-            _from == _msgSender() || isApprovedForAll(_from, _msgSender()),
-            "ERC1155: caller is not owner nor approved"
-        );
+        if(_ids.length != _amounts.length) {
+            revert IdsAndAmountsLengthsMismatch();
+        }
+        if(_to == address(0)) {
+            revert TransferToZeroAddress();
+        }
+        if(_from != _msgSender() && !isApprovedForAll(_from, _msgSender())) {
+            revert CallerIsNotOwnerOrApproved();
+        }
 
         // An array to keep track of paidGroups for PerTransfer transfer Type.
         uint256[] memory paidGroup;
@@ -610,11 +647,10 @@ contract SuperEnjin1155 is
                 itemGroups[groupId].transferData.transferType ==
                 Data.TransferType.TemporaryTransfer
             ) {
-                require(
-                    block.timestamp <=
-                        itemGroups[groupId].transferData.transferTime,
-                    "Transfer time is over"
-                );
+                if(block.timestamp >
+                        itemGroups[groupId].transferData.transferTime) {
+                    revert TransferTimeIsOver();
+                }
             }
 
             // Check transfer fee type.
@@ -680,11 +716,14 @@ contract SuperEnjin1155 is
             }
 
             // Update all specially-tracked group-specific balances.
-            require(
-                balances[_ids[i]][_from] >= _amounts[i],
-                "ERC1155: insufficient balance for transfer"
-            );
-            balances[_ids[i]][_from] = balances[_ids[i]][_from] - _amounts[i];
+            if(balances[_ids[i]][_from] < _amounts[i]) {
+                revert InsufficientBalanceForTransfer();
+            }
+            // TODO add unchecked
+            unchecked {
+                balances[_ids[i]][_from] = balances[_ids[i]][_from] - _amounts[i];
+            }
+
             balances[_ids[i]][_to] =
                 balances[_ids[i]][_to] +
                 _amounts[i] -
@@ -763,36 +802,34 @@ contract SuperEnjin1155 is
         uint256 _groupId,
         Data.ItemGroupInput calldata _data
     ) external payable {
-        require(_groupId != 0, "Super1155: group ID 0 is invalid");
-        require(
-            _hasItemRight(_groupId, CONFIGURE_GROUP),
-            "Super1155: you don't have rights to configure group"
-        );
+        if(_groupId == 0) {
+            revert GroupID0IsInvalid();
+        }
+        if(!_hasItemRight(_groupId, CONFIGURE_GROUP)) {
+            revert DoNotHaveRightsToConfigureGroup();
+        }
 
         // If the collection is not locked, we may add a new item group.
         if (!itemGroups[_groupId].initialized) {
-            require(
-                !locked,
-                "Super1155: the collection is locked so groups cannot be created"
-            );
+            if(locked) {
+                revert CollectionIsLockedGroupsCannotBeCreated();
+            }
 
             // Add actual item group.
-            itemGroups[_groupId] = ItemGroup({
-                initialized: true,
-                name: _data.name,
-                supplyType: _data.supplyType,
-                supplyData: _data.supplyData,
-                itemType: _data.itemType,
-                itemData: _data.itemData,
-                burnType: _data.burnType,
-                burnData: _data.burnData,
-                circulatingSupply: 0,
-                mintCount: 0,
-                burnCount: 0,
-                timeData: _data.timeData,
-                transferData: _data.transferData,
-                intrinsicData: _data.intrinsicData
-            });
+            itemGroups[_groupId].initialized = true;
+            itemGroups[_groupId].name = _data.name;
+            itemGroups[_groupId].supplyType = _data.supplyType;
+            itemGroups[_groupId].supplyData = _data.supplyData;
+            itemGroups[_groupId].itemType = _data.itemType;
+            itemGroups[_groupId].itemData = _data.itemData;
+            itemGroups[_groupId].burnType = _data.burnType;
+            itemGroups[_groupId].burnData = _data.burnData;
+            itemGroups[_groupId].circulatingSupply = 0;
+            itemGroups[_groupId].mintCount = 0;
+            itemGroups[_groupId].burnCount = 0;
+            itemGroups[_groupId].timeData = _data.timeData;
+            itemGroups[_groupId].transferData = _data.transferData;
+            itemGroups[_groupId].intrinsicData = _data.intrinsicData;
 
             itemGroups[_groupId].intrinsicData.prefund = 0;
             itemGroups[_groupId].intrinsicData.totalLocked = 0;
@@ -804,14 +841,12 @@ contract SuperEnjin1155 is
             // A capped or time capped supply type may not change.
             // It may also not have its cap increased.
             if (itemGroups[_groupId].supplyType == Data.SupplyType.Capped) {
-                require(
-                    _data.supplyType == Data.SupplyType.Capped,
-                    "Super1155: you may not uncap a capped supply type"
-                );
-                require(
-                    _data.supplyData <= itemGroups[_groupId].supplyData,
-                    "Super1155: you may not increase the supply of a capped type"
-                );
+                if(_data.supplyType != Data.SupplyType.Capped) {
+                    revert MayNotUncapCappedSupplyType();
+                }
+                if(_data.supplyData > itemGroups[_groupId].supplyData) {
+                    revert MayNotIncreaseSupplyOfCappedType();
+                }
 
                 // The flexible, uncapped, timeRate and timePercent types may freely change.
             } else if (_data.supplyType == Data.SupplyType.TimeValue) {
@@ -824,56 +859,50 @@ contract SuperEnjin1155 is
                     .timeData
                     .timeRate;
             } else if (_data.supplyType == Data.SupplyType.TimePercent) {
-                require(
-                    _data.timeData.timeCap >= _data.supplyData,
-                    "Super1155: you may not set the timeCap less than supplyData"
-                );
+                if(_data.timeData.timeCap < _data.supplyData) {
+                    revert MayNotSetTimeCapLessThanSupplyData();
+                }
                 itemGroups[_groupId].supplyType = _data.supplyType;
             } else {
                 itemGroups[_groupId].supplyType = _data.supplyType;
             }
 
             // Item supply data may not be reduced below the circulating supply.
-            require(
-                _data.supplyData >= itemGroups[_groupId].circulatingSupply,
-                "Super1155: you may not decrease supply below the circulating amount"
-            );
+            if(_data.supplyData < itemGroups[_groupId].circulatingSupply) {
+                revert CanNotDecreaseSupplyBelowCirculatingAmount();
+            }
             itemGroups[_groupId].supplyData = _data.supplyData;
 
             // A nonfungible item may not change type.
             if (itemGroups[_groupId].itemType == Data.ItemType.Nonfungible) {
-                require(
-                    _data.itemType == Data.ItemType.Nonfungible,
-                    "Super1155: you may not alter nonfungible items"
-                );
+                if(_data.itemType != Data.ItemType.Nonfungible) {
+                    revert MayNotAlterNonfungibleItems();
+                }
 
                 // A semifungible item may not change type.
             } else if (
                 itemGroups[_groupId].itemType == Data.ItemType.Semifungible
             ) {
-                require(
-                    _data.itemType == Data.ItemType.Semifungible,
-                    "Super1155: you may not alter nonfungible items"
-                );
+                if(_data.itemType != Data.ItemType.Semifungible) {
+                    revert MayNotAlterNonfungibleItems();
+                }
 
                 // A fungible item may change type if it is unique enough.
             } else if (
                 itemGroups[_groupId].itemType == Data.ItemType.Fungible
             ) {
                 if (_data.itemType == Data.ItemType.Nonfungible) {
-                    require(
-                        itemGroups[_groupId].circulatingSupply <= 1,
-                        "Super1155: the fungible item is not unique enough to change"
-                    );
+                    if(itemGroups[_groupId].circulatingSupply > 1) {
+                        revert FungibleItemIsNotUniqueEnoughToChange();
+                    }
                     itemGroups[_groupId].itemType = Data.ItemType.Nonfungible;
 
                     // We may also try for semifungible items with a high-enough cap.
                 } else if (_data.itemType == Data.ItemType.Semifungible) {
-                    require(
-                        itemGroups[_groupId].circulatingSupply <=
-                            _data.itemData,
-                        "Super1155: the fungible item is not unique enough to change"
-                    );
+                    if(itemGroups[_groupId].circulatingSupply > 
+                            _data.itemData) {
+                        revert SemifungibleItemIsNotUniqueEnoughToChange();
+                    }
                     itemGroups[_groupId].itemType = Data.ItemType.Semifungible;
                     itemGroups[_groupId].itemData = _data.itemData;
                 }
@@ -982,10 +1011,9 @@ contract SuperEnjin1155 is
         // Retrieve the item's group ID.
         uint256 shiftedGroupId = (_id & GROUP_MASK);
         uint256 groupId = shiftedGroupId >> 128;
-        require(
-            itemGroups[groupId].initialized,
-            "Super1155: you cannot mint a non-existent item group"
-        );
+        if(!itemGroups[groupId].initialized) {
+            revert CanNotMintNonExistentItemGroup();
+        }
 
         // If we can replenish burnt items, then only our currently-circulating
         // supply matters. Otherwise, historic mints are what determine the cap.
@@ -998,26 +1026,23 @@ contract SuperEnjin1155 is
 
         // If we are subject to a cap on group size, ensure we don't exceed it.
         if (itemGroups[groupId].supplyType != Data.SupplyType.Uncapped) {
-            require(
-                (currentGroupSupply + _amount) <=
-                    itemGroups[groupId].supplyData,
-                "Super1155: you cannot mint a group beyond its cap"
-            );
+            if((currentGroupSupply + _amount) >
+                    itemGroups[groupId].supplyData) {
+                revert CanNotMintGroupBeyongItsCap();
+            }
         }
 
         // Do not violate nonfungibility rules.
         if (itemGroups[groupId].itemType == Data.ItemType.Nonfungible) {
-            require(
-                (currentItemSupply + _amount) <= 1,
-                "Super1155: you cannot mint more than a single nonfungible item"
-            );
+            if((currentItemSupply + _amount) > 1) {
+                revert CanNotMintMoreThanSingleNonfungibleItem();
+            }
 
             // Do not violate semifungibility rules.
         } else if (itemGroups[groupId].itemType == Data.ItemType.Semifungible) {
-            require(
-                (currentItemSupply + _amount) <= itemGroups[groupId].itemData,
-                "Super1155: you cannot mint more than the alloted semifungible items"
-            );
+            if((currentItemSupply + _amount) > itemGroups[groupId].itemData) {
+                revert CanNotMintMoreThanAllotedSemifungibleItems();
+            }
         }
 
         // Fungible items are coerced into the single group ID + index one slot.
@@ -1045,11 +1070,12 @@ contract SuperEnjin1155 is
         uint256[] calldata _amounts,
         bytes calldata _data
     ) external payable {
-        require(_recipient != address(0), "ERC1155: mint to the zero address");
-        require(
-            _ids.length == _amounts.length,
-            "ERC1155: ids and amounts length mismatch"
-        );
+        if(_recipient == address(0)) {
+            revert MintToZeroAddress();
+        }
+        if(_ids.length != _amounts.length) {
+            revert IdsAndAmountsLengthsMismatch();
+        } 
 
         // Validate and perform the mint.
         address operator = _msgSender();
@@ -1066,28 +1092,24 @@ contract SuperEnjin1155 is
         // balances and circulation balances.
         uint256 etherValue = msg.value;
         for (uint256 i = 0; i < _ids.length; i++) {
-            require(
-                _hasItemRight(_ids[i], MINT),
-                "Super1155: you do not have the right to mint that item"
-            );
+            if(!_hasItemRight(_ids[i], MINT)) {
+                revert DoNotHaveRigthsToMintThatItem();
+            }
 
             // Retrieve the group ID from the given item `_id`.
             uint256 groupId = _ids[i] >> 128;
 
-            // Add supplyData if the supplyTime was time dependent.
-            if (itemGroups[groupId].supplyType == Data.SupplyType.TimeValue) {
-                uint256 intervals = (block.timestamp -
+            uint256 intervals = (block.timestamp -
                     itemGroups[groupId].timeData.timeStamp) /
                     itemGroups[groupId].timeData.timeInterval;
+            // Add supplyData if the supplyTime was time dependent.
+            if (itemGroups[groupId].supplyType == Data.SupplyType.TimeValue) {
                 itemGroups[groupId].supplyData +=
                     intervals *
                     itemGroups[groupId].timeData.timeRate;
             } else if (
                 itemGroups[groupId].supplyType == Data.SupplyType.TimePercent
             ) {
-                uint256 intervals = (block.timestamp -
-                    itemGroups[groupId].timeData.timeStamp) /
-                    itemGroups[groupId].timeData.timeInterval;
                 itemGroups[groupId].supplyData =
                     intervals *
                     itemGroups[groupId].timeData.timeStamp;
@@ -1190,10 +1212,9 @@ contract SuperEnjin1155 is
         // Retrieve the item's group ID.
         uint256 shiftedGroupId = (_id & GROUP_MASK);
         uint256 groupId = shiftedGroupId >> 128;
-        require(
-            itemGroups[groupId].initialized,
-            "Super1155: you cannot burn a non-existent item group"
-        );
+        if(!itemGroups[groupId].initialized) {
+            revert CanNotBurnNonExistentItemGroup();
+        }
 
         // If the item group is non-burnable, then revert.
         if (itemGroups[groupId].burnType == Data.BurnType.None) {
@@ -1202,11 +1223,10 @@ contract SuperEnjin1155 is
 
         // If we can burn items, then we must verify that we do not exceed the cap.
         if (itemGroups[groupId].burnType == Data.BurnType.Burnable) {
-            require(
-                (itemGroups[groupId].burnCount + _amount) <=
-                    itemGroups[groupId].burnData,
-                "Super1155: you may not exceed the burn limit on this item group"
-            );
+            if((itemGroups[groupId].burnCount + _amount) >
+                    itemGroups[groupId].burnData) {
+                revert CanNotExceedBurnLimitOnThisItemGroup();
+            }
         }
 
         // Fungible items are coerced into the single group ID + index one slot.
@@ -1229,11 +1249,12 @@ contract SuperEnjin1155 is
         uint256[] memory _ids,
         uint256[] memory _amounts
     ) public virtual {
-        require(_burner != address(0), "ERC1155: burn from the zero address");
-        require(
-            _ids.length == _amounts.length,
-            "ERC1155: ids and amounts length mismatch"
-        );
+        if(_burner == address(0)) {
+            revert BurnFromTheZeroAddress();
+        }
+        if(_ids.length != _amounts.length) {
+            revert IdsAndAmountsLengthsMismatch();
+        }
 
         // Validate and perform the burn.
         address operator = _msgSender();
@@ -1242,31 +1263,32 @@ contract SuperEnjin1155 is
         // Loop through each of the batched IDs to update storage of special
         // balances and circulation balances.
         for (uint256 i = 0; i < _ids.length; i++) {
-            require(
-                _hasItemRight(_ids[i], BURN),
-                "Super1155: you do not have the right to burn that item"
-            );
+            if(!_hasItemRight(_ids[i], BURN)) {
+                revert DoNotHaveRigthsToBurn();
+            }
 
             // Retrieve the group ID from the given item `_id` and check burn.
             uint256 groupId = _ids[i] >> 128;
             uint256 burntItemId = _burnChecker(_ids[i], _amounts[i]);
 
             // Update storage of special balances and circulating values.
-            require(
-                balances[burntItemId][_burner] >= _amounts[i],
-                "ERC1155: burn amount exceeds balance"
-            );
-            balances[burntItemId][_burner] =
-                balances[burntItemId][_burner] -
-                _amounts[i];
-            groupBalances[groupId][_burner] =
-                groupBalances[groupId][_burner] -
-                _amounts[i];
-            totalBalances[_burner] = totalBalances[_burner] - _amounts[i];
+            if(balances[burntItemId][_burner] < _amounts[i]) {
+                revert BurnAmountExceedBalance();
+            }
+            unchecked {
+                balances[burntItemId][_burner] =
+                    balances[burntItemId][_burner] -
+                    _amounts[i];
+                groupBalances[groupId][_burner] =
+                    groupBalances[groupId][_burner] -
+                    _amounts[i];
+                totalBalances[_burner] = totalBalances[_burner] - _amounts[i];
+                circulatingSupply[burntItemId] =
+                    circulatingSupply[burntItemId] -
+                    _amounts[i];
+            }
+
             burnCount[burntItemId] = burnCount[burntItemId] + _amounts[i];
-            circulatingSupply[burntItemId] =
-                circulatingSupply[burntItemId] -
-                _amounts[i];
             itemGroups[groupId].burnCount =
                 itemGroups[groupId].burnCount +
                 _amounts[i];
@@ -1317,10 +1339,9 @@ contract SuperEnjin1155 is
         uint256 _id,
         uint256 _amount
     ) external virtual {
-        require(
-            _hasItemRight(_id, BURN),
-            "Super1155: you don't have rights to burn"
-        );
+        if(!_hasItemRight(_id, BURN)) {
+            revert DoNotHaveRigthsToBurn();
+        }
         burnBatch(_burner, _asSingletonArray(_id), _asSingletonArray(_amount));
     }
 
@@ -1332,15 +1353,13 @@ contract SuperEnjin1155 is
     @param _metadata The metadata string to store on-chain.
   */
     function setMetadata(uint256 _id, string memory _metadata) external {
-        require(
-            _hasItemRight(_id, SET_METADATA),
-            "Super1155: you don't have rights to setMetadata"
-        );
+        if(!_hasItemRight(_id, SET_METADATA)) {
+            revert DoNotHaveRigthsToSetMetadata();
+        } 
         uint256 groupId = _id >> 128;
-        require(
-            !uriLocked && !metadataFrozen[_id] && !metadataFrozen[groupId],
-            "Super1155: you cannot edit this metadata because it is frozen"
-        );
+        if(uriLocked || metadataFrozen[_id] || metadataFrozen[groupId]) {
+            revert CanNotEditMetadataBecauseItIsFrozen();
+        }
         string memory oldMetadata = metadata[_id];
         metadata[_id] = _metadata;
         emit MetadataChanged(_msgSender(), _id, oldMetadata, _metadata);
@@ -1371,10 +1390,9 @@ contract SuperEnjin1155 is
     @param _id The token ID to lock a metadata URI value into.
   */
     function lockURI(string calldata _uri, uint256 _id) external {
-        require(
-            _hasItemRight(_id, LOCK_ITEM_URI),
-            "Super1155: you don't have rights to lock URI"
-        );
+        if(!_hasItemRight(_id, LOCK_ITEM_URI)) {
+            revert DoNotHaveRigthsToLockURI();
+        }
         metadataFrozen[_id] = true;
         emit PermanentURI(_uri, _id);
     }
@@ -1386,10 +1404,9 @@ contract SuperEnjin1155 is
     @param groupId The group ID to lock a metadata URI value into.
   */
     function lockGroupURI(string calldata _uri, uint256 groupId) external {
-        require(
-            _hasItemRight(groupId, LOCK_ITEM_URI),
-            "Super1155: you don't have rights to lock group URI"
-        );
+        if(!_hasItemRight(groupId, LOCK_ITEM_URI)) {
+            revert DoNotHaveRigthsToLockGroupURI();
+        }
         metadataFrozen[groupId] = true;
         emit PermanentURI(_uri, groupId);
     }

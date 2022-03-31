@@ -1,14 +1,33 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8.7;
 
-import "@openzeppelin/contracts/utils/introspection/ERC165Storage.sol";
 import "@openzeppelin/contracts/token/ERC1155/IERC1155.sol";
 import "@openzeppelin/contracts/token/ERC1155/extensions/IERC1155MetadataURI.sol";
 import "@openzeppelin/contracts/token/ERC1155/IERC1155Receiver.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
-
 import "../../access/PermitControl.sol";
 import "../../proxy/StubProxyRegistry.sol";
+import '@openzeppelin/contracts/utils/introspection/ERC165.sol';
+
+/**
+  ERROR CODES
+ */
+error CollectionURIHasBeenLocked();
+error ContractURIHasBeenLocked();
+error BalanceQueryForZeroAddress();
+error AccountsAndIdsLengthMismatched();
+error SettingApprovalStatusForSelf();
+error IdsAndAmountsLengthsMismatch();
+error TransferToZeroAddress();
+error CallerIsNotOwnerOrApproved();
+error InsufficientBalanceForTransfer();
+error MintToZeroAddress();
+error MintIdsAndAmountsLengthsMismatch();
+error DoNotHaveRigthToMintThatItem();
+error DoNotHaveRigthToSetMetadata();
+error CanNotEditMetadateThatFrozen();
+error DoNotHaveRigthToLockURI();
+
 /**
   @title  A lite ERC-1155 item creation contract.
   @author Tim Clancy
@@ -27,7 +46,7 @@ import "../../proxy/StubProxyRegistry.sol";
   January 15th, 2022.
 */
 contract Super1155Lite is 
-PermitControl, ERC165Storage, IERC1155, IERC1155MetadataURI {
+ERC165, PermitControl, IERC1155, IERC1155MetadataURI {
 
   using Address for address;
 
@@ -53,12 +72,6 @@ PermitControl, ERC165Storage, IERC1155, IERC1155MetadataURI {
 
   /// The public identifier for the right to disable item creation.
   bytes32 public constant LOCK_CREATION = keccak256("LOCK_CREATION");
-
-  /// @dev Supply the magic number for the required ERC-1155 interface.
-  bytes4 public constant INTERFACE_ERC1155 = 0xd9b67a26;
-
-  /// @dev Supply the magic number for the required ERC-1155 metadata extension.
-  bytes4 public constant INTERFACE_ERC1155_METADATA_URI = 0x0e89341c;
 
   /// The public name of this contract.
   string public name;
@@ -194,10 +207,6 @@ PermitControl, ERC165Storage, IERC1155, IERC1155MetadataURI {
   constructor(address _owner, string memory _name,
   string memory _metadataURI, string memory _contractURI, address _proxyRegistryAddress) {
 
-    // Register the ERC-165 interfaces.
-    _registerInterface(INTERFACE_ERC1155);
-    _registerInterface(INTERFACE_ERC1155_METADATA_URI);
-
      if (_owner != owner()) {
       transferOwnership(_owner);
     }
@@ -208,6 +217,20 @@ PermitControl, ERC165Storage, IERC1155, IERC1155MetadataURI {
     contractURI = _contractURI;
     proxyRegistryAddress = _proxyRegistryAddress;
   }
+
+
+  /**
+    EIP165 function. Hardcoded values are INTERFACE_ERC1155 &
+    INTERFACE_ERC1155_METADATA_URI interface ids
+   */
+  function supportsInterface(
+    bytes4 _interfaceId
+  ) public view virtual override(ERC165, IERC165) returns (bool) {
+    return _interfaceId ==  type(IERC1155).interfaceId 
+      || _interfaceId == type(IERC1155MetadataURI).interfaceId 
+      || (super.supportsInterface(_interfaceId));
+  }
+
 
   /**
     Returns the version number for this contract's interface.
@@ -228,7 +251,7 @@ PermitControl, ERC165Storage, IERC1155, IERC1155MetadataURI {
 
     @return The metadata URI string of the item with ID `_itemId`.
   */
-  function uri(uint256) external view 
+  function uri(uint256 id) external view 
   returns (string memory) {
 
     return metadataUri;
@@ -245,8 +268,9 @@ PermitControl, ERC165Storage, IERC1155, IERC1155MetadataURI {
   function setURI(string calldata _uri) external 
   virtual hasValidPermit(UNIVERSAL, SET_URI) {
 
-    require(!uriLocked,
-      "Super1155: the collection URI has been permanently locked");
+    if(uriLocked) {
+      revert CollectionURIHasBeenLocked();
+    }
     string memory oldURI = metadataUri;
     metadataUri = _uri;
     emit ChangeURI(oldURI, _uri);
@@ -261,8 +285,9 @@ PermitControl, ERC165Storage, IERC1155, IERC1155MetadataURI {
   function setContractUri(string calldata _uri) external 
   virtual hasValidPermit(UNIVERSAL, SET_URI) {
 
-    require(!contractUriLocked,
-      "Super1155: the contract URI has been permanently locked");
+    if(contractUriLocked) {
+      revert ContractURIHasBeenLocked();
+    }
     string memory oldContractUri = contractURI;
     contractURI = _uri;
     emit ChangeContractURI(oldContractUri, _uri);
@@ -293,9 +318,10 @@ PermitControl, ERC165Storage, IERC1155, IERC1155MetadataURI {
   */
   function balanceOf(address _owner, uint256 _id) public view 
   virtual returns (uint256) {
-
-    require(_owner != address(0),
-      "ERC1155: balance query for the zero address");
+    
+    if(_owner == address(0)) {
+      revert BalanceQueryForZeroAddress();
+    }
     return balances[_id][_owner];
   }
 
@@ -311,8 +337,9 @@ PermitControl, ERC165Storage, IERC1155, IERC1155MetadataURI {
   uint256[] calldata _ids) external view 
   virtual returns (uint256[] memory) {
 
-    require(_owners.length == _ids.length,
-      "ERC1155: accounts and ids length mismatch");
+    if(_owners.length != _ids.length) {
+      revert AccountsAndIdsLengthMismatched();
+    }
 
     // Populate and return an array of balances.
     uint256[] memory batchBalances = new uint256[](_owners.length);
@@ -353,8 +380,9 @@ PermitControl, ERC165Storage, IERC1155, IERC1155MetadataURI {
   function setApprovalForAll(address _operator, bool _approved) external
   virtual {
 
-    require(_msgSender() != _operator,
-      "ERC1155: setting approval status for self");
+    if(_msgSender() == _operator) {
+      revert SettingApprovalStatusForSelf();
+    }
     operatorApprovals[_msgSender()][_operator] = _approved;
     emit ApprovalForAll(_msgSender(), _operator, _approved);
   }
@@ -460,20 +488,24 @@ PermitControl, ERC165Storage, IERC1155, IERC1155MetadataURI {
   uint256[] memory _ids, uint256[] memory _amounts, bytes memory _data) public 
   virtual {
 
-    require(_ids.length == _amounts.length,
-      "ERC1155: ids and amounts length mismatch");
-    require(_to != address(0),
-      "ERC1155: transfer to the zero address");
-    require(_from == _msgSender() || isApprovedForAll(_from, _msgSender()),
-      "ERC1155: caller is not owner nor approved");
+    if(_ids.length != _amounts.length) {
+      revert IdsAndAmountsLengthsMismatch();
+    }
+    if(_to == address(0)) {
+      revert TransferToZeroAddress();
+    }
+    if(_from != _msgSender() && !isApprovedForAll(_from, _msgSender())) {
+      revert CallerIsNotOwnerOrApproved();
+    }
 
     // Validate transfer and perform all batch token sends.
     _beforeTokenTransfer(_msgSender(), _from, _to, _ids, _amounts, _data);
     for (uint256 i = 0; i < _ids.length; ++i) {
 
       // Update all specially-tracked balances.
-      require(balances[_ids[i]][_from] >= _amounts[i], 
-        "ERC1155: insufficient balance for transfer");
+      if(balances[_ids[i]][_from] < _amounts[i]) {
+        revert InsufficientBalanceForTransfer();
+      }
       balances[_ids[i]][_from] = balances[_ids[i]][_from] - _amounts[i];
       balances[_ids[i]][_to] = balances[_ids[i]][_to] + _amounts[i];
       totalBalances[_from] = totalBalances[_from] - _amounts[i];
@@ -541,10 +573,12 @@ PermitControl, ERC165Storage, IERC1155, IERC1155MetadataURI {
   uint256[] calldata _amounts, bytes calldata _data)
   external virtual hasValidPermit(UNIVERSAL, MINT) {
 
-    require(_recipient != address(0),
-      "ERC1155: mint to the zero address");
-    require(_ids.length == _amounts.length,
-      "ERC1155: ids and amounts length mismatch");
+    if(_recipient == address(0)) {
+      revert MintToZeroAddress();
+    }
+    if(_ids.length != _amounts.length) {
+      revert MintIdsAndAmountsLengthsMismatch();
+    }
 
     // Validate and perform the mint.
     address operator = _msgSender();
@@ -553,8 +587,9 @@ PermitControl, ERC165Storage, IERC1155, IERC1155MetadataURI {
 
     // Loop through each of the batched IDs to update balances.
     for (uint256 i = 0; i < _ids.length; i++) {
-      require(_hasItemRight(_ids[i], MINT),
-        "Super1155: you do not have the right to mint that item");
+      if(!_hasItemRight(_ids[i], MINT)) {
+        revert DoNotHaveRigthToMintThatItem();
+      }
 
       // Update storage of special balances and circulating values.
       balances[_ids[i]][_recipient] = balances[_ids[i]][_recipient] + _amounts[i];
@@ -578,10 +613,12 @@ PermitControl, ERC165Storage, IERC1155, IERC1155MetadataURI {
   */
   function setMetadata(uint256 _id, string memory _metadata) external {
 
-    require(_hasItemRight(_id, SET_METADATA), 
-      "Super1155: you don't have rights to setMetadata");
-    require(!uriLocked && !metadataFrozen[_id],
-      "Super1155: you cannot edit this metadata because it is frozen");
+    if(!_hasItemRight(_id, SET_METADATA)) {
+      revert DoNotHaveRigthToSetMetadata();
+    }
+    if(uriLocked || metadataFrozen[_id]) {
+      revert CanNotEditMetadateThatFrozen();
+    }
     string memory oldMetadata = metadata[_id];
     metadata[_id] = _metadata;
     emit MetadataChanged(_msgSender(), _id, oldMetadata, _metadata);
@@ -617,10 +654,11 @@ PermitControl, ERC165Storage, IERC1155, IERC1155MetadataURI {
     @param _uri The value of the URI to lock for `_id`.
     @param _id The token ID to lock a metadata URI value into.
   */
-  function lockURI(string calldata _uri, uint256 _id) external {
+  function lockItemURI(string calldata _uri, uint256 _id) external {
 
-    require(_hasItemRight(_id, LOCK_ITEM_URI), 
-      "Super1155: you don't have rights to lock URI");
+    if(!_hasItemRight(_id, LOCK_ITEM_URI)) {
+      revert DoNotHaveRigthToLockURI();
+    }
     metadataFrozen[_id] = true;
     emit PermanentURI(_uri, _id);
   }
@@ -634,16 +672,5 @@ PermitControl, ERC165Storage, IERC1155, IERC1155MetadataURI {
 
     locked = true;
     emit CollectionLocked(_msgSender());
-  }
-
-  /** 
-    A function used for registering interface when deploying.
-    
-    @param interfaceId The hash of the interface.
-  */
-  function registerInterface(bytes4 interfaceId) external 
-  virtual onlyOwner {
-
-    _registerInterface(interfaceId);
   }
 }

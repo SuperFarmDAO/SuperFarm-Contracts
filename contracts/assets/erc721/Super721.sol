@@ -3,10 +3,13 @@ pragma solidity ^0.8.7;
 
 import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
-import "@openzeppelin/contracts/utils/introspection/ERC165Storage.sol";
+import "@openzeppelin/contracts/token/ERC721/extensions/IERC721Metadata.sol";
+import "@openzeppelin/contracts/token/ERC721/extensions/IERC721Enumerable.sol";
+// import "@openzeppelin/contracts/utils/introspection/ERC165Storage.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableMap.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
+import '@openzeppelin/contracts/utils/introspection/ERC165.sol';
 
 import "../../access/PermitControl.sol";
 import "../../proxy/StubProxyRegistry.sol";
@@ -63,7 +66,8 @@ error IsApprovedOrOwnerQueryNonExictentToken();
   ideas inherited from the Super721 reference implementation.
   August 4th, 2021.
 */
-contract Super721 is PermitControl, ERC165Storage, IERC721 {
+contract Super721 is 
+ERC165, PermitControl, IERC721, IERC721Enumerable, IERC721Metadata {
     using Address for address;
     using EnumerableSet for EnumerableSet.UintSet;
     using EnumerableMap for EnumerableMap.UintToAddressMap;
@@ -98,41 +102,6 @@ contract Super721 is PermitControl, ERC165Storage, IERC721 {
 
     /// The public identifier for the right to update transfer state.
     bytes32 public constant TRANSFER_LOCK = keccak256("TRANSFER_LOCK");
-
-    /*
-     *     bytes4(keccak256('balanceOf(address)')) == 0x70a08231
-     *     bytes4(keccak256('ownerOf(uint256)')) == 0x6352211e
-     *     bytes4(keccak256('approve(address,uint256)')) == 0x095ea7b3
-     *     bytes4(keccak256('getApproved(uint256)')) == 0x081812fc
-     *     bytes4(keccak256('setApprovalForAll(address,bool)')) == 0xa22cb465
-     *     bytes4(keccak256('isApprovedForAll(address,address)')) == 0xe985e9c5
-     *     bytes4(keccak256('transferFrom(address,address,uint256)')) == 0x23b872dd
-     *     bytes4(keccak256('safeTransferFrom(address,address,uint256)')) == 0x42842e0e
-     *     bytes4(keccak256('safeTransferFrom(address,address,uint256,bytes)')) == 0xb88d4fde
-     *
-     *     => 0x70a08231 ^ 0x6352211e ^ 0x095ea7b3 ^ 0x081812fc ^
-     *        0xa22cb465 ^ 0xe985e9c ^ 0x23b872dd ^ 0x42842e0e ^ 0xb88d4fde == 0x80ac58cd
-     */
-    bytes4 private constant _INTERFACE_ID_ERC721 = 0x80ac58cd;
-
-    /*
-     *     bytes4(keccak256('name()')) == 0x06fdde03
-     *     bytes4(keccak256('symbol()')) == 0x95d89b41
-     *     bytes4(keccak256('tokenURI(uint256)')) == 0xc87b56dd
-     *
-     *     => 0x06fdde03 ^ 0x95d89b41 ^ 0xc87b56dd == 0x5b5e139f
-     */
-    bytes4 private constant _INTERFACE_ID_ERC721_METADATA = 0x5b5e139f;
-
-    /*
-     *     bytes4(keccak256('totalSupply()')) == 0x18160ddd
-     *     bytes4(keccak256('tokenOfOwnerByIndex(address,uint256)')) == 0x2f745c59
-     *     bytes4(keccak256('tokenByIndex(uint256)')) == 0x4f6ccce7
-     *
-     *     => 0x18160ddd ^ 0x2f745c59 ^ 0x4f6ccce7 == 0x780e9d63
-     */
-    bytes4 private constant _INTERFACE_ID_ERC721_ENUMERABLE = 0x780e9d63;
-    /// @dev Supply the magic number for the required ERC-721 interface.
 
     /// @dev A mask for isolating an item's group ID.
     uint256 private constant GROUP_MASK = uint256(type(uint128).max) << 128;
@@ -423,11 +392,6 @@ contract Super721 is PermitControl, ERC165Storage, IERC721 {
             transferOwnership(_owner);
         }
 
-        // Register 721 interfaces
-        _registerInterface(_INTERFACE_ID_ERC721);
-        _registerInterface(_INTERFACE_ID_ERC721_METADATA);
-        _registerInterface(_INTERFACE_ID_ERC721_ENUMERABLE);
-
         // Continue initialization.
         name = _name;
         symbol = _symbol;
@@ -478,6 +442,48 @@ contract Super721 is PermitControl, ERC165Storage, IERC721 {
   */
     function version() external pure virtual override returns (uint256) {
         return 1;
+    }
+
+    /**
+        EIP165 implementation. Constant counts in following way 
+    
+     *     bytes4(keccak256('balanceOf(address)')) == 0x70a08231
+     *     bytes4(keccak256('ownerOf(uint256)')) == 0x6352211e
+     *     bytes4(keccak256('approve(address,uint256)')) == 0x095ea7b3
+     *     bytes4(keccak256('getApproved(uint256)')) == 0x081812fc
+     *     bytes4(keccak256('setApprovalForAll(address,bool)')) == 0xa22cb465
+     *     bytes4(keccak256('isApprovedForAll(address,address)')) == 0xe985e9c5
+     *     bytes4(keccak256('transferFrom(address,address,uint256)')) == 0x23b872dd
+     *     bytes4(keccak256('safeTransferFrom(address,address,uint256)')) == 0x42842e0e
+     *     bytes4(keccak256('safeTransferFrom(address,address,uint256,bytes)')) == 0xb88d4fde
+     *
+     *     => 0x70a08231 ^ 0x6352211e ^ 0x095ea7b3 ^ 0x081812fc ^
+     *        0xa22cb465 ^ 0xe985e9c ^ 0x23b872dd ^ 0x42842e0e ^ 0xb88d4fde == 0x80ac58cd
+    
+        bytes4 private constant _INTERFACE_ID_ERC721 = 0x80ac58cd;
+
+     *     bytes4(keccak256('name()')) == 0x06fdde03
+     *     bytes4(keccak256('symbol()')) == 0x95d89b41
+     *     bytes4(keccak256('tokenURI(uint256)')) == 0xc87b56dd
+     *
+     *     => 0x06fdde03 ^ 0x95d89b41 ^ 0xc87b56dd == 0x5b5e139f
+        bytes4 private constant _INTERFACE_ID_ERC721_METADATA = 0x5b5e139f;
+
+     *     bytes4(keccak256('totalSupply()')) == 0x18160ddd
+     *     bytes4(keccak256('tokenOfOwnerByIndex(address,uint256)')) == 0x2f745c59
+     *     bytes4(keccak256('tokenByIndex(uint256)')) == 0x4f6ccce7
+     *
+     *     => 0x18160ddd ^ 0x2f745c59 ^ 0x4f6ccce7 == 0x780e9d63
+        bytes4 private constant _INTERFACE_ID_ERC721_ENUMERABLE = 0x780e9d63;
+    
+     */
+    function supportsInterface(
+        bytes4 _interfaceId
+    ) public view virtual override(ERC165, IERC165) returns(bool) {
+        return _interfaceId == type(IERC721).interfaceId 
+          || _interfaceId == type(IERC721Enumerable).interfaceId
+          || _interfaceId == type(IERC721Metadata).interfaceId 
+          || super.supportsInterface(_interfaceId);
     }
 
     /**
@@ -898,17 +904,16 @@ contract Super721 is PermitControl, ERC165Storage, IERC721 {
             if(locked) {
                 revert ConfigureGroupCollectionIsLocked();
             }
-            itemGroups[_groupId] = ItemGroup({
-                initialized: true,
-                name: _data.name,
-                supplyType: _data.supplyType,
-                supplyData: _data.supplyData,
-                burnType: _data.burnType,
-                burnData: _data.burnData,
-                circulatingSupply: 0,
-                mintCount: 0,
-                burnCount: 0
-            });
+             
+            itemGroups[_groupId].initialized = true;
+            itemGroups[_groupId].name = _data.name;
+            itemGroups[_groupId].supplyType = _data.supplyType;
+            itemGroups[_groupId].supplyData = _data.supplyData;
+            itemGroups[_groupId].burnType = _data.burnType;
+            itemGroups[_groupId].burnData = _data.burnData;
+            itemGroups[_groupId].circulatingSupply = 0;
+            itemGroups[_groupId].mintCount = 0;
+            itemGroups[_groupId].burnCount = 0;
 
             // Edit an existing item group. The name may always be updated.
         } else {

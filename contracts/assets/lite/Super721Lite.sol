@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8.7;
-import "@openzeppelin/contracts/utils/introspection/ERC165Storage.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/IERC721Enumerable.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/IERC721Metadata.sol";
@@ -10,6 +9,31 @@ import "@openzeppelin/contracts/utils/Address.sol";
 import "../../access/PermitControl.sol";
 import "../../proxy/StubProxyRegistry.sol";
 import "../../utils/Utils.sol";
+import '@openzeppelin/contracts/utils/introspection/ERC165.sol';
+
+
+/*
+  error codes 
+ */
+error OwnerQueryForNonExistentToken();
+error ApproveToCurrrentOwner();
+error ApproveCallerIsNotOwnerOrApproved();
+error CollectionURILocked();
+error ContractURILocked();
+error BalanceQueryForZeroAddress();
+error SetApprovalForSelf();
+error TransferToZeroAddress();
+error NonExistentTokenID();
+error TransferFromIncorrectOwner();
+error TransferCallerNotApproved();
+error MintToZeroAddress();
+error MintQuantityTooHigh();
+error MintCapReached();
+error MetadataIsFrozen();
+error GetApprovedQueryNonExictentToken();
+error InvalidOwnerAddress();
+error OwnerIndexOutOfBounds();
+error IndexOutOfBounds();
 
 /**
   @title A lite ERC-721 item creation contract.
@@ -28,7 +52,7 @@ import "../../utils/Utils.sol";
   January 15th, 2022.
 */
 contract Super721Lite is 
-PermitControl, ERC165Storage, IERC721, IERC721Enumerable, IERC721Metadata {
+PermitControl, ERC165, IERC721, IERC721Enumerable, IERC721Metadata {
 
   using Address for address;
 
@@ -53,15 +77,6 @@ PermitControl, ERC165Storage, IERC721, IERC721Enumerable, IERC721Metadata {
   /// The public identifier for the right to disable item creation.
   bytes32 public constant LOCK_CREATION = keccak256("LOCK_CREATION");
   
-  /// @dev Magic number for ERC721 interface.
-  bytes4 public constant _INTERFACE_ID_ERC721 = 0x80ac58cd;
-
-  /// @dev Magic number for ERC721 metadata interface.
-  bytes4 public constant _INTERFACE_ID_ERC721_METADATA = 0x5b5e139f;
-
-  /// @dev Magic number for ERC721 enumberable interface.
-  bytes4 public constant _INTERFACE_ID_ERC721_ENUMERABLE = 0x780e9d63;
-
   /// The public name of this contract.
   string public name;
 
@@ -233,11 +248,6 @@ PermitControl, ERC165Storage, IERC721, IERC721Enumerable, IERC721Metadata {
       transferOwnership(_owner);
     }
 
-    // Register 721 interfaces
-    _registerInterface(_INTERFACE_ID_ERC721);
-    _registerInterface(_INTERFACE_ID_ERC721_METADATA);
-    _registerInterface(_INTERFACE_ID_ERC721_ENUMERABLE);
-
     // Continue initialization.
     name = _name;
     symbol = _symbol;
@@ -247,6 +257,21 @@ PermitControl, ERC165Storage, IERC721, IERC721Enumerable, IERC721Metadata {
     contractURI = _contractURI;
     proxyRegistryAddress = _proxyRegistryAddress;
   }
+
+    /**
+        EIP165 implementation  
+        0x80ac58cd & 0x5b5e139f & 0x780e9d63 are magic number for 
+        _INTERFACE_ID_ERC721, INTERFACE_ID_ERC721_METADATA 
+        and _INTERFACE_ID_ERC721_ENUMERABLE
+    */
+    function supportsInterface(
+      bytes4 _interfaceId
+    ) public view virtual override(ERC165, IERC165) returns(bool) {
+        return _interfaceId == type(IERC721).interfaceId 
+          || _interfaceId == type(IERC721Enumerable).interfaceId
+          || _interfaceId == type(IERC721Metadata).interfaceId 
+          || super.supportsInterface(_interfaceId);
+    }
 
 /**
    * @dev Returns whether `tokenId` exists.
@@ -270,9 +295,10 @@ PermitControl, ERC165Storage, IERC721, IERC721Enumerable, IERC721Metadata {
   function ownershipOf(uint256 tokenId) internal view 
   returns (address) {
 
-    require(_exists(tokenId), 
-      "ERC721: owner query for nonexistent token");
-
+    if(!_exists(tokenId)) {
+      revert OwnerQueryForNonExistentToken();
+    }
+    
     uint256 lowestTokenToCheck;
     if (tokenId >= batchSize) {
       lowestTokenToCheck = tokenId - batchSize + 1;
@@ -304,12 +330,13 @@ PermitControl, ERC165Storage, IERC721, IERC721Enumerable, IERC721Metadata {
   virtual override {
 
     address tokenOwner = ownerOf(tokenId);
-    require(to != tokenOwner, 
-      "Super721: approval to current owner");
-
-    require(_msgSender() == tokenOwner || 
-      isApprovedForAll(tokenOwner, _msgSender()),
-      "Super721: approve caller is not owner or approved");
+    if(to == tokenOwner) {
+      revert ApproveToCurrrentOwner();
+    }
+    if(_msgSender() != tokenOwner && 
+      !isApprovedForAll(tokenOwner, _msgSender())) {
+      revert ApproveCallerIsNotOwnerOrApproved();
+    }
 
     tokenApprovals[tokenId] = to;
     emit Approval(ownerOf(tokenId), to, tokenId);
@@ -353,9 +380,10 @@ PermitControl, ERC165Storage, IERC721, IERC721Enumerable, IERC721Metadata {
   */
   function setURI(string calldata _uri) external 
   virtual hasValidPermit(UNIVERSAL, SET_URI) {
+    if(uriLocked) {
+      revert CollectionURILocked();
+    }
 
-    require(!uriLocked,
-      "Super721: the collection URI has been permanently locked");
     string memory oldURI = metadataUri;
     metadataUri = _uri;
     emit ChangeURI(oldURI, _uri);
@@ -370,8 +398,9 @@ PermitControl, ERC165Storage, IERC721, IERC721Enumerable, IERC721Metadata {
   function setContractURI(string calldata _uri) external 
   virtual hasValidPermit(UNIVERSAL, SET_URI) {
 
-    require(!contractUriLocked,
-      "Super721: the contract URI has been permanently locked");
+    if(contractUriLocked) {
+      revert ContractURILocked();
+    }
     string memory oldContractUri = contractURI;
     contractURI = _uri;
     emit ChangeContractURI(oldContractUri, _uri);
@@ -398,8 +427,9 @@ PermitControl, ERC165Storage, IERC721, IERC721Enumerable, IERC721Metadata {
   function balanceOf(address _owner) public view 
   virtual override returns (uint256) {
 
-    require(_owner != address(0), 
-      "ERC721: balance query for the zero address");
+    if(_owner == address(0)) {
+      revert BalanceQueryForZeroAddress();
+    }
     return balances[_owner];
   }
 
@@ -452,8 +482,10 @@ PermitControl, ERC165Storage, IERC721, IERC721Enumerable, IERC721Metadata {
   function setApprovalForAll(address _operator, bool _approved) external 
   virtual override {
 
-    require(_msgSender() != _operator,
-      "Super721: setting approval status for self");
+    if(_msgSender() == _operator) {
+      revert SetApprovalForSelf();
+    }
+
     operatorApprovals[_msgSender()][_operator] = _approved;
     emit ApprovalForAll(_msgSender(), _operator, _approved);
   }
@@ -545,23 +577,26 @@ PermitControl, ERC165Storage, IERC721, IERC721Enumerable, IERC721Metadata {
   uint256[] memory _ids, bytes memory _data) public 
   virtual {
 
-    require(_to != address(0), 
-      "ERC721: transfer to the zero address");
-      
+    if(_to == address(0)) {
+      revert TransferToZeroAddress();
+    }
+    
     _beforeTokenTransfer(_msgSender(), address(0), _to, mintIndex, _ids.length, _data);
     for (uint256 i = 0; i < _ids.length; i++) {
-      require(_exists(_ids[i]),
-        "ERC721: non existent token id");
-
+      if(!_exists(_ids[i])) {
+        revert NonExistentTokenID();
+      }
       address prevOwnership = ownershipOf(_ids[i]);
-      require(prevOwnership == _from, 
-        "ERC721: transfer from incorrect owner");
+      if(prevOwnership != _from) {
+        revert TransferFromIncorrectOwner();
+      }
 
       bool isApprovedOrOwner = (_msgSender() == prevOwnership ||
         getApproved(_ids[i]) == _msgSender() ||
         isApprovedForAll(prevOwnership, _msgSender()));
-      require(isApprovedOrOwner, 
-        "ERC721: transfer caller is not owner nor approved");
+      if(!isApprovedOrOwner) {
+        revert TransferCallerNotApproved();
+      }
 
       // Clear approvals from the previous owner
       approve(address(0), _ids[i]);
@@ -630,9 +665,15 @@ PermitControl, ERC165Storage, IERC721, IERC721Enumerable, IERC721Metadata {
   function mintBatch(address _recipient, uint256 _quantity, bytes memory _data) external 
   virtual hasValidPermit(UNIVERSAL, MINT) {
 
-    require(_recipient != address(0), "Super721: mint to zero address");
-    require(_quantity <= batchSize, "Super721: quantity too high");
-    require(mintIndex + _quantity <= totalSupply, "Super721: cap reached");
+    if(_recipient == address(0)) {
+      revert MintToZeroAddress();
+    }
+    if(_quantity > batchSize) {
+      revert MintQuantityTooHigh();
+    }
+    if(mintIndex + _quantity > totalSupply) {
+      revert MintCapReached();
+    }
 
     _beforeTokenTransfer(_msgSender(), address(0), _recipient, 
       mintIndex, _quantity, _data);
@@ -667,8 +708,9 @@ PermitControl, ERC165Storage, IERC721, IERC721Enumerable, IERC721Metadata {
   function setMetadata(uint256 _id, string memory _metadata) external 
   hasItemRight(_id, SET_METADATA) {
 
-    require(!uriLocked && !metadataFrozen[_id], 
-      "Super721: metadata is frozen");
+    if(uriLocked || metadataFrozen[_id]) {
+      revert MetadataIsFrozen();
+    }
     string memory oldMetadata = metadata[_id];
     metadata[_id] = _metadata;
     emit MetadataChanged(_msgSender(), _id, oldMetadata, _metadata);
@@ -720,25 +762,15 @@ PermitControl, ERC165Storage, IERC721, IERC721Enumerable, IERC721Metadata {
     emit CollectionLocked(_msgSender());
   }
 
-  /** 
-    A function used for registering interface when deploying.
-    
-    @param interfaceId The hash of the interface.
-  */
-  function registerInterface(bytes4 interfaceId) external 
-  virtual onlyOwner {
-
-    _registerInterface(interfaceId);
-  }
-
   /**
    * @dev See {IERC721-getApproved}.
    */
   function getApproved(uint256 tokenId) public view 
   override returns (address) {
 
-    require(_exists(tokenId), 
-      "ERC721: approved query for nonexistent token");
+    if(!_exists(tokenId)) {
+      revert GetApprovedQueryNonExictentToken();
+    }
     return tokenApprovals[tokenId];
   }
   
@@ -748,11 +780,13 @@ PermitControl, ERC165Storage, IERC721, IERC721Enumerable, IERC721Metadata {
   function tokenOfOwnerByIndex(address _owner, uint256 _index) public view 
   returns (uint256) {
 
-    require(_owner != address(0), 
-      "ERC721: invalid owner address");
-    require(_index < balanceOf(_owner), 
-      "ERC721: owner index out of bounds");
-
+    if(_owner == address(0)) {
+      revert InvalidOwnerAddress();
+    }
+    if(_index >= balanceOf(_owner)) {
+      revert OwnerIndexOutOfBounds();
+    }
+    
     uint256 numMintedSoFar = mintIndex;
     uint256 tokenIdsIdx = 0;
     address currOwnershipAddr = address(0);
@@ -777,8 +811,9 @@ PermitControl, ERC165Storage, IERC721, IERC721Enumerable, IERC721Metadata {
   function tokenByIndex(uint256 index) public view 
   returns (uint256) {
 
-    require(index < totalSupply, 
-      "ERC721: index out of bounds");
+    if(index >= totalSupply) {
+      revert IndexOutOfBounds();
+    }
     return index;
   }
 }

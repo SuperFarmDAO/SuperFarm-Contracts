@@ -328,22 +328,20 @@ contract FacetGroupUri is PermitControlds, ERC165Storage {
             );
 
             // Add actual item group.
-            b.itemGroups[_groupId] = BlueprintSuper1155.ItemGroup({
-                initialized: true,
-                name: _data.name,
-                supplyType: _data.supplyType,
-                supplyData: _data.supplyData,
-                itemType: _data.itemType,
-                itemData: _data.itemData,
-                burnType: _data.burnType,
-                burnData: _data.burnData,
-                circulatingSupply: 0,
-                mintCount: 0,
-                burnCount: 0,
-                timeData: _data.timeData,
-                transferData: _data.transferData,
-                intrinsicData: _data.intrinsicData
-            });
+            b.itemGroups[_groupId].initialized = true;
+            b.itemGroups[_groupId].name = _data.name;
+            b.itemGroups[_groupId].supplyType = _data.supplyType;
+            b.itemGroups[_groupId].supplyData = _data.supplyData;
+            b.itemGroups[_groupId].itemType = _data.itemType;
+            b.itemGroups[_groupId].itemData = _data.itemData;
+            b.itemGroups[_groupId].burnType = _data.burnType;
+            b.itemGroups[_groupId].burnData = _data.burnData;
+            b.itemGroups[_groupId].circulatingSupply = 0;
+            b.itemGroups[_groupId].mintCount = 0;
+            b.itemGroups[_groupId].burnCount = 0;
+            b.itemGroups[_groupId].timeData = _data.timeData;
+            b.itemGroups[_groupId].transferData = _data.transferData;
+            b.itemGroups[_groupId].intrinsicData = _data.intrinsicData;
 
             b.itemGroups[_groupId].intrinsicData.prefund = 0;
             b.itemGroups[_groupId].intrinsicData.totalLocked = 0;

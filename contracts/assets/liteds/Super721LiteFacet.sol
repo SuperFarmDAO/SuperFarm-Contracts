@@ -1,15 +1,16 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8.7;
-import "@openzeppelin/contracts/utils/introspection/ERC165Storage.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/IERC721Enumerable.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/IERC721Metadata.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
+import '@openzeppelin/contracts/utils/introspection/ERC165.sol';
 
-import "../../../access/PermitControlds.sol";
-import "../../../proxy/StubProxyRegistry.sol";
-import "../../../utils/Utils.sol";
+
+import "../../access/PermitControlds.sol";
+import "../../proxy/StubProxyRegistry.sol";
+import "../../utils/Utils.sol";
 import "./Super721LiteBlueprint.sol";
 
 /**
@@ -29,7 +30,7 @@ import "./Super721LiteBlueprint.sol";
   January 15th, 2022.
 */
 contract Super721LiteFacet is 
-PermitControlds, ERC165Storage, IERC721, IERC721Enumerable, IERC721Metadata {
+PermitControlds, ERC165, IERC721, IERC721Enumerable, IERC721Metadata {
 
   using Address for address;
 
@@ -117,10 +118,19 @@ PermitControlds, ERC165Storage, IERC721, IERC721Enumerable, IERC721Metadata {
   */
   function initialize(address _owner) external initializer {
     __Ownable_init_unchained();
-    _registerInterface(Super721LiteBlueprint._INTERFACE_ID_ERC721);
-    _registerInterface(Super721LiteBlueprint._INTERFACE_ID_ERC721_METADATA);
-    _registerInterface(Super721LiteBlueprint._INTERFACE_ID_ERC721_ENUMERABLE);
     transferOwnership(_owner);
+  }
+
+  /**
+    EIP165 implementation  
+  */
+  function supportsInterface(
+    bytes4 _interfaceId
+  ) public view virtual override(ERC165, IERC165)returns(bool) {
+      return _interfaceId == type(IERC721).interfaceId  
+        || _interfaceId == type(IERC721Enumerable).interfaceId
+        || _interfaceId == type(IERC721Metadata).interfaceId
+        || super.supportsInterface(_interfaceId); 
   }
 
 /**
@@ -644,17 +654,6 @@ PermitControlds, ERC165Storage, IERC721, IERC721Enumerable, IERC721Metadata {
 
     b.locked = true;
     emit CollectionLocked(_msgSender());
-  }
-
-  /** 
-    A function used for registering interface when deploying.
-    
-    @param interfaceId The hash of the interface.
-  */
-  function registerInterface(bytes4 interfaceId) external 
-  virtual onlyOwner {
-
-    _registerInterface(interfaceId);
   }
 
   /**

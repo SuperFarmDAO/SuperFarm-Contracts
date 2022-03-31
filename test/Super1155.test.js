@@ -7,6 +7,10 @@ const NULL_ADDRESS = '0x0000000000000000000000000000000000000000';
 
 const DATA = "0x02";
 
+
+let snapshotId;
+let currentTime;
+
 ///////////////////////////////////////////////////////////
 // SEE https://hardhat.org/tutorial/testing-contracts.html
 // FOR HELP WRITING TESTS
@@ -78,6 +82,15 @@ describe('===Super1155===', function () {
         UNIVERSAL = await super1155.UNIVERSAL();
     });
 
+    beforeEach(async function() {
+        currentTime = await (await ethers.provider.getBlock()).timestamp;
+        snapshotId = await network.provider.send("evm_snapshot");
+    });
+
+    afterEach(async function() {
+        await network.provider.send("evm_revert", [snapshotId]);
+    });
+
     // Test cases
 
     //////////////////////////////
@@ -133,7 +146,7 @@ describe('===Super1155===', function () {
             await super1155.connect(owner)["lockURI()"]();
             await expect(
                 super1155.connect(owner).setURI("://ipfs/newuri/{id}")
-            ).to.be.revertedWith("Super1155: the collection URI has been permanently locked");
+            ).to.be.revertedWith('CollectionURIHasBeenLocked');
 
             expect(await super1155.uri(1)).to.equal(originalUri);
         });
@@ -174,7 +187,7 @@ describe('===Super1155===', function () {
         it('Reverts: setting approval status for self', async () => {
             await expect(
                 super1155.connect(deployer).setApprovalForAll(deployer.address, true)
-            ).to.be.revertedWith("ERC1155: setting approval status for self");
+            ).to.be.revertedWith('SettingApprovalStatusForSelf');
         });
 
         it('uses operatorApprovals except when the operator is registered in the proxyRegistry', async () => {
@@ -236,14 +249,14 @@ describe('===Super1155===', function () {
         it('Reverts: transfer to Zero address', async () => {
             await expect(
                 super1155.connect(signer1).safeTransferFrom(deployer.address, NULL_ADDRESS, shiftedItemGroupId.add(1), "5", DATA)
-            ).to.be.revertedWith("ERC1155: transfer to the zero address");
+            ).to.be.revertedWith('TransferToTheZeroAddress');
 
         });
 
         it('Reverts: transfer not approved', async () => {
             await expect(
                 super1155.connect(signer1).safeTransferFrom(deployer.address, owner.address, shiftedItemGroupId.add(1), "5", DATA)
-            ).to.be.revertedWith("ERC1155: caller is not owner nor approved");
+            ).to.be.revertedWith('CallerIsNotOwnerOrApproved');
         });
 
         it('Reverts: transfer has insufficient balance', async () => {
@@ -252,7 +265,7 @@ describe('===Super1155===', function () {
 
             await expect(
                 super1155.connect(signer1).safeTransferFrom(deployer.address, owner.address, shiftedItemGroupId.add(1), "8", DATA)
-            ).to.be.revertedWith("ERC1155: insufficient balance for transfer");
+            ).to.be.revertedWith('InsufficientBalanceForTransfer');
         });
 
         it('Reverts: transferAcceptanceCheck on a contract with no ERC1155Receiver', async () => {
@@ -314,19 +327,19 @@ describe('===Super1155===', function () {
         it('Reverts: transferBatch ids and amounts length mismatch', async () => {
             await expect(
                 super1155.connect(signer1).safeBatchTransferFrom(deployer.address, owner.address, [shiftedItemGroupId.add(1), shiftedItemGroupId2.add(1)], ["5", "5", "5"], DATA)
-            ).to.be.revertedWith("ERC1155: ids and amounts length mismatch");
+            ).to.be.revertedWith('IdsAndAmountsLengthsMismatch');
         });
 
         it('Reverts: transferBatch to Zero address', async () => {
             await expect(
                 super1155.connect(signer1).safeBatchTransferFrom(deployer.address, NULL_ADDRESS, [shiftedItemGroupId.add(1), shiftedItemGroupId2.add(1)], ["5", "5"], DATA)
-            ).to.be.revertedWith("ERC1155: transfer to the zero address");
+            ).to.be.revertedWith('TransferToTheZeroAddress');
         });
 
         it('Reverts: transferBatch not approved', async () => {
             await expect(
                 super1155.connect(signer1).safeBatchTransferFrom(deployer.address, owner.address, [shiftedItemGroupId.add(1), shiftedItemGroupId2.add(1)], ["5", "5"], DATA)
-            ).to.be.revertedWith("ERC1155: caller is not owner nor approved");
+            ).to.be.revertedWith('CallerIsNotOwnerOrApproved');
         });
 
         it('Reverts: transferBatch has insufficient balance', async () => {
@@ -335,7 +348,7 @@ describe('===Super1155===', function () {
 
             await expect(
                 super1155.connect(signer1).safeBatchTransferFrom(deployer.address, owner.address, [shiftedItemGroupId.add(1), shiftedItemGroupId2.add(1)], ["8", "8"], DATA)
-            ).to.be.revertedWith("ERC1155: insufficient balance for transfer");
+            ).to.be.revertedWith('InsufficientBalanceForTransfer');
         });
 
         it('Reverts: batchTransferAcceptanceCheck on a contract with no ERC1155Receiver', async () => {
@@ -407,7 +420,7 @@ describe('===Super1155===', function () {
                     burnType: 1,
                     burnData: 20000
                 })
-            ).to.be.revertedWith("Super1155: group ID 0 is invalid");
+            ).to.be.revertedWith('GroupIDOIsInvalid');
         });
 
         it('Reverts: sender does not have the right', async () => {
@@ -421,7 +434,7 @@ describe('===Super1155===', function () {
                     burnType: 1,
                     burnData: 20000
                 })
-            ).to.be.revertedWith("Super1155: you don't have rights to configure group");
+            ).to.be.revertedWith('DoNotHaveRigthsToConfigureGroup');
         });
 
         it('Reverts: collection is locked', async function(){
@@ -443,7 +456,7 @@ describe('===Super1155===', function () {
                 itemData: 0,
                 burnType: 1,
                 burnData: 20000
-            })).to.be.revertedWith('Super1155: the collection is locked so groups cannot be created');
+            })).to.be.revertedWith('CollectionIsLockedGroupsCanNotBeCreated');
         });
 
         it('should create a group with UNIVERSAL right', async () => {
@@ -551,7 +564,7 @@ describe('===Super1155===', function () {
                     itemData: 0,
                     burnType: 0,
                     burnData: 0
-            })).to.be.revertedWith("Super1155: you may not decrease supply below the circulating amount");
+            })).to.be.revertedWith('CanNotDecreaseSupplyBelowCirculatingAmount');
 
             // (From) Flexible, Fungible, Replenishable (To) Flexible, Fungible, Replenishable (Changes) supplyData
             super1155.connect(deployer).configureGroup(itemGroupId, {
@@ -607,7 +620,7 @@ describe('===Super1155===', function () {
                 itemData: 0,
                 burnType: 2,
                 burnData: 0
-            })).to.be.revertedWith("Super1155: you may not uncap a capped supply type");
+            })).to.be.revertedWith('CanNotUncapCappedSupplyType');
 
             await expect(super1155.connect(deployer).configureGroup(itemGroupId, {
                 name: 'KFCv6',
@@ -617,7 +630,7 @@ describe('===Super1155===', function () {
                 itemData: 0,
                 burnType: 2,
                 burnData: 0
-            })).to.be.revertedWith("Super1155: you may not increase the supply of a capped type");
+            })).to.be.revertedWith("CanNotIncreaseSupplyOfCappedType");
 
             // (From) Capped, Fungible, Replenishable (To) Capped, Fungible, Burnable (Changes) burnType, burnData
             super1155.connect(deployer).configureGroup(itemGroupId, {
@@ -651,7 +664,7 @@ describe('===Super1155===', function () {
                 itemData: 0,
                 burnType: 1,
                 burnData: 5
-            })).to.be.revertedWith("Super1155: the fungible item is not unique enough to change");
+            })).to.be.revertedWith('FungibleItemIsNotUniqueEnoughToChange');
 
             await expect(
                 super1155.connect(deployer).configureGroup(itemGroupId, {
@@ -662,7 +675,7 @@ describe('===Super1155===', function () {
                 itemData: 0,
                 burnType: 1,
                 burnData: 5
-            })).to.be.revertedWith("Super1155: you may not decrease supply below the circulating amount");
+            })).to.be.revertedWith('CanNotDecreaseSupplyBelowCirculatingAmount');
 
             super1155.connect(owner).burn(deployer.address, shiftedItemGroupId, "1");
 
@@ -690,7 +703,7 @@ describe('===Super1155===', function () {
                 itemData: 0,
                 burnType: 1,
                 burnData: 0
-            })).to.be.revertedWith("Super1155: you may not alter nonfungible items");
+            })).to.be.revertedWith('CanNotAlterNonFungibleItems');
 
             // Check for semi-fungible
             // Create Capped, Fungible, Burnable (Changes) itemType
@@ -720,7 +733,7 @@ describe('===Super1155===', function () {
                 itemData: 0,
                 burnType: 1,
                 burnData: 5
-            })).to.be.revertedWith("Super1155: the fungible item is not unique enough to change");
+            })).to.be.revertedWith('SemifungibleItemIsNotUniqueEnoughToChange');
 
             // Burn to make the fungible item unique
             await super1155.connect(owner).burn(deployer.address, shiftedItemGroupId2, "1");
@@ -750,7 +763,7 @@ describe('===Super1155===', function () {
                 itemData: 0,
                 burnType: 1,
                 burnData: 5
-            })).to.be.revertedWith("Super1155: you may not alter nonfungible items");
+            })).to.be.revertedWith('CanNotAlterSemifungibleItems');
         });
 
         it('should configure a new non-fungible group and edit it to another non-fungible group', async function () {
@@ -822,7 +835,7 @@ describe('===Super1155===', function () {
         it('Reverts: balance of Zero address', async function () {
             await expect(
                 super1155.balanceOf(NULL_ADDRESS, 0)
-                ).to.be.revertedWith("ERC1155: balance query for the zero address");
+                ).to.be.revertedWith('BalanceQueryForZeroAddress');
          });
 
         it('should get the correct balance of a token relating to an address', async function () {
@@ -835,7 +848,7 @@ describe('===Super1155===', function () {
             // Check if the minted balances are correct
             await expect(
                 super1155.connect(owner).balanceOfBatch([deployer.address, deployer.address, deployer.address], [shiftedItemGroupId.add(1), shiftedItemGroupId2.add(1)])
-            ).to.be.revertedWith("ERC1155: accounts and ids length mismatch");
+            ).to.be.revertedWith('AccountsAndLendgthMismatch');
 
         });
        it('should return an array of balances mapped to addresses', async function () {
@@ -922,21 +935,21 @@ describe('===Super1155===', function () {
             // Mint to zero address
             await expect(
                 super1155.connect(deployer).mintBatch(NULL_ADDRESS, [shiftedItemGroupId, shiftedItemGroupId2], ["5", "5"], DATA)
-            ).to.be.revertedWith("ERC1155: mint to the zero address");
+            ).to.be.revertedWith('MintToZeroAddress');
         });
 
         it('Reverts: ids and amounts length mismatch', async function () {
             // Mint with ids and amounts mismatch
             await expect(
                 super1155.connect(deployer).mintBatch(deployer.address, [shiftedItemGroupId, shiftedItemGroupId2], ["5", "5", "5"], DATA)
-            ).to.be.revertedWith("ERC1155: ids and amounts length mismatch");
+            ).to.be.revertedWith('MintIdsAndAmountsLengthsMismatch');
         });
 
         it('Reverts: no valid permit', async function () {
             // Mint without permit
             await expect(
                 super1155.connect(deployer).mintBatch(deployer.address, [shiftedItemGroupId, shiftedItemGroupId2], ["5", "5"], DATA)
-            ).to.be.revertedWith("Super1155: you do not have the right to mint that item");
+            ).to.be.revertedWith('MintDoNotHaveRigthToMintThatItem');
         });
 
         it('Reverts: mint to non-existent itemsgroup', async function () {
@@ -952,7 +965,7 @@ describe('===Super1155===', function () {
             let nonExistentGroup = shiftedItemGroupId.mul(5);
             await expect(
                 super1155.connect(deployer).mintBatch(deployer.address, [nonExistentGroup, shiftedItemGroupId2], ["1", "1"], DATA)
-            ).to.be.revertedWith("Super1155: you cannot mint a non-existent item group");
+            ).to.be.revertedWith('CanNotMintNonExistentItemGroup');
         });
 
         it('Reverts: minting beyond cap', async function () {
@@ -967,7 +980,7 @@ describe('===Super1155===', function () {
             // MintChecker to a group beyond its cap
             await expect(
                 super1155.connect(deployer).mintBatch(deployer.address, [shiftedItemGroupId, shiftedItemGroupId2], ["10", "16"], DATA)
-            ).to.be.revertedWith("Super1155: you cannot mint a group beyond its cap");
+            ).to.be.revertedWith('CanNotMintGroupBeyongItsCap');
         });
 
         it('Reverts: minting more than one non-fungible item', async function () {
@@ -983,7 +996,7 @@ describe('===Super1155===', function () {
             let group3Item = (shiftedItemGroupId.mul(3)).add(2); // GroupID = 3, ItemID = 2
             await expect(
                 super1155.connect(deployer).mintBatch(deployer.address, [group3Item], ["2"], DATA)
-            ).to.be.revertedWith("Super1155: you cannot mint more than a single nonfungible item");
+            ).to.be.revertedWith('CanNotMintMoreThanSingleNonfungibleItem');
         });
 
         it('Reverts: minting more than alloted semi-fungible items', async function () {
@@ -999,7 +1012,7 @@ describe('===Super1155===', function () {
             let group4Item = (shiftedItemGroupId.mul(4)).add(2); // GroupID = 3, ItemID = 2
             await expect(
                 super1155.connect(deployer).mintBatch(deployer.address, [group4Item], ["2"], DATA)
-            ).to.be.revertedWith("Super1155: you cannot mint more than the alloted semifungible items");
+            ).to.be.revertedWith('CanNotMintMoreThanAllotedSemifungibleItems');
         });
 
         it('should mint tokens in batch to an address', async function () {
@@ -1113,14 +1126,14 @@ describe('===Super1155===', function () {
         it('Reverts: burn has no valid permit', async function () {
             await expect(
                 super1155.connect(deployer).burn(deployer.address, shiftedItemGroupId.add(1), "5")
-            ).to.be.revertedWith("Super1155: you don't have rights to burn");
+            ).to.be.revertedWith('DoNotHaveRigthToBurn');
         });
 
         it('Reverts: burn from Zero address', async function () {
             // Burn from Zero address
             await expect(
                 super1155.connect(owner).burn(NULL_ADDRESS, shiftedItemGroupId.add(1), "5")
-                ).to.be.revertedWith("ERC1155: burn from the zero address");
+                ).to.be.revertedWith('BurnFromTheZeroAddress');
         });
 
         it('Reverts: burn from non-existent itemgroup', async function () {
@@ -1128,14 +1141,14 @@ describe('===Super1155===', function () {
             let nonExistentGroup = shiftedItemGroupId.mul(5);
             await expect(
                 super1155.connect(owner).burn(deployer.address, nonExistentGroup, "10")
-                ).to.be.revertedWith("Super1155: you cannot burn a non-existent item group");
+                ).to.be.revertedWith('CanNotBurnNonExistentItemGroup');
         });
 
         it('Reverts: burn limit exceeded on itemgroup', async function () {
             // BurnChecker more than the burn limit
             await expect(
                 super1155.connect(owner).burn(deployer.address, shiftedItemGroupId.add(1), "7")
-                ).to.be.revertedWith("Super1155: you may not exceed the burn limit on this item group");
+                ).to.be.revertedWith('MayNotExceedTheBurnLimitOnThisItemGroup');
 
         });
 
@@ -1143,7 +1156,7 @@ describe('===Super1155===', function () {
             // Burn more than the balance of holder
             await expect(
                 super1155.connect(owner).burn(deployer.address, shiftedItemGroupId.add(1), "6")
-                ).to.be.revertedWith("ERC1155: burn amount exceeds balance");
+                ).to.be.revertedWith('BurnAmountExceedBalance');
         });
 
         it('should burn tokens individually based on UNIVERSAL, GROUP and ITEM circumstances (Modifier)', async function () {
@@ -1204,21 +1217,21 @@ describe('===Super1155===', function () {
             // BurnBatch from Zero address
             await expect(
                 super1155.connect(owner).burnBatch(NULL_ADDRESS, [shiftedItemGroupId3, shiftedItemGroupId4], ["5", "5"])
-                ).to.be.revertedWith("ERC1155: burn from the zero address");
+                ).to.be.revertedWith('BurnFromTheZeroAddress');
         });
 
         it('Reverts: burnBatch ids and amounts length mismatch', async function () {
             // BurnBatch with id and amount length mismatch
             await expect(
                 super1155.connect(owner).burnBatch(deployer.address, [shiftedItemGroupId3, shiftedItemGroupId4], ["5", "5", "5"])
-                ).to.be.revertedWith("ERC1155: ids and amounts length mismatch");
+                ).to.be.revertedWith('BurnIdsAndAmountsLengthsMismatch');
         });
 
         it('Reverts: burnBatch has no valid permit', async function () {
             // BurnBatch without permission
             await expect(
                 super1155.connect(deployer).burnBatch(deployer.address, [shiftedItemGroupId3, shiftedItemGroupId4], ["5", "5"])
-                ).to.be.revertedWith("Super1155: you do not have the right to burn that item");
+                ).to.be.revertedWith('DoNotHaveTheRigthToBurnThatItem');
         });
 
         it('Reverts: burnBatch from non-existent itemgroups', async function () {
@@ -1226,7 +1239,7 @@ describe('===Super1155===', function () {
             let nonExistentGroup = shiftedItemGroupId.mul(5);
             await expect(
                 super1155.connect(owner).burnBatch(deployer.address, [nonExistentGroup, shiftedItemGroupId4], ["5", "5"])
-                ).to.be.revertedWith("Super1155: you cannot burn a non-existent item group");
+                ).to.be.revertedWith('CanNotBurnNonExistentItemGroup');
         });
 
         it('Reverts: burnBatch a non-burnable item group', async function () {
@@ -1255,14 +1268,14 @@ describe('===Super1155===', function () {
             // BurnChecker more than the burn limit
             await expect(
                 super1155.connect(owner).burnBatch(deployer.address, [shiftedItemGroupId3, shiftedItemGroupId4], ["7", "6"])
-                ).to.be.revertedWith("Super1155: you may not exceed the burn limit on this item group");
+                ).to.be.revertedWith('MayNotExceedTheBurnLimitOnThisItemGroup');
         });
 
         it('Reverts: burnBatch amount is more than holder balance', async function () {
             // Burn more than the balances of holders
             await expect(
                 super1155.connect(owner).burnBatch(deployer.address, [shiftedItemGroupId3, shiftedItemGroupId4], ["6", "5"])
-                ).to.be.revertedWith("ERC1155: burn amount exceeds balance");
+                ).to.be.revertedWith('BurnAmountExceedBalance');
         });
 
         it('should burnBatch tokens in batch based on UNIVERSAL, GROUP and ITEM circumstances (Function)', async function () {
@@ -1353,7 +1366,7 @@ describe('===Super1155===', function () {
             // Check if metadata can be set again
             await expect(
                 super1155.connect(deployer).setMetadata(shiftedItemGroupId, DATA)
-                ).to.be.revertedWith("Super1155: you cannot edit this metadata because it is frozen");            
+                ).to.be.revertedWith('CanNotEditFrozenMetadata');            
         });
     });
 
@@ -1400,7 +1413,7 @@ describe('===Super1155===', function () {
                 itemData: 0,
                 burnType: 1,
                 burnData: 5
-            })).to.be.revertedWith("Super1155: the collection is locked so groups cannot be created");
+            })).to.be.revertedWith('CollectionIsLockedGroupsCanNotBeCreated');
         });
     });
 
@@ -1436,7 +1449,7 @@ describe('===Super1155===', function () {
                 [shiftedItemGroupId.add(1)],
                 [1],
                 ethers.utils.id('a')
-            )).to.be.revertedWith("Super1155: you cannot mint a group beyond its cap");
+            )).to.be.revertedWith('CanNotMintGroupBeyongItsCap');
 
             // Burning must fail regardless of whatever itemType it is
             await expect(
@@ -1495,7 +1508,7 @@ describe('===Super1155===', function () {
                     [shiftedItemGroupId],
                     [1],
                     ethers.utils.id('a'))
-                ).to.be.revertedWith("Super1155: you cannot mint more than a single nonfungible item");
+                ).to.be.revertedWith('CanNotMintMoreThanSingleNonfungibleItem');
         });
 
         it('should test BurnType=Burnable FT group. can be minted | can be burned | can not be reminted', async () => {
@@ -1555,7 +1568,7 @@ describe('===Super1155===', function () {
                     [shiftedItemGroupId.add(1)],
                     [1],
                     ethers.utils.id('a'))
-                ).to.be.revertedWith("Super1155: you cannot mint a group beyond its cap");
+                ).to.be.revertedWith('CanNotMintGroupBeyongItsCap');
         });
 
         it('should test BurnType=Burnable SFT group. can be minted | can be burned | can not be reminted', async () => {
@@ -1593,7 +1606,7 @@ describe('===Super1155===', function () {
                     [shiftedItemGroupId.add(2)],
                     [3],
                     ethers.utils.id('a')
-            )).to.be.revertedWith("Super1155: you cannot mint a group beyond its cap");
+            )).to.be.revertedWith('CanNotMintGroupBeyongItsCap');
 
             // Can not mint more beyond itemData
             await expect(
@@ -1602,7 +1615,7 @@ describe('===Super1155===', function () {
                     [shiftedItemGroupId.add(1)],
                     [1],
                     ethers.utils.id('a')
-            )).to.be.revertedWith("Super1155: you cannot mint more than the alloted semifungible items");
+            )).to.be.revertedWith('CanNotMintMoreThanAllotedSemifungibleItems');
 
             // Check circulating supply, mintcount, burncount
             let group = await super1155.itemGroups(itemGroupId);
@@ -1651,7 +1664,7 @@ describe('===Super1155===', function () {
                     [shiftedItemGroupId],
                     [1],
                     ethers.utils.id('a'))
-            ).to.be.revertedWith("Super1155: you cannot mint more than the alloted semifungible items");
+            ).to.be.revertedWith('CanNotMintMoreThanAllotedSemifungibleItems');
 
             // Burn one item but from next item
             await super1155.connect(owner).burnBatch(deployer.address, [shiftedItemGroupId.add(1)], [1]);
@@ -1670,7 +1683,7 @@ describe('===Super1155===', function () {
                 [shiftedItemGroupId.add(1)],
                 [1],
                 ethers.utils.id('a'))
-            ).to.be.revertedWith("Super1155: you cannot mint more than the alloted semifungible items");
+            ).to.be.revertedWith('CanNotMintMoreThanAllotedSemifungibleItems');
         });
         
         it('should test BurnType=Replenishable NFT group. can be minted | can be burned | can be reminted', async () => {
@@ -1730,7 +1743,7 @@ describe('===Super1155===', function () {
                     [shiftedItemGroupId],
                     [1],
                     ethers.utils.id('a'))
-            ).to.be.revertedWith("Super1155: you cannot mint more than a single nonfungible item");
+            ).to.be.revertedWith('CanNotMintMoreThanSingleNonfungibleItem');
         });
 
         it('should test BurnType=Replenishable FT group. can be minted | can be burned | can be reminted', async () => {
@@ -1809,7 +1822,7 @@ describe('===Super1155===', function () {
                     [shiftedItemGroupId.add(1)],
                     [1],
                     ethers.utils.id('a'))
-                ).to.be.revertedWith("Super1155: you cannot mint a group beyond its cap");
+                ).to.be.revertedWith('CanNotMintGroupBeyongItsCap');
 
             // Burn one item
             await super1155.connect(owner).burnBatch(deployer.address, [shiftedItemGroupId.add(1)], [1]);
@@ -1834,7 +1847,7 @@ describe('===Super1155===', function () {
                     [shiftedItemGroupId.add(1)],
                     [1],
                     ethers.utils.id('a'))
-                ).to.be.revertedWith("Super1155: you cannot mint a group beyond its cap");
+                ).to.be.revertedWith('CanNotMintGroupBeyongItsCap');
         });
 
         it('should test BurnType=Replenishable SFT group. can be minted | can be burned | can be reminted', async () => {
@@ -1872,7 +1885,7 @@ describe('===Super1155===', function () {
                     [shiftedItemGroupId.add(2)],
                     [3],
                     ethers.utils.id('a')
-            )).to.be.revertedWith("Super1155: you cannot mint a group beyond its cap");
+            )).to.be.revertedWith('CanNotMintGroupBeyongItsCap');
 
             // Can not mint more beyond itemData
             await expect(
@@ -1881,7 +1894,7 @@ describe('===Super1155===', function () {
                     [shiftedItemGroupId.add(1)],
                     [1],
                     ethers.utils.id('a')
-            )).to.be.revertedWith("Super1155: you cannot mint more than the alloted semifungible items");
+            )).to.be.revertedWith('CanNotMintMoreThanAllotedSemifungibleItems');
 
             // Check circulating supply, mintcount, burncount
             let group = await super1155.itemGroups(itemGroupId);
@@ -1953,7 +1966,7 @@ describe('===Super1155===', function () {
                     [shiftedItemGroupId],
                     [1],
                     ethers.utils.id('a'))
-            ).to.be.revertedWith("Super1155: you cannot mint more than the alloted semifungible items");
+            ).to.be.revertedWith('CanNotMintMoreThanAllotedSemifungibleItems');
 
             // Burn one item but from next item
             await super1155.connect(owner).burnBatch(deployer.address, [shiftedItemGroupId.add(1)], [1]);
@@ -1978,7 +1991,7 @@ describe('===Super1155===', function () {
                 [shiftedItemGroupId.add(1)],
                 [1],
                 ethers.utils.id('a'))
-            ).to.be.revertedWith("Super1155: you cannot mint more than the alloted semifungible items");
+            ).to.be.revertedWith('CanNotMintMoreThanAllotedSemifungibleItems');
         });
     });
     
