@@ -5,6 +5,8 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
+import "../staker/stakerDs/StakerBlueprint.sol";
+
 /**
  * @title An asset staking contract.
  * @author Tim Clancy
@@ -17,30 +19,31 @@ import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
  * This code is inspired by and modified from Sushi's Master Chef contract.
  * https://github.com/sushiswap/sushiswap/blob/master/contracts/MasterChef.sol
  */
-contract TestStakerV3FacetPoints {
+contract TestStakerV3FacetBoosters {
     using SafeERC20 for IERC20;
     using EnumerableSet for EnumerableSet.UintSet;
     using EnumerableSet for EnumerableSet.AddressSet;
 
     /**
-     * Allows the owner of this Staker to grant or remove approval to an external
-     * spender of the points that users accrue from staking resources.
-     * @param _spender The external address allowed to spend user points.
-     * @param _approval The updated user approval status.
+     * Deposit some particular assets to a particular pool on the Staker.
+     * @param _poolId the pool id.
+     * @param _boosterId id of booster that you want to achieve.
+     * @param _asset asset user wants to lock for booster.
      */
-    function approvePointSpender(address _spender, bool _approval)
-        external
-        returns (bytes memory)
-    {
+    function stakeItemsBatch(
+        uint256 _poolId,
+        uint256 _boosterId,
+        StakerBlueprint.StakedAsset memory _asset
+    ) external returns (bytes memory) {
         return msg.data;
     }
 
     /**
-     * Allows an approved spender of points to spend points on behalf of a user.
-     * @param _user The user whose points are being spent.
-     * @param _amount The amount of the user's points being spent.
+     * Withdraw some particular assets from a particular pool on the Staker.
+     * @param _poolId the id of pool, withdraw tokens from.
+     * @param _boosterId the booster that accepted these Items.
      */
-    function spendPoints(address _user, uint256 _amount)
+    function unstakeItemsBatch(uint256 _poolId, uint256 _boosterId)
         external
         returns (bytes memory)
     {

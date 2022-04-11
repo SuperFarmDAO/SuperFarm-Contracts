@@ -209,22 +209,22 @@ contract StakerV2FacetStaking is Sweepableds, ReentrancyGuard {
         return ((user.amount * pointsPerShare) / 1e30) - user.pointPaid;
     }
 
-    /**
-     * Return the number of points that the user has available to spend.
-     * @return the number of points that the user has available to spend.
-     */
-    function getAvailablePoints(address _user) public view returns (uint256) {
-        StakerBlueprint.StakerStateVariables storage b = StakerBlueprint
-            .stakerStateVariables();
+    // /**
+    //  * Return the number of points that the user has available to spend.
+    //  * @return the number of points that the user has available to spend.
+    //  */
+    // function getAvailablePoints(address _user) public view returns (uint256) {
+    //     StakerBlueprint.StakerStateVariables storage b = StakerBlueprint
+    //         .stakerStateVariables();
 
-        uint256 pendingTotal = 0;
-        for (uint256 i; i < b.poolTokens.length; i++) {
-            IERC20 poolToken = b.poolTokens[i];
-            uint256 _pendingPoints = getPendingPoints(poolToken, _user);
-            pendingTotal = pendingTotal + _pendingPoints;
-        }
-        return (b.userPoints[_user] + pendingTotal) - b.userSpentPoints[_user];
-    }
+    //     uint256 pendingTotal = 0;
+    //     for (uint256 i; i < b.poolTokens.length; i++) {
+    //         IERC20 poolToken = b.poolTokens[i];
+    //         uint256 _pendingPoints = getPendingPoints(poolToken, _user);
+    //         pendingTotal = pendingTotal + _pendingPoints;
+    //     }
+    //     return (b.userPoints[_user] + pendingTotal) - b.userSpentPoints[_user];
+    // }
 
     /**
      * Return the total number of points that the user has ever accrued.
@@ -683,35 +683,35 @@ contract StakerV2FacetStaking is Sweepableds, ReentrancyGuard {
         emit UnstakeItemBatch(msg.sender, _token, _boosterId);
     }
 
-    /**
-     * Allows the owner of this Staker to grant or remove approval to an external
-     * spender of the points that users accrue from staking resources.
-     * @param _spender The external address allowed to spend user points.
-     * @param _approval The updated user approval status.
-     */
-    function approvePointSpender(address _spender, bool _approval)
-        external
-        hasValidPermit(UNIVERSAL, StakerBlueprint.APPROVE_POINT_SPENDER)
-    {
-        StakerBlueprint.StakerStateVariables storage b = StakerBlueprint
-            .stakerStateVariables();
+    // /**
+    //  * Allows the owner of this Staker to grant or remove approval to an external
+    //  * spender of the points that users accrue from staking resources.
+    //  * @param _spender The external address allowed to spend user points.
+    //  * @param _approval The updated user approval status.
+    //  */
+    // function approvePointSpender(address _spender, bool _approval)
+    //     external
+    //     hasValidPermit(UNIVERSAL, StakerBlueprint.APPROVE_POINT_SPENDER)
+    // {
+    //     StakerBlueprint.StakerStateVariables storage b = StakerBlueprint
+    //         .stakerStateVariables();
 
-        b.approvedPointSpenders[_spender] = _approval;
-    }
+    //     b.approvedPointSpenders[_spender] = _approval;
+    // }
 
-    /**
-     * Allows an approved spender of points to spend points on behalf of a user.
-     * @param _user The user whose points are being spent.
-     * @param _amount The amount of the user's points being spent.
-     */
-    function spendPoints(address _user, uint256 _amount) external {
-        StakerBlueprint.StakerStateVariables storage b = StakerBlueprint
-            .stakerStateVariables();
+    // /**
+    //  * Allows an approved spender of points to spend points on behalf of a user.
+    //  * @param _user The user whose points are being spent.
+    //  * @param _amount The amount of the user's points being spent.
+    //  */
+    // function spendPoints(address _user, uint256 _amount) external {
+    //     StakerBlueprint.StakerStateVariables storage b = StakerBlueprint
+    //         .stakerStateVariables();
 
-        require(b.approvedPointSpenders[msg.sender], "Not allowed.");
-        require(getAvailablePoints(_user) >= _amount, "Invalid amount.");
+    //     require(b.approvedPointSpenders[msg.sender], "Not allowed.");
+    //     require(getAvailablePoints(_user) >= _amount, "Invalid amount.");
 
-        b.userSpentPoints[_user] += _amount;
-        emit SpentPoints(msg.sender, _user, _amount);
-    }
+    //     b.userSpentPoints[_user] += _amount;
+    //     emit SpentPoints(msg.sender, _user, _amount);
+    // }
 }

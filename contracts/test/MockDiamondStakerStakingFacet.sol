@@ -246,12 +246,10 @@ contract TestStakerV3FacetStaking is
     /**
      * Deposit some particular assets to a particular pool on the Staker.
      * @param _poolId the pool id.
-     * @param _boosterId id of booster that you want to achieve.
      * @param _asset asset user wants to deposit
      */
     function deposit(
         uint256 _poolId,
-        uint256 _boosterId,
         StakerBlueprint.StakedAsset memory _asset,
         bool isLocking
     ) external returns (bytes memory) {
@@ -261,13 +259,11 @@ contract TestStakerV3FacetStaking is
     /**
      * Withdraw some particular assets from a particular pool on the Staker.
      * @param _poolId the id of pool, withdraw tokens from.
-     * @param _asset asset user wants to withdraw
      */
-    function withdraw(
-        uint256 _poolId,
-        StakerBlueprint.StakedAsset memory _asset,
-        uint256 _boosterId
-    ) external returns (bytes memory) {
+    function withdraw(uint256 _poolId, uint256[] calldata IOUTokenIds)
+        external
+        returns (bytes memory)
+    {
         return msg.data;
     }
 

@@ -32,24 +32,6 @@ contract StakerV3FacetCore is Sweepableds, ERC1155Holder, IERC721Receiver {
     using EnumerableSet for EnumerableSet.UintSet;
     using EnumerableSet for EnumerableSet.AddressSet;
 
-    error CantAlterDevs();
-    error ZeroDevShare();
-    error CantIncreaseDevShare();
-    error InvalidNewAddress();
-    error CantAlterTokenEmissionSchedule();
-    error CantAlterPointEmissionSchedule();
-    error ZeroTokenEmissionEvents();
-    error ZeroPointEmissionEvents();
-    error EmptyBoostInfoArray();
-    error InputLengthsMismatch();
-    error BoosterIdZero();
-    error InvalidConfBoostersInputs();
-    error InvalidConfBoostersAssetType();
-    error EmissionNotSet();
-    error ZeroStrength();
-    error InvalidAsset();
-    error InvalidTypeOfAsset();
-
     /**
      * A function that needs to be called immediately after deployment.
      * Sets the owner of the newly deployed proxy.
@@ -74,7 +56,7 @@ contract StakerV3FacetCore is Sweepableds, ERC1155Holder, IERC721Receiver {
             .stakerStateVariables();
 
         if (!b.canAlterDevelopers) {
-            revert CantAlterDevs();
+            revert StakerBlueprint.CantAlterDevs();
         }
         b.developerAddresses.add(_developerAddress);
         b.developerShares[_developerAddress] = _share;
@@ -111,10 +93,10 @@ contract StakerV3FacetCore is Sweepableds, ERC1155Holder, IERC721Receiver {
 
         uint256 developerShare = b.developerShares[msg.sender];
         if (developerShare == 0) {
-            revert ZeroDevShare();
+            revert StakerBlueprint.ZeroDevShare();
         }
         if (_newShare > developerShare) {
-            revert CantIncreaseDevShare();
+            revert StakerBlueprint.CantIncreaseDevShare();
         }
         if (_newShare == 0) {
             b.developerAddresses.remove(msg.sender);
@@ -125,7 +107,7 @@ contract StakerV3FacetCore is Sweepableds, ERC1155Holder, IERC721Receiver {
                     b.developerShares[_newDeveloperAddress] != 0 ||
                     _newDeveloperAddress == address(0)
                 ) {
-                    revert InvalidNewAddress();
+                    revert StakerBlueprint.InvalidNewAddress();
                 }
                 delete b.developerShares[msg.sender];
                 b.developerAddresses.remove(msg.sender);
@@ -152,7 +134,7 @@ contract StakerV3FacetCore is Sweepableds, ERC1155Holder, IERC721Receiver {
 
         if (_tokenSchedule.length > 0) {
             if (!b.canAlterTokenEmissionSchedule) {
-                revert CantAlterTokenEmissionSchedule();
+                revert StakerBlueprint.CantAlterTokenEmissionSchedule();
             }
             b.tokenEmissionEventsCount = _tokenSchedule.length;
             for (uint256 i; i < b.tokenEmissionEventsCount; i++) {
@@ -165,12 +147,12 @@ contract StakerV3FacetCore is Sweepableds, ERC1155Holder, IERC721Receiver {
             }
         }
         if (b.tokenEmissionEventsCount == 0) {
-            revert ZeroTokenEmissionEvents();
+            revert StakerBlueprint.ZeroTokenEmissionEvents();
         }
 
         if (_pointSchedule.length > 0) {
             if (!b.canAlterPointEmissionSchedule) {
-                revert CantAlterPointEmissionSchedule();
+                revert StakerBlueprint.CantAlterPointEmissionSchedule();
             }
             b.pointEmissionEventsCount = _pointSchedule.length;
             for (uint256 i; i < b.pointEmissionEventsCount; i++) {
@@ -183,7 +165,7 @@ contract StakerV3FacetCore is Sweepableds, ERC1155Holder, IERC721Receiver {
             }
         }
         if (b.pointEmissionEventsCount == 0) {
-            revert ZeroPointEmissionEvents();
+            revert StakerBlueprint.ZeroPointEmissionEvents();
         }
     }
 
@@ -231,22 +213,22 @@ contract StakerV3FacetCore is Sweepableds, ERC1155Holder, IERC721Receiver {
             .stakerStateVariables();
 
         if (_boostInfo.length == 0) {
-            revert EmptyBoostInfoArray();
+            revert StakerBlueprint.EmptyBoostInfoArray();
         }
         if (_ids.length != _boostInfo.length) {
-            revert InputLengthsMismatch();
+            revert StakerBlueprint.InputLengthsMismatch();
         }
 
         for (uint256 i; i < _boostInfo.length; i++) {
             if (_ids[i] == 0) {
-                revert BoosterIdZero();
+                revert StakerBlueprint.BoosterIdZero();
             }
             if (
                 (_boostInfo[i].multiplier == 0 &&
                     _boostInfo[i].amountRequired == 0) ||
                 _boostInfo[i].contractRequired == address(0)
             ) {
-                revert InvalidConfBoostersInputs();
+                revert StakerBlueprint.InvalidConfBoostersInputs();
             }
             if (
                 _boostInfo[i].typeOfAsset !=
@@ -254,7 +236,7 @@ contract StakerV3FacetCore is Sweepableds, ERC1155Holder, IERC721Receiver {
                 _boostInfo[i].typeOfAsset !=
                 StakerBlueprint.PoolAssetType.ERC1155
             ) {
-                revert InvalidConfBoostersAssetType();
+                revert StakerBlueprint.InvalidConfBoostersAssetType();
             }
 
             unchecked {
@@ -295,12 +277,12 @@ contract StakerV3FacetCore is Sweepableds, ERC1155Holder, IERC721Receiver {
         if (
             b.tokenEmissionEventsCount == 0 || b.pointEmissionEventsCount == 0
         ) {
-            revert EmissionNotSet();
+            revert StakerBlueprint.EmissionNotSet();
         }
 
-        if (_addPoolStruct.typeOfAsset == StakerBlueprint.PoolAssetType.ERC20) {
-            revert InvalidTypeOfAsset();
-        }
+        // if (_addPoolStruct.typeOfAsset == StakerBlueprint.PoolAssetType.ERC20) {
+        //     revert StakerBlueprint.InvalidTypeOfAsset();
+        // }
 
         if (
             _addPoolStruct.typeOfAsset == StakerBlueprint.PoolAssetType.ERC721
@@ -310,15 +292,17 @@ contract StakerV3FacetCore is Sweepableds, ERC1155Holder, IERC721Receiver {
                     StakerBlueprint.INTERFACE_ERC721
                 )
             ) {
-                revert InvalidAsset();
+                revert StakerBlueprint.InvalidAsset();
             }
-        } else {
+        } else if (
+            _addPoolStruct.typeOfAsset == StakerBlueprint.PoolAssetType.ERC1155
+        ) {
             if (
                 !IERC1155(_addPoolStruct.assetAddress).supportsInterface(
                     StakerBlueprint.INTERFACE_ERC1155
                 )
             ) {
-                revert InvalidAsset();
+                revert StakerBlueprint.InvalidAsset();
             }
         }
 
@@ -326,7 +310,13 @@ contract StakerV3FacetCore is Sweepableds, ERC1155Holder, IERC721Receiver {
             _addPoolStruct.tokenStrength == 0 ||
             _addPoolStruct.pointStrength == 0
         ) {
-            revert ZeroStrength();
+            revert StakerBlueprint.ZeroStrength();
+        }
+        if (
+            _addPoolStruct.groupId != 0 &&
+            _addPoolStruct.typeOfAsset == StakerBlueprint.PoolAssetType.ERC20
+        ) {
+            revert StakerBlueprint.InvalidGroupIdForERC20();
         }
 
         uint256 lastTokenRewardTime = block.timestamp >
@@ -340,6 +330,7 @@ contract StakerV3FacetCore is Sweepableds, ERC1155Holder, IERC721Receiver {
         uint256 lastRewardEvent = lastTokenRewardTime > lastPointRewardTime
             ? lastTokenRewardTime
             : lastPointRewardTime;
+
         if (
             address(b.poolInfoV3[_addPoolStruct.id].assetAddress) == address(0)
         ) {
@@ -363,9 +354,12 @@ contract StakerV3FacetCore is Sweepableds, ERC1155Holder, IERC721Receiver {
             b.poolInfoV3[_addPoolStruct.id].pointBoostedDeposit = 0;
             b.poolInfoV3[_addPoolStruct.id].pointsPerShare = _addPoolStruct
                 .pointsPerShare;
+            b.poolInfoV3[_addPoolStruct.id].groupId = _addPoolStruct.groupId;
             b.poolInfoV3[_addPoolStruct.id].lastRewardEvent = lastRewardEvent;
             b.poolInfoV3[_addPoolStruct.id].boostInfo = _addPoolStruct
                 .boostInfo;
+            b.poolInfoV3[_addPoolStruct.id].typeOfPool = _addPoolStruct
+                .typeOfPool;
             b.poolInfoV3[_addPoolStruct.id].typeOfAsset = _addPoolStruct
                 .typeOfAsset;
             b.poolInfoV3[_addPoolStruct.id].lockPeriod = _addPoolStruct
@@ -399,25 +393,24 @@ contract StakerV3FacetCore is Sweepableds, ERC1155Holder, IERC721Receiver {
                 _addPoolStruct.pointStrength;
             b.poolInfoV3[_addPoolStruct.id].pointStrength = _addPoolStruct
                 .pointStrength;
-
-            b.poolInfoV3[_addPoolStruct.id].lockPeriod = _addPoolStruct
-                .lockPeriod;
-            b.poolInfoV3[_addPoolStruct.id].lockAmount = _addPoolStruct
-                .lockAmount;
-            b.poolInfoV3[_addPoolStruct.id].lockMultiplier = _addPoolStruct
-                .lockMultiplier;
-            b
-                .poolInfoV3[_addPoolStruct.id]
-                .compoundInterestThreshold = _addPoolStruct
-                .compoundInterestThreshold;
-            b
-                .poolInfoV3[_addPoolStruct.id]
-                .compoundInterestMultiplier = _addPoolStruct
-                .compoundInterestMultiplier;
-            b.poolInfoV3[_addPoolStruct.id].timeLockTypeOfBoost = _addPoolStruct
-                .timeLockTypeOfBoost;
-            b.poolInfoV3[_addPoolStruct.id].compoundTypeOfBoost = _addPoolStruct
-                .compoundTypeOfBoost;
+            // b.poolInfoV3[_addPoolStruct.id].lockPeriod = _addPoolStruct
+            //     .lockPeriod;
+            // b.poolInfoV3[_addPoolStruct.id].lockAmount = _addPoolStruct
+            //     .lockAmount;
+            // b.poolInfoV3[_addPoolStruct.id].lockMultiplier = _addPoolStruct
+            //     .lockMultiplier;
+            // b
+            //     .poolInfoV3[_addPoolStruct.id]
+            //     .compoundInterestThreshold = _addPoolStruct
+            //     .compoundInterestThreshold;
+            // b
+            //     .poolInfoV3[_addPoolStruct.id]
+            //     .compoundInterestMultiplier = _addPoolStruct
+            //     .compoundInterestMultiplier;
+            // b.poolInfoV3[_addPoolStruct.id].timeLockTypeOfBoost = _addPoolStruct
+            //     .timeLockTypeOfBoost;
+            // b.poolInfoV3[_addPoolStruct.id].compoundTypeOfBoost = _addPoolStruct
+            //     .compoundTypeOfBoost;
 
             // Append boosters by avoid writing to storage directly in a loop to avoid costs
             uint256[] memory boosters = new uint256[](
