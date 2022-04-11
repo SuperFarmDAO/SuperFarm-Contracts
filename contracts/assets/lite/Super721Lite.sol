@@ -4,12 +4,12 @@ import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/IERC721Enumerable.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/IERC721Metadata.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
+import '@openzeppelin/contracts/utils/introspection/ERC165.sol';
 import "@openzeppelin/contracts/utils/Address.sol";
 
 import "../../access/PermitControl.sol";
 import "../../proxy/StubProxyRegistry.sol";
 import "../../utils/Utils.sol";
-import '@openzeppelin/contracts/utils/introspection/ERC165.sol';
 
 
 /*
@@ -601,8 +601,6 @@ PermitControl, ERC165, IERC721, IERC721Enumerable, IERC721Metadata {
       // Clear approvals from the previous owner
       approve(address(0), _ids[i]);
 
-      balances[_from] -= 1;
-      balances[_to] += 1;
       ownerships[_ids[i]] = _to;
 
       // Set the immediate ownership of token index + 1
@@ -614,6 +612,8 @@ PermitControl, ERC165, IERC721, IERC721Enumerable, IERC721Metadata {
       }
       emit Transfer(_from, _to, _ids[i]);
     }
+    balances[_from] -= _ids.length;
+    balances[_to] += _ids.length;
 
     _afterTokenTransfer(_msgSender(), address(0), _to, mintIndex, _ids.length, _data);
   }

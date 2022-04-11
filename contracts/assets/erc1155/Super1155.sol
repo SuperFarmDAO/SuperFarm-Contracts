@@ -668,6 +668,7 @@ contract Super1155 is
 
         // Validate transfer and perform all batch token sends.
         _beforeTokenTransfer(_msgSender(), _from, _to, _ids, _amounts, _data);
+        uint amountToTransfer;
         for (uint256 i = 0; i < _ids.length; ++i) {
             // Retrieve the item's group ID.
             uint256 groupId = (_ids[i] & GROUP_MASK) >> 128;
@@ -684,9 +685,10 @@ contract Super1155 is
             groupBalances[groupId][_to] =
                 groupBalances[groupId][_to] +
                 _amounts[i];
-            totalBalances[_from] = totalBalances[_from] - _amounts[i];
-            totalBalances[_to] = totalBalances[_to] + _amounts[i];
+            amountToTransfer = amountToTransfer + _amounts[i];
         }
+        totalBalances[_from] = totalBalances[_from] - amountToTransfer;
+        totalBalances[_to] = totalBalances[_to] + amountToTransfer;
 
         // Emit the transfer event and perform the safety check.
         emit TransferBatch(_msgSender(), _from, _to, _ids, _amounts);
@@ -759,9 +761,9 @@ contract Super1155 is
             itemGroups[_groupId].itemData = _data.itemData;
             itemGroups[_groupId].burnType = _data.burnType;
             itemGroups[_groupId].burnData = _data.burnData;
-            itemGroups[_groupId].circulatingSupply = 0;
-            itemGroups[_groupId].mintCount = 0;
-            itemGroups[_groupId].burnCount = 0;
+            // itemGroups[_groupId].circulatingSupply = 0;
+            // itemGroups[_groupId].mintCount = 0;
+            // itemGroups[_groupId].burnCount = 0;
 
             // Edit an existing item group. The name may always be updated.
         } else {
@@ -965,6 +967,7 @@ contract Super1155 is
 
         // Loop through each of the batched IDs to update storage of special
         // balances and circulation balances.
+        uint totalMintAmount;
         for (uint256 i = 0; i < _ids.length; i++) {
             if(!_hasItemRight(_ids[i], MINT)) {
                 revert MintDoNotHaveRigthToMintThatItem();
@@ -981,7 +984,7 @@ contract Super1155 is
             groupBalances[groupId][_recipient] =
                 groupBalances[groupId][_recipient] +
                 _amounts[i];
-            totalBalances[_recipient] = totalBalances[_recipient] + _amounts[i];
+            totalMintAmount = totalMintAmount + _amounts[i]; 
             mintCount[mintedItemId] = mintCount[mintedItemId] + _amounts[i];
             circulatingSupply[mintedItemId] =
                 circulatingSupply[mintedItemId] +
@@ -993,6 +996,7 @@ contract Super1155 is
                 itemGroups[groupId].circulatingSupply +
                 _amounts[i];
         }
+        totalBalances[_recipient] = totalBalances[_recipient] + totalMintAmount;
 
         // Emit event and handle the safety check.
         emit TransferBatch(operator, address(0), _recipient, _ids, _amounts);
@@ -1074,6 +1078,7 @@ contract Super1155 is
 
         // Loop through each of the batched IDs to update storage of special
         // balances and circulation balances.
+        uint totalBurnAmount;
         for (uint256 i = 0; i < _ids.length; i++) {
             if(!_hasItemRight(_ids[i], BURN)) {
                 revert DoNotHaveTheRigthToBurnThatItem();
@@ -1093,7 +1098,7 @@ contract Super1155 is
             groupBalances[groupId][_burner] =
                 groupBalances[groupId][_burner] -
                 _amounts[i];
-            totalBalances[_burner] = totalBalances[_burner] - _amounts[i];
+            totalBurnAmount = totalBurnAmount + _amounts[i];
             burnCount[burntItemId] = burnCount[burntItemId] + _amounts[i];
             circulatingSupply[burntItemId] =
                 circulatingSupply[burntItemId] -
@@ -1105,6 +1110,7 @@ contract Super1155 is
                 itemGroups[groupId].circulatingSupply -
                 _amounts[i];
         }
+        totalBalances[_burner] = totalBalances[_burner] - totalBurnAmount;
 
         // Emit the burn event.
         emit TransferBatch(operator, _burner, address(0), _ids, _amounts);

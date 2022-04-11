@@ -484,8 +484,6 @@ PermitControlds, ERC165, IERC721, IERC721Enumerable, IERC721Metadata {
       // Clear approvals from the previous owner
       approve(address(0), _ids[i]);
 
-      b.balances[_from] -= 1;
-      b.balances[_to] += 1;
       b.ownerships[_ids[i]] = _to;
 
       // Set the immediate ownership of token index + 1
@@ -497,6 +495,8 @@ PermitControlds, ERC165, IERC721, IERC721Enumerable, IERC721Metadata {
       }
       emit Transfer(_from, _to, _ids[i]);
     }
+    b.balances[_from] -= _ids.length;
+    b.balances[_to] += _ids.length;
 
     _afterTokenTransfer(_msgSender(), address(0), _to, b.mintIndex, _ids.length, _data);
   }

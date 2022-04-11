@@ -398,16 +398,18 @@ PermitControlds, ERC165, IERC1155, IERC1155MetadataURI {
 
     // Validate transfer and perform all batch token sends.
     _beforeTokenTransfer(_msgSender(), _from, _to, _ids, _amounts, _data);
+    uint totalAmounts;
     for (uint256 i = 0; i < _ids.length; ++i) {
 
       // Update all specially-tracked balances.
       require(b.balances[_ids[i]][_from] >= _amounts[i], 
         "ERC1155: insufficient balance for transfer");
+      totalAmounts += _amounts[i];
       b.balances[_ids[i]][_from] = b.balances[_ids[i]][_from] - _amounts[i];
       b.balances[_ids[i]][_to] = b.balances[_ids[i]][_to] + _amounts[i];
-      b.totalBalances[_from] = b.totalBalances[_from] - _amounts[i];
-      b.totalBalances[_to] = b.totalBalances[_to] + _amounts[i];
     }
+    b.totalBalances[_from] = b.totalBalances[_from] - totalAmounts;
+    b.totalBalances[_to] = b.totalBalances[_to] + totalAmounts;
 
     // Emit the transfer event and perform the safety check.
     emit TransferBatch(_msgSender(), _from, _to, _ids, _amounts);
@@ -484,15 +486,17 @@ PermitControlds, ERC165, IERC1155, IERC1155MetadataURI {
     _ids, _amounts, _data);
 
     // Loop through each of the batched IDs to update balances.
+    uint totalAmounts;
     for (uint256 i = 0; i < _ids.length; i++) {
       require(_hasItemRight(_ids[i], Super1155LiteBlueprint.MINT),
         "Super1155: you do not have the right to mint that item");
 
       // Update storage of special balances and circulating values.
       b.balances[_ids[i]][_recipient] = b.balances[_ids[i]][_recipient] + _amounts[i];
-      b.totalBalances[_recipient] = b.totalBalances[_recipient] + _amounts[i];
       b.circulatingSupply[_ids[i]] = b.circulatingSupply[_ids[i]] + _amounts[i];
+      totalAmounts += _amounts[i];
     }
+    b.totalBalances[_recipient] = b.totalBalances[_recipient] + totalAmounts;
 
     // Emit event and handle the safety check.
     emit TransferBatch(operator, address(0), _recipient, _ids, _amounts);

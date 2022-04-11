@@ -855,17 +855,14 @@ ERC165, PermitControl, IERC721, IERC721Enumerable, IERC721Metadata {
         for (uint256 i = 0; i < _ids.length; ++i) {
             // Retrieve the item's group ID.
             uint256 groupId = (_ids[i] & GROUP_MASK) >> 128;
-
             // Update all specially-tracked group-specific balances.
             if(balances[_ids[i]][_from] < 1) {
                 revert SafeBatchTransferInsufficientBalance();
             }
-            balances[_ids[i]][_from] = balances[_ids[i]][_from] - 1;
-            balances[_ids[i]][_to] = balances[_ids[i]][_to] + 1;
+            balances[_ids[i]][_from] = 0;
+            balances[_ids[i]][_to] = 1;
             groupBalances[groupId][_from] = groupBalances[groupId][_from] - 1;
             groupBalances[groupId][_to] = groupBalances[groupId][_to] + 1;
-            totalBalances[_from] = totalBalances[_from] - 1;
-            totalBalances[_to] = totalBalances[_to] + 1;
             _holderTokens[_from].remove(_ids[i]);
             _holderTokens[_to].add(_ids[i]);
 
@@ -880,6 +877,8 @@ ERC165, PermitControl, IERC721, IERC721Enumerable, IERC721Metadata {
                 _data
             );
         }
+        totalBalances[_from] = totalBalances[_from] - _ids.length;
+        totalBalances[_to] = totalBalances[_to] + _ids.length;
     }
 
     /**
@@ -911,9 +910,6 @@ ERC165, PermitControl, IERC721, IERC721Enumerable, IERC721Metadata {
             itemGroups[_groupId].supplyData = _data.supplyData;
             itemGroups[_groupId].burnType = _data.burnType;
             itemGroups[_groupId].burnData = _data.burnData;
-            itemGroups[_groupId].circulatingSupply = 0;
-            itemGroups[_groupId].mintCount = 0;
-            itemGroups[_groupId].burnCount = 0;
 
             // Edit an existing item group. The name may always be updated.
         } else {
@@ -1065,7 +1061,6 @@ ERC165, PermitControl, IERC721, IERC721Enumerable, IERC721Metadata {
             groupBalances[groupId][_recipient] =
                 groupBalances[groupId][_recipient] +
                 1;
-            totalBalances[_recipient] = totalBalances[_recipient] + 1;
             mintCount[mintedItemId] = mintCount[mintedItemId] + 1;
             circulatingSupply[mintedItemId] =
                 circulatingSupply[mintedItemId] +
@@ -1089,6 +1084,7 @@ ERC165, PermitControl, IERC721, IERC721Enumerable, IERC721Metadata {
                 _data
             );
         }
+        totalBalances[_recipient] = totalBalances[_recipient] + _ids.length;
     }
 
     /**
@@ -1209,7 +1205,6 @@ ERC165, PermitControl, IERC721, IERC721Enumerable, IERC721Metadata {
             groupBalances[groupId][_burner] =
                 groupBalances[groupId][_burner] -
                 1;
-            totalBalances[_burner] = totalBalances[_burner] - 1;
             burnCount[burntItemId] = burnCount[burntItemId] + 1;
             circulatingSupply[burntItemId] = circulatingSupply[burntItemId] - 1;
             itemGroups[groupId].burnCount = itemGroups[groupId].burnCount + 1;
@@ -1228,6 +1223,7 @@ ERC165, PermitControl, IERC721, IERC721Enumerable, IERC721Metadata {
             // Emit the burn event.
             emit Transfer(operator, address(0), _ids[i]);
         }
+        totalBalances[_burner] = totalBalances[_burner] - _ids.length;
     }
 
     /**

@@ -1,13 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8.7;
 
-import "@openzeppelin/contracts/token/ERC1155/IERC1155.sol";
 import "@openzeppelin/contracts/token/ERC1155/extensions/IERC1155MetadataURI.sol";
+import "@openzeppelin/contracts/token/ERC1155/IERC1155.sol";
 import "@openzeppelin/contracts/token/ERC1155/IERC1155Receiver.sol";
+import '@openzeppelin/contracts/utils/introspection/ERC165.sol';
 import "@openzeppelin/contracts/utils/Address.sol";
+
 import "../../access/PermitControl.sol";
 import "../../proxy/StubProxyRegistry.sol";
-import '@openzeppelin/contracts/utils/introspection/ERC165.sol';
 
 /**
   ERROR CODES
@@ -500,6 +501,7 @@ ERC165, PermitControl, IERC1155, IERC1155MetadataURI {
 
     // Validate transfer and perform all batch token sends.
     _beforeTokenTransfer(_msgSender(), _from, _to, _ids, _amounts, _data);
+    uint amountToTransfer;  
     for (uint256 i = 0; i < _ids.length; ++i) {
 
       // Update all specially-tracked balances.
@@ -508,9 +510,10 @@ ERC165, PermitControl, IERC1155, IERC1155MetadataURI {
       }
       balances[_ids[i]][_from] = balances[_ids[i]][_from] - _amounts[i];
       balances[_ids[i]][_to] = balances[_ids[i]][_to] + _amounts[i];
-      totalBalances[_from] = totalBalances[_from] - _amounts[i];
-      totalBalances[_to] = totalBalances[_to] + _amounts[i];
+      amountToTransfer = amountToTransfer + _amounts[i];  
     }
+    totalBalances[_from] = totalBalances[_from] - amountToTransfer; 
+    totalBalances[_to] = totalBalances[_to] + amountToTransfer; 
 
     // Emit the transfer event and perform the safety check.
     emit TransferBatch(_msgSender(), _from, _to, _ids, _amounts);
@@ -586,6 +589,7 @@ ERC165, PermitControl, IERC1155, IERC1155MetadataURI {
     _ids, _amounts, _data);
 
     // Loop through each of the batched IDs to update balances.
+    uint totalAmounts;
     for (uint256 i = 0; i < _ids.length; i++) {
       if(!_hasItemRight(_ids[i], MINT)) {
         revert DoNotHaveRigthToMintThatItem();
@@ -593,9 +597,10 @@ ERC165, PermitControl, IERC1155, IERC1155MetadataURI {
 
       // Update storage of special balances and circulating values.
       balances[_ids[i]][_recipient] = balances[_ids[i]][_recipient] + _amounts[i];
-      totalBalances[_recipient] = totalBalances[_recipient] + _amounts[i];
       circulatingSupply[_ids[i]] = circulatingSupply[_ids[i]] + _amounts[i];
+      totalAmounts += _amounts[i];
     }
+    totalBalances[_recipient] += totalAmounts;
 
     // Emit event and handle the safety check.
     emit TransferBatch(operator, address(0), _recipient, _ids, _amounts);
