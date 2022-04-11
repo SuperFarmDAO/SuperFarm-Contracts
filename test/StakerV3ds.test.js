@@ -30,12 +30,16 @@ describe("===Stakerv3ds===", function () {
 
   let coreSelectors,
     stakingSelectors,
+    pointsSelectors,
+    boostersSelectors,
     viewsSelectors,
     addressesForSelectors,
     allSelectors;
 
   let mockCoreFacet,
     mockStakingFacet,
+    mockPointsFacet,
+    mockBoostersFacet,
     mockViewFacet,
     some721,
     some1155,
@@ -47,6 +51,8 @@ describe("===Stakerv3ds===", function () {
     proxyRegistry,
     stakerV3FacetCore,
     stakerV3FacetStaking,
+    stakerV3FacetPoints,
+    stakerV3FacetBoosters,
     stakerV3FacetViews,
     stakerV3dsProxy;
   let startOfStaking;
@@ -68,6 +74,12 @@ describe("===Stakerv3ds===", function () {
     this.MockStakingFacet = await ethers.getContractFactory(
       "TestStakerV3FacetStaking"
     );
+    this.MockPointsFacet = await ethers.getContractFactory(
+      "TestStakerV3FacetPoints"
+    );
+    this.MockBoostersFacet = await ethers.getContractFactory(
+      "TestStakerV3FacetBoosters"
+    );
     this.MockViewFacet = await ethers.getContractFactory(
       "TestStakerV3FacetViews"
     );
@@ -83,6 +95,12 @@ describe("===Stakerv3ds===", function () {
     );
     this.StakerV3FacetStaking = await ethers.getContractFactory(
       "StakerV3FacetStaking"
+    );
+    this.StakerV3FacetPoints = await ethers.getContractFactory(
+      "StakerV3FacetPoints"
+    );
+    this.StakerV3FacetBoosters = await ethers.getContractFactory(
+      "StakerV3FacetBoosters"
     );
     this.Super721 = await ethers.getContractFactory("Super721");
     this.Super1155 = await ethers.getContractFactory("Super1155");
@@ -107,6 +125,12 @@ describe("===Stakerv3ds===", function () {
     mockStakingFacet = await this.MockStakingFacet.deploy();
     await mockStakingFacet.deployed();
 
+    mockPointsFacet = await this.MockPointsFacet.deploy();
+    await mockPointsFacet.deployed();
+
+    mockBoostersFacet = await this.MockBoostersFacet.deploy();
+    await mockBoostersFacet.deployed();
+
     mockViewFacet = await this.MockViewFacet.deploy();
     await mockViewFacet.deployed();
 
@@ -124,6 +148,12 @@ describe("===Stakerv3ds===", function () {
 
     stakerV3FacetCore = await this.StakerV3FacetCore.deploy();
     await stakerV3FacetCore.deployed();
+
+    stakerV3FacetPoints = await this.StakerV3FacetPoints.deploy();
+    await stakerV3FacetPoints.deployed();
+
+    stakerV3FacetBoosters = await this.StakerV3FacetBoosters.deploy();
+    await stakerV3FacetBoosters.deployed();
 
     stakerV3FacetViews = await this.StakerV3FacetViews.deploy();
     await stakerV3FacetViews.deployed();
@@ -163,7 +193,7 @@ describe("===Stakerv3ds===", function () {
 
     coreSelectors = await utils.getSelectors(stakerV3FacetCore);
     addressesForSelectors = [];
-    //console.log(coreSelectors);
+    // console.log(coreSelectors);
     let counter = 0;
     for (counter; counter < coreSelectors.length; counter++) {
       addressesForSelectors.push(stakerV3FacetCore.address);
@@ -172,19 +202,40 @@ describe("===Stakerv3ds===", function () {
     stakerV3FacetStaking = await this.StakerV3FacetStaking.deploy();
     await stakerV3FacetStaking.deployed();
 
-    var oldCounter = counter;
-    stakingSelectors = await utils.getSelectors(stakerV3FacetStaking);
-    for (counter; counter < stakingSelectors.length + oldCounter; counter++) {
-      addressesForSelectors.push(stakerV3FacetStaking.address);
-    }
-
     oldCounter = counter;
     viewsSelectors = await utils.getSelectors(stakerV3FacetViews);
     for (counter; counter < viewsSelectors.length + oldCounter; counter++) {
       addressesForSelectors.push(stakerV3FacetViews.address);
     }
 
-    allSelectors = [...coreSelectors, ...stakingSelectors, ...viewsSelectors];
+    oldCounter = counter;
+    pointsSelectors = await utils.getSelectors(stakerV3FacetPoints);
+    for (counter; counter < pointsSelectors.length + oldCounter; counter++) {
+      addressesForSelectors.push(stakerV3FacetPoints.address);
+    }
+    // console.log(pointsSelectors);
+
+    oldCounter = counter;
+    boostersSelectors = await utils.getSelectors(stakerV3FacetBoosters);
+    for (counter; counter < boostersSelectors.length + oldCounter; counter++) {
+      addressesForSelectors.push(stakerV3FacetBoosters.address);
+    }
+
+    var oldCounter = counter;
+    stakingSelectors = await utils.getSelectors(stakerV3FacetStaking);
+    for (counter; counter < stakingSelectors.length + oldCounter; counter++) {
+      addressesForSelectors.push(stakerV3FacetStaking.address);
+    }
+    //console.log(stakingSelectors);
+
+    allSelectors = [
+      ...coreSelectors,
+      ...viewsSelectors,
+      ...pointsSelectors,
+      ...boostersSelectors,
+      ...stakingSelectors,
+    ];
+    //console.log(allSelectors);
 
     stakerV3dsProxy = await this.StakerV3Proxy.deploy(
       stakerV3FacetCore.address,
@@ -201,6 +252,8 @@ describe("===Stakerv3ds===", function () {
     some721.mint(signer1.address, 1);
 
     IOUToken.transferOwnership(stakerV3dsProxy.address);
+
+    depositToken;
   });
 
   describe("Proxy", function () {
@@ -960,7 +1013,7 @@ describe("===Stakerv3ds===", function () {
         ).to.be.revertedWith("BoosterIdZero()");
       });
 
-      it("Reverts: you can't set ERC20 as asset for stake", async function () {
+      it("Reverts: you can't set ERC20 as asset for stake for boosts", async function () {
         let itemGroupId = ethers.BigNumber.from(1);
         let shiftedItemGroupId = itemGroupId.shl(128);
         let itemGroupId2 = ethers.BigNumber.from(2);
@@ -1430,7 +1483,59 @@ describe("===Stakerv3ds===", function () {
         ).to.be.revertedWith("ZeroStrength()");
       });
 
-      it("Reverts: ERC20 can't be as asset at pool for stake", async function () {
+      // it("Reverts: ERC20 can't be as asset at pool for stake", async function () {
+      //   const testCallData1 = await mockCoreFacet.connect(owner).setEmissions(
+      //     [
+      //       {
+      //         timeStamp: await utils.getCurrentTime(),
+      //         rate: ethers.utils.parseEther("6.6666666666"),
+      //       },
+      //     ],
+      //     [
+      //       {
+      //         timeStamp: await utils.getCurrentTime(),
+      //         rate: ethers.utils.parseEther("6.6666666666"),
+      //       },
+      //     ]
+      //   );
+      //   const testCallData1String = testCallData1.data.toString();
+
+      //   //setEmissions
+      //   await owner.sendTransaction({
+      //     to: stakerV3dsProxy.address,
+      //     data: testCallData1String,
+      //   });
+
+      //   const testCallData2 = await mockCoreFacet.connect(owner).addPool({
+      //     id: 0,
+      //     tokenStrength: 100,
+      //     pointStrength: 10000,
+      //     groupId: 0,
+      //     tokensPerShare: 0,
+      //     pointsPerShare: 0,
+      //     compoundInterestThreshold: ethers.utils.parseEther("1000"),
+      //     compoundInterestMultiplier: 5000,
+      //     boostInfo: [1, 2],
+      //     assetAddress: depositToken.address,
+      //     typeOfAsset: 0,
+      //     lockPeriod: 0,
+      //     lockAmount: 0,
+      //     lockMultiplier: 0,
+      //     timeLockTypeOfBoost: 0,
+      //     compoundTypeOfBoost: 0,
+      //   });
+      //   const testCallData2String = testCallData2.data.toString();
+
+      //   //addPool
+      //   await expect(
+      //     owner.sendTransaction({
+      //       to: stakerV3dsProxy.address,
+      //       data: testCallData2String,
+      //     })
+      //   ).to.be.revertedWith("InvalidTypeOfAsset()");
+      // });
+
+      it("Reverts: when group id is required but it is ERC20 asset", async function () {
         const testCallData1 = await mockCoreFacet.connect(owner).setEmissions(
           [
             {
@@ -1454,13 +1559,13 @@ describe("===Stakerv3ds===", function () {
         });
 
         const testCallData2 = await mockCoreFacet.connect(owner).addPool({
-          id: 0,
-          tokenStrength: 100,
+          id: 1,
+          tokenStrength: 10000,
           pointStrength: 10000,
-          groupId: 0,
+          groupId: 1,
           tokensPerShare: 0,
           pointsPerShare: 0,
-          compoundInterestThreshold: ethers.utils.parseEther("1000"),
+          compoundInterestThreshold: ethers.utils.parseEther("1000000"),
           compoundInterestMultiplier: 5000,
           boostInfo: [1, 2],
           assetAddress: depositToken.address,
@@ -1479,7 +1584,7 @@ describe("===Stakerv3ds===", function () {
             to: stakerV3dsProxy.address,
             data: testCallData2String,
           })
-        ).to.be.revertedWith("InvalidTypeOfAsset()");
+        ).to.be.revertedWith("InvalidGroupIdForERC20()");
       });
 
       it("should add a new pool, overwrite it and get pool count", async function () {
@@ -1625,6 +1730,19 @@ describe("===Stakerv3ds===", function () {
           signer2.address,
           ethers.utils.parseEther("1000")
         );
+        await depositToken.transfer(
+          signer3.address,
+          ethers.utils.parseEther("1000")
+        );
+        await depositToken
+          .connect(signer1)
+          .approve(stakerV3dsProxy.address, ethers.utils.parseEther("1000"));
+        await depositToken
+          .connect(signer2)
+          .approve(stakerV3dsProxy.address, ethers.utils.parseEther("1000"));
+        await depositToken
+          .connect(signer3)
+          .approve(stakerV3dsProxy.address, ethers.utils.parseEther("1000"));
         await rewardToken.transfer(
           stakerV3dsProxy.address,
           ethers.utils.parseEther("500000")
@@ -1797,10 +1915,238 @@ describe("===Stakerv3ds===", function () {
           .setApprovalForAll(stakerV3dsProxy.address, true);
       });
 
+      it("Reverts: deposit in pool with group requires, not an group item", async function () {
+        const testCallData1 = await mockCoreFacet.connect(owner).addPool({
+          id: 1,
+          tokenStrength: 10000,
+          pointStrength: 10000,
+          groupId: itemGroupId,
+          tokensPerShare: 0,
+          pointsPerShare: 0,
+          compoundInterestThreshold: ethers.utils.parseEther("1000000"),
+          compoundInterestMultiplier: 5000,
+          boostInfo: [1, 2],
+          assetAddress: super721.address,
+          typeOfAsset: 1,
+          lockPeriod: 0,
+          lockAmount: 0,
+          lockMultiplier: 0,
+          timeLockTypeOfBoost: 0,
+          compoundTypeOfBoost: 0,
+        });
+        const testCallData1String = testCallData1.data.toString();
+
+        //addPool
+        await owner.sendTransaction({
+          to: stakerV3dsProxy.address,
+          data: testCallData1String,
+        });
+
+        const testCallData2 = await mockStakingFacet.connect(signer1).deposit(
+          1,
+          {
+            assetAddress: super721.address,
+            id: [
+              shiftedItemGroupId2,
+              shiftedItemGroupId2.add(1),
+              shiftedItemGroupId2.add(2),
+            ],
+            amounts: [1, 2, 3],
+            IOUTokenId: [],
+          },
+          false
+        );
+        const testCallData2String = testCallData2.data.toString();
+
+        //deposit
+        await expect(
+          signer1.sendTransaction({
+            to: stakerV3dsProxy.address,
+            data: testCallData2String,
+          })
+        ).to.be.revertedWith("InvalidGroupIdForStake()");
+      });
+
+      it("Should deposit correctly with group id requires", async function () {
+        const testCallData1 = await mockCoreFacet.connect(owner).addPool({
+          id: 1,
+          tokenStrength: 10000,
+          pointStrength: 10000,
+          groupId: itemGroupId2,
+          tokensPerShare: 0,
+          pointsPerShare: 0,
+          compoundInterestThreshold: ethers.utils.parseEther("1000000"),
+          compoundInterestMultiplier: 5000,
+          boostInfo: [1, 2],
+          assetAddress: super721.address,
+          typeOfAsset: 1,
+          lockPeriod: 0,
+          lockAmount: 0,
+          lockMultiplier: 0,
+          timeLockTypeOfBoost: 0,
+          compoundTypeOfBoost: 0,
+        });
+        const testCallData1String = testCallData1.data.toString();
+
+        //addPool
+        await owner.sendTransaction({
+          to: stakerV3dsProxy.address,
+          data: testCallData1String,
+        });
+
+        const testCallData2 = await mockStakingFacet.connect(signer1).deposit(
+          1,
+          {
+            assetAddress: super721.address,
+            id: [
+              shiftedItemGroupId2,
+              shiftedItemGroupId2.add(1),
+              shiftedItemGroupId2.add(2),
+            ],
+            amounts: [1, 1, 1],
+            IOUTokenId: [],
+          },
+          false
+        );
+        const testCallData2String = testCallData2.data.toString();
+
+        //deposit
+        await signer1.sendTransaction({
+          to: stakerV3dsProxy.address,
+          data: testCallData2String,
+        });
+      });
+
+      it("Reverts: when asset is ERC20 and amounts array length not equal 1", async function () {
+        const testCallData1 = await mockCoreFacet.connect(owner).addPool({
+          id: 1,
+          tokenStrength: 10000,
+          pointStrength: 10000,
+          groupId: 0,
+          tokensPerShare: 0,
+          pointsPerShare: 0,
+          compoundInterestThreshold: ethers.utils.parseEther("1000000"),
+          compoundInterestMultiplier: 5000,
+          boostInfo: [1, 2],
+          assetAddress: depositToken.address,
+          typeOfAsset: 0,
+          lockPeriod: 0,
+          lockAmount: 0,
+          lockMultiplier: 0,
+          timeLockTypeOfBoost: 0,
+          compoundTypeOfBoost: 0,
+        });
+        const testCallData1String = testCallData1.data.toString();
+
+        //addPool
+        await owner.sendTransaction({
+          to: stakerV3dsProxy.address,
+          data: testCallData1String,
+        });
+
+        const testCallData2 = await mockStakingFacet.connect(signer1).deposit(
+          1,
+          {
+            assetAddress: depositToken.address,
+            id: [1, 2],
+            amounts: [ethers.utils.parseEther("100"), 20],
+            IOUTokenId: [],
+          },
+          false
+        );
+        const testCallData2String = testCallData2.data.toString();
+
+        //setEmissions
+        await expect(
+          signer1.sendTransaction({
+            to: stakerV3dsProxy.address,
+            data: testCallData2String,
+          })
+        ).to.be.revertedWith("InvalidERC20DepositInputs()");
+      });
+
+      it("ERC20 staking asset tests", async function () {
+        const testCallData1 = await mockCoreFacet.connect(owner).addPool({
+          id: 1,
+          tokenStrength: 10000,
+          pointStrength: 10000,
+          groupId: 0,
+          tokensPerShare: 0,
+          pointsPerShare: 0,
+          compoundInterestThreshold: ethers.utils.parseEther("1000000"),
+          compoundInterestMultiplier: 5000,
+          boostInfo: [1, 2],
+          assetAddress: depositToken.address,
+          typeOfAsset: 0,
+          lockPeriod: 0,
+          lockAmount: 0,
+          lockMultiplier: 0,
+          timeLockTypeOfBoost: 0,
+          compoundTypeOfBoost: 0,
+        });
+        const testCallData1String = testCallData1.data.toString();
+
+        //addPool
+        await owner.sendTransaction({
+          to: stakerV3dsProxy.address,
+          data: testCallData1String,
+        });
+
+        const testCallData2 = await mockStakingFacet.connect(signer1).deposit(
+          1,
+          {
+            assetAddress: depositToken.address,
+            id: [1],
+            amounts: [ethers.utils.parseEther("100")],
+            IOUTokenId: [],
+          },
+          false
+        );
+        const testCallData2String = testCallData2.data.toString();
+
+        //setEmissions
+        await signer1.sendTransaction({
+          to: stakerV3dsProxy.address,
+          data: testCallData2String,
+        });
+        startOfStaking = await utils.getCurrentTime();
+
+        await network.provider.send("evm_setNextBlockTimestamp", [
+          startOfStaking + 29,
+        ]);
+        await ethers.provider.send("evm_mine", []);
+
+        const testCallData10 = await mockStakingFacet
+          .connect(signer1)
+          .withdraw(1, [0]);
+
+        const testCallData10String = testCallData10.data.toString();
+
+        //withdraw
+        await signer1.sendTransaction({
+          to: stakerV3dsProxy.address,
+          data: testCallData10String,
+        });
+
+        //   //User2-Claims
+        const testCallData11 = await mockStakingFacet
+          .connect(signer1)
+          .claim(1, []);
+
+        const testCallData11String = testCallData11.data.toString();
+
+        await signer1.sendTransaction({
+          to: stakerV3dsProxy.address,
+          data: testCallData11String,
+        });
+        expect(await rewardToken.balanceOf(signer1.address)).to.be.closeTo(
+          ethers.utils.parseEther("103.3333"),
+          ethers.utils.parseEther("0.01")
+        );
+      });
       it("Reverts: Inactive pool", async function () {
         const testCallData1 = await mockStakingFacet.connect(signer1).deposit(
           5,
-          0,
           {
             assetAddress: super721.address,
             id: [1, 2, 3],
@@ -1817,7 +2163,7 @@ describe("===Stakerv3ds===", function () {
             to: stakerV3dsProxy.address,
             data: testCallData1String,
           })
-        ).to.be.revertedWith("IncativePool()");
+        ).to.be.revertedWith("InactivePool()");
       });
 
       it("Reverts: wrong asset deposited", async function () {
@@ -1827,7 +2173,6 @@ describe("===Stakerv3ds===", function () {
         let shiftedItemGroupId2 = itemGroupId2.shl(128);
 
         const testCallData1 = await mockStakingFacet.connect(signer1).deposit(
-          0,
           0,
           {
             assetAddress: some721.address,
@@ -1859,7 +2204,6 @@ describe("===Stakerv3ds===", function () {
 
         const testCallData1 = await mockStakingFacet.connect(signer1).deposit(
           0,
-          0,
           {
             assetAddress: super721.address,
             id: [
@@ -1890,7 +2234,6 @@ describe("===Stakerv3ds===", function () {
         let shiftedItemGroupId2 = itemGroupId2.shl(128);
 
         const testCallData1 = await mockStakingFacet.connect(signer1).deposit(
-          0,
           0,
           {
             assetAddress: super721.address,
@@ -1931,10 +2274,9 @@ describe("===Stakerv3ds===", function () {
         let itemGroupId2 = ethers.BigNumber.from(2);
         let shiftedItemGroupId2 = itemGroupId2.shl(128);
 
-        const testCallData1 = await mockStakingFacet.connect(signer1).deposit(
-          0,
-          10,
-          {
+        const testCallData1 = await mockBoostersFacet
+          .connect(signer1)
+          .stakeItemsBatch(0, 10, {
             assetAddress: super721.address,
             id: [
               shiftedItemGroupId2,
@@ -1943,9 +2285,7 @@ describe("===Stakerv3ds===", function () {
             ],
             amounts: [1, 1, 1],
             IOUTokenId: [],
-          },
-          false
-        );
+          });
         const testCallData1String = testCallData1.data.toString();
 
         //deposit
@@ -1963,10 +2303,9 @@ describe("===Stakerv3ds===", function () {
         let itemGroupId2 = ethers.BigNumber.from(2);
         let shiftedItemGroupId2 = itemGroupId2.shl(128);
 
-        const testCallData1 = await mockStakingFacet.connect(signer1).deposit(
-          0,
-          1,
-          {
+        const testCallData1 = await mockBoostersFacet
+          .connect(signer1)
+          .stakeItemsBatch(0, 1, {
             assetAddress: some721.address,
             id: [
               shiftedItemGroupId2,
@@ -1975,61 +2314,26 @@ describe("===Stakerv3ds===", function () {
             ],
             amounts: [1, 1],
             IOUTokenId: [],
-          },
-          false
-        );
+          });
         const testCallData1String = testCallData1.data.toString();
 
-        //deposit
+        //stakeItemsBatch
         await expect(
           signer1.sendTransaction({
             to: stakerV3dsProxy.address,
             data: testCallData1String,
           })
         ).to.be.revertedWith("AssetArrayLengthsMismatch()");
-      });
 
-      it("Reverts: check that you not eligible to stake in the pool for booster", async function () {
-        let itemGroupId = ethers.BigNumber.from(1);
-        let shiftedItemGroupId = itemGroupId.shl(128);
-        let itemGroupId2 = ethers.BigNumber.from(2);
-        let shiftedItemGroupId2 = itemGroupId2.shl(128);
-        let itemGroupId3 = ethers.BigNumber.from(3);
-        let shiftedItemGroupId3 = itemGroupId3.shl(128);
-
-        // incorrect asset
-        const testCallData1 = await mockStakingFacet.connect(signer1).deposit(
+        const testCallData2 = await mockStakingFacet.connect(signer1).deposit(
           0,
-          1,
           {
-            assetAddress: some721.address,
+            assetAddress: super721.address,
             id: [
               shiftedItemGroupId2,
               shiftedItemGroupId2.add(1),
               shiftedItemGroupId2.add(2),
             ],
-            amounts: [1, 1, 1],
-            IOUTokenId: [],
-          },
-          false
-        );
-        const testCallData1String = testCallData1.data.toString();
-
-        //deposit
-        await expect(
-          signer1.sendTransaction({
-            to: stakerV3dsProxy.address,
-            data: testCallData1String,
-          })
-        ).to.be.revertedWith("InvalidInfoStakeForBoost()");
-
-        // incorrect amounts
-        const testCallData2 = await mockStakingFacet.connect(signer1).deposit(
-          0,
-          1,
-          {
-            assetAddress: super721.address,
-            id: [shiftedItemGroupId2, shiftedItemGroupId2.add(1)],
             amounts: [1, 1],
             IOUTokenId: [],
           },
@@ -2043,13 +2347,63 @@ describe("===Stakerv3ds===", function () {
             to: stakerV3dsProxy.address,
             data: testCallData2String,
           })
+        ).to.be.revertedWith("AssetArrayLengthsMismatch()");
+      });
+
+      it("Reverts: check that you not eligible to stake in the pool for booster", async function () {
+        let itemGroupId = ethers.BigNumber.from(1);
+        let shiftedItemGroupId = itemGroupId.shl(128);
+        let itemGroupId2 = ethers.BigNumber.from(2);
+        let shiftedItemGroupId2 = itemGroupId2.shl(128);
+        let itemGroupId3 = ethers.BigNumber.from(3);
+        let shiftedItemGroupId3 = itemGroupId3.shl(128);
+
+        // incorrect asset
+        const testCallData1 = await mockBoostersFacet
+          .connect(signer1)
+          .stakeItemsBatch(0, 1, {
+            assetAddress: some721.address,
+            id: [
+              shiftedItemGroupId2,
+              shiftedItemGroupId2.add(1),
+              shiftedItemGroupId2.add(2),
+            ],
+            amounts: [1, 1, 1],
+            IOUTokenId: [],
+          });
+        const testCallData1String = testCallData1.data.toString();
+
+        //deposit
+        await expect(
+          signer1.sendTransaction({
+            to: stakerV3dsProxy.address,
+            data: testCallData1String,
+          })
+        ).to.be.revertedWith("InvalidInfoStakeForBoost()");
+
+        // incorrect amounts
+        const testCallData2 = await mockBoostersFacet
+          .connect(signer1)
+          .stakeItemsBatch(0, 1, {
+            assetAddress: super721.address,
+            id: [shiftedItemGroupId2, shiftedItemGroupId2.add(1)],
+            amounts: [1, 1],
+            IOUTokenId: [],
+          });
+        const testCallData2String = testCallData2.data.toString();
+
+        //deposit
+        await expect(
+          signer1.sendTransaction({
+            to: stakerV3dsProxy.address,
+            data: testCallData2String,
+          })
         ).to.be.revertedWith("InvalidInfoStakeForBoost()");
 
         // incorrect group id
-        const testCallData3 = await mockStakingFacet.connect(signer1).deposit(
-          0,
-          1,
-          {
+        const testCallData3 = await mockBoostersFacet
+          .connect(signer1)
+          .stakeItemsBatch(0, 1, {
             assetAddress: super721.address,
             id: [
               shiftedItemGroupId3,
@@ -2058,9 +2412,7 @@ describe("===Stakerv3ds===", function () {
             ],
             amounts: [1, 1, 1],
             IOUTokenId: [],
-          },
-          false
-        );
+          });
         const testCallData3String = testCallData3.data.toString();
 
         //deposit
@@ -2097,10 +2449,9 @@ describe("===Stakerv3ds===", function () {
         });
 
         // cant stake for booster with multiplier 0
-        const testCallData5 = await mockStakingFacet.connect(signer1).deposit(
-          0,
-          1,
-          {
+        const testCallData5 = await mockBoostersFacet
+          .connect(signer1)
+          .stakeItemsBatch(0, 1, {
             assetAddress: super721.address,
             id: [
               shiftedItemGroupId2,
@@ -2109,9 +2460,7 @@ describe("===Stakerv3ds===", function () {
             ],
             amounts: [1, 1, 1],
             IOUTokenId: [],
-          },
-          false
-        );
+          });
         const testCallData5String = testCallData5.data.toString();
 
         //deposit
@@ -2129,10 +2478,9 @@ describe("===Stakerv3ds===", function () {
         let itemGroupId2 = ethers.BigNumber.from(2);
         let shiftedItemGroupId2 = itemGroupId2.shl(128);
 
-        const testCallData1 = await mockStakingFacet.connect(signer1).deposit(
-          0,
-          1,
-          {
+        const testCallData1 = await mockBoostersFacet
+          .connect(signer1)
+          .stakeItemsBatch(0, 1, {
             assetAddress: super721.address,
             id: [
               shiftedItemGroupId2,
@@ -2141,9 +2489,7 @@ describe("===Stakerv3ds===", function () {
             ],
             amounts: [1, 1, 1],
             IOUTokenId: [],
-          },
-          false
-        );
+          });
         const testCallData1String = testCallData1.data.toString();
 
         //deposit
@@ -2295,6 +2641,32 @@ describe("===Stakerv3ds===", function () {
           data: testCallData3String,
         });
 
+        const testCallData23 = await mockCoreFacet.connect(owner).addPool({
+          id: 1,
+          tokenStrength: 10000,
+          pointStrength: 10000,
+          groupId: 0,
+          tokensPerShare: 0,
+          pointsPerShare: 0,
+          compoundInterestThreshold: ethers.utils.parseEther("1000"),
+          compoundInterestMultiplier: 5000,
+          boostInfo: [1, 2],
+          assetAddress: super1155.address,
+          typeOfAsset: 2,
+          lockPeriod: 0,
+          lockAmount: 0,
+          lockMultiplier: 0,
+          timeLockTypeOfBoost: 0,
+          compoundTypeOfBoost: 0,
+        });
+        const testCallData23String = testCallData23.data.toString();
+
+        //addPool
+        await owner.sendTransaction({
+          to: stakerV3dsProxy.address,
+          data: testCallData23String,
+        });
+
         // Mint ITEMS for Signer1
         await super721.connect(owner).configureGroup(itemGroupId2, {
           name: "PEPSI",
@@ -2378,20 +2750,9 @@ describe("===Stakerv3ds===", function () {
       });
 
       it("Reverts: booster not available for this user", async function () {
-        const testCallData1 = await mockStakingFacet.connect(owner).withdraw(
-          0,
-          {
-            assetAddress: super721.address,
-            id: [
-              shiftedItemGroupId2.add(3),
-              shiftedItemGroupId2.add(4),
-              shiftedItemGroupId2.add(5),
-            ],
-            amounts: [1, 1, 1],
-            IOUTokenId: [],
-          },
-          1
-        );
+        const testCallData1 = await mockBoostersFacet
+          .connect(owner)
+          .unstakeItemsBatch(0, 1);
         const testCallData1String = testCallData1.data.toString();
 
         //withdraw
@@ -2403,31 +2764,29 @@ describe("===Stakerv3ds===", function () {
         ).to.be.revertedWith("NotStaked()");
       });
 
-      it("Reverts: withdraw amount exceeds user's amount on staking", async function () {
-        const testCallData1 = await mockStakingFacet.connect(owner).withdraw(
-          0,
-          {
-            assetAddress: super721.address,
-            id: [
-              shiftedItemGroupId2.add(3),
-              shiftedItemGroupId2.add(4),
-              shiftedItemGroupId2.add(5),
-            ],
-            amounts: [1, 1, 1],
-            IOUTokenId: [],
-          },
-          0
-        );
-        const testCallData1String = testCallData1.data.toString();
+      // it("Reverts: withdraw amount exceeds user's amount on staking", async function () {
+      //   const testCallData1 = await mockStakingFacet
+      //     .connect(owner)
+      //     .withdraw(0, {
+      //       assetAddress: super721.address,
+      //       id: [
+      //         shiftedItemGroupId2.add(3),
+      //         shiftedItemGroupId2.add(4),
+      //         shiftedItemGroupId2.add(5),
+      //       ],
+      //       amounts: [1, 1, 1],
+      //       IOUTokenId: [],
+      //     });
+      //   const testCallData1String = testCallData1.data.toString();
 
-        //withdraw
-        await expect(
-          owner.sendTransaction({
-            to: stakerV3dsProxy.address,
-            data: testCallData1String,
-          })
-        ).to.be.revertedWith("InvalidAmount()");
-      });
+      //   //withdraw
+      //   await expect(
+      //     owner.sendTransaction({
+      //       to: stakerV3dsProxy.address,
+      //       data: testCallData1String,
+      //     })
+      //   ).to.be.revertedWith("InvalidAmount()");
+      // });
 
       // it("Reverts: withdraw amount exceeds user's amount on staking", async function () {
       //   const testCallData1 = await mockStakingFacet.connect(owner).withdraw(
@@ -2441,8 +2800,7 @@ describe("===Stakerv3ds===", function () {
       //       ],
       //       amounts: [1, 1, 1],
       //       IOUTokenId: [],
-      //     },
-      //     0
+      //     }
       //   );
       //   const testCallData1String = testCallData1.data.toString();
 
@@ -2467,8 +2825,7 @@ describe("===Stakerv3ds===", function () {
       //       ],
       //       amounts: [0, 0, 0],
       //       IOUTokenId: [],
-      //     },
-      //     0
+      //     }
       //   );
       //   const testCallData1String = testCallData1.data.toString();
 
@@ -2483,7 +2840,6 @@ describe("===Stakerv3ds===", function () {
 
       it("Reverts: trying to withdraw with incorrect IOUToken id", async function () {
         const testCallData1 = await mockStakingFacet.connect(signer1).deposit(
-          0,
           0,
           {
             assetAddress: super721.address,
@@ -2506,20 +2862,9 @@ describe("===Stakerv3ds===", function () {
           data: testCallData1String,
         });
 
-        const testCallData2 = await mockStakingFacet.connect(owner).withdraw(
-          0,
-          {
-            assetAddress: super721.address,
-            id: [
-              shiftedItemGroupId2,
-              shiftedItemGroupId2.add(1),
-              shiftedItemGroupId2.add(2),
-            ],
-            amounts: [1, 1, 1],
-            IOUTokenId: [0],
-          },
-          0
-        );
+        const testCallData2 = await mockStakingFacet
+          .connect(owner)
+          .withdraw(0, [0]);
         const testCallData2String = testCallData2.data.toString();
 
         await IOUToken.connect(signer1).transferFrom(
@@ -2566,7 +2911,6 @@ describe("===Stakerv3ds===", function () {
 
         const testCallData1 = await mockStakingFacet.connect(signer1).deposit(
           0,
-          0,
           {
             assetAddress: super721.address,
             id: [
@@ -2590,7 +2934,6 @@ describe("===Stakerv3ds===", function () {
 
         const testCallData2 = await mockStakingFacet.connect(signer2).deposit(
           1,
-          0,
           {
             assetAddress: super1155.address,
             id: [shiftedItemGroupId, shiftedItemGroupId.add(1)],
@@ -2614,20 +2957,9 @@ describe("===Stakerv3ds===", function () {
           0
         );
 
-        const testCallData3 = await mockStakingFacet.connect(signer2).withdraw(
-          1,
-          {
-            assetAddress: super721.address,
-            id: [
-              shiftedItemGroupId2,
-              shiftedItemGroupId2.add(1),
-              shiftedItemGroupId2.add(2),
-            ],
-            amounts: [],
-            IOUTokenId: [0],
-          },
-          0
-        );
+        const testCallData3 = await mockStakingFacet
+          .connect(signer2)
+          .withdraw(1, [0]);
         const testCallData3String = testCallData3.data.toString();
 
         //withdraw
@@ -2641,7 +2973,6 @@ describe("===Stakerv3ds===", function () {
 
       it("should withdraw correctly", async function () {
         const testCallData1 = await mockStakingFacet.connect(signer1).deposit(
-          0,
           0,
           {
             assetAddress: super721.address,
@@ -2664,10 +2995,28 @@ describe("===Stakerv3ds===", function () {
           data: testCallData1String,
         });
 
-        const testCallData2 = await mockStakingFacet.connect(signer1).deposit(
-          0,
+        const testCallData23 = await mockStakingFacet.connect(signer2).deposit(
           1,
           {
+            assetAddress: super1155.address,
+            id: [shiftedItemGroupId, shiftedItemGroupId.add(1)],
+            amounts: [10, 10],
+            IOUTokenId: [],
+          },
+          false
+        );
+
+        const testCallData23String = testCallData23.data.toString();
+
+        //deposit
+        await signer2.sendTransaction({
+          to: stakerV3dsProxy.address,
+          data: testCallData23String,
+        });
+
+        const testCallData2 = await mockBoostersFacet
+          .connect(signer1)
+          .stakeItemsBatch(0, 1, {
             assetAddress: super721.address,
             id: [
               shiftedItemGroupId2.add(3),
@@ -2676,9 +3025,7 @@ describe("===Stakerv3ds===", function () {
             ],
             amounts: [1, 1, 1],
             IOUTokenId: [],
-          },
-          false
-        );
+          });
 
         const testCallData2String = testCallData2.data.toString();
 
@@ -2693,20 +3040,9 @@ describe("===Stakerv3ds===", function () {
         expect(await IOUToken.ownerOf(1)).to.be.eq(signer1.address);
         expect(await IOUToken.ownerOf(2)).to.be.eq(signer1.address);
 
-        const testCallData3 = await mockStakingFacet.connect(owner).withdraw(
-          0,
-          {
-            assetAddress: super721.address,
-            id: [
-              shiftedItemGroupId2,
-              shiftedItemGroupId2.add(1),
-              shiftedItemGroupId2.add(2),
-            ],
-            amounts: [0, 0, 0],
-            IOUTokenId: [0, 1, 2],
-          },
-          0
-        );
+        const testCallData3 = await mockStakingFacet
+          .connect(owner)
+          .withdraw(0, [0, 1, 2]);
         const testCallData3String = testCallData3.data.toString();
 
         //withdraw
@@ -2717,20 +3053,9 @@ describe("===Stakerv3ds===", function () {
 
         expect(await IOUToken.balanceOf(signer1.address)).to.be.eq(0);
 
-        const testCallData4 = await mockStakingFacet.connect(owner).withdraw(
-          0,
-          {
-            assetAddress: super721.address,
-            id: [
-              shiftedItemGroupId2,
-              shiftedItemGroupId2.add(1),
-              shiftedItemGroupId2.add(2),
-            ],
-            amounts: [0, 0, 0],
-            IOUTokenId: [0, 1, 2],
-          },
-          1
-        );
+        const testCallData4 = await mockBoostersFacet
+          .connect(signer1)
+          .unstakeItemsBatch(0, 1);
         const testCallData4String = testCallData4.data.toString();
 
         //withdraw
@@ -2738,13 +3063,23 @@ describe("===Stakerv3ds===", function () {
           to: stakerV3dsProxy.address,
           data: testCallData4String,
         });
+
+        const testCallData25 = await mockStakingFacet
+          .connect(signer2)
+          .withdraw(1, [3, 4]);
+        const testCallData25String = testCallData25.data.toString();
+
+        //withdraw
+        await signer2.sendTransaction({
+          to: stakerV3dsProxy.address,
+          data: testCallData25String,
+        });
       });
 
       it("should claim correctly", async function () {
-        const testCallData2 = await mockStakingFacet.connect(signer1).deposit(
-          0,
-          1,
-          {
+        const testCallData2 = await mockBoostersFacet
+          .connect(signer1)
+          .stakeItemsBatch(0, 1, {
             assetAddress: super721.address,
             id: [
               shiftedItemGroupId2.add(3),
@@ -2753,9 +3088,7 @@ describe("===Stakerv3ds===", function () {
             ],
             amounts: [1, 1, 1],
             IOUTokenId: [],
-          },
-          false
-        );
+          });
 
         const testCallData2String = testCallData2.data.toString();
 
@@ -2766,7 +3099,6 @@ describe("===Stakerv3ds===", function () {
         });
 
         const testCallData1 = await mockStakingFacet.connect(signer1).deposit(
-          0,
           0,
           {
             assetAddress: super721.address,
@@ -2821,20 +3153,9 @@ describe("===Stakerv3ds===", function () {
         //   ethers.utils.parseEther("0.01")
         // );
 
-        const testCallData4 = await mockStakingFacet.connect(owner).withdraw(
-          0,
-          {
-            assetAddress: super721.address,
-            id: [
-              shiftedItemGroupId2,
-              shiftedItemGroupId2.add(1),
-              shiftedItemGroupId2.add(2),
-            ],
-            amounts: [1, 1, 1],
-            IOUTokenId: [],
-          },
-          1
-        );
+        const testCallData4 = await mockBoostersFacet
+          .connect(owner)
+          .unstakeItemsBatch(0, 1);
         const testCallData4String = testCallData4.data.toString();
 
         //withdraw
@@ -2843,20 +3164,9 @@ describe("===Stakerv3ds===", function () {
           data: testCallData4String,
         });
 
-        const testCallData5 = await mockStakingFacet.connect(owner).withdraw(
-          0,
-          {
-            assetAddress: super721.address,
-            id: [
-              shiftedItemGroupId2,
-              shiftedItemGroupId2.add(1),
-              shiftedItemGroupId2.add(2),
-            ],
-            amounts: [1, 1, 1],
-            IOUTokenId: [0, 1, 2],
-          },
-          0
-        );
+        const testCallData5 = await mockStakingFacet
+          .connect(owner)
+          .withdraw(0, [0, 1, 2]);
         const testCallData5String = testCallData5.data.toString();
 
         //withdraw
@@ -3354,7 +3664,6 @@ describe("===Stakerv3ds===", function () {
 
         const testCallData23 = await mockStakingFacet.connect(signer1).deposit(
           0,
-          0,
           {
             assetAddress: super721.address,
             id: [shiftedItemGroupId2, shiftedItemGroupId2.add(1)],
@@ -3373,7 +3682,6 @@ describe("===Stakerv3ds===", function () {
         });
 
         const testCallData24 = await mockStakingFacet.connect(signer1).deposit(
-          0,
           0,
           {
             assetAddress: super721.address,
@@ -3483,8 +3791,6 @@ describe("===Stakerv3ds===", function () {
           to: stakerV3dsProxy.address,
           data: testCallData1String,
         });
-
-        console.log(await rewardToken.balanceOf(signer1.address));
 
         // expect(await rewardToken.balanceOf(signer1.address)).to.be.gt(0);
       });
@@ -3692,7 +3998,6 @@ describe("===Stakerv3ds===", function () {
 
         const testCallData5 = await mockStakingFacet.connect(signer1).deposit(
           0,
-          0,
           {
             assetAddress: super721.address,
             id: [
@@ -3718,7 +4023,6 @@ describe("===Stakerv3ds===", function () {
         await ethers.provider.send("evm_mine", []);
 
         const testCallData6 = await mockStakingFacet.connect(signer1).deposit(
-          0,
           0,
           {
             assetAddress: super721.address,
@@ -3879,10 +4183,9 @@ describe("===Stakerv3ds===", function () {
           .setApprovalForAll(stakerV3dsProxy.address, true);
       });
       it("should work correctly with different/without boosts", async function () {
-        const testCallData1 = await mockStakingFacet.connect(signer1).deposit(
-          0,
-          1,
-          {
+        const testCallData1 = await mockBoostersFacet
+          .connect(signer1)
+          .stakeItemsBatch(0, 1, {
             assetAddress: super721.address,
             id: [
               shiftedItemGroupId2,
@@ -3891,9 +4194,7 @@ describe("===Stakerv3ds===", function () {
             ],
             amounts: [1, 1, 1],
             IOUTokenId: [],
-          },
-          false
-        );
+          });
 
         const testCallData1String = testCallData1.data.toString();
 
@@ -3906,17 +4207,14 @@ describe("===Stakerv3ds===", function () {
         await network.provider.send("evm_increaseTime", [30]);
         await ethers.provider.send("evm_mine", []);
 
-        const testCallData2 = await mockStakingFacet.connect(signer1).deposit(
-          0,
-          2,
-          {
+        const testCallData2 = await mockBoostersFacet
+          .connect(signer1)
+          .stakeItemsBatch(0, 2, {
             assetAddress: super721.address,
             id: [shiftedItemGroupId2.add(3), shiftedItemGroupId2.add(4)],
             amounts: [1, 1],
             IOUTokenId: [],
-          },
-          false
-        );
+          });
 
         const testCallData2String = testCallData2.data.toString();
 
@@ -3927,7 +4225,6 @@ describe("===Stakerv3ds===", function () {
         });
 
         const testCallData3 = await mockStakingFacet.connect(signer1).deposit(
-          0,
           0,
           {
             assetAddress: super721.address,
@@ -3974,7 +4271,6 @@ describe("===Stakerv3ds===", function () {
 
         const testCallData5 = await mockStakingFacet.connect(signer2).deposit(
           1,
-          0,
           {
             assetAddress: super721.address,
             id: [shiftedItemGroupId2.add(7)],
@@ -3994,10 +4290,9 @@ describe("===Stakerv3ds===", function () {
       });
 
       it("should get total points correctly", async function () {
-        const testCallData1 = await mockStakingFacet.connect(signer1).deposit(
-          0,
-          1,
-          {
+        const testCallData1 = await mockBoostersFacet
+          .connect(signer1)
+          .stakeItemsBatch(0, 1, {
             assetAddress: super721.address,
             id: [
               shiftedItemGroupId2,
@@ -4006,9 +4301,7 @@ describe("===Stakerv3ds===", function () {
             ],
             amounts: [1, 1, 1],
             IOUTokenId: [],
-          },
-          false
-        );
+          });
 
         const testCallData1String = testCallData1.data.toString();
 
@@ -4021,17 +4314,14 @@ describe("===Stakerv3ds===", function () {
         await network.provider.send("evm_increaseTime", [30]);
         await ethers.provider.send("evm_mine", []);
 
-        const testCallData2 = await mockStakingFacet.connect(signer1).deposit(
-          0,
-          2,
-          {
+        const testCallData2 = await mockBoostersFacet
+          .connect(signer1)
+          .stakeItemsBatch(0, 2, {
             assetAddress: super721.address,
             id: [shiftedItemGroupId2.add(3), shiftedItemGroupId2.add(4)],
             amounts: [1, 1],
             IOUTokenId: [],
-          },
-          false
-        );
+          });
 
         const testCallData2String = testCallData2.data.toString();
 
@@ -4042,7 +4332,6 @@ describe("===Stakerv3ds===", function () {
         });
 
         const testCallData3 = await mockStakingFacet.connect(signer1).deposit(
-          0,
           0,
           {
             assetAddress: super721.address,
@@ -4089,7 +4378,6 @@ describe("===Stakerv3ds===", function () {
 
         const testCallData5 = await mockStakingFacet.connect(signer2).deposit(
           1,
-          0,
           {
             assetAddress: super721.address,
             id: [shiftedItemGroupId2.add(7)],
@@ -4231,10 +4519,9 @@ describe("===Stakerv3ds===", function () {
           .connect(signer2)
           .setApprovalForAll(stakerV3dsProxy.address, true);
 
-        const testCallData4 = await mockStakingFacet.connect(signer1).deposit(
-          0,
-          1,
-          {
+        const testCallData4 = await mockBoostersFacet
+          .connect(signer1)
+          .stakeItemsBatch(0, 1, {
             assetAddress: super721.address,
             id: [
               shiftedItemGroupId2,
@@ -4243,9 +4530,7 @@ describe("===Stakerv3ds===", function () {
             ],
             amounts: [1, 1, 1],
             IOUTokenId: [],
-          },
-          false
-        );
+          });
 
         const testCallData4String = testCallData4.data.toString();
 
@@ -4255,17 +4540,14 @@ describe("===Stakerv3ds===", function () {
           data: testCallData4String,
         });
 
-        const testCallData5 = await mockStakingFacet.connect(signer1).deposit(
-          0,
-          2,
-          {
+        const testCallData5 = await mockBoostersFacet
+          .connect(signer1)
+          .stakeItemsBatch(0, 2, {
             assetAddress: super721.address,
             id: [shiftedItemGroupId2.add(3), shiftedItemGroupId2.add(4)],
             amounts: [1, 1],
             IOUTokenId: [],
-          },
-          false
-        );
+          });
 
         const testCallData5String = testCallData5.data.toString();
 
@@ -4276,7 +4558,6 @@ describe("===Stakerv3ds===", function () {
         });
 
         const testCallData6 = await mockStakingFacet.connect(signer1).deposit(
-          0,
           0,
           {
             assetAddress: super721.address,
@@ -4360,6 +4641,9 @@ describe("===Stakerv3ds===", function () {
         const stakingFacetABI = await hre.artifacts.readArtifact(
           "StakerV3FacetStaking"
         );
+        const pointsFacetABI = await hre.artifacts.readArtifact(
+          "StakerV3FacetPoints"
+        );
         const testCallData1 = await mockStakingFacet
           .connect(owner)
           .approvePointSpender(signer2.address, true);
@@ -4400,7 +4684,7 @@ describe("===Stakerv3ds===", function () {
         });
 
         let decodedData = utils.decodeResults(
-          [stakingFacetABI],
+          [pointsFacetABI],
           ["getAvailablePoints"],
           [getAvailablePointsCall]
         );
@@ -4657,7 +4941,6 @@ describe("===Stakerv3ds===", function () {
 
         const testCallData3 = await mockStakingFacet.connect(signer1).deposit(
           1,
-          0,
           {
             id: [shiftedItemGroupId2, shiftedItemGroupId2.add(1)],
             amounts: [1, 1],
@@ -4691,7 +4974,6 @@ describe("===Stakerv3ds===", function () {
 
         const testCallData5 = await mockStakingFacet.connect(signer1).deposit(
           1,
-          0,
           {
             id: [shiftedItemGroupId2.add(2), shiftedItemGroupId2.add(3)],
             amounts: [1, 1],
@@ -4726,1310 +5008,1293 @@ describe("===Stakerv3ds===", function () {
         // });
       });
     });
-    describe("time lock deposits testing", function () {
-      beforeEach(async function () {
-        const testCallData1 = await mockCoreFacet.connect(owner).setEmissions(
-          [
-            {
-              timeStamp: await utils.getCurrentTime(),
-              rate: ethers.utils.parseEther("10"),
-            },
-          ],
-          [
-            {
-              timeStamp: await utils.getCurrentTime(),
-              rate: ethers.utils.parseEther("10"),
-            },
-          ]
-        );
-        const testCallData1String = testCallData1.data.toString();
-
-        //setEmissions
-        await owner.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: testCallData1String,
-        });
-
-        const testCallData2 = await mockCoreFacet
-          .connect(owner)
-          .configureBoostersBatch(
-            [1, 2],
-            [
-              {
-                set: true,
-                multiplier: 2300,
-                amountRequired: 3,
-                groupRequired: itemGroupId2,
-                contractRequired: super721.address,
-                assetType: 0,
-                typeOfAsset: 1,
-              },
-              {
-                set: true,
-                multiplier: 2000,
-                amountRequired: 2,
-                groupRequired: 0,
-                contractRequired: super721.address,
-                assetType: 1,
-                typeOfAsset: 1,
-              },
-            ]
-          );
-        const testCallData2String = testCallData2.data.toString();
-
-        //configureBoosterBatch
-        await owner.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: testCallData2String,
-        });
-
-        const testCallData3 = await mockCoreFacet.connect(owner).addPool({
-          id: 0,
-          tokenStrength: 10000,
-          pointStrength: 10000,
-          groupId: 0,
-          tokensPerShare: 0,
-          pointsPerShare: 0,
-          compoundInterestThreshold: ethers.utils.parseEther("1000"),
-          compoundInterestMultiplier: 5000,
-          boostInfo: [1, 2],
-          assetAddress: super721.address,
-          typeOfAsset: 1,
-          lockPeriod: 60,
-          lockAmount: 2,
-          lockMultiplier: 10000,
-          timeLockTypeOfBoost: 2,
-          compoundTypeOfBoost: 2,
-        });
-        const testCallData3String = testCallData3.data.toString();
-
-        //addPool
-        await owner.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: testCallData3String,
-        });
-
-        await super721.connect(owner).configureGroup(itemGroupId2, {
-          name: "PEPSI",
-          supplyType: 0,
-          supplyData: 10,
-          burnType: 0,
-          burnData: 0,
-        });
-        await super721
-          .connect(owner)
-          .mintBatch(
-            signer1.address,
-            [
-              shiftedItemGroupId2,
-              shiftedItemGroupId2.add(1),
-              shiftedItemGroupId2.add(2),
-              shiftedItemGroupId2.add(3),
-            ],
-            DATA
-          );
-        await super721
-          .connect(owner)
-          .mintBatch(
-            signer3.address,
-            [
-              shiftedItemGroupId2.add(4),
-              shiftedItemGroupId2.add(5),
-              shiftedItemGroupId2.add(6),
-            ],
-            DATA
-          );
-        await super721
-          .connect(owner)
-          .mintBatch(
-            signer2.address,
-            [
-              shiftedItemGroupId2.add(7),
-              shiftedItemGroupId2.add(8),
-              shiftedItemGroupId2.add(9),
-            ],
-            DATA
-          );
-        await super721
-          .connect(signer1)
-          .setApprovalForAll(stakerV3dsProxy.address, true);
-        await super721
-          .connect(signer2)
-          .setApprovalForAll(stakerV3dsProxy.address, true);
-        await super721
-          .connect(signer3)
-          .setApprovalForAll(stakerV3dsProxy.address, true);
-
-        // const testCallData5 = await mockStakingFacet.connect(signer1).deposit(
-        //   0,
-        //   2,
-        //   {
-        //     assetAddress: super721.address,
-        //     id: [shiftedItemGroupId2.add(3), shiftedItemGroupId2.add(4)],
-        //     amounts: [1, 1],
-        //     IOUTokenId: [],
-        //   },
-        //   false
-        // );
-
-        // const testCallData5String = testCallData5.data.toString();
-
-        // //deposit
-        // await signer1.sendTransaction({
-        //   to: stakerV3dsProxy.address,
-        //   data: testCallData5String,
-        // });
-
-        await rewardToken.transfer(
-          stakerV3dsProxy.address,
-          ethers.utils.parseEther("500000")
-        );
-      });
-      it("Reverts: invalid amount to lock", async function () {
-        const testCallData1 = await mockStakingFacet.connect(signer2).deposit(
-          0,
-          0,
-          {
-            assetAddress: super721.address,
-            id: [shiftedItemGroupId2.add(7)],
-            amounts: [1],
-            IOUTokenId: [],
-          },
-          true
-        );
-        const testCallData1String = testCallData1.data.toString();
-        await expect(
-          signer2.sendTransaction({
-            to: stakerV3dsProxy.address,
-            data: testCallData1String,
-          })
-        ).to.be.revertedWith("InvalidAmountToLock()");
-      });
-      it("Reverts: tokens already locked", async function () {
-        const testCallData1 = await mockStakingFacet.connect(signer1).deposit(
-          0,
-          0,
-          {
-            assetAddress: super721.address,
-            id: [shiftedItemGroupId2, shiftedItemGroupId2.add(1)],
-            amounts: [1, 1],
-            IOUTokenId: [],
-          },
-          true
-        );
-        const testCallData1String = testCallData1.data.toString();
-        await signer1.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: testCallData1String,
-        });
-
-        const testCallData2 = await mockStakingFacet.connect(signer1).deposit(
-          0,
-          0,
-          {
-            assetAddress: super721.address,
-            id: [shiftedItemGroupId2.add(2), shiftedItemGroupId2.add(3)],
-            amounts: [1, 1],
-            IOUTokenId: [],
-          },
-          true
-        );
-        const testCallData2String = testCallData2.data.toString();
-        await expect(
-          signer1.sendTransaction({
-            to: stakerV3dsProxy.address,
-            data: testCallData2String,
-          })
-        ).to.be.revertedWith("TokensAlreadyLocked()");
-      });
-      it("Reverts: can't withdraw tokens are locked", async function () {
-        const testCallData1 = await mockStakingFacet.connect(signer1).deposit(
-          0,
-          0,
-          {
-            assetAddress: super721.address,
-            id: [shiftedItemGroupId2, shiftedItemGroupId2.add(1)],
-            amounts: [1, 1],
-            IOUTokenId: [],
-          },
-          true
-        );
-        const testCallData1String = testCallData1.data.toString();
-        await signer1.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: testCallData1String,
-        });
-        let startOfStaking = await utils.getCurrentTime();
-
-        const testCallData2 = await mockStakingFacet.connect(signer1).withdraw(
-          0,
-          {
-            assetAddress: super721.address,
-            id: [shiftedItemGroupId2.add(3), shiftedItemGroupId2.add(4)],
-            amounts: [1, 1],
-            IOUTokenId: [0, 1],
-          },
-          0
-        );
-        const testCallData2String = testCallData2.data.toString();
-        await expect(
-          signer1.sendTransaction({
-            to: stakerV3dsProxy.address,
-            data: testCallData2String,
-          })
-        ).to.be.revertedWith("TokenLocked()");
-
-        const testCallData3 = await mockStakingFacet.connect(signer1).deposit(
-          0,
-          0,
-          {
-            assetAddress: super721.address,
-            id: [shiftedItemGroupId2.add(2), shiftedItemGroupId2.add(3)],
-            amounts: [1, 1],
-            IOUTokenId: [],
-          },
-          false
-        );
-        const testCallData3String = testCallData3.data.toString();
-        signer1.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: testCallData3String,
-        });
-
-        const testCallData4 = await mockStakingFacet.connect(signer1).withdraw(
-          0,
-          {
-            assetAddress: super721.address,
-            id: [shiftedItemGroupId2.add(3), shiftedItemGroupId2.add(4)],
-            amounts: [1, 1],
-            IOUTokenId: [2, 3],
-          },
-          0
-        );
-        const testCallData4String = testCallData4.data.toString();
-
-        await signer1.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: testCallData4String,
-        });
-        expect(await super721.ownerOf(shiftedItemGroupId2.add(3))).to.be.eq(
-          signer1.address
-        );
-
-        await network.provider.send("evm_setNextBlockTimestamp", [
-          startOfStaking + 70,
-        ]);
-        await ethers.provider.send("evm_mine", []);
-
-        await signer1.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: testCallData2String,
-        });
-        expect(await super721.ownerOf(shiftedItemGroupId2.add(1))).to.be.eq(
-          signer1.address
-        );
-      });
-      it("should work with different types of time lock boosts correctly", async function () {
-        const testCallData1 = await mockCoreFacet.connect(owner).addPool({
-          id: 1,
-          tokenStrength: 10000,
-          pointStrength: 10000,
-          groupId: 0,
-          tokensPerShare: 0,
-          pointsPerShare: 0,
-          compoundInterestThreshold: ethers.utils.parseEther("10"),
-          compoundInterestMultiplier: 5000,
-          boostInfo: [1, 2],
-          assetAddress: super721.address,
-          typeOfAsset: 1,
-          lockPeriod: 60,
-          lockAmount: 2,
-          lockMultiplier: 10000,
-          timeLockTypeOfBoost: 1,
-          compoundTypeOfBoost: 1,
-        });
-        const testCallData2 = await mockCoreFacet.connect(owner).addPool({
-          id: 2,
-          tokenStrength: 10000,
-          pointStrength: 10000,
-          groupId: 0,
-          tokensPerShare: 0,
-          pointsPerShare: 0,
-          compoundInterestThreshold: ethers.utils.parseEther("1000"),
-          compoundInterestMultiplier: 5000,
-          boostInfo: [1, 2],
-          assetAddress: super721.address,
-          typeOfAsset: 1,
-          lockPeriod: 60,
-          lockAmount: 2,
-          lockMultiplier: 10000,
-          timeLockTypeOfBoost: 0,
-          compoundTypeOfBoost: 0,
-        });
-        const testCallData1String = testCallData1.data.toString();
-        const testCallData2String = testCallData2.data.toString();
-
-        await owner.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: testCallData1String,
-        });
-        await owner.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: testCallData2String,
-        });
-
-        let startOfStaking = await utils.getCurrentTime();
-        const testCallData3 = await mockStakingFacet.connect(signer1).deposit(
-          1,
-          0,
-          {
-            assetAddress: super721.address,
-            id: [shiftedItemGroupId2.add(2), shiftedItemGroupId2.add(3)],
-            amounts: [1, 1],
-            IOUTokenId: [],
-          },
-          true
-        );
-
-        const testCallData4 = await mockStakingFacet.connect(signer1).deposit(
-          2,
-          0,
-          {
-            assetAddress: super721.address,
-            id: [shiftedItemGroupId2, shiftedItemGroupId2.add(1)],
-            amounts: [1, 1],
-            IOUTokenId: [],
-          },
-          true
-        );
-        const testCallData3String = testCallData3.data.toString();
-        const testCallData4String = testCallData4.data.toString();
-        await signer1.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: testCallData3String,
-        });
-
-        await signer1.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: testCallData4String,
-        });
-
-        const testCallData5 = await mockStakingFacet
-          .connect(signer1)
-          .claim(1, []);
-
-        const testCallData5String = testCallData5.data.toString();
-
-        await network.provider.send("evm_setNextBlockTimestamp", [
-          startOfStaking + 30,
-        ]);
-        await ethers.provider.send("evm_mine", []);
-
-        //claim
-        await signer1.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: testCallData5String,
-        });
-      });
-      it("complex math tests of time locks with 3 users", async function () {
-        let shares = {
-          sig1: 0,
-          sig2: 0,
-          sig3: 0,
-          sum: 0,
-        };
-        let rewardsPerSecond = BigNumber.from(ethers.utils.parseEther("10")),
-          lockMultiplier = 2;
-
-        const testCallData6 = await mockStakingFacet.connect(signer2).deposit(
-          0,
-          0,
-          {
-            assetAddress: super721.address,
-            id: [shiftedItemGroupId2.add(7), shiftedItemGroupId2.add(8)],
-            amounts: [1, 1],
-            IOUTokenId: [],
-          },
-          false
-        );
-
-        const testCallData6String = testCallData6.data.toString();
-
-        const testCallData4 = await mockStakingFacet.connect(signer1).deposit(
-          0,
-          0,
-          {
-            assetAddress: super721.address,
-            id: [shiftedItemGroupId2, shiftedItemGroupId2.add(1)],
-            amounts: [1, 1],
-            IOUTokenId: [],
-          },
-          true
-        );
-
-        const testCallData4String = testCallData4.data.toString();
-
-        //deposit
-        await signer2.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: testCallData6String,
-        });
-        shares.sig2 = 2000;
-        shares.sum = shares.sig1 + shares.sig2 + shares.sig3;
-        let signer2DepTime = await utils.getCurrentTime();
-
-        //deposit
-        let startOfStaking = await utils.getCurrentTime();
-        await signer1.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: testCallData4String,
-        });
-        // 2000 with time lock bonus multiplier x2
-        shares.sig1 = 2000 * lockMultiplier;
-        shares.sum = shares.sig1 + shares.sig2 + shares.sig3;
-        let signer1DepTime = await utils.getCurrentTime();
-        let signer2Rewards = BigNumber.from(
-          rewardsPerSecond.mul(signer1DepTime - signer2DepTime)
-        );
-
-        const testCallData1 = await mockStakingFacet
-          .connect(signer1)
-          .claim(0, []);
-
-        const testCallData1String = testCallData1.data.toString();
-
-        const testCallData2 = await mockStakingFacet
-          .connect(signer2)
-          .claim(0, []);
-
-        const testCallData2String = testCallData2.data.toString();
-
-        await network.provider.send("evm_setNextBlockTimestamp", [
-          startOfStaking + 30,
-        ]);
-        await ethers.provider.send("evm_mine", []);
-
-        //claim
-        await signer1.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: testCallData1String,
-        });
-
-        // helper var
-        let someBig = ethers.utils.parseEther("1");
-        // signer 1 share with time lock boost is 2/3 (4000/6000) * 10(rewards per second) *
-        // * 30(time from start of signer1 staked) ~= 200
-        let signer1Rewards = BigNumber.from(
-          rewardsPerSecond
-            .mul(someBig.mul(shares.sig1).div(shares.sum))
-            .mul((await utils.getCurrentTime()) - signer1DepTime)
-            .div(someBig)
-        );
-
-        // expect(await rewardToken.balanceOf(signer1.address)).to.be.closeTo(
-        //   signer1Rewards,
-        //   10 ** 15
-        // );
-        let signer1FirstClaimTime = await (
-          await ethers.provider.getBlock()
-        ).timestamp;
-
-        await signer2.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: testCallData2String,
-        });
-        signer2Rewards = signer2Rewards.add(
-          rewardsPerSecond
-            .mul(someBig.mul(shares.sig2).div(shares.sum))
-            .mul((await utils.getCurrentTime()) - signer1DepTime)
-            .div(someBig)
-        );
-        let signer2FirstClaimTime = await (
-          await ethers.provider.getBlock()
-        ).timestamp;
-        // signer 2 share is 1/3 (2000/6000) * 10 * 31 (1 sec past from last tx) +
-        // + 10(reward for 1 sec when singer2 deposited first) ~= 113.3333333
-        // expect(await rewardToken.balanceOf(signer2.address)).to.be.closeTo(
-        //   signer2Rewards,
-        //   10 ** 15
-        // );
-
-        const testCallData3 = await mockStakingFacet.connect(signer3).deposit(
-          0,
-          0,
-          {
-            assetAddress: super721.address,
-            id: [shiftedItemGroupId2.add(4)],
-            amounts: [1],
-            IOUTokenId: [],
-          },
-          false
-        );
-
-        const testCallData3String = testCallData3.data.toString();
-
-        const testCallData7 = await mockStakingFacet.connect(signer3).deposit(
-          0,
-          0,
-          {
-            assetAddress: super721.address,
-            id: [shiftedItemGroupId2.add(5), shiftedItemGroupId2.add(6)],
-            amounts: [1, 1],
-            IOUTokenId: [],
-          },
-          true
-        );
-
-        const testCallData7String = testCallData7.data.toString();
-
-        // 3 seconds have passed since the last claim
-        //deposit
-        await signer3.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: testCallData3String,
-        });
-        let signer3DepTime = await utils.getCurrentTime();
-        signer1Rewards = signer1Rewards.add(
-          rewardsPerSecond
-            .mul(someBig.mul(shares.sig1).div(shares.sum))
-            .mul(signer3DepTime - signer1FirstClaimTime)
-            .div(someBig)
-        );
-        signer2Rewards = signer2Rewards.add(
-          rewardsPerSecond
-            .mul(someBig.mul(shares.sig2).div(shares.sum))
-            .mul(signer3DepTime - signer2FirstClaimTime)
-            .div(someBig)
-        );
-        shares.sig3 = 1000;
-        shares.sum = shares.sig1 + shares.sig2 + shares.sig3;
-
-        // +1 second (4 overall)
-        //deposit
-        await signer3.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: testCallData7String,
-        });
-        let signer3TimeLockAt = await utils.getCurrentTime();
-        signer1Rewards = signer1Rewards.add(
-          rewardsPerSecond
-            .mul(someBig.mul(shares.sig1).div(shares.sum))
-            .mul(signer3TimeLockAt - signer3DepTime)
-            .div(someBig)
-        );
-        signer2Rewards = signer2Rewards.add(
-          rewardsPerSecond
-            .mul(someBig.mul(shares.sig2).div(shares.sum))
-            .mul(signer3TimeLockAt - signer3DepTime)
-            .div(someBig)
-        );
-        let signer3Rewards = BigNumber.from(
-          rewardsPerSecond
-            .mul(someBig.mul(shares.sig3).div(shares.sum))
-            .mul(signer3TimeLockAt - signer3DepTime)
-            .div(someBig)
-        );
-
-        shares.sig3 = 3000 * lockMultiplier;
-        shares.sum = shares.sig1 + shares.sig2 + shares.sig3;
-
-        // claim
-        await signer1.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: testCallData1String,
-        });
-        let signer1SecondClaimTime = await utils.getCurrentTime();
-        signer1Rewards = signer1Rewards.add(
-          rewardsPerSecond
-            .mul(someBig.mul(shares.sig1).div(shares.sum))
-            .mul(signer1SecondClaimTime - signer3TimeLockAt)
-            .div(someBig)
-        );
-        // 200 + 10 * 2/3 * 4(time between 1st signer1 claim and 1st signer3 deposit) + 10 *
-        // * 4/7(share of signer1 at signer3 1st deposit) * 1 + 1/3(share of signer1 at signer3 2nd deposit) *
-        // * 1(second past until 2nd signer1 claim) ~= 235,714285714
-        // expect(await rewardToken.balanceOf(signer1.address)).to.be.closeTo(
-        //   signer1Rewards,
-        //   10 ** 15
-        // );
-
-        await signer2.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: testCallData1String,
-        });
-        let signer2SecondClaimTime = await utils.getCurrentTime();
-        signer2Rewards = signer2Rewards.add(
-          rewardsPerSecond
-            .mul(someBig.mul(shares.sig2).div(shares.sum))
-            .mul(signer2SecondClaimTime - signer3TimeLockAt)
-            .div(someBig)
-        );
-        // 113.333333 + 10 * 1/3 * 3(one less second) + 10 * 2/7 * 1 + 1/6 *
-        // * 2(+1 second from last tx) ~= 129.52380949
-        // expect(await rewardToken.balanceOf(signer2.address)).to.be.closeTo(
-        //   signer2Rewards,
-        //   10 ** 15
-        // );
-
-        // moving to 60 seconds after signer1 time locked
-        await network.provider.send("evm_setNextBlockTimestamp", [
-          startOfStaking + 60,
-        ]);
-        await ethers.provider.send("evm_mine", []);
-
-        //claim
-        await signer1.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: testCallData1String,
-        });
-        let signer1ThirdClaimTime = await utils.getCurrentTime();
-        signer1Rewards = signer1Rewards.add(
-          rewardsPerSecond
-            .mul(someBig.mul(shares.sig1).div(shares.sum))
-            .mul(signer1ThirdClaimTime - signer1SecondClaimTime)
-            .div(someBig)
-        );
-        // 235.714285 + 10 * 1/3 * 24(time from last signer1 claim) ~= 315.714285
-        // expect(await rewardToken.balanceOf(signer1.address)).to.be.closeTo(
-        //   signer1Rewards,
-        //   10 ** 15
-        // );
-
-        signer2Rewards = signer2Rewards.add(
-          rewardsPerSecond
-            .mul(someBig.mul(shares.sig2).div(shares.sum))
-            .mul(signer1ThirdClaimTime - signer2SecondClaimTime)
-            .div(someBig)
-        );
-        signer3Rewards = signer3Rewards.add(
-          rewardsPerSecond
-            .mul(someBig.mul(shares.sig3).div(shares.sum))
-            .mul(signer1ThirdClaimTime - signer3TimeLockAt)
-            .div(someBig)
-        );
-
-        shares.sig1 = 2000;
-        shares.sum = shares.sig1 + shares.sig2 + shares.sig3;
-
-        //claim
-        await signer2.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: testCallData2String,
-        });
-        let signer2ThirdClaimTime = await utils.getCurrentTime();
-        signer2Rewards = signer2Rewards.add(
-          rewardsPerSecond
-            .mul(someBig.mul(shares.sig2).div(shares.sum))
-            .mul(signer2ThirdClaimTime - signer1ThirdClaimTime)
-            .div(someBig)
-        );
-
-        // 129.52380949 + 10 * 1/6 * 23(time from last signer2 claim to unlock of signer1 deposit) +
-        // 10 * 1/5 ~= 169.857142823
-        // expect(await rewardToken.balanceOf(signer2.address)).to.be.closeTo(
-        //   signer2Rewards,
-        //   10 ** 15
-        // );
-
-        //claim
-        await signer3.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: testCallData1String,
-        });
-        let signer3FirstClaimTime = await utils.getCurrentTime();
-        signer3Rewards = signer3Rewards.add(
-          rewardsPerSecond
-            .mul(someBig.mul(shares.sig3).div(shares.sum))
-            .mul(signer3FirstClaimTime - signer1ThirdClaimTime)
-            .div(someBig)
-        );
-
-        // 10 * 1/7 + 10 * 6/12 * 25(seconds from time lock of signer3 to unlock of signer1 deposit) + 10 *
-        // * 6 / 10 * 2(time from signer1 unlock) ~=
-        // 10 * 1/5 ~= 138.4285714
-        // expect(await rewardToken.balanceOf(signer3.address)).to.be.closeTo(
-        //   signer3Rewards,
-        //   10 ** 15
-        // );
-
-        await signer1.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: testCallData1String,
-        });
-        let signer1FourthClaimTime = await utils.getCurrentTime();
-        signer1Rewards = signer1Rewards.add(
-          rewardsPerSecond
-            .mul(someBig.mul(shares.sig1).div(shares.sum))
-            .mul(signer1FourthClaimTime - signer1ThirdClaimTime)
-            .div(someBig)
-        );
-        // 315.714285 + 10 * 2/10 * 3 ~= 321.714285714285
-        // expect(await rewardToken.balanceOf(signer1.address)).to.be.closeTo(
-        //   signer1Rewards,
-        //   10 ** 15
-        // );
-
-        await signer2.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: testCallData1String,
-        });
-        let signer2FourthClaimTime = await utils.getCurrentTime();
-        signer2Rewards = signer2Rewards.add(
-          rewardsPerSecond
-            .mul(someBig.mul(shares.sig2).div(shares.sum))
-            .mul(signer2FourthClaimTime - signer2ThirdClaimTime)
-            .div(someBig)
-        );
-        // 169.857142823 + 10 * 2/10 * 3 ~= 175.85714285714
-        // expect(await rewardToken.balanceOf(signer2.address)).to.be.closeTo(
-        //   signer2Rewards,
-        //   10 ** 15
-        // );
-
-        await signer3.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: testCallData1String,
-        });
-        let signer3SecondClaimTime = await utils.getCurrentTime();
-        signer3Rewards = signer3Rewards.add(
-          rewardsPerSecond
-            .mul(someBig.mul(shares.sig3).div(shares.sum))
-            .mul(signer3SecondClaimTime - signer3FirstClaimTime)
-            .div(someBig)
-        );
-        // 138.428571428571 + 10 * 6/10 * 3 ~= 156.428571429
-        // expect(await rewardToken.balanceOf(signer3.address)).to.be.closeTo(
-        //   signer3Rewards,
-        //   10 ** 15
-        // );
-
-        // moving to 60 seconds after signer1 time locked
-        await network.provider.send("evm_setNextBlockTimestamp", [
-          signer3TimeLockAt + 60,
-        ]);
-        await ethers.provider.send("evm_mine", []);
-
-        let signer3UnlockTime = await utils.getCurrentTime();
-        signer1Rewards = signer1Rewards.add(
-          rewardsPerSecond
-            .mul(someBig.mul(shares.sig1).div(shares.sum))
-            .mul(signer3UnlockTime - signer1FourthClaimTime)
-            .div(someBig)
-        );
-        signer2Rewards = signer2Rewards.add(
-          rewardsPerSecond
-            .mul(someBig.mul(shares.sig2).div(shares.sum))
-            .mul(signer3UnlockTime - signer2FourthClaimTime)
-            .div(someBig)
-        );
-        signer3Rewards = signer3Rewards.add(
-          rewardsPerSecond
-            .mul(someBig.mul(shares.sig3).div(shares.sum))
-            .mul(signer3UnlockTime - signer3SecondClaimTime)
-            .div(someBig)
-        );
-
-        shares.sig3 = 3000;
-        shares.sum = shares.sig1 + shares.sig2 + shares.sig3;
-        await network.provider.send("evm_setNextBlockTimestamp", [
-          signer3TimeLockAt + 75,
-        ]);
-        await ethers.provider.send("evm_mine", []);
-
-        await signer1.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: testCallData1String,
-        });
-        let signer1FifthClaimTime = await utils.getCurrentTime();
-        signer1Rewards = signer1Rewards.add(
-          rewardsPerSecond
-            .mul(someBig.mul(shares.sig1).div(shares.sum))
-            .mul(signer1FifthClaimTime - signer3UnlockTime)
-            .div(someBig)
-        );
-        // expect(await rewardToken.balanceOf(signer1.address)).to.be.closeTo(
-        //   signer1Rewards,
-        //   10 ** 15
-        // );
-
-        await signer2.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: testCallData1String,
-        });
-        let signer2FifthClaimTime = await utils.getCurrentTime();
-        signer2Rewards = signer2Rewards.add(
-          rewardsPerSecond
-            .mul(someBig.mul(shares.sig2).div(shares.sum))
-            .mul(signer2FifthClaimTime - signer3UnlockTime)
-            .div(someBig)
-        );
-        // expect(await rewardToken.balanceOf(signer2.address)).to.be.closeTo(
-        //   signer2Rewards,
-        //   10 ** 15
-        // );
-
-        await signer3.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: testCallData1String,
-        });
-        let signer3ThirdClaimTime = await utils.getCurrentTime();
-        signer3Rewards = signer3Rewards.add(
-          rewardsPerSecond
-            .mul(someBig.mul(shares.sig3).div(shares.sum))
-            .mul(signer3ThirdClaimTime - signer3UnlockTime)
-            .div(someBig)
-        );
-        // expect(await rewardToken.balanceOf(signer3.address)).to.be.closeTo(
-        //   signer3Rewards,
-        //   10 ** 15
-        // );
-      });
-      it("multiple unlocks should work correctly", async function () {
-        let shares = {
-          sig1: 0,
-          sig2: 0,
-          sig3: 0,
-          sum: 0,
-        };
-        let rewardsPerSecond = BigNumber.from(ethers.utils.parseEther("10")),
-          lockMultiplier = 2;
-
-        const testCallData6 = await mockStakingFacet.connect(signer2).deposit(
-          0,
-          0,
-          {
-            assetAddress: super721.address,
-            id: [shiftedItemGroupId2.add(7), shiftedItemGroupId2.add(8)],
-            amounts: [1, 1],
-            IOUTokenId: [],
-          },
-          false
-        );
-
-        const testCallData6String = testCallData6.data.toString();
-
-        const testCallData4 = await mockStakingFacet.connect(signer1).deposit(
-          0,
-          0,
-          {
-            assetAddress: super721.address,
-            id: [shiftedItemGroupId2, shiftedItemGroupId2.add(1)],
-            amounts: [1, 1],
-            IOUTokenId: [],
-          },
-          true
-        );
-
-        const testCallData4String = testCallData4.data.toString();
-
-        //deposit
-        await signer2.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: testCallData6String,
-        });
-        shares.sig2 = 2000;
-        shares.sum = shares.sig1 + shares.sig2 + shares.sig3;
-        let signer2DepTime = await utils.getCurrentTime();
-
-        //deposit
-        let startOfStaking = await utils.getCurrentTime();
-        await signer1.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: testCallData4String,
-        });
-        // 2000 with time lock bonus multiplier x2
-        shares.sig1 = 2000 * lockMultiplier;
-        shares.sum = shares.sig1 + shares.sig2 + shares.sig3;
-        let signer1DepTime = await utils.getCurrentTime();
-        let signer2Rewards = BigNumber.from(
-          rewardsPerSecond.mul(signer1DepTime - signer2DepTime)
-        );
-
-        const claimCallData = await mockStakingFacet
-          .connect(signer1)
-          .claim(0, []);
-
-        const claimCallDataString = claimCallData.data.toString();
-
-        await network.provider.send("evm_setNextBlockTimestamp", [
-          startOfStaking + 30,
-        ]);
-        await ethers.provider.send("evm_mine", []);
-
-        //claim
-        await signer1.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: claimCallDataString,
-        });
-
-        // helper var
-        let someBig = ethers.utils.parseEther("1");
-        // signer 1 share with time lock boost is 2/3 (4000/6000) * 10(rewards per second) *
-        // * 30(time of signer1 staked) ~= 200
-        let signer1Rewards = BigNumber.from(
-          rewardsPerSecond
-            .mul(someBig.mul(shares.sig1).div(shares.sum))
-            .mul((await utils.getCurrentTime()) - signer1DepTime)
-            .div(someBig)
-        );
-
-        expect(await rewardToken.balanceOf(signer1.address)).to.be.closeTo(
-          signer1Rewards,
-          10 ** 15
-        );
-        let signer1FirstClaimTime = await (
-          await ethers.provider.getBlock()
-        ).timestamp;
-
-        await signer2.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: claimCallDataString,
-        });
-        signer2Rewards = signer2Rewards.add(
-          rewardsPerSecond
-            .mul(someBig.mul(shares.sig2).div(shares.sum))
-            .mul((await utils.getCurrentTime()) - signer1DepTime)
-            .div(someBig)
-        );
-        let signer2FirstClaimTime = await (
-          await ethers.provider.getBlock()
-        ).timestamp;
-        // signer 2 share is 1/3 (2000/6000) * 10 * 31 (1 sec past from last tx) +
-        // + 10(reward for 1 sec when singer2 deposited first) ~= 113.3333333
-        expect(await rewardToken.balanceOf(signer2.address)).to.be.closeTo(
-          signer2Rewards,
-          10 ** 15
-        );
-
-        const testCallData3 = await mockStakingFacet.connect(signer3).deposit(
-          0,
-          0,
-          {
-            assetAddress: super721.address,
-            id: [shiftedItemGroupId2.add(4)],
-            amounts: [1],
-            IOUTokenId: [],
-          },
-          false
-        );
-
-        const testCallData3String = testCallData3.data.toString();
-
-        const testCallData7 = await mockStakingFacet.connect(signer3).deposit(
-          0,
-          0,
-          {
-            assetAddress: super721.address,
-            id: [shiftedItemGroupId2.add(5), shiftedItemGroupId2.add(6)],
-            amounts: [1, 1],
-            IOUTokenId: [],
-          },
-          true
-        );
-
-        const testCallData7String = testCallData7.data.toString();
-
-        // 3 seconds have passed since the last claim
-        //deposit
-        await signer3.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: testCallData3String,
-        });
-        let signer3DepTime = await utils.getCurrentTime();
-        signer1Rewards = signer1Rewards.add(
-          rewardsPerSecond
-            .mul(someBig.mul(shares.sig1).div(shares.sum))
-            .mul(signer3DepTime - signer1FirstClaimTime)
-            .div(someBig)
-        );
-        signer2Rewards = signer2Rewards.add(
-          rewardsPerSecond
-            .mul(someBig.mul(shares.sig2).div(shares.sum))
-            .mul(signer3DepTime - signer2FirstClaimTime)
-            .div(someBig)
-        );
-        shares.sig3 = 1000;
-        shares.sum = shares.sig1 + shares.sig2 + shares.sig3;
-
-        // +1 second (4 overall)
-        //deposit
-        await signer3.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: testCallData7String,
-        });
-        let signer3TimeLockAt = await utils.getCurrentTime();
-        signer1Rewards = signer1Rewards.add(
-          rewardsPerSecond
-            .mul(someBig.mul(shares.sig1).div(shares.sum))
-            .mul(signer3TimeLockAt - signer3DepTime)
-            .div(someBig)
-        );
-        signer2Rewards = signer2Rewards.add(
-          rewardsPerSecond
-            .mul(someBig.mul(shares.sig2).div(shares.sum))
-            .mul(signer3TimeLockAt - signer3DepTime)
-            .div(someBig)
-        );
-        let signer3Rewards = BigNumber.from(
-          rewardsPerSecond
-            .mul(someBig.mul(shares.sig3).div(shares.sum))
-            .mul(signer3TimeLockAt - signer3DepTime)
-            .div(someBig)
-        );
-
-        shares.sig3 = 3000 * lockMultiplier;
-        shares.sum = shares.sig1 + shares.sig2 + shares.sig3;
-
-        await network.provider.send("evm_setNextBlockTimestamp", [
-          signer1DepTime + 200,
-        ]);
-
-        signer1Rewards = signer1Rewards.add(
-          rewardsPerSecond
-            .mul(someBig.mul(shares.sig1).div(shares.sum))
-            .mul(signer1DepTime + 60 - signer3TimeLockAt)
-            .div(someBig)
-        );
-        signer2Rewards = signer2Rewards.add(
-          rewardsPerSecond
-            .mul(someBig.mul(shares.sig2).div(shares.sum))
-            .mul(signer1DepTime + 60 - signer3TimeLockAt)
-            .div(someBig)
-        );
-        signer3Rewards = signer3Rewards.add(
-          rewardsPerSecond
-            .mul(someBig.mul(shares.sig3).div(shares.sum))
-            .mul(signer1DepTime + 60 - signer3TimeLockAt)
-            .div(someBig)
-        );
-
-        shares.sig1 = 2000;
-        shares.sum = shares.sig1 + shares.sig2 + shares.sig3;
-
-        signer1Rewards = signer1Rewards.add(
-          rewardsPerSecond
-            .mul(someBig.mul(shares.sig1).div(shares.sum))
-            .mul(signer3TimeLockAt + 60 - (signer1DepTime + 60))
-            .div(someBig)
-        );
-        signer2Rewards = signer2Rewards.add(
-          rewardsPerSecond
-            .mul(someBig.mul(shares.sig2).div(shares.sum))
-            .mul(signer3TimeLockAt + 60 - (signer1DepTime + 60))
-            .div(someBig)
-        );
-        signer3Rewards = signer3Rewards.add(
-          rewardsPerSecond
-            .mul(someBig.mul(shares.sig3).div(shares.sum))
-            .mul(signer3TimeLockAt + 60 - (signer1DepTime + 60))
-            .div(someBig)
-        );
-
-        shares.sig3 = 3000;
-        shares.sum = shares.sig1 + shares.sig2 + shares.sig3;
-
-        // move to signer1LockTime + 200 seconds
-        await ethers.provider.send("evm_mine", []);
-
-        await expect(IOUToken.ownerOf(2)).to.be.reverted;
-        expect(await IOUToken.ownerOf(4)).to.be.eq(signer3.address);
-        await expect(IOUToken.ownerOf(5)).to.be.reverted;
-        //claim
-        await signer1.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: claimCallDataString,
-        });
-        let signer1LastClaim = await utils.getCurrentTime();
-        signer1Rewards = signer1Rewards.add(
-          rewardsPerSecond
-            .mul(someBig.mul(shares.sig1).div(shares.sum))
-            .mul(signer1LastClaim - (signer3TimeLockAt + 60))
-            .div(someBig)
-        );
-        expect(await IOUToken.ownerOf(2)).to.be.eq(signer1.address);
-        expect(await IOUToken.ownerOf(4)).to.be.eq(signer3.address);
-        expect(await IOUToken.ownerOf(5)).to.be.eq(signer3.address);
-        expect(await rewardToken.balanceOf(signer1.address)).to.be.closeTo(
-          signer1Rewards,
-          10 ** 15
-        );
-
-        await signer2.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: claimCallDataString,
-        });
-        let signer2LastClaim = await utils.getCurrentTime();
-        signer2Rewards = signer2Rewards.add(
-          rewardsPerSecond
-            .mul(someBig.mul(shares.sig2).div(shares.sum))
-            .mul(signer2LastClaim - (signer3TimeLockAt + 60))
-            .div(someBig)
-        );
-        expect(await rewardToken.balanceOf(signer2.address)).to.be.closeTo(
-          signer2Rewards,
-          10 ** 15
-        );
-
-        await signer3.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: claimCallDataString,
-        });
-        let signer3LastClaim = await utils.getCurrentTime();
-        signer3Rewards = signer3Rewards.add(
-          rewardsPerSecond
-            .mul(someBig.mul(shares.sig3).div(shares.sum))
-            .mul(signer3LastClaim - (signer3TimeLockAt + 60))
-            .div(someBig)
-        );
-        expect(await rewardToken.balanceOf(signer3.address)).to.be.closeTo(
-          signer3Rewards,
-          10 ** 15
-        );
-      });
-    });
   });
+  //   describe("time lock deposits testing", function () {
+  //     beforeEach(async function () {
+  //       const testCallData1 = await mockCoreFacet.connect(owner).setEmissions(
+  //         [
+  //           {
+  //             timeStamp: await utils.getCurrentTime(),
+  //             rate: ethers.utils.parseEther("10"),
+  //           },
+  //         ],
+  //         [
+  //           {
+  //             timeStamp: await utils.getCurrentTime(),
+  //             rate: ethers.utils.parseEther("10"),
+  //           },
+  //         ]
+  //       );
+  //       const testCallData1String = testCallData1.data.toString();
 
-  describe("Compound interest testing", function () {
-    it("Should work correctly with compound interest pools", async function () {
-      await rewardToken.transfer(
-        stakerV3dsProxy.address,
-        ethers.utils.parseEther("500000")
-      );
+  //       //setEmissions
+  //       await owner.sendTransaction({
+  //         to: stakerV3dsProxy.address,
+  //         data: testCallData1String,
+  //       });
 
-      const testCallData1 = await mockCoreFacet.connect(owner).setEmissions(
-        [
-          {
-            timeStamp: await utils.getCurrentTime(),
-            rate: ethers.utils.parseEther("10"),
-          },
-        ],
-        [
-          {
-            timeStamp: await utils.getCurrentTime(),
-            rate: ethers.utils.parseEther("10"),
-          },
-        ]
-      );
-      const testCallData1String = testCallData1.data.toString();
+  //       const testCallData2 = await mockCoreFacet
+  //         .connect(owner)
+  //         .configureBoostersBatch(
+  //           [1, 2],
+  //           [
+  //             {
+  //               set: true,
+  //               multiplier: 2300,
+  //               amountRequired: 3,
+  //               groupRequired: itemGroupId2,
+  //               contractRequired: super721.address,
+  //               assetType: 0,
+  //               typeOfAsset: 1,
+  //             },
+  //             {
+  //               set: true,
+  //               multiplier: 2000,
+  //               amountRequired: 2,
+  //               groupRequired: 0,
+  //               contractRequired: super721.address,
+  //               assetType: 1,
+  //               typeOfAsset: 1,
+  //             },
+  //           ]
+  //         );
+  //       const testCallData2String = testCallData2.data.toString();
 
-      //setEmissions
-      await owner.sendTransaction({
-        to: stakerV3dsProxy.address,
-        data: testCallData1String,
-      });
+  //       //configureBoosterBatch
+  //       await owner.sendTransaction({
+  //         to: stakerV3dsProxy.address,
+  //         data: testCallData2String,
+  //       });
 
-      const testCallData2 = await mockCoreFacet.connect(owner).addPool({
-        id: 0,
-        tokenStrength: 10000,
-        pointStrength: 10000,
-        groupId: 0,
-        tokensPerShare: 0,
-        pointsPerShare: 0,
-        compoundInterestThreshold: ethers.utils.parseEther("500"),
-        compoundInterestMultiplier: 5000,
-        boostInfo: [1, 2],
-        assetAddress: super721.address,
-        typeOfAsset: 1,
-        lockPeriod: 0,
-        lockAmount: 0,
-        lockMultiplier: 0,
-        timeLockTypeOfBoost: 0,
-        compoundTypeOfBoost: 0,
-      });
-      const testCallData2String = testCallData2.data.toString();
+  //       const testCallData3 = await mockCoreFacet.connect(owner).addPool({
+  //         id: 0,
+  //         tokenStrength: 10000,
+  //         pointStrength: 10000,
+  //         groupId: 0,
+  //         tokensPerShare: 0,
+  //         pointsPerShare: 0,
+  //         compoundInterestThreshold: ethers.utils.parseEther("1000"),
+  //         compoundInterestMultiplier: 5000,
+  //         boostInfo: [1, 2],
+  //         assetAddress: super721.address,
+  //         typeOfAsset: 1,
+  //         lockPeriod: 60,
+  //         lockAmount: 2,
+  //         lockMultiplier: 10000,
+  //         timeLockTypeOfBoost: 2,
+  //         compoundTypeOfBoost: 2,
+  //       });
+  //       const testCallData3String = testCallData3.data.toString();
 
-      await super721.connect(owner).configureGroup(itemGroupId2, {
-        name: "PEPSI",
-        supplyType: 0,
-        supplyData: 10,
-        burnType: 0,
-        burnData: 0,
-      });
-      await super721
-        .connect(owner)
-        .mintBatch(
-          signer1.address,
-          [
-            shiftedItemGroupId2,
-            shiftedItemGroupId2.add(1),
-            shiftedItemGroupId2.add(2),
-            shiftedItemGroupId2.add(3),
-          ],
-          DATA
-        );
-      await super721
-        .connect(signer1)
-        .setApprovalForAll(stakerV3dsProxy.address, true);
+  //       //addPool
+  //       await owner.sendTransaction({
+  //         to: stakerV3dsProxy.address,
+  //         data: testCallData3String,
+  //       });
 
-      //addPool
-      await owner.sendTransaction({
-        to: stakerV3dsProxy.address,
-        data: testCallData2String,
-      });
+  //       await super721.connect(owner).configureGroup(itemGroupId2, {
+  //         name: "PEPSI",
+  //         supplyType: 0,
+  //         supplyData: 10,
+  //         burnType: 0,
+  //         burnData: 0,
+  //       });
+  //       await super721
+  //         .connect(owner)
+  //         .mintBatch(
+  //           signer1.address,
+  //           [
+  //             shiftedItemGroupId2,
+  //             shiftedItemGroupId2.add(1),
+  //             shiftedItemGroupId2.add(2),
+  //             shiftedItemGroupId2.add(3),
+  //           ],
+  //           DATA
+  //         );
+  //       await super721
+  //         .connect(owner)
+  //         .mintBatch(
+  //           signer3.address,
+  //           [
+  //             shiftedItemGroupId2.add(4),
+  //             shiftedItemGroupId2.add(5),
+  //             shiftedItemGroupId2.add(6),
+  //           ],
+  //           DATA
+  //         );
+  //       await super721
+  //         .connect(owner)
+  //         .mintBatch(
+  //           signer2.address,
+  //           [
+  //             shiftedItemGroupId2.add(7),
+  //             shiftedItemGroupId2.add(8),
+  //             shiftedItemGroupId2.add(9),
+  //           ],
+  //           DATA
+  //         );
+  //       await super721
+  //         .connect(signer1)
+  //         .setApprovalForAll(stakerV3dsProxy.address, true);
+  //       await super721
+  //         .connect(signer2)
+  //         .setApprovalForAll(stakerV3dsProxy.address, true);
+  //       await super721
+  //         .connect(signer3)
+  //         .setApprovalForAll(stakerV3dsProxy.address, true);
 
-      const testCallData3 = await mockStakingFacet.connect(signer1).deposit(
-        0,
-        0,
-        {
-          assetAddress: super721.address,
-          id: [
-            shiftedItemGroupId2,
-            shiftedItemGroupId2.add(1),
-            shiftedItemGroupId2.add(2),
-          ],
-          amounts: [1, 1, 1],
-          IOUTokenId: [],
-        },
-        false
-      );
+  //       // const testCallData5 = await mockStakingFacet.connect(signer1).deposit(
+  //       //   0,
+  //       //   2,
+  //       //   {
+  //       //     assetAddress: super721.address,
+  //       //     id: [shiftedItemGroupId2.add(3), shiftedItemGroupId2.add(4)],
+  //       //     amounts: [1, 1],
+  //       //     IOUTokenId: [],
+  //       //   },
+  //       //   false
+  //       // );
 
-      const testCallData3String = testCallData3.data.toString();
+  //       // const testCallData5String = testCallData5.data.toString();
 
-      const testCallData4 = await mockStakingFacet
-        .connect(signer1)
-        .claim(0, []);
+  //       // //deposit
+  //       // await signer1.sendTransaction({
+  //       //   to: stakerV3dsProxy.address,
+  //       //   data: testCallData5String,
+  //       // });
 
-      const testCallData4String = testCallData4.data.toString();
+  //       await rewardToken.transfer(
+  //         stakerV3dsProxy.address,
+  //         ethers.utils.parseEther("500000")
+  //       );
+  //     });
+  //     it("Reverts: invalid amount to lock", async function () {
+  //       const testCallData1 = await mockStakingFacet.connect(signer2).deposit(
+  //         0,
+  //         {
+  //           assetAddress: super721.address,
+  //           id: [shiftedItemGroupId2.add(7)],
+  //           amounts: [1],
+  //           IOUTokenId: [],
+  //         },
+  //         true
+  //       );
+  //       const testCallData1String = testCallData1.data.toString();
+  //       await expect(
+  //         signer2.sendTransaction({
+  //           to: stakerV3dsProxy.address,
+  //           data: testCallData1String,
+  //         })
+  //       ).to.be.revertedWith("InvalidAmountToLock()");
+  //     });
+  //     it("Reverts: tokens already locked", async function () {
+  //       const testCallData1 = await mockStakingFacet.connect(signer1).deposit(
+  //         0,
+  //         {
+  //           assetAddress: super721.address,
+  //           id: [shiftedItemGroupId2, shiftedItemGroupId2.add(1)],
+  //           amounts: [1, 1],
+  //           IOUTokenId: [],
+  //         },
+  //         true
+  //       );
+  //       const testCallData1String = testCallData1.data.toString();
+  //       await signer1.sendTransaction({
+  //         to: stakerV3dsProxy.address,
+  //         data: testCallData1String,
+  //       });
 
-      let signer1DepTime = await utils.getCurrentTime();
-      //deposit
-      await signer1.sendTransaction({
-        to: stakerV3dsProxy.address,
-        data: testCallData3String,
-      });
+  //       const testCallData2 = await mockStakingFacet.connect(signer1).deposit(
+  //         0,
+  //         {
+  //           assetAddress: super721.address,
+  //           id: [shiftedItemGroupId2.add(2), shiftedItemGroupId2.add(3)],
+  //           amounts: [1, 1],
+  //           IOUTokenId: [],
+  //         },
+  //         true
+  //       );
+  //       const testCallData2String = testCallData2.data.toString();
+  //       await expect(
+  //         signer1.sendTransaction({
+  //           to: stakerV3dsProxy.address,
+  //           data: testCallData2String,
+  //         })
+  //       ).to.be.revertedWith("TokensAlreadyLocked()");
+  //     });
+  //     it("Reverts: can't withdraw tokens are locked", async function () {
+  //       const testCallData1 = await mockStakingFacet.connect(signer1).deposit(
+  //         0,
+  //         {
+  //           assetAddress: super721.address,
+  //           id: [shiftedItemGroupId2, shiftedItemGroupId2.add(1)],
+  //           amounts: [1, 1],
+  //           IOUTokenId: [],
+  //         },
+  //         true
+  //       );
+  //       const testCallData1String = testCallData1.data.toString();
+  //       await signer1.sendTransaction({
+  //         to: stakerV3dsProxy.address,
+  //         data: testCallData1String,
+  //       });
+  //       let startOfStaking = await utils.getCurrentTime();
 
-      await network.provider.send("evm_setNextBlockTimestamp", [
-        signer1DepTime + 30,
-      ]);
-      await ethers.provider.send("evm_mine", []);
+  //       const testCallData2 = await mockStakingFacet.connect(signer1).withdraw(
+  //         0,
+  //         {
+  //           assetAddress: super721.address,
+  //           id: [shiftedItemGroupId2.add(3), shiftedItemGroupId2.add(4)],
+  //           amounts: [1, 1],
+  //           IOUTokenId: [0, 1],
+  //         }
+  //       );
+  //       const testCallData2String = testCallData2.data.toString();
+  //       await expect(
+  //         signer1.sendTransaction({
+  //           to: stakerV3dsProxy.address,
+  //           data: testCallData2String,
+  //         })
+  //       ).to.be.revertedWith("TokenLocked()");
 
-      //claim
-      await signer1.sendTransaction({
-        to: stakerV3dsProxy.address,
-        data: testCallData4String,
-      });
-      // expect(await rewardToken.balanceOf(signer1.address)).to.be.closeTo(
-      //   ethers.utils.parseEther("300"),
-      //   10 ** 15
-      // );
+  //       const testCallData3 = await mockStakingFacet.connect(signer1).deposit(
+  //         0,
+  //         {
+  //           assetAddress: super721.address,
+  //           id: [shiftedItemGroupId2.add(2), shiftedItemGroupId2.add(3)],
+  //           amounts: [1, 1],
+  //           IOUTokenId: [],
+  //         },
+  //         false
+  //       );
+  //       const testCallData3String = testCallData3.data.toString();
+  //       signer1.sendTransaction({
+  //         to: stakerV3dsProxy.address,
+  //         data: testCallData3String,
+  //       });
 
-      await network.provider.send("evm_setNextBlockTimestamp", [
-        signer1DepTime + 100,
-      ]);
-      await ethers.provider.send("evm_mine", []);
+  //       const testCallData4 = await mockStakingFacet.connect(signer1).withdraw(
+  //         0,
+  //         {
+  //           assetAddress: super721.address,
+  //           id: [shiftedItemGroupId2.add(3), shiftedItemGroupId2.add(4)],
+  //           amounts: [1, 1],
+  //           IOUTokenId: [2, 3],
+  //         }
+  //       );
+  //       const testCallData4String = testCallData4.data.toString();
 
-      //claim
-      await signer1.sendTransaction({
-        to: stakerV3dsProxy.address,
-        data: testCallData4String,
-      });
-      // 300 + 10 * 50 + 10 * 20 * 1.5 = 1100
-      // expect(await rewardToken.balanceOf(signer1.address)).to.be.closeTo(
-      //   ethers.utils.parseEther("1100"),
-      //   10 ** 15
-      // );
-    });
-  });
+  //       await signer1.sendTransaction({
+  //         to: stakerV3dsProxy.address,
+  //         data: testCallData4String,
+  //       });
+  //       expect(await super721.ownerOf(shiftedItemGroupId2.add(3))).to.be.eq(
+  //         signer1.address
+  //       );
+
+  //       await network.provider.send("evm_setNextBlockTimestamp", [
+  //         startOfStaking + 70,
+  //       ]);
+  //       await ethers.provider.send("evm_mine", []);
+
+  //       await signer1.sendTransaction({
+  //         to: stakerV3dsProxy.address,
+  //         data: testCallData2String,
+  //       });
+  //       expect(await super721.ownerOf(shiftedItemGroupId2.add(1))).to.be.eq(
+  //         signer1.address
+  //       );
+  //     });
+  //     it("should work with different types of time lock boosts correctly", async function () {
+  //       const testCallData1 = await mockCoreFacet.connect(owner).addPool({
+  //         id: 1,
+  //         tokenStrength: 10000,
+  //         pointStrength: 10000,
+  //         groupId: 0,
+  //         tokensPerShare: 0,
+  //         pointsPerShare: 0,
+  //         compoundInterestThreshold: ethers.utils.parseEther("10"),
+  //         compoundInterestMultiplier: 5000,
+  //         boostInfo: [1, 2],
+  //         assetAddress: super721.address,
+  //         typeOfAsset: 1,
+  //         lockPeriod: 60,
+  //         lockAmount: 2,
+  //         lockMultiplier: 10000,
+  //         timeLockTypeOfBoost: 1,
+  //         compoundTypeOfBoost: 1,
+  //       });
+  //       const testCallData2 = await mockCoreFacet.connect(owner).addPool({
+  //         id: 2,
+  //         tokenStrength: 10000,
+  //         pointStrength: 10000,
+  //         groupId: 0,
+  //         tokensPerShare: 0,
+  //         pointsPerShare: 0,
+  //         compoundInterestThreshold: ethers.utils.parseEther("1000"),
+  //         compoundInterestMultiplier: 5000,
+  //         boostInfo: [1, 2],
+  //         assetAddress: super721.address,
+  //         typeOfAsset: 1,
+  //         lockPeriod: 60,
+  //         lockAmount: 2,
+  //         lockMultiplier: 10000,
+  //         timeLockTypeOfBoost: 0,
+  //         compoundTypeOfBoost: 0,
+  //       });
+  //       const testCallData1String = testCallData1.data.toString();
+  //       const testCallData2String = testCallData2.data.toString();
+
+  //       await owner.sendTransaction({
+  //         to: stakerV3dsProxy.address,
+  //         data: testCallData1String,
+  //       });
+  //       await owner.sendTransaction({
+  //         to: stakerV3dsProxy.address,
+  //         data: testCallData2String,
+  //       });
+
+  //       let startOfStaking = await utils.getCurrentTime();
+  //       const testCallData3 = await mockStakingFacet.connect(signer1).deposit(
+  //         1,
+  //         {
+  //           assetAddress: super721.address,
+  //           id: [shiftedItemGroupId2.add(2), shiftedItemGroupId2.add(3)],
+  //           amounts: [1, 1],
+  //           IOUTokenId: [],
+  //         },
+  //         true
+  //       );
+
+  //       const testCallData4 = await mockStakingFacet.connect(signer1).deposit(
+  //         2,
+  //         {
+  //           assetAddress: super721.address,
+  //           id: [shiftedItemGroupId2, shiftedItemGroupId2.add(1)],
+  //           amounts: [1, 1],
+  //           IOUTokenId: [],
+  //         },
+  //         true
+  //       );
+  //       const testCallData3String = testCallData3.data.toString();
+  //       const testCallData4String = testCallData4.data.toString();
+  //       await signer1.sendTransaction({
+  //         to: stakerV3dsProxy.address,
+  //         data: testCallData3String,
+  //       });
+
+  //       await signer1.sendTransaction({
+  //         to: stakerV3dsProxy.address,
+  //         data: testCallData4String,
+  //       });
+
+  //       const testCallData5 = await mockStakingFacet
+  //         .connect(signer1)
+  //         .claim(1, []);
+
+  //       const testCallData5String = testCallData5.data.toString();
+
+  //       await network.provider.send("evm_setNextBlockTimestamp", [
+  //         startOfStaking + 30,
+  //       ]);
+  //       await ethers.provider.send("evm_mine", []);
+
+  //       //claim
+  //       await signer1.sendTransaction({
+  //         to: stakerV3dsProxy.address,
+  //         data: testCallData5String,
+  //       });
+  //     });
+  //     it("complex math tests of time locks with 3 users", async function () {
+  //       let shares = {
+  //         sig1: 0,
+  //         sig2: 0,
+  //         sig3: 0,
+  //         sum: 0,
+  //       };
+  //       let rewardsPerSecond = BigNumber.from(ethers.utils.parseEther("10")),
+  //         lockMultiplier = 2;
+
+  //       const testCallData6 = await mockStakingFacet.connect(signer2).deposit(
+  //         0,
+  //         {
+  //           assetAddress: super721.address,
+  //           id: [shiftedItemGroupId2.add(7), shiftedItemGroupId2.add(8)],
+  //           amounts: [1, 1],
+  //           IOUTokenId: [],
+  //         },
+  //         false
+  //       );
+
+  //       const testCallData6String = testCallData6.data.toString();
+
+  //       const testCallData4 = await mockStakingFacet.connect(signer1).deposit(
+  //         0,
+  //         {
+  //           assetAddress: super721.address,
+  //           id: [shiftedItemGroupId2, shiftedItemGroupId2.add(1)],
+  //           amounts: [1, 1],
+  //           IOUTokenId: [],
+  //         },
+  //         true
+  //       );
+
+  //       const testCallData4String = testCallData4.data.toString();
+
+  //       //deposit
+  //       await signer2.sendTransaction({
+  //         to: stakerV3dsProxy.address,
+  //         data: testCallData6String,
+  //       });
+  //       shares.sig2 = 2000;
+  //       shares.sum = shares.sig1 + shares.sig2 + shares.sig3;
+  //       let signer2DepTime = await utils.getCurrentTime();
+
+  //       //deposit
+  //       let startOfStaking = await utils.getCurrentTime();
+  //       await signer1.sendTransaction({
+  //         to: stakerV3dsProxy.address,
+  //         data: testCallData4String,
+  //       });
+  //       // 2000 with time lock bonus multiplier x2
+  //       shares.sig1 = 2000 * lockMultiplier;
+  //       shares.sum = shares.sig1 + shares.sig2 + shares.sig3;
+  //       let signer1DepTime = await utils.getCurrentTime();
+  //       let signer2Rewards = BigNumber.from(
+  //         rewardsPerSecond.mul(signer1DepTime - signer2DepTime)
+  //       );
+
+  //       const testCallData1 = await mockStakingFacet
+  //         .connect(signer1)
+  //         .claim(0, []);
+
+  //       const testCallData1String = testCallData1.data.toString();
+
+  //       const testCallData2 = await mockStakingFacet
+  //         .connect(signer2)
+  //         .claim(0, []);
+
+  //       const testCallData2String = testCallData2.data.toString();
+
+  //       await network.provider.send("evm_setNextBlockTimestamp", [
+  //         startOfStaking + 30,
+  //       ]);
+  //       await ethers.provider.send("evm_mine", []);
+
+  //       //claim
+  //       await signer1.sendTransaction({
+  //         to: stakerV3dsProxy.address,
+  //         data: testCallData1String,
+  //       });
+
+  //       // helper var
+  //       let someBig = ethers.utils.parseEther("1");
+  //       // signer 1 share with time lock boost is 2/3 (4000/6000) * 10(rewards per second) *
+  //       // * 30(time from start of signer1 staked) ~= 200
+  //       let signer1Rewards = BigNumber.from(
+  //         rewardsPerSecond
+  //           .mul(someBig.mul(shares.sig1).div(shares.sum))
+  //           .mul((await utils.getCurrentTime()) - signer1DepTime)
+  //           .div(someBig)
+  //       );
+
+  //       // expect(await rewardToken.balanceOf(signer1.address)).to.be.closeTo(
+  //       //   signer1Rewards,
+  //       //   10 ** 15
+  //       // );
+  //       let signer1FirstClaimTime = await (
+  //         await ethers.provider.getBlock()
+  //       ).timestamp;
+
+  //       await signer2.sendTransaction({
+  //         to: stakerV3dsProxy.address,
+  //         data: testCallData2String,
+  //       });
+  //       signer2Rewards = signer2Rewards.add(
+  //         rewardsPerSecond
+  //           .mul(someBig.mul(shares.sig2).div(shares.sum))
+  //           .mul((await utils.getCurrentTime()) - signer1DepTime)
+  //           .div(someBig)
+  //       );
+  //       let signer2FirstClaimTime = await (
+  //         await ethers.provider.getBlock()
+  //       ).timestamp;
+  //       // signer 2 share is 1/3 (2000/6000) * 10 * 31 (1 sec past from last tx) +
+  //       // + 10(reward for 1 sec when singer2 deposited first) ~= 113.3333333
+  //       // expect(await rewardToken.balanceOf(signer2.address)).to.be.closeTo(
+  //       //   signer2Rewards,
+  //       //   10 ** 15
+  //       // );
+
+  //       const testCallData3 = await mockStakingFacet.connect(signer3).deposit(
+  //         0,
+  //         {
+  //           assetAddress: super721.address,
+  //           id: [shiftedItemGroupId2.add(4)],
+  //           amounts: [1],
+  //           IOUTokenId: [],
+  //         },
+  //         false
+  //       );
+
+  //       const testCallData3String = testCallData3.data.toString();
+
+  //       const testCallData7 = await mockStakingFacet.connect(signer3).deposit(
+  //         0,
+  //         {
+  //           assetAddress: super721.address,
+  //           id: [shiftedItemGroupId2.add(5), shiftedItemGroupId2.add(6)],
+  //           amounts: [1, 1],
+  //           IOUTokenId: [],
+  //         },
+  //         true
+  //       );
+
+  //       const testCallData7String = testCallData7.data.toString();
+
+  //       // 3 seconds have passed since the last claim
+  //       //deposit
+  //       await signer3.sendTransaction({
+  //         to: stakerV3dsProxy.address,
+  //         data: testCallData3String,
+  //       });
+  //       let signer3DepTime = await utils.getCurrentTime();
+  //       signer1Rewards = signer1Rewards.add(
+  //         rewardsPerSecond
+  //           .mul(someBig.mul(shares.sig1).div(shares.sum))
+  //           .mul(signer3DepTime - signer1FirstClaimTime)
+  //           .div(someBig)
+  //       );
+  //       signer2Rewards = signer2Rewards.add(
+  //         rewardsPerSecond
+  //           .mul(someBig.mul(shares.sig2).div(shares.sum))
+  //           .mul(signer3DepTime - signer2FirstClaimTime)
+  //           .div(someBig)
+  //       );
+  //       shares.sig3 = 1000;
+  //       shares.sum = shares.sig1 + shares.sig2 + shares.sig3;
+
+  //       // +1 second (4 overall)
+  //       //deposit
+  //       await signer3.sendTransaction({
+  //         to: stakerV3dsProxy.address,
+  //         data: testCallData7String,
+  //       });
+  //       let signer3TimeLockAt = await utils.getCurrentTime();
+  //       signer1Rewards = signer1Rewards.add(
+  //         rewardsPerSecond
+  //           .mul(someBig.mul(shares.sig1).div(shares.sum))
+  //           .mul(signer3TimeLockAt - signer3DepTime)
+  //           .div(someBig)
+  //       );
+  //       signer2Rewards = signer2Rewards.add(
+  //         rewardsPerSecond
+  //           .mul(someBig.mul(shares.sig2).div(shares.sum))
+  //           .mul(signer3TimeLockAt - signer3DepTime)
+  //           .div(someBig)
+  //       );
+  //       let signer3Rewards = BigNumber.from(
+  //         rewardsPerSecond
+  //           .mul(someBig.mul(shares.sig3).div(shares.sum))
+  //           .mul(signer3TimeLockAt - signer3DepTime)
+  //           .div(someBig)
+  //       );
+
+  //       shares.sig3 = 3000 * lockMultiplier;
+  //       shares.sum = shares.sig1 + shares.sig2 + shares.sig3;
+
+  //       // claim
+  //       await signer1.sendTransaction({
+  //         to: stakerV3dsProxy.address,
+  //         data: testCallData1String,
+  //       });
+  //       let signer1SecondClaimTime = await utils.getCurrentTime();
+  //       signer1Rewards = signer1Rewards.add(
+  //         rewardsPerSecond
+  //           .mul(someBig.mul(shares.sig1).div(shares.sum))
+  //           .mul(signer1SecondClaimTime - signer3TimeLockAt)
+  //           .div(someBig)
+  //       );
+  //       // 200 + 10 * 2/3 * 4(time between 1st signer1 claim and 1st signer3 deposit) + 10 *
+  //       // * 4/7(share of signer1 at signer3 1st deposit) * 1 + 1/3(share of signer1 at signer3 2nd deposit) *
+  //       // * 1(second past until 2nd signer1 claim) ~= 235,714285714
+  //       // expect(await rewardToken.balanceOf(signer1.address)).to.be.closeTo(
+  //       //   signer1Rewards,
+  //       //   10 ** 15
+  //       // );
+
+  //       await signer2.sendTransaction({
+  //         to: stakerV3dsProxy.address,
+  //         data: testCallData1String,
+  //       });
+  //       let signer2SecondClaimTime = await utils.getCurrentTime();
+  //       signer2Rewards = signer2Rewards.add(
+  //         rewardsPerSecond
+  //           .mul(someBig.mul(shares.sig2).div(shares.sum))
+  //           .mul(signer2SecondClaimTime - signer3TimeLockAt)
+  //           .div(someBig)
+  //       );
+  //       // 113.333333 + 10 * 1/3 * 3(one less second) + 10 * 2/7 * 1 + 1/6 *
+  //       // * 2(+1 second from last tx) ~= 129.52380949
+  //       // expect(await rewardToken.balanceOf(signer2.address)).to.be.closeTo(
+  //       //   signer2Rewards,
+  //       //   10 ** 15
+  //       // );
+
+  //       // moving to 60 seconds after signer1 time locked
+  //       await network.provider.send("evm_setNextBlockTimestamp", [
+  //         startOfStaking + 60,
+  //       ]);
+  //       await ethers.provider.send("evm_mine", []);
+
+  //       //claim
+  //       await signer1.sendTransaction({
+  //         to: stakerV3dsProxy.address,
+  //         data: testCallData1String,
+  //       });
+  //       let signer1ThirdClaimTime = await utils.getCurrentTime();
+  //       signer1Rewards = signer1Rewards.add(
+  //         rewardsPerSecond
+  //           .mul(someBig.mul(shares.sig1).div(shares.sum))
+  //           .mul(signer1ThirdClaimTime - signer1SecondClaimTime)
+  //           .div(someBig)
+  //       );
+  //       // 235.714285 + 10 * 1/3 * 24(time from last signer1 claim) ~= 315.714285
+  //       // expect(await rewardToken.balanceOf(signer1.address)).to.be.closeTo(
+  //       //   signer1Rewards,
+  //       //   10 ** 15
+  //       // );
+
+  //       signer2Rewards = signer2Rewards.add(
+  //         rewardsPerSecond
+  //           .mul(someBig.mul(shares.sig2).div(shares.sum))
+  //           .mul(signer1ThirdClaimTime - signer2SecondClaimTime)
+  //           .div(someBig)
+  //       );
+  //       signer3Rewards = signer3Rewards.add(
+  //         rewardsPerSecond
+  //           .mul(someBig.mul(shares.sig3).div(shares.sum))
+  //           .mul(signer1ThirdClaimTime - signer3TimeLockAt)
+  //           .div(someBig)
+  //       );
+
+  //       shares.sig1 = 2000;
+  //       shares.sum = shares.sig1 + shares.sig2 + shares.sig3;
+
+  //       //claim
+  //       await signer2.sendTransaction({
+  //         to: stakerV3dsProxy.address,
+  //         data: testCallData2String,
+  //       });
+  //       let signer2ThirdClaimTime = await utils.getCurrentTime();
+  //       signer2Rewards = signer2Rewards.add(
+  //         rewardsPerSecond
+  //           .mul(someBig.mul(shares.sig2).div(shares.sum))
+  //           .mul(signer2ThirdClaimTime - signer1ThirdClaimTime)
+  //           .div(someBig)
+  //       );
+
+  //       // 129.52380949 + 10 * 1/6 * 23(time from last signer2 claim to unlock of signer1 deposit) +
+  //       // 10 * 1/5 ~= 169.857142823
+  //       // expect(await rewardToken.balanceOf(signer2.address)).to.be.closeTo(
+  //       //   signer2Rewards,
+  //       //   10 ** 15
+  //       // );
+
+  //       //claim
+  //       await signer3.sendTransaction({
+  //         to: stakerV3dsProxy.address,
+  //         data: testCallData1String,
+  //       });
+  //       let signer3FirstClaimTime = await utils.getCurrentTime();
+  //       signer3Rewards = signer3Rewards.add(
+  //         rewardsPerSecond
+  //           .mul(someBig.mul(shares.sig3).div(shares.sum))
+  //           .mul(signer3FirstClaimTime - signer1ThirdClaimTime)
+  //           .div(someBig)
+  //       );
+
+  //       // 10 * 1/7 + 10 * 6/12 * 25(seconds from time lock of signer3 to unlock of signer1 deposit) + 10 *
+  //       // * 6 / 10 * 2(time from signer1 unlock) ~=
+  //       // 10 * 1/5 ~= 138.4285714
+  //       // expect(await rewardToken.balanceOf(signer3.address)).to.be.closeTo(
+  //       //   signer3Rewards,
+  //       //   10 ** 15
+  //       // );
+
+  //       await signer1.sendTransaction({
+  //         to: stakerV3dsProxy.address,
+  //         data: testCallData1String,
+  //       });
+  //       let signer1FourthClaimTime = await utils.getCurrentTime();
+  //       signer1Rewards = signer1Rewards.add(
+  //         rewardsPerSecond
+  //           .mul(someBig.mul(shares.sig1).div(shares.sum))
+  //           .mul(signer1FourthClaimTime - signer1ThirdClaimTime)
+  //           .div(someBig)
+  //       );
+  //       // 315.714285 + 10 * 2/10 * 3 ~= 321.714285714285
+  //       // expect(await rewardToken.balanceOf(signer1.address)).to.be.closeTo(
+  //       //   signer1Rewards,
+  //       //   10 ** 15
+  //       // );
+
+  //       await signer2.sendTransaction({
+  //         to: stakerV3dsProxy.address,
+  //         data: testCallData1String,
+  //       });
+  //       let signer2FourthClaimTime = await utils.getCurrentTime();
+  //       signer2Rewards = signer2Rewards.add(
+  //         rewardsPerSecond
+  //           .mul(someBig.mul(shares.sig2).div(shares.sum))
+  //           .mul(signer2FourthClaimTime - signer2ThirdClaimTime)
+  //           .div(someBig)
+  //       );
+  //       // 169.857142823 + 10 * 2/10 * 3 ~= 175.85714285714
+  //       // expect(await rewardToken.balanceOf(signer2.address)).to.be.closeTo(
+  //       //   signer2Rewards,
+  //       //   10 ** 15
+  //       // );
+
+  //       await signer3.sendTransaction({
+  //         to: stakerV3dsProxy.address,
+  //         data: testCallData1String,
+  //       });
+  //       let signer3SecondClaimTime = await utils.getCurrentTime();
+  //       signer3Rewards = signer3Rewards.add(
+  //         rewardsPerSecond
+  //           .mul(someBig.mul(shares.sig3).div(shares.sum))
+  //           .mul(signer3SecondClaimTime - signer3FirstClaimTime)
+  //           .div(someBig)
+  //       );
+  //       // 138.428571428571 + 10 * 6/10 * 3 ~= 156.428571429
+  //       // expect(await rewardToken.balanceOf(signer3.address)).to.be.closeTo(
+  //       //   signer3Rewards,
+  //       //   10 ** 15
+  //       // );
+
+  //       // moving to 60 seconds after signer1 time locked
+  //       await network.provider.send("evm_setNextBlockTimestamp", [
+  //         signer3TimeLockAt + 60,
+  //       ]);
+  //       await ethers.provider.send("evm_mine", []);
+
+  //       let signer3UnlockTime = await utils.getCurrentTime();
+  //       signer1Rewards = signer1Rewards.add(
+  //         rewardsPerSecond
+  //           .mul(someBig.mul(shares.sig1).div(shares.sum))
+  //           .mul(signer3UnlockTime - signer1FourthClaimTime)
+  //           .div(someBig)
+  //       );
+  //       signer2Rewards = signer2Rewards.add(
+  //         rewardsPerSecond
+  //           .mul(someBig.mul(shares.sig2).div(shares.sum))
+  //           .mul(signer3UnlockTime - signer2FourthClaimTime)
+  //           .div(someBig)
+  //       );
+  //       signer3Rewards = signer3Rewards.add(
+  //         rewardsPerSecond
+  //           .mul(someBig.mul(shares.sig3).div(shares.sum))
+  //           .mul(signer3UnlockTime - signer3SecondClaimTime)
+  //           .div(someBig)
+  //       );
+
+  //       shares.sig3 = 3000;
+  //       shares.sum = shares.sig1 + shares.sig2 + shares.sig3;
+  //       await network.provider.send("evm_setNextBlockTimestamp", [
+  //         signer3TimeLockAt + 75,
+  //       ]);
+  //       await ethers.provider.send("evm_mine", []);
+
+  //       await signer1.sendTransaction({
+  //         to: stakerV3dsProxy.address,
+  //         data: testCallData1String,
+  //       });
+  //       let signer1FifthClaimTime = await utils.getCurrentTime();
+  //       signer1Rewards = signer1Rewards.add(
+  //         rewardsPerSecond
+  //           .mul(someBig.mul(shares.sig1).div(shares.sum))
+  //           .mul(signer1FifthClaimTime - signer3UnlockTime)
+  //           .div(someBig)
+  //       );
+  //       // expect(await rewardToken.balanceOf(signer1.address)).to.be.closeTo(
+  //       //   signer1Rewards,
+  //       //   10 ** 15
+  //       // );
+
+  //       await signer2.sendTransaction({
+  //         to: stakerV3dsProxy.address,
+  //         data: testCallData1String,
+  //       });
+  //       let signer2FifthClaimTime = await utils.getCurrentTime();
+  //       signer2Rewards = signer2Rewards.add(
+  //         rewardsPerSecond
+  //           .mul(someBig.mul(shares.sig2).div(shares.sum))
+  //           .mul(signer2FifthClaimTime - signer3UnlockTime)
+  //           .div(someBig)
+  //       );
+  //       // expect(await rewardToken.balanceOf(signer2.address)).to.be.closeTo(
+  //       //   signer2Rewards,
+  //       //   10 ** 15
+  //       // );
+
+  //       await signer3.sendTransaction({
+  //         to: stakerV3dsProxy.address,
+  //         data: testCallData1String,
+  //       });
+  //       let signer3ThirdClaimTime = await utils.getCurrentTime();
+  //       signer3Rewards = signer3Rewards.add(
+  //         rewardsPerSecond
+  //           .mul(someBig.mul(shares.sig3).div(shares.sum))
+  //           .mul(signer3ThirdClaimTime - signer3UnlockTime)
+  //           .div(someBig)
+  //       );
+  //       // expect(await rewardToken.balanceOf(signer3.address)).to.be.closeTo(
+  //       //   signer3Rewards,
+  //       //   10 ** 15
+  //       // );
+  //     });
+  //     it("multiple unlocks should work correctly", async function () {
+  //       let shares = {
+  //         sig1: 0,
+  //         sig2: 0,
+  //         sig3: 0,
+  //         sum: 0,
+  //       };
+  //       let rewardsPerSecond = BigNumber.from(ethers.utils.parseEther("10")),
+  //         lockMultiplier = 2;
+
+  //       const testCallData6 = await mockStakingFacet.connect(signer2).deposit(
+  //         0,
+  //         {
+  //           assetAddress: super721.address,
+  //           id: [shiftedItemGroupId2.add(7), shiftedItemGroupId2.add(8)],
+  //           amounts: [1, 1],
+  //           IOUTokenId: [],
+  //         },
+  //         false
+  //       );
+
+  //       const testCallData6String = testCallData6.data.toString();
+
+  //       const testCallData4 = await mockStakingFacet.connect(signer1).deposit(
+  //         0,
+  //         {
+  //           assetAddress: super721.address,
+  //           id: [shiftedItemGroupId2, shiftedItemGroupId2.add(1)],
+  //           amounts: [1, 1],
+  //           IOUTokenId: [],
+  //         },
+  //         true
+  //       );
+
+  //       const testCallData4String = testCallData4.data.toString();
+
+  //       //deposit
+  //       await signer2.sendTransaction({
+  //         to: stakerV3dsProxy.address,
+  //         data: testCallData6String,
+  //       });
+  //       shares.sig2 = 2000;
+  //       shares.sum = shares.sig1 + shares.sig2 + shares.sig3;
+  //       let signer2DepTime = await utils.getCurrentTime();
+
+  //       //deposit
+  //       let startOfStaking = await utils.getCurrentTime();
+  //       await signer1.sendTransaction({
+  //         to: stakerV3dsProxy.address,
+  //         data: testCallData4String,
+  //       });
+  //       // 2000 with time lock bonus multiplier x2
+  //       shares.sig1 = 2000 * lockMultiplier;
+  //       shares.sum = shares.sig1 + shares.sig2 + shares.sig3;
+  //       let signer1DepTime = await utils.getCurrentTime();
+  //       let signer2Rewards = BigNumber.from(
+  //         rewardsPerSecond.mul(signer1DepTime - signer2DepTime)
+  //       );
+
+  //       const claimCallData = await mockStakingFacet
+  //         .connect(signer1)
+  //         .claim(0, []);
+
+  //       const claimCallDataString = claimCallData.data.toString();
+
+  //       await network.provider.send("evm_setNextBlockTimestamp", [
+  //         startOfStaking + 30,
+  //       ]);
+  //       await ethers.provider.send("evm_mine", []);
+
+  //       //claim
+  //       await signer1.sendTransaction({
+  //         to: stakerV3dsProxy.address,
+  //         data: claimCallDataString,
+  //       });
+
+  //       // helper var
+  //       let someBig = ethers.utils.parseEther("1");
+  //       // signer 1 share with time lock boost is 2/3 (4000/6000) * 10(rewards per second) *
+  //       // * 30(time of signer1 staked) ~= 200
+  //       let signer1Rewards = BigNumber.from(
+  //         rewardsPerSecond
+  //           .mul(someBig.mul(shares.sig1).div(shares.sum))
+  //           .mul((await utils.getCurrentTime()) - signer1DepTime)
+  //           .div(someBig)
+  //       );
+
+  //       expect(await rewardToken.balanceOf(signer1.address)).to.be.closeTo(
+  //         signer1Rewards,
+  //         10 ** 15
+  //       );
+  //       let signer1FirstClaimTime = await (
+  //         await ethers.provider.getBlock()
+  //       ).timestamp;
+
+  //       await signer2.sendTransaction({
+  //         to: stakerV3dsProxy.address,
+  //         data: claimCallDataString,
+  //       });
+  //       signer2Rewards = signer2Rewards.add(
+  //         rewardsPerSecond
+  //           .mul(someBig.mul(shares.sig2).div(shares.sum))
+  //           .mul((await utils.getCurrentTime()) - signer1DepTime)
+  //           .div(someBig)
+  //       );
+  //       let signer2FirstClaimTime = await (
+  //         await ethers.provider.getBlock()
+  //       ).timestamp;
+  //       // signer 2 share is 1/3 (2000/6000) * 10 * 31 (1 sec past from last tx) +
+  //       // + 10(reward for 1 sec when singer2 deposited first) ~= 113.3333333
+  //       expect(await rewardToken.balanceOf(signer2.address)).to.be.closeTo(
+  //         signer2Rewards,
+  //         10 ** 15
+  //       );
+
+  //       const testCallData3 = await mockStakingFacet.connect(signer3).deposit(
+  //         0,
+  //         {
+  //           assetAddress: super721.address,
+  //           id: [shiftedItemGroupId2.add(4)],
+  //           amounts: [1],
+  //           IOUTokenId: [],
+  //         },
+  //         false
+  //       );
+
+  //       const testCallData3String = testCallData3.data.toString();
+
+  //       const testCallData7 = await mockStakingFacet.connect(signer3).deposit(
+  //         0,
+  //         {
+  //           assetAddress: super721.address,
+  //           id: [shiftedItemGroupId2.add(5), shiftedItemGroupId2.add(6)],
+  //           amounts: [1, 1],
+  //           IOUTokenId: [],
+  //         },
+  //         true
+  //       );
+
+  //       const testCallData7String = testCallData7.data.toString();
+
+  //       // 3 seconds have passed since the last claim
+  //       //deposit
+  //       await signer3.sendTransaction({
+  //         to: stakerV3dsProxy.address,
+  //         data: testCallData3String,
+  //       });
+  //       let signer3DepTime = await utils.getCurrentTime();
+  //       signer1Rewards = signer1Rewards.add(
+  //         rewardsPerSecond
+  //           .mul(someBig.mul(shares.sig1).div(shares.sum))
+  //           .mul(signer3DepTime - signer1FirstClaimTime)
+  //           .div(someBig)
+  //       );
+  //       signer2Rewards = signer2Rewards.add(
+  //         rewardsPerSecond
+  //           .mul(someBig.mul(shares.sig2).div(shares.sum))
+  //           .mul(signer3DepTime - signer2FirstClaimTime)
+  //           .div(someBig)
+  //       );
+  //       shares.sig3 = 1000;
+  //       shares.sum = shares.sig1 + shares.sig2 + shares.sig3;
+
+  //       // +1 second (4 overall)
+  //       //deposit
+  //       await signer3.sendTransaction({
+  //         to: stakerV3dsProxy.address,
+  //         data: testCallData7String,
+  //       });
+  //       let signer3TimeLockAt = await utils.getCurrentTime();
+  //       signer1Rewards = signer1Rewards.add(
+  //         rewardsPerSecond
+  //           .mul(someBig.mul(shares.sig1).div(shares.sum))
+  //           .mul(signer3TimeLockAt - signer3DepTime)
+  //           .div(someBig)
+  //       );
+  //       signer2Rewards = signer2Rewards.add(
+  //         rewardsPerSecond
+  //           .mul(someBig.mul(shares.sig2).div(shares.sum))
+  //           .mul(signer3TimeLockAt - signer3DepTime)
+  //           .div(someBig)
+  //       );
+  //       let signer3Rewards = BigNumber.from(
+  //         rewardsPerSecond
+  //           .mul(someBig.mul(shares.sig3).div(shares.sum))
+  //           .mul(signer3TimeLockAt - signer3DepTime)
+  //           .div(someBig)
+  //       );
+
+  //       shares.sig3 = 3000 * lockMultiplier;
+  //       shares.sum = shares.sig1 + shares.sig2 + shares.sig3;
+
+  //       await network.provider.send("evm_setNextBlockTimestamp", [
+  //         signer1DepTime + 200,
+  //       ]);
+
+  //       signer1Rewards = signer1Rewards.add(
+  //         rewardsPerSecond
+  //           .mul(someBig.mul(shares.sig1).div(shares.sum))
+  //           .mul(signer1DepTime + 60 - signer3TimeLockAt)
+  //           .div(someBig)
+  //       );
+  //       signer2Rewards = signer2Rewards.add(
+  //         rewardsPerSecond
+  //           .mul(someBig.mul(shares.sig2).div(shares.sum))
+  //           .mul(signer1DepTime + 60 - signer3TimeLockAt)
+  //           .div(someBig)
+  //       );
+  //       signer3Rewards = signer3Rewards.add(
+  //         rewardsPerSecond
+  //           .mul(someBig.mul(shares.sig3).div(shares.sum))
+  //           .mul(signer1DepTime + 60 - signer3TimeLockAt)
+  //           .div(someBig)
+  //       );
+
+  //       shares.sig1 = 2000;
+  //       shares.sum = shares.sig1 + shares.sig2 + shares.sig3;
+
+  //       signer1Rewards = signer1Rewards.add(
+  //         rewardsPerSecond
+  //           .mul(someBig.mul(shares.sig1).div(shares.sum))
+  //           .mul(signer3TimeLockAt + 60 - (signer1DepTime + 60))
+  //           .div(someBig)
+  //       );
+  //       signer2Rewards = signer2Rewards.add(
+  //         rewardsPerSecond
+  //           .mul(someBig.mul(shares.sig2).div(shares.sum))
+  //           .mul(signer3TimeLockAt + 60 - (signer1DepTime + 60))
+  //           .div(someBig)
+  //       );
+  //       signer3Rewards = signer3Rewards.add(
+  //         rewardsPerSecond
+  //           .mul(someBig.mul(shares.sig3).div(shares.sum))
+  //           .mul(signer3TimeLockAt + 60 - (signer1DepTime + 60))
+  //           .div(someBig)
+  //       );
+
+  //       shares.sig3 = 3000;
+  //       shares.sum = shares.sig1 + shares.sig2 + shares.sig3;
+
+  //       // move to signer1LockTime + 200 seconds
+  //       await ethers.provider.send("evm_mine", []);
+
+  //       await expect(IOUToken.ownerOf(2)).to.be.reverted;
+  //       expect(await IOUToken.ownerOf(4)).to.be.eq(signer3.address);
+  //       await expect(IOUToken.ownerOf(5)).to.be.reverted;
+  //       //claim
+  //       await signer1.sendTransaction({
+  //         to: stakerV3dsProxy.address,
+  //         data: claimCallDataString,
+  //       });
+  //       let signer1LastClaim = await utils.getCurrentTime();
+  //       signer1Rewards = signer1Rewards.add(
+  //         rewardsPerSecond
+  //           .mul(someBig.mul(shares.sig1).div(shares.sum))
+  //           .mul(signer1LastClaim - (signer3TimeLockAt + 60))
+  //           .div(someBig)
+  //       );
+  //       expect(await IOUToken.ownerOf(2)).to.be.eq(signer1.address);
+  //       expect(await IOUToken.ownerOf(4)).to.be.eq(signer3.address);
+  //       expect(await IOUToken.ownerOf(5)).to.be.eq(signer3.address);
+  //       expect(await rewardToken.balanceOf(signer1.address)).to.be.closeTo(
+  //         signer1Rewards,
+  //         10 ** 15
+  //       );
+
+  //       await signer2.sendTransaction({
+  //         to: stakerV3dsProxy.address,
+  //         data: claimCallDataString,
+  //       });
+  //       let signer2LastClaim = await utils.getCurrentTime();
+  //       signer2Rewards = signer2Rewards.add(
+  //         rewardsPerSecond
+  //           .mul(someBig.mul(shares.sig2).div(shares.sum))
+  //           .mul(signer2LastClaim - (signer3TimeLockAt + 60))
+  //           .div(someBig)
+  //       );
+  //       expect(await rewardToken.balanceOf(signer2.address)).to.be.closeTo(
+  //         signer2Rewards,
+  //         10 ** 15
+  //       );
+
+  //       await signer3.sendTransaction({
+  //         to: stakerV3dsProxy.address,
+  //         data: claimCallDataString,
+  //       });
+  //       let signer3LastClaim = await utils.getCurrentTime();
+  //       signer3Rewards = signer3Rewards.add(
+  //         rewardsPerSecond
+  //           .mul(someBig.mul(shares.sig3).div(shares.sum))
+  //           .mul(signer3LastClaim - (signer3TimeLockAt + 60))
+  //           .div(someBig)
+  //       );
+  //       expect(await rewardToken.balanceOf(signer3.address)).to.be.closeTo(
+  //         signer3Rewards,
+  //         10 ** 15
+  //       );
+  //     });
+  //   });
+  // });
+
+  // describe("Compound interest testing", function () {
+  //   it("Should work correctly with compound interest pools", async function () {
+  //     await rewardToken.transfer(
+  //       stakerV3dsProxy.address,
+  //       ethers.utils.parseEther("500000")
+  //     );
+
+  //     const testCallData1 = await mockCoreFacet.connect(owner).setEmissions(
+  //       [
+  //         {
+  //           timeStamp: await utils.getCurrentTime(),
+  //           rate: ethers.utils.parseEther("10"),
+  //         },
+  //       ],
+  //       [
+  //         {
+  //           timeStamp: await utils.getCurrentTime(),
+  //           rate: ethers.utils.parseEther("10"),
+  //         },
+  //       ]
+  //     );
+  //     const testCallData1String = testCallData1.data.toString();
+
+  //     //setEmissions
+  //     await owner.sendTransaction({
+  //       to: stakerV3dsProxy.address,
+  //       data: testCallData1String,
+  //     });
+
+  //     const testCallData2 = await mockCoreFacet.connect(owner).addPool({
+  //       id: 0,
+  //       tokenStrength: 10000,
+  //       pointStrength: 10000,
+  //       groupId: 0,
+  //       tokensPerShare: 0,
+  //       pointsPerShare: 0,
+  //       compoundInterestThreshold: ethers.utils.parseEther("500"),
+  //       compoundInterestMultiplier: 5000,
+  //       boostInfo: [1, 2],
+  //       assetAddress: super721.address,
+  //       typeOfAsset: 1,
+  //       lockPeriod: 0,
+  //       lockAmount: 0,
+  //       lockMultiplier: 0,
+  //       timeLockTypeOfBoost: 0,
+  //       compoundTypeOfBoost: 0,
+  //     });
+  //     const testCallData2String = testCallData2.data.toString();
+
+  //     await super721.connect(owner).configureGroup(itemGroupId2, {
+  //       name: "PEPSI",
+  //       supplyType: 0,
+  //       supplyData: 10,
+  //       burnType: 0,
+  //       burnData: 0,
+  //     });
+  //     await super721
+  //       .connect(owner)
+  //       .mintBatch(
+  //         signer1.address,
+  //         [
+  //           shiftedItemGroupId2,
+  //           shiftedItemGroupId2.add(1),
+  //           shiftedItemGroupId2.add(2),
+  //           shiftedItemGroupId2.add(3),
+  //         ],
+  //         DATA
+  //       );
+  //     await super721
+  //       .connect(signer1)
+  //       .setApprovalForAll(stakerV3dsProxy.address, true);
+
+  //     //addPool
+  //     await owner.sendTransaction({
+  //       to: stakerV3dsProxy.address,
+  //       data: testCallData2String,
+  //     });
+
+  //     const testCallData3 = await mockStakingFacet.connect(signer1).deposit(
+  //       0,
+  //       {
+  //         assetAddress: super721.address,
+  //         id: [
+  //           shiftedItemGroupId2,
+  //           shiftedItemGroupId2.add(1),
+  //           shiftedItemGroupId2.add(2),
+  //         ],
+  //         amounts: [1, 1, 1],
+  //         IOUTokenId: [],
+  //       },
+  //       false
+  //     );
+
+  //     const testCallData3String = testCallData3.data.toString();
+
+  //     const testCallData4 = await mockStakingFacet
+  //       .connect(signer1)
+  //       .claim(0, []);
+
+  //     const testCallData4String = testCallData4.data.toString();
+
+  //     let signer1DepTime = await utils.getCurrentTime();
+  //     //deposit
+  //     await signer1.sendTransaction({
+  //       to: stakerV3dsProxy.address,
+  //       data: testCallData3String,
+  //     });
+
+  //     await network.provider.send("evm_setNextBlockTimestamp", [
+  //       signer1DepTime + 30,
+  //     ]);
+  //     await ethers.provider.send("evm_mine", []);
+
+  //     //claim
+  //     await signer1.sendTransaction({
+  //       to: stakerV3dsProxy.address,
+  //       data: testCallData4String,
+  //     });
+  //     // expect(await rewardToken.balanceOf(signer1.address)).to.be.closeTo(
+  //     //   ethers.utils.parseEther("300"),
+  //     //   10 ** 15
+  //     // );
+
+  //     await network.provider.send("evm_setNextBlockTimestamp", [
+  //       signer1DepTime + 100,
+  //     ]);
+  //     await ethers.provider.send("evm_mine", []);
+
+  //     //claim
+  //     await signer1.sendTransaction({
+  //       to: stakerV3dsProxy.address,
+  //       data: testCallData4String,
+  //     });
+  //     // 300 + 10 * 50 + 10 * 20 * 1.5 = 1100
+  //     // expect(await rewardToken.balanceOf(signer1.address)).to.be.closeTo(
+  //     //   ethers.utils.parseEther("1100"),
+  //     //   10 ** 15
+  //     // );
+  //   });
+  // });
 
   describe("All", function () {
     it("stakerv3", async function () {
@@ -6216,7 +6481,6 @@ describe("===Stakerv3ds===", function () {
       //User1-Deposit
       const testCallData4 = await mockStakingFacet.connect(signer1).deposit(
         0,
-        0,
         {
           assetAddress: super721.address,
           id: [
@@ -6265,10 +6529,9 @@ describe("===Stakerv3ds===", function () {
       expect(await IOUToken.ownerOf(1)).to.be.eq(signer1.address);
 
       //User1-StakeITEMS
-      const testCallData5 = await mockStakingFacet.connect(signer1).deposit(
-        0,
-        1,
-        {
+      const testCallData5 = await mockBoostersFacet
+        .connect(signer1)
+        .stakeItemsBatch(0, 1, {
           assetAddress: super721.address,
           id: [
             shiftedItemGroupId2.add(3),
@@ -6277,9 +6540,7 @@ describe("===Stakerv3ds===", function () {
           ],
           amounts: [1, 1, 1],
           IOUTokenId: [],
-        },
-        false
-      );
+        });
 
       const testCallData5String = testCallData5.data.toString();
       expect(await super721.ownerOf(shiftedItemGroupId2.add(3))).to.be.eq(
@@ -6305,17 +6566,14 @@ describe("===Stakerv3ds===", function () {
       );
 
       //user2 stake items
-      const testCallData6 = await mockStakingFacet.connect(signer2).deposit(
-        0,
-        2,
-        {
+      const testCallData6 = await mockBoostersFacet
+        .connect(signer2)
+        .stakeItemsBatch(0, 2, {
           assetAddress: super1155.address,
           id: [shiftedItemGroupId, shiftedItemGroupId.add(1)],
           amounts: [1, 1],
           IOUTokenId: [],
-        },
-        false
-      );
+        });
 
       const testCallData6String = testCallData6.data.toString();
 
@@ -6331,7 +6589,6 @@ describe("===Stakerv3ds===", function () {
 
       //User2-Deposit
       const testCallData7 = await mockStakingFacet.connect(signer2).deposit(
-        0,
         0,
         {
           assetAddress: super721.address,
@@ -6386,20 +6643,9 @@ describe("===Stakerv3ds===", function () {
         stakerV3dsProxy.address
       );
       //User1-UnstakeITEMS
-      const testCallData9 = await mockStakingFacet.connect(signer1).withdraw(
-        0,
-        {
-          assetAddress: super721.address,
-          id: [
-            shiftedItemGroupId2.add(3),
-            shiftedItemGroupId2.add(4),
-            shiftedItemGroupId2.add(5),
-          ],
-          amounts: [1, 1, 1],
-          IOUTokenId: [],
-        },
-        1
-      );
+      const testCallData9 = await mockBoostersFacet
+        .connect(signer1)
+        .unstakeItemsBatch(0, 1);
 
       const testCallData9String = testCallData9.data.toString();
 
@@ -6414,16 +6660,9 @@ describe("===Stakerv3ds===", function () {
       );
 
       //User2-Withdraw
-      const testCallData10 = await mockStakingFacet.connect(signer2).withdraw(
-        0,
-        {
-          assetAddress: super721.address,
-          id: [],
-          amounts: [1, 1, 1],
-          IOUTokenId: [3, 4, 5],
-        },
-        0
-      );
+      const testCallData10 = await mockStakingFacet
+        .connect(signer2)
+        .withdraw(0, [3, 4, 5]);
 
       const testCallData10String = testCallData10.data.toString();
 
@@ -6472,16 +6711,9 @@ describe("===Stakerv3ds===", function () {
       // );
 
       //User2-UnstakeITEMS
-      const testCallData12 = await mockStakingFacet.connect(signer2).withdraw(
-        0,
-        {
-          assetAddress: super1155.address,
-          id: [shiftedItemGroupId, shiftedItemGroupId.add(1)],
-          amounts: [1, 1],
-          IOUTokenId: [],
-        },
-        2
-      );
+      const testCallData12 = await mockBoostersFacet
+        .connect(signer2)
+        .unstakeItemsBatch(0, 2);
 
       const testCallData12String = testCallData12.data.toString();
 
@@ -6494,7 +6726,7 @@ describe("===Stakerv3ds===", function () {
       // //User1-Deposit
       // const testCallData12 = await mockStakingFacet
       //   .connect(signer1)
-      //   .deposit(0, 0, {
+      //   .deposit(0, {
       //     assetAddress: super721.address,
       //     id: [
       //       shiftedItemGroupId2,

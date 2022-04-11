@@ -17,6 +17,65 @@ library StakerBlueprint {
     using EnumerableSet for EnumerableSet.UintSet;
     using EnumerableSet for EnumerableSet.AddressSet;
 
+    error AssetArrayLengthsMismatch();
+    error InvalidInfoStakeForBoost();
+    error InactivePool();
+    error InvalidAssetToStake();
+    error NotStaked();
+    error InvalidAmount();
+    error IOUTokenFromDifferentPool();
+    error NotAnOwnerOfIOUToken();
+    error NotAnAdmin();
+    error MismatchArgumentsAndHash();
+    error HashUsed();
+    error NotApprovedPointSpender();
+    error InvalidAmountToLock();
+    error TokensAlreadyLocked();
+    error TokenLocked();
+    error InvalidERC721Amount();
+    error CantAlterDevs();
+    error ZeroDevShare();
+    error CantIncreaseDevShare();
+    error InvalidNewAddress();
+    error CantAlterTokenEmissionSchedule();
+    error CantAlterPointEmissionSchedule();
+    error ZeroTokenEmissionEvents();
+    error ZeroPointEmissionEvents();
+    error EmptyBoostInfoArray();
+    error InputLengthsMismatch();
+    error BoosterIdZero();
+    error InvalidConfBoostersInputs();
+    error InvalidConfBoostersAssetType();
+    error EmissionNotSet();
+    error ZeroStrength();
+    error InvalidAsset();
+    error InvalidTypeOfAsset();
+    error InvalidERC20DepositInputs();
+    error InvalidGroupIdForERC20();
+    error InvalidGroupIdForStake();
+    error InvalidTypeOfPool();
+
+    /// Event for staking non fungible items for boosters.
+    event StakeItemBatch(
+        address indexed user,
+        uint256 indexed _poolId,
+        uint256 boosterId
+    );
+
+    /// Event for unstaking non fungible items from boosters.
+    event UnstakeItemBatch(
+        address indexed user,
+        uint256 indexed _poolId,
+        uint256 boosterId
+    );
+
+    /// An event for tracking when a user has spent points.
+    event SpentPoints(
+        address indexed source,
+        address indexed user,
+        uint256 amount
+    );
+
     /// The public identifier for the right to add developer.
     bytes32 public constant ADD_DEVELOPER = keccak256("ADD_DEVELOPER");
 
@@ -121,6 +180,7 @@ library StakerBlueprint {
         mapping(IERC20 => mapping(address => UserInfo)) userInfo;
         mapping(uint256 => PoolInfo) poolInfoV3;
         mapping(uint256 => mapping(address => UserInfo)) userInfoV3;
+        mapping(uint256 => mapping(uint256 => RewardsTiedToNFT)) NFTRewards;
         uint256 totalTokenStrength;
         uint256 totalPointStrength;
         uint256 totalTokenDisbursed;
@@ -137,6 +197,15 @@ library StakerBlueprint {
         string name;
         mapping(uint256 => PoolLocks[]) poolLocks;
         mapping(uint256 => uint256) lockIndex;
+    }
+
+    struct RewardsTiedToNFT {
+        uint256 shareOfTokenBoostedDeposited;
+        uint256 shareOfPointBoostedDeposited;
+        uint256 accamulatedTokenRewards;
+        uint256 accamulatedPointRewards;
+        uint256 tokenPaid;
+        uint256 pointPaid;
     }
 
     struct PoolLocks {
@@ -162,7 +231,7 @@ library StakerBlueprint {
      * @param tokensPerShare accumulated tokens per share times 1e12.
      * @param pointStrength the relative point emission strength of this pool.
      * @param pointBoostedDeposit amount of points after boosts are applied.
-     * @param pointsPerShare accumulated points per share times 1e12.
+     * @param pointsPerShare accumulated points per share times 1e30.
      * @param lastRewardEvent record of the time of the last disbursement.
      * @param boostInfo boosters applied to the pool rewards when eligible. !Must start with 1!
      * @param lockPeriod the time for which the token will be locked with time locked deposit.
@@ -185,6 +254,7 @@ library StakerBlueprint {
         uint256 pointStrength;
         uint256 pointBoostedDeposit;
         uint256 pointsPerShare;
+        uint256 groupId;
         uint256 lastRewardEvent;
         uint256[] boostInfo;
         uint256 lockPeriod;
@@ -193,6 +263,7 @@ library StakerBlueprint {
         uint256 compoundInterestThreshold;
         uint256 compoundInterestMultiplier;
         address assetAddress;
+        PoolType typeOfPool;
         PoolAssetType typeOfAsset;
         BoosterAssetType timeLockTypeOfBoost;
         BoosterAssetType compoundTypeOfBoost;
@@ -205,7 +276,7 @@ library StakerBlueprint {
      * @param pointStrength the relative point emission strength of this pool.
      * @param groupId id of the group of tokens that should be staked in this pool.
      * @param tokensPerShare accumulated tokens per share times 1e12.
-     * @param pointsPerShare accumulated points per share times 1e12.
+     * @param pointsPerShare accumulated points per share times 1e30.
      * @param boostInfo boosters applied to the pool rewards when eligible. !Must start with 1!
      * @param lockPeriod the time for which the token will be locked with time locked deposit.
      * @param lockAmount required amount of tokens for time lock deposit.
@@ -231,6 +302,7 @@ library StakerBlueprint {
         uint256 compoundInterestThreshold;
         uint256 compoundInterestMultiplier;
         address assetAddress;
+        PoolType typeOfPool;
         PoolAssetType typeOfAsset;
         BoosterAssetType timeLockTypeOfBoost;
         BoosterAssetType compoundTypeOfBoost;
@@ -284,6 +356,13 @@ library StakerBlueprint {
         StakedAsset asset;
     }
 
+    enum PoolType {
+        StakingTiedToHolder,
+        StakingTiedToNFT,
+        NoStakingTiedToHolder,
+        NoStakingTiedToNFT
+    }
+
     /**
      * The type of asset on which the boost is applied.
      * @param Tokens boost is applied on the disburse token.
@@ -317,7 +396,7 @@ library StakerBlueprint {
      *   as requirement for the boost. If 0, then any group or item.
      * @param contractRequired contract that the required assets belong to.
      * @param assetType enum that specifies Tokens/Points to boost or both.
-     * @param typeOfAsset type of asset that is represented in booster for stake.
+     * @param typeOfAsset type of asset that is represented in booster for lock.
      */
     struct BoostInfo {
         uint256 multiplier;
