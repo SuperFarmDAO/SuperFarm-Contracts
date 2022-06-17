@@ -9,10 +9,31 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Burnable.sol";
 import "@openzeppelin/contracts/token/ERC1155/utils/ERC1155Holder.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
-import "@openzeppelin/contracts/utils/introspection/ERC165Storage.sol";
 
 import "../assets/erc721/interfaces/ISuper721.sol";
-import "../interfaces/ISuperGeneric.sol"; 
+import "../interfaces/ISuperGeneric.sol";
+
+/*
+  It saves bytecode to revert on custom errors instead of using require
+  statements. We are just declaring these errors for reverting with upon various
+  conditions later in this contract.
+*/
+error CallerIsNotPanicOwner();
+error CannotChangePanicDetailsOnLockedVault();
+error AddressOfSuper721AlreadyInSet();
+error AddressOfSuper1155AlreadyInSet();
+error NumberOfContractsAndAssetsShouldBeTheSame();
+error AddressOfTokenIsNotPermited();
+error TypeOfAssetIsNotERC721OrERC1155();
+error MustSendTokensToAtLeastOneRecipient();
+error RecipientLengthCannotBeMismathedWithAssetsLength();
+error SendEthFailed();
+error Super721IsNotAvailible();
+error Unsupported721Interface();
+error Super1155IsNotAvailible();
+error Unsupported1155Interface();
+error EtherBurnWasUnsuccesful();
+error EtherTransferWasUnsuccessful();
 
 /**
   @title A vault for securely holding tokens.
@@ -37,13 +58,13 @@ contract TokenVault is
     using EnumerableSet for EnumerableSet.AddressSet;
     /// A version number for this TokenVault contract's interface.
     uint256 public version = 1;
-    
+
     /// ERC721 interface ID to detect external contracts for Items staking.
     bytes4 private constant INTERFACE_ERC721 = 0x80ac58cd;
 
     /// ERC1155 interface ID to detect external contracts for Items staking.
     bytes4 private constant INTERFACE_ERC1155 = 0xd9b67a26;
-    
+
     /// A user-specified, descriptive name for this TokenVault.
     string public name;
 
@@ -145,10 +166,9 @@ contract TokenVault is
 
     /// @dev a modifier which allows only `panicOwner` to call a function.
     modifier onlyPanicOwner() {
-        require(
-            panicOwner == _msgSender(),
-            "TokenVault: caller is not the panic owner"
-        );
+        if (panicOwner != _msgSender()) {
+            revert CallerIsNotPanicOwner();
+        }
         _;
     }
 
@@ -174,8 +194,7 @@ contract TokenVault is
         panicLimit = _panicLimit;
         panicCounter = 0;
         canAlterPanicDetails = true;
-        uint256 MAX_INT = 2**256 - 1;
-        IERC20(token).approve(address(this), MAX_INT);
+        IERC20(token).approve(address(this), type(uint256).max);
     }
 
     /**
@@ -189,10 +208,9 @@ contract TokenVault is
         nonReentrant
         onlyOwner
     {
-        require(
-            canAlterPanicDetails,
-            "You cannot change panic details on a vault which is locked."
-        );
+        if (!canAlterPanicDetails) {
+            revert CannotChangePanicDetailsOnLockedVault();
+        }
         panicOwner = _panicOwner;
         panicDestination = _panicDestination;
         emit PanicDetailsChange(panicOwner, panicDestination);
@@ -203,13 +221,15 @@ contract TokenVault is
         @param _super721 array with addresses of super721 contracts
      */
     function addSuper721Addr(address[] calldata _super721) external onlyOwner {
-        for (uint256 i = 0; i < _super721.length; i++) {
+        for (uint256 i = 0; i < _super721.length; ) {
             address super721 = _super721[i];
-            require(
-                !super721Addresses.contains(super721),
-                "address of super721 already presented in set"
-            );
+            if (super721Addresses.contains(super721)) {
+                revert AddressOfSuper721AlreadyInSet();
+            }
             super721Addresses.add(super721);
+            unchecked {
+                ++i;
+            }
         }
     }
 
@@ -221,13 +241,15 @@ contract TokenVault is
         external
         onlyOwner
     {
-        for (uint256 i = 0; i < _super1155.length; i++) {
+        for (uint256 i = 0; i < _super1155.length; ) {
             address super1155 = _super1155[i];
-            require(
-                !super1155Addresses.contains(super1155),
-                "address of super1155 already presented in set"
-            );
+            if (super1155Addresses.contains(super1155)) {
+                revert AddressOfSuper1155AlreadyInSet();
+            }
             super1155Addresses.add(super1155);
+            unchecked {
+                ++i;
+            }
         }
     }
 
@@ -240,23 +262,27 @@ contract TokenVault is
         nonReentrant
         onlyOwner
     {
-        require(
-            _contrAddrs.length == _assets.length,
-            "Number of contracts and assets should be the same"
-        );
+        if (_contrAddrs.length != _assets.length) {
+            revert NumberOfContractsAndAssetsShouldBeTheSame();
+        }
 
-        for (uint256 i = 0; i < _contrAddrs.length; i++) {
-            require(
-                super1155Addresses.contains(_contrAddrs[i]) ||
-                    super721Addresses.contains(_contrAddrs[i]),
-                "Address of token is not permited"
-            );
-            require(
-                _assets[i].assetType == AssetType.ERC721 ||
-                    _assets[i].assetType == AssetType.ERC1155,
-                "Type of asset isn't ERC721 or ERC1155"
-            );
+        for (uint256 i = 0; i < _contrAddrs.length; ) {
+            if (
+                !super1155Addresses.contains(_contrAddrs[i]) &&
+                !super721Addresses.contains(_contrAddrs[i])
+            ) {
+                revert AddressOfTokenIsNotPermited();
+            }
+            if (
+                _assets[i].assetType != AssetType.ERC721 &&
+                _assets[i].assetType != AssetType.ERC1155
+            ) {
+                revert TypeOfAssetIsNotERC721OrERC1155();
+            }
             assets[_contrAddrs[i]] = (_assets[i]);
+            unchecked {
+                ++i;
+            }
         }
         // TO_ASK add smth to emit
     }
@@ -280,20 +306,18 @@ contract TokenVault is
         address[] calldata _tokens,
         Asset[] calldata _assets
     ) external nonReentrant onlyOwner {
-        require(
-            _recipients.length > 0,
-            "You must send tokens to at least one recipient."
-        );
-        require(
-            _recipients.length == _assets.length,
-            "Recipients length cannot be mismatched with assets length."
-        );
+        if (_recipients.length == 0) {
+            revert MustSendTokensToAtLeastOneRecipient();
+        }
+        if (_recipients.length != _assets.length) {
+            revert RecipientLengthCannotBeMismathedWithAssetsLength();
+        }
         // Iterate through every specified recipient and send tokens.
         uint256 totalAmount = 0;
         uint256 totalEth = 0;
         uint256 totalSuper721 = 0;
         uint256 totalSuper1155 = 0;
-        for (uint256 i = 0; i < _recipients.length; i++) {
+        for (uint256 i = 0; i < _recipients.length; ) {
             address recipient = _recipients[i];
             address tokenAddr = _tokens[i];
             Asset memory asset = _assets[i];
@@ -301,7 +325,7 @@ contract TokenVault is
 
             if (asset.assetType == AssetType.Eth) {
                 (bool success, ) = recipient.call{value: amount}("");
-                require(success, "send Eth failed");
+                if (!success) revert SendEthFailed();
                 totalEth += amount;
             }
             if (asset.assetType == AssetType.ERC20) {
@@ -309,11 +333,16 @@ contract TokenVault is
                 totalAmount = totalAmount + amount;
             }
             if (asset.assetType == AssetType.ERC721) {
-                require(
-                    super721Addresses.contains(tokenAddr),
-                    "Super721 address is not availible"
-                );
-                require((ISuperGeneric(tokenAddr).supportsInterface(INTERFACE_ERC721)), "unsupported interface");
+                if (!super721Addresses.contains(tokenAddr)) {
+                    revert Super721IsNotAvailible();
+                }
+                if (
+                    !ISuperGeneric(tokenAddr).supportsInterface(
+                        INTERFACE_ERC721
+                    )
+                ) {
+                    revert Unsupported721Interface();
+                }
                 ISuperGeneric(tokenAddr).safeBatchTransferFrom(
                     address(this),
                     recipient,
@@ -323,11 +352,16 @@ contract TokenVault is
                 totalSuper721 += 1; // TO_ASK calculate number of transfers, or may be change it to number of ids?
             }
             if (asset.assetType == AssetType.ERC1155) {
-                require(
-                    super1155Addresses.contains(tokenAddr),
-                    "Super1155 address is not availible"
-                );
-                require((ISuperGeneric(tokenAddr).supportsInterface(INTERFACE_ERC1155)), "unsupported interface");
+                if (!super1155Addresses.contains(tokenAddr)) {
+                    revert Super1155IsNotAvailible();
+                }
+                if (
+                    !ISuperGeneric(tokenAddr).supportsInterface(
+                        INTERFACE_ERC1155
+                    )
+                ) {
+                    revert Unsupported1155Interface();
+                }
                 ISuperGeneric(tokenAddr).safeBatchTransferFrom(
                     address(this),
                     recipient,
@@ -338,6 +372,9 @@ contract TokenVault is
                 totalSuper1155 += 1;
             }
             _removeToken(tokenAddr, asset);
+            unchecked {
+                ++i;
+            }
         }
         emit TokenSend(totalAmount, totalEth, totalSuper721, totalSuper1155);
     }
@@ -367,22 +404,40 @@ contract TokenVault is
             // burn eth
             ERC20Burnable(token).burn(totalBalanceERC20); // CHECK
             (bool success, ) = address(0).call{value: totalBalanceEth}("");
-            require(success, "Ether burn was unsuccessful");
+            if (!success) revert EtherBurnWasUnsuccesful();
 
-            for (uint256 i = 0; i < super721Addresses.length(); i++) {
-                require((ISuperGeneric(super721Addresses.at(i)).supportsInterface(INTERFACE_ERC721)), "unsupported interface");
+            for (uint256 i = 0; i < super721Addresses.length(); ) {
+                if (
+                    !ISuperGeneric(super721Addresses.at(i)).supportsInterface(
+                        INTERFACE_ERC721
+                    )
+                ) {
+                    revert Unsupported721Interface();
+                }
                 ISuperGeneric(super721Addresses.at(i)).burnBatch(
                     address(this),
                     assets[super721Addresses.at(i)].ids
                 );
+                unchecked {
+                    ++i;
+                }
             }
-            for (uint256 i = 0; i < super1155Addresses.length(); i++) {
-                require((ISuperGeneric(super1155Addresses.at(i)).supportsInterface(INTERFACE_ERC1155)), "unsupported interface");
+            for (uint256 i = 0; i < super1155Addresses.length(); ) {
+                if (
+                    !ISuperGeneric(super1155Addresses.at(i)).supportsInterface(
+                        INTERFACE_ERC1155
+                    )
+                ) {
+                    revert Unsupported1155Interface();
+                }
                 ISuperGeneric(super1155Addresses.at(i)).burnBatch(
                     address(this),
                     assets[super1155Addresses.at(i)].ids,
                     assets[super1155Addresses.at(i)].amounts
                 );
+                unchecked {
+                    ++i;
+                }
             }
             emit PanicBurn(
                 panicCounter,
@@ -392,23 +447,38 @@ contract TokenVault is
                 totalAmountERC1155
             );
         } else {
-            // panic transfer 
+            // panic transfer
             IERC20(token).safeTransfer(panicDestination, totalBalanceERC20);
             (bool success, ) = panicDestination.call{value: totalBalanceEth}(
                 ""
             );
-            require(success, "Ether transfer was unsuccessful");
-            for (uint256 i = 0; i < super721Addresses.length(); i++) {
-                require((ISuperGeneric(super721Addresses.at(i)).supportsInterface(INTERFACE_ERC721)), "unsupported interface");
+            if (!success) revert EtherTransferWasUnsuccessful();
+            for (uint256 i = 0; i < super721Addresses.length(); ) {
+                if (
+                    !ISuperGeneric(super721Addresses.at(i)).supportsInterface(
+                        INTERFACE_ERC721
+                    )
+                ) {
+                    revert Unsupported721Interface();
+                }
                 ISuperGeneric(super721Addresses.at(i)).safeBatchTransferFrom(
                     address(this),
                     panicDestination,
                     assets[super721Addresses.at(i)].ids,
                     ""
                 );
+                unchecked {
+                    ++i;
+                }
             }
-            for (uint256 i = 0; i < super1155Addresses.length(); i++) {
-                require((ISuperGeneric(super1155Addresses.at(i)).supportsInterface(INTERFACE_ERC1155)), "unsupported interface");
+            for (uint256 i = 0; i < super1155Addresses.length(); ) {
+                if (
+                    !ISuperGeneric(super1155Addresses.at(i)).supportsInterface(
+                        INTERFACE_ERC1155
+                    )
+                ) {
+                    revert Unsupported1155Interface();
+                }
                 ISuperGeneric(super1155Addresses.at(i)).safeBatchTransferFrom(
                     address(this),
                     panicDestination,
@@ -416,14 +486,17 @@ contract TokenVault is
                     assets[super1155Addresses.at(i)].amounts,
                     ""
                 );
+                unchecked {
+                    ++i;
+                }
             }
             panicCounter += 1;
             emit PanicTransfer(
                 panicCounter,
-                totalBalanceERC20, 
-                totalBalanceEth, 
-                totalAmountERC721, 
-                totalAmountERC1155, 
+                totalBalanceERC20,
+                totalBalanceEth,
+                totalAmountERC721,
+                totalAmountERC1155,
                 panicDestination
             );
         }

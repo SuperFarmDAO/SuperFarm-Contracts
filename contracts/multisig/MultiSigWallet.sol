@@ -4,10 +4,9 @@ pragma solidity ^0.8.8;
 import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 import "@openzeppelin/contracts/token/ERC1155/utils/ERC1155Holder.sol";
 
-
 /// @title Multisignature wallet - Allows multiple parties to agree on transactions before execution.
 /// @author Stefan George - <stefan.george@consensys.net>
-contract MultiSigWallet is IERC721Receiver, ERC1155Holder{
+contract MultiSigWallet is IERC721Receiver, ERC1155Holder {
     /*
      *  Events
      */

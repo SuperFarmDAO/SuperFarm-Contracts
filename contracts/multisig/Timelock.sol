@@ -9,7 +9,6 @@
 pragma solidity ^0.8.8;
 
 contract Timelock {
-
     event NewAdmin(address indexed newAdmin);
     event NewPendingAdmin(address indexed newPendingAdmin);
     event NewDelay(uint256 indexed newDelay);
@@ -175,7 +174,6 @@ contract Timelock {
             "Timelock::executeTransaction: Call must come from admin."
         );
 
-
         bytes32 txHash = keccak256(
             abi.encode(target, value, signature, data, eta)
         );
@@ -187,7 +185,7 @@ contract Timelock {
             getBlockTimestamp() >= eta,
             "Timelock::executeTransaction: Transaction hasn't surpassed time lock."
         );
-        
+
         require(
             getBlockTimestamp() <= eta + GRACE_PERIOD,
             "Timelock::executeTransaction: Transaction is stale."

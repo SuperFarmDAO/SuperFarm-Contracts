@@ -7,6 +7,7 @@ import "chai/register-should";
 
 const DATA = "0x02";
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
+let currentTime, snapshotId;
 
 const AssetType = Object.freeze({
     None: 0,
@@ -260,6 +261,17 @@ describe("===TokenVault Timelock MultiSig=== ", function () {
          
     });
     
+    // accelerate tests by taking snapshot of block 
+    beforeEach(async function() {
+        currentTime = await (await ethers.provider.getBlock()).timestamp;
+        snapshotId = await network.provider.send("evm_snapshot");
+    });
+
+
+    afterEach(async function() {
+        await network.provider.send("evm_revert", [snapshotId]);
+    });
+
     // Verify that the multisignature wallet can send tokens from the vault.
     it("should allow the multisig to send tokens via timelock", async () => {
         let devBalance = await token.balanceOf(dev.address);
@@ -993,7 +1005,7 @@ describe("===TokenVault Timelock MultiSig=== ", function () {
 
             it('PANIC REVERT trying non panic owner call panic', async () => {
                 await expect( tokenVault.connect(bob).panic())
-                .to.be.revertedWith("TokenVault: caller is not the panic owner");
+                .to.be.revertedWith("CallerIsNotPanicOwner()");
             });
         });
     })
