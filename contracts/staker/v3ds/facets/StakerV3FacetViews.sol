@@ -2,7 +2,6 @@
 pragma solidity ^0.8.7;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
 import "../../../base/Sweepableds.sol";
@@ -24,15 +23,14 @@ import "../StakerBlueprint.sol";
  * https://github.com/sushiswap/sushiswap/blob/master/contracts/MasterChef.sol
  */
 contract StakerV3FacetViews is Sweepableds {
-    using SafeERC20 for IERC20;
     using EnumerableSet for EnumerableSet.UintSet;
     using EnumerableSet for EnumerableSet.AddressSet;
 
     /**
      * Allows to get information about tokens staked in a booster for Items staker address.
-     * @param _itemUserAddress the user address to check.
-     * @param _boosterId the booster Id to check the tokens staked for.
-     * @return a struct containing the information.
+     * @param _itemUserAddress The user address to check.
+     * @param _boosterId The booster Id to check the tokens staked for.
+     * @return A struct containing the information.
      */
     function getItemsUserInfo(address _itemUserAddress, uint256 _boosterId)
         external
@@ -48,7 +46,7 @@ contract StakerV3FacetViews is Sweepableds {
             .length();
         uint256[] memory _tokenIds = new uint256[](length);
         uint256[] memory _amounts = new uint256[](length);
-        for (uint256 i = 0; i < length; i++) {
+        for (uint256 i = 0; i < length; ) {
             _tokenIds[i] = b
                 .itemUserInfo[_itemUserAddress]
                 .tokenIds[_boosterId]
@@ -56,6 +54,9 @@ contract StakerV3FacetViews is Sweepableds {
             _amounts[i] = b.itemUserInfo[_itemUserAddress].amounts[
                 _tokenIds[i]
             ];
+            unchecked {
+                ++i;
+            }
         }
 
         StakerBlueprint.GetItemUserInfo memory _userInfo = StakerBlueprint
@@ -70,7 +71,7 @@ contract StakerV3FacetViews is Sweepableds {
 
     /**
      * Allows to get information about all developers that will get % by stakers rewatds.
-     * @return developers array of developers addresses.
+     * @return Developers array of developers addresses.
      */
     function getDeveloperAddresses() external view returns (address[] memory) {
         StakerBlueprint.StakerStateVariables storage b = StakerBlueprint
@@ -78,12 +79,19 @@ contract StakerV3FacetViews is Sweepableds {
 
         uint256 developerAddressLength = b.developerAddresses.length();
         address[] memory developers = new address[](developerAddressLength);
-        for (uint256 i; i < developerAddressLength; i++) {
+        for (uint256 i; i < developerAddressLength; ) {
             developers[i] = b.developerAddresses.at(i);
+            unchecked {
+                ++i;
+            }
         }
         return developers;
     }
 
+    /**
+     * Returns info about current developer share.
+     * @param developer Address of developer whose share should be returned.
+     */
     function getDeveloperShare(address developer)
         external
         view
@@ -96,7 +104,7 @@ contract StakerV3FacetViews is Sweepableds {
 
     /**
      * Returns the length of the staking pool array.
-     * @return the length of the staking pool array.
+     * @return The length of the staking pool array.
      */
     function getPoolCount() external view returns (uint256) {
         StakerBlueprint.StakerStateVariables storage b = StakerBlueprint
@@ -106,8 +114,23 @@ contract StakerV3FacetViews is Sweepableds {
     }
 
     /**
+     * Returns info about pool by id at staking.
+     * @return _poolInfo Info about pool by id at staking.
+     */
+    function getPoolInfo(uint256 id)
+        external
+        view
+        returns (StakerBlueprint.PoolInfo memory _poolInfo)
+    {
+        StakerBlueprint.StakerStateVariables storage b = StakerBlueprint
+            .stakerStateVariables();
+
+        _poolInfo = b.poolInfoV3[id];
+    }
+
+    /**
      * Returns the count of active boosters at staking.
-     * @return the count of active boosters at staking.
+     * @return The count of active boosters at staking.
      */
     function getBoostersCount() external view returns (uint256) {
         StakerBlueprint.StakerStateVariables storage b = StakerBlueprint
@@ -118,7 +141,7 @@ contract StakerV3FacetViews is Sweepableds {
 
     /**
      * Returns info about boost by id at staking.
-     * @return _boostInfo info about boost by id at staking.
+     * @return _boostInfo Info about boost by id at staking.
      */
     function getBoosterInfo(uint256 id)
         external

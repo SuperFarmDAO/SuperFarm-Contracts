@@ -84,6 +84,11 @@ module.exports = {
         url: `https://eth-mainnet.alchemyapi.io/v2/${process.env.ALCHEMY_KEY}`,
         blockNumber: 12883802,
       },
+      mining: {
+        mempool: {
+          order: "fifo",
+        },
+      },
     },
     mainnet: {
       url: `https://mainnet.infura.io/v3/${INFURA_PROJECT_ID}`,
@@ -159,6 +164,7 @@ module.exports = {
   },
   mocha: {
     grep: "^(?!.*; using Ganache).*",
+    timeout: 1000000,
   },
   contractSizer: {
     alphaSort: true,
@@ -166,6 +172,12 @@ module.exports = {
     disambiguatePaths: false,
   },
   gasReporter: {
-    enabled: false,
+    enabled: process.env.REPORT_GAS ? true : false,
+    currency: "USD",
+    coinmarketcap: "f00f5626-6a6c-4729-8f82-1fce01420257",
+    // outputFile: "gasPrice.txt",
+    // noColors: true,
+    // onlyCalledMethods: false,
+    showTimeSpent: true,
   },
 };
