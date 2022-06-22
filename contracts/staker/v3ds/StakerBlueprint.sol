@@ -54,6 +54,8 @@ library StakerBlueprint {
     error InvalidGroupIdForERC20();
     error InvalidGroupIdForStake();
     error InvalidTypeOfPool();
+    error WrongTypeOfPoolForTypeOfAsset();
+    error CantGetSameBoosterTwice();
 
     /// Event for staking non fungible items for boosters.
     event StakeItemBatch(
@@ -168,6 +170,8 @@ library StakerBlueprint {
         bool canAlterPointEmissionSchedule;
         EnumerableSet.AddressSet developerAddresses;
         mapping(address => uint256) developerShares;
+        //mapping(address => uint256) developerRewards;
+        mapping(uint256 => EnumerableSet.UintSet) boosterPools;
         uint256 lastPoolId;
         uint256 tokenEmissionEventsCount;
         uint256 pointEmissionEventsCount;
@@ -197,6 +201,9 @@ library StakerBlueprint {
         string name;
         mapping(uint256 => PoolLocks[]) poolLocks;
         mapping(uint256 => uint256) lockIndex;
+        mapping(uint256 => mapping(uint256 => uint256)) boosterAmount;
+        mapping(uint256 => mapping(uint256 => uint256[])) tpsOnBoostUpdate;
+        mapping(uint256 => mapping(uint256 => uint256[])) ppsOnBoostUpdate;
     }
 
     struct RewardsTiedToNFT {
@@ -264,7 +271,7 @@ library StakerBlueprint {
         uint256 compoundInterestMultiplier;
         address assetAddress;
         PoolType typeOfPool;
-        PoolAssetType typeOfAsset;
+        AssetType typeOfAsset;
         BoosterAssetType timeLockTypeOfBoost;
         BoosterAssetType compoundTypeOfBoost;
     }
@@ -303,7 +310,7 @@ library StakerBlueprint {
         uint256 compoundInterestMultiplier;
         address assetAddress;
         PoolType typeOfPool;
-        PoolAssetType typeOfAsset;
+        AssetType typeOfAsset;
         BoosterAssetType timeLockTypeOfBoost;
         BoosterAssetType compoundTypeOfBoost;
     }
@@ -330,7 +337,10 @@ library StakerBlueprint {
     struct Checkpoint {
         uint256[] startTime;
         uint256[] endTime;
-        uint256[] balance;
+        uint256[] tokensBalance;
+        uint256[] pointsBalance;
+        uint256[] tokensPerShare;
+        uint256[] pointsPerShare;
     }
 
     /**
@@ -381,7 +391,7 @@ library StakerBlueprint {
      * @param ERC721 represents ERC721 token.
      * @param ERC1155 represents ERC1155 token.
      */
-    enum PoolAssetType {
+    enum AssetType {
         ERC20,
         ERC721,
         ERC1155
@@ -395,16 +405,18 @@ library StakerBlueprint {
      * @param groupRequired (optional) specifies a group from Items contract
      *   as requirement for the boost. If 0, then any group or item.
      * @param contractRequired contract that the required assets belong to.
-     * @param assetType enum that specifies Tokens/Points to boost or both.
+     * @param boostType enum that specifies Tokens/Points to boost or both.
      * @param typeOfAsset type of asset that is represented in booster for lock.
      */
     struct BoostInfo {
-        uint256 multiplier;
-        uint256 amountRequired;
-        uint256 groupRequired;
+        uint32 multiplier;
+        uint24 amountRequired;
+        uint32 groupRequired;
         address contractRequired;
-        BoosterAssetType assetType;
-        PoolAssetType typeOfAsset;
+        BoosterAssetType boostType;
+        AssetType typeOfAsset;
+        uint256[] historyOfTokenMultipliers;
+        uint256[] historyOfPointMultipliers;
     }
 
     /**
@@ -436,6 +448,7 @@ library StakerBlueprint {
         mapping(uint256 => uint256) amounts;
         EnumerableSet.UintSet boosterIds;
         mapping(uint256 => LockedItems) lockedItems;
+        mapping(uint256 => uint256) lastNumberOfBoosterUpdate;
     }
 
     struct LockedItems {

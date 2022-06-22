@@ -36,12 +36,7 @@ describe("===Stakerv3ds===", function () {
     addressesForSelectors,
     allSelectors;
 
-  let mockCoreFacet,
-    mockStakingFacet,
-    mockPointsFacet,
-    mockBoostersFacet,
-    mockViewFacet,
-    some721,
+  let some721,
     some1155,
     rewardToken,
     depositToken,
@@ -54,7 +49,12 @@ describe("===Stakerv3ds===", function () {
     stakerV3FacetPoints,
     stakerV3FacetBoosters,
     stakerV3FacetViews,
-    stakerV3dsProxy;
+    stakerV3dsProxy,
+    diamondStakingFacet,
+    diamondCoreFacet,
+    diamondPointsFacet,
+    diamondBoostersFacet,
+    diamondViewFacet;
   let startOfStaking;
   const originalUri = "://ipfs/uri/";
   const originalUri721 = "://ipfs/uri/";
@@ -68,21 +68,6 @@ describe("===Stakerv3ds===", function () {
   let stakerName = "StakerV3ds";
 
   before(async function () {
-    this.MockCoreFacet = await ethers.getContractFactory(
-      "TestStakerV3FacetCore"
-    );
-    this.MockStakingFacet = await ethers.getContractFactory(
-      "TestStakerV3FacetStaking"
-    );
-    this.MockPointsFacet = await ethers.getContractFactory(
-      "TestStakerV3FacetPoints"
-    );
-    this.MockBoostersFacet = await ethers.getContractFactory(
-      "TestStakerV3FacetBoosters"
-    );
-    this.MockViewFacet = await ethers.getContractFactory(
-      "TestStakerV3FacetViews"
-    );
     this.MockERC721 = await ethers.getContractFactory("TestERC721");
     this.MockERC1155 = await ethers.getContractFactory("TestERC1155");
     this.MockERC20 = await ethers.getContractFactory("MockERC20");
@@ -119,21 +104,6 @@ describe("===Stakerv3ds===", function () {
       developer,
     ] = await ethers.getSigners();
 
-    mockCoreFacet = await this.MockCoreFacet.deploy();
-    await mockCoreFacet.deployed();
-
-    mockStakingFacet = await this.MockStakingFacet.deploy();
-    await mockStakingFacet.deployed();
-
-    mockPointsFacet = await this.MockPointsFacet.deploy();
-    await mockPointsFacet.deployed();
-
-    mockBoostersFacet = await this.MockBoostersFacet.deploy();
-    await mockBoostersFacet.deployed();
-
-    mockViewFacet = await this.MockViewFacet.deploy();
-    await mockViewFacet.deployed();
-
     some721 = await this.MockERC721.deploy();
     await await some721.deployed();
 
@@ -148,6 +118,9 @@ describe("===Stakerv3ds===", function () {
 
     stakerV3FacetCore = await this.StakerV3FacetCore.deploy();
     await stakerV3FacetCore.deployed();
+
+    stakerV3FacetStaking = await this.StakerV3FacetStaking.deploy();
+    await stakerV3FacetStaking.deployed();
 
     stakerV3FacetPoints = await this.StakerV3FacetPoints.deploy();
     await stakerV3FacetPoints.deployed();
@@ -198,9 +171,6 @@ describe("===Stakerv3ds===", function () {
     for (counter; counter < coreSelectors.length; counter++) {
       addressesForSelectors.push(stakerV3FacetCore.address);
     }
-
-    stakerV3FacetStaking = await this.StakerV3FacetStaking.deploy();
-    await stakerV3FacetStaking.deployed();
 
     oldCounter = counter;
     viewsSelectors = await utils.getSelectors(stakerV3FacetViews);
@@ -253,7 +223,30 @@ describe("===Stakerv3ds===", function () {
 
     IOUToken.transferOwnership(stakerV3dsProxy.address);
 
-    depositToken;
+    diamondStakingFacet = await ethers.getContractAt(
+      "StakerV3FacetStaking",
+      stakerV3dsProxy.address
+    );
+
+    diamondCoreFacet = await ethers.getContractAt(
+      "StakerV3FacetCore",
+      stakerV3dsProxy.address
+    );
+
+    diamondBoostersFacet = await ethers.getContractAt(
+      "StakerV3FacetBoosters",
+      stakerV3dsProxy.address
+    );
+
+    diamondPointsFacet = await ethers.getContractAt(
+      "StakerV3FacetPoints",
+      stakerV3dsProxy.address
+    );
+
+    diamondViewFacet = await ethers.getContractAt(
+      "StakerV3FacetViews",
+      stakerV3dsProxy.address
+    );
   });
 
   describe("Proxy", function () {
@@ -312,48 +305,16 @@ describe("===Stakerv3ds===", function () {
           "StakerV3FacetCore"
         );
 
-        // generate data for sendTransaction
-        // lockDevelopers()
-        const testCallData1 = await mockCoreFacet
-          .connect(owner)
-          .lockDevelopers();
-        const testCallData1String = testCallData1.data.toString();
+        await diamondCoreFacet.connect(owner).lockDevelopers();
 
-        // addDeveloper
-        const testCallData2 = await mockCoreFacet
-          .connect(owner)
-          .addDeveloper(developer.address, 500);
-        const testCallData2String = testCallData2.data.toString();
-
-        // execute lockDevelopers()
-        await owner.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: testCallData1String,
-        });
-
-        // execute addDeveloper()
         await expect(
-          owner.sendTransaction({
-            to: stakerV3dsProxy.address,
-            data: testCallData2String,
-          })
+          diamondCoreFacet.connect(owner).addDeveloper(developer.address, 500)
         ).to.be.revertedWith("CantAlterDevs");
       });
 
       it("Reverts: update developer by person with 0 share", async function () {
-        // generate data for sendTransaction
-        // updateDeveloper()
-        const testCallData1 = await mockCoreFacet
-          .connect(signer1)
-          .updateDeveloper(signer2.address, 100);
-        const testCallData1String = testCallData1.data.toString();
-
-        // execute updateDeveloper()
         await expect(
-          owner.sendTransaction({
-            to: stakerV3dsProxy.address,
-            data: testCallData1String,
-          })
+          diamondCoreFacet.connect(owner).updateDeveloper(signer2.address, 100)
         ).to.be.revertedWith("ZeroDevShare()");
       });
 
@@ -364,175 +325,66 @@ describe("===Stakerv3ds===", function () {
           "StakerV3FacetViews"
         );
 
-        // generate data for sendTransaction
-        // addDeveloper()
-        const testCallData1 = await mockCoreFacet
+        await diamondCoreFacet
           .connect(owner)
           .addDeveloper(developer.address, developersShare[0]);
-        const testCallData1String = testCallData1.data.toString();
 
-        // addDeveloper()
-        const testCallData2 = await mockCoreFacet
+        await diamondCoreFacet
           .connect(owner)
           .addDeveloper(signer1.address, developersShare[1]);
-        const testCallData2String = testCallData2.data.toString();
 
-        // addDeveloper()
-        const testCallData3 = await mockCoreFacet
+        await diamondCoreFacet
           .connect(owner)
           .addDeveloper(signer2.address, developersShare[2]);
-        const testCallData3String = testCallData3.data.toString();
 
         // getDeveloperAddresses
-        const getDevAddressesData = await mockViewFacet
+        let devAddresses = await diamondViewFacet
           .connect(owner)
           .getDeveloperAddresses();
-        const getDevAddressesDataString = getDevAddressesData.toString();
 
-        // execute addDeveloper()
-        await owner.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: testCallData1String,
-        });
-
-        // execute addDeveloper()
-        await owner.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: testCallData2String,
-        });
-
-        // execute addDeveloper()
-        await owner.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: testCallData3String,
-        });
-
-        const devAddresses = await ethers.provider.call({
-          to: stakerV3dsProxy.address,
-          data: getDevAddressesDataString,
-        });
-
-        let decodedData = utils.decodeResults(
-          [viewFacetABI],
-          ["getDeveloperAddresses"],
-          [devAddresses]
-        );
-
-        expect(decodedData[0][0]).to.be.eq(developer.address);
-        expect(decodedData[0][1]).to.be.eq(signer1.address);
-        expect(decodedData[0][2]).to.be.eq(signer2.address);
+        expect(devAddresses[0]).to.be.eq(developer.address);
+        expect(devAddresses[1]).to.be.eq(signer1.address);
+        expect(devAddresses[2]).to.be.eq(signer2.address);
 
         // getDeveloperShare
-        const getDevShares1Data = await mockViewFacet
-          .connect(owner)
-          .getDeveloperShare(decodedData[0][0]);
-        const getDevShares1DataString = getDevShares1Data.toString();
+        let devShares = [];
 
-        // getDeveloperShare
-        const getDevShares2Data = await mockViewFacet
-          .connect(owner)
-          .getDeveloperShare(decodedData[0][1]);
-        const getDevShares2DataString = getDevShares2Data.toString();
+        for (let i = 0; i < devAddresses.length; i++) {
+          devShares[i] = await diamondViewFacet
+            .connect(owner)
+            .getDeveloperShare(devAddresses[i]);
+        }
 
-        // getDeveloperShare
-        const getDevShares3Data = await mockViewFacet
-          .connect(owner)
-          .getDeveloperShare(decodedData[0][2]);
-        const getDevShares3DataString = getDevShares3Data.toString();
-
-        const shareCall1 = await ethers.provider.call({
-          to: stakerV3dsProxy.address,
-          data: getDevShares1DataString,
-        });
-
-        const shareCall2 = await ethers.provider.call({
-          to: stakerV3dsProxy.address,
-          data: getDevShares2DataString,
-        });
-
-        const shareCall3 = await ethers.provider.call({
-          to: stakerV3dsProxy.address,
-          data: getDevShares3DataString,
-        });
-
-        decodedData = utils.decodeResults(
-          [viewFacetABI, viewFacetABI, viewFacetABI],
-          ["getDeveloperShare", "getDeveloperShare", "getDeveloperShare"],
-          [shareCall1, shareCall2, shareCall3]
-        );
-
-        expect(decodedData[0]).to.be.eq(developersShare[0]);
-        expect(decodedData[1]).to.be.eq(developersShare[1]);
-        expect(decodedData[2]).to.be.eq(developersShare[2]);
+        expect(devShares[0]).to.be.eq(developersShare[0]);
+        expect(devShares[1]).to.be.eq(developersShare[1]);
+        expect(devShares[2]).to.be.eq(developersShare[2]);
       });
 
       it("Reverts: can not increase share", async function () {
-        // generate data for sendTransaction
-        // addDeveloper()
-        const testCallData1 = await mockCoreFacet
+        await diamondCoreFacet
           .connect(owner)
           .addDeveloper(developer.address, 500);
-        const testCallData1String = testCallData1.data.toString();
 
-        // updateDeveloper()
-        const testCallData2 = await mockCoreFacet
-          .connect(developer)
-          .updateDeveloper(developer.address, 1000);
-        const testCallData2String = testCallData2.data.toString();
-
-        // execute addDeveloper()
-        await owner.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: testCallData1String,
-        });
-
-        // execute updateDeveloper()
         await expect(
-          developer.sendTransaction({
-            to: stakerV3dsProxy.address,
-            data: testCallData2String,
-          })
+          diamondCoreFacet
+            .connect(developer)
+            .updateDeveloper(developer.address, 1000)
         ).to.be.revertedWith("CantIncreaseDevShare()");
       });
 
       it("Reverts: can not update developer at address with greater then 0 share", async function () {
-        // generate data for sendTransaction
-        // addDeveloper()
-        const testCallData1 = await mockCoreFacet
+        await diamondCoreFacet
           .connect(owner)
           .addDeveloper(developer.address, 500);
-        const testCallData1String = testCallData1.data.toString();
 
-        // addDeveloper()
-        const testCallData2 = await mockCoreFacet
+        await diamondCoreFacet
           .connect(owner)
           .addDeveloper(signer1.address, 1000);
-        const testCallData2String = testCallData2.data.toString();
 
-        // updateDeveloper()
-        const testCallData3 = await mockCoreFacet
-          .connect(developer)
-          .updateDeveloper(signer1.address, 100);
-        const testCallData3String = testCallData3.data.toString();
-
-        // execute addDeveloper()
-        await owner.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: testCallData1String,
-        });
-
-        // execute addDeveloper()
-        await owner.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: testCallData2String,
-        });
-
-        // execute updateDeveloper()
         await expect(
-          developer.sendTransaction({
-            to: stakerV3dsProxy.address,
-            data: testCallData3String,
-          })
+          diamondCoreFacet
+            .connect(developer)
+            .updateDeveloper(signer1.address, 100)
         ).to.be.revertedWith("InvalidNewAddress()");
       });
 
@@ -543,84 +395,30 @@ describe("===Stakerv3ds===", function () {
           "StakerV3FacetViews"
         );
 
-        // generate data for sendTransaction
-        // addDeveloper()
-        const addDevData1 = await mockCoreFacet
+        await diamondCoreFacet
           .connect(owner)
           .addDeveloper(developer.address, developersShare[0]);
-        const addDevData1String = addDevData1.data.toString();
 
-        // addDeveloper()
-        const addDevData2 = await mockCoreFacet
+        await diamondCoreFacet
           .connect(owner)
           .addDeveloper(signer1.address, developersShare[1]);
-        const addDevData2String = addDevData2.data.toString();
 
-        // addDeveloper()
-        const addDevData3 = await mockCoreFacet
+        await diamondCoreFacet
           .connect(owner)
           .addDeveloper(signer2.address, developersShare[2]);
-        const addDevData3String = addDevData3.data.toString();
 
-        // updateDeveloper()
-        const updateDevData1 = await mockCoreFacet
+        // Updating devs
+        await diamondCoreFacet
           .connect(developer)
           .updateDeveloper(developer.address, 0);
-        const updateDevData1String = updateDevData1.data.toString();
 
-        // updateDeveloper()
-        const updateDevData2 = await mockCoreFacet
+        await diamondCoreFacet
           .connect(signer1)
           .updateDeveloper(signer3.address, developersShare[1]);
-        const updateDevData2String = updateDevData2.data.toString();
 
-        // updateDeveloper()
-        const updateDevData3 = await mockCoreFacet
+        await diamondCoreFacet
           .connect(signer2)
           .updateDeveloper(signer2.address, developersShare[2] - 1000);
-        const updateDevData3String = updateDevData3.data.toString();
-
-        // updateDeveloper()
-        const updateDevData4 = await mockCoreFacet
-          .connect(signer2)
-          .updateDeveloper(signer2.address, developersShare[2] - 1000);
-        const updateDevData4String = updateDevData4.data.toString();
-
-        // execute addDeveloper()
-        await owner.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: addDevData1String,
-        });
-
-        // execute addDeveloper()
-        await owner.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: addDevData2String,
-        });
-
-        // execute addDeveloper()
-        await owner.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: addDevData3String,
-        });
-
-        // execute updateDeveloper()
-        await developer.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: updateDevData1String,
-        });
-
-        // execute updateDeveloper()
-        await signer1.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: updateDevData2String,
-        });
-
-        // execute updateDeveloper()
-        await signer2.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: updateDevData3String,
-        });
 
         /**
          *
@@ -631,189 +429,99 @@ describe("===Stakerv3ds===", function () {
          */
 
         // getDeveloperAddresses
-        const getDevAddressesData = await mockViewFacet
+        let devAddresses = await diamondViewFacet
           .connect(owner)
           .getDeveloperAddresses();
-        const getDevAddressesDataString = getDevAddressesData.toString();
 
-        const devAddresses = await ethers.provider.call({
-          to: stakerV3dsProxy.address,
-          data: getDevAddressesDataString,
-        });
+        expect(devAddresses).to.not.contain(developer.address);
+        expect(devAddresses[0]).to.be.eq(signer2.address);
+        expect(devAddresses[1]).to.be.eq(signer3.address);
 
-        let decodedData = utils.decodeResults(
-          [viewFacetABI],
-          ["getDeveloperAddresses"],
-          [devAddresses]
-        );
-
-        expect(decodedData[0]).to.not.contain(developer.address);
-        expect(decodedData[0][0]).to.be.eq(signer2.address);
-        expect(decodedData[0][1]).to.be.eq(signer3.address);
+        let newDevShares = [];
+        // getDeveloperShare
+        newDevShares[0] = await diamondViewFacet
+          .connect(owner)
+          .getDeveloperShare(devAddresses[0]);
 
         // getDeveloperShare
-        const getDevShares1Data = await mockViewFacet
+        newDevShares[1] = await diamondViewFacet
           .connect(owner)
-          .getDeveloperShare(decodedData[0][0]);
-        const getDevShares1DataString = getDevShares1Data.toString();
+          .getDeveloperShare(devAddresses[1]);
 
-        // getDeveloperShare
-        const getDevShares2Data = await mockViewFacet
-          .connect(owner)
-          .getDeveloperShare(decodedData[0][1]);
-        const getDevShares2DataString = getDevShares2Data.toString();
+        expect(newDevShares[0]).to.be.eq(developersShare[2] - 1000);
+        expect(newDevShares[1]).to.be.eq(developersShare[1]);
 
-        const shareCall1 = await ethers.provider.call({
-          to: stakerV3dsProxy.address,
-          data: getDevShares1DataString,
-        });
-
-        const shareCall2 = await ethers.provider.call({
-          to: stakerV3dsProxy.address,
-          data: getDevShares2DataString,
-        });
-
-        decodedData = utils.decodeResults(
-          [viewFacetABI, viewFacetABI, viewFacetABI],
-          ["getDeveloperShare", "getDeveloperShare"],
-          [shareCall1, shareCall2]
-        );
-
-        expect(decodedData[0]).to.be.eq(developersShare[2] - 1000);
-        expect(decodedData[1]).to.be.eq(developersShare[1]);
-
-        // execute updateDeveloper()
-        await signer2.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: updateDevData4String,
-        });
+        diamondCoreFacet
+          .connect(signer2)
+          .updateDeveloper(signer2.address, developersShare[2] - 1000);
       });
     });
     describe("setEmissions, lockTokenEmissions, lockPointEmissions", function () {
       it("Reverts: alteration of token emission is locked", async function () {
-        // generate data for sendTransaction
-        // lockTokenEmissions()
-        const testCallData1 = await mockCoreFacet
-          .connect(owner)
-          .lockTokenEmissions();
-        const testCallData1String = testCallData1.data.toString();
+        await diamondCoreFacet.connect(owner).lockTokenEmissions();
 
         // setEmissions()
-        const testCallData2 = await mockCoreFacet.connect(owner).setEmissions(
-          [
-            {
-              timeStamp: await utils.getCurrentTime(),
-              rate: ethers.utils.parseEther("6.6666666666"),
-            },
-          ],
-          [
-            {
-              timeStamp: await utils.getCurrentTime(),
-              rate: ethers.utils.parseEther("6.6666666666"),
-            },
-          ]
-        );
-        const testCallData2String = testCallData2.data.toString();
-
-        // execute lockTokenEmissions()
-        await owner.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: testCallData1String,
-        });
-
-        //execute setEmissions
         await expect(
-          owner.sendTransaction({
-            to: stakerV3dsProxy.address,
-            data: testCallData2String,
-          })
+          diamondCoreFacet.connect(owner).setEmissions(
+            [
+              {
+                timeStamp: await utils.getCurrentTime(),
+                rate: ethers.utils.parseEther("6.6666666666"),
+              },
+            ],
+            [
+              {
+                timeStamp: await utils.getCurrentTime(),
+                rate: ethers.utils.parseEther("6.6666666666"),
+              },
+            ]
+          )
         ).to.be.revertedWith("CantAlterTokenEmissionSchedule()");
       });
 
       it("Reverts: alteration of point emissions is locked", async function () {
-        // generate data for sendTransaction
-        // lockPointEmissions()
-        const testCallData1 = await mockCoreFacet
-          .connect(owner)
-          .lockPointEmissions();
-        const testCallData1String = testCallData1.data.toString();
+        await diamondCoreFacet.connect(owner).lockPointEmissions();
 
-        // setEmissions()
-        const testCallData2 = await mockCoreFacet.connect(owner).setEmissions(
-          [
-            {
-              timeStamp: await utils.getCurrentTime(),
-              rate: ethers.utils.parseEther("6.6666666666"),
-            },
-          ],
-          [
-            {
-              timeStamp: await utils.getCurrentTime(),
-              rate: ethers.utils.parseEther("6.6666666666"),
-            },
-          ]
-        );
-        const testCallData2String = testCallData2.data.toString();
-
-        // execute lockPointEmissions()
-        await owner.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: testCallData1String,
-        });
-
-        //execute setEmissions
         await expect(
-          owner.sendTransaction({
-            to: stakerV3dsProxy.address,
-            data: testCallData2String,
-          })
+          diamondCoreFacet.connect(owner).setEmissions(
+            [
+              {
+                timeStamp: await utils.getCurrentTime(),
+                rate: ethers.utils.parseEther("6.6666666666"),
+              },
+            ],
+            [
+              {
+                timeStamp: await utils.getCurrentTime(),
+                rate: ethers.utils.parseEther("6.6666666666"),
+              },
+            ]
+          )
         ).to.be.revertedWith("CantAlterPointEmissionSchedule()");
       });
 
       it("Reverts: token emission schedule must be set", async function () {
-        // generate data for sendTransaction
-        // setEmissions()
-        const testCallData1 = await mockCoreFacet
-          .connect(owner)
-          .setEmissions([], []);
-        const testCallData1String = testCallData1.data.toString();
-
-        //execute setEmissions
         await expect(
-          owner.sendTransaction({
-            to: stakerV3dsProxy.address,
-            data: testCallData1String,
-          })
+          diamondCoreFacet.connect(owner).setEmissions([], [])
         ).to.be.revertedWith("ZeroTokenEmissionEvents()");
       });
 
       it("Reverts: point emission schedule must be set", async function () {
-        // generate data for sendTransaction
-        // setEmissions()
-        const testCallData1 = await mockCoreFacet.connect(owner).setEmissions(
-          [
-            {
-              timeStamp: await utils.getCurrentTime(),
-              rate: ethers.utils.parseEther("6.6666666666"),
-            },
-          ],
-          []
-        );
-        const testCallData1String = testCallData1.data.toString();
-
-        //execute setEmissions
         await expect(
-          owner.sendTransaction({
-            to: stakerV3dsProxy.address,
-            data: testCallData1String,
-          })
+          diamondCoreFacet.connect(owner).setEmissions(
+            [
+              {
+                timeStamp: await utils.getCurrentTime(),
+                rate: ethers.utils.parseEther("6.6666666666"),
+              },
+            ],
+            []
+          )
         ).to.be.revertedWith("ZeroPointEmissionEvents()");
       });
 
       it("should set emissions", async function () {
-        // generate data for sendTransaction
-        // setEmissions()
-        const testCallData1 = await mockCoreFacet.connect(owner).setEmissions(
+        await diamondCoreFacet.connect(owner).setEmissions(
           [
             {
               timeStamp: await utils.getCurrentTime(),
@@ -827,19 +535,10 @@ describe("===Stakerv3ds===", function () {
             },
           ]
         );
-        const testCallData1String = testCallData1.data.toString();
-
-        // execute setEmissions()
-        await owner.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: testCallData1String,
-        });
       });
 
       it("should set emissions of staker where earliestTokenEmission/earliestPointEmission timestamps are less", async function () {
-        // generate data for sendTransaction
-        // setEmissions()
-        const testCallData1 = await mockCoreFacet.connect(owner).setEmissions(
+        await diamondCoreFacet.connect(owner).setEmissions(
           [
             {
               timeStamp: await utils.getCurrentTime(),
@@ -853,19 +552,12 @@ describe("===Stakerv3ds===", function () {
             },
           ]
         );
-        const testCallData1String = testCallData1.data.toString();
-
-        // execute setEmissions()
-        await owner.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: testCallData1String,
-        });
 
         // Increase time so that the earliestTokenEmission/EarliestPointEmission timestamps are less
         await ethers.provider.send("evm_increaseTime", [70]);
         await ethers.provider.send("evm_mine", []);
 
-        const testCallData2 = await mockCoreFacet.connect(owner).setEmissions(
+        await diamondCoreFacet.connect(owner).setEmissions(
           [
             {
               timeStamp: await utils.getCurrentTime(),
@@ -879,53 +571,31 @@ describe("===Stakerv3ds===", function () {
             },
           ]
         );
-        const testCallData2String = testCallData2.data.toString();
-
-        // execute setEmissions()
-        await owner.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: testCallData2String,
-        });
       });
     });
+
     describe("configureBoostersBatch, getBoostersCount, getBoosterInfo", function () {
       it("Reverts: boost info must be set", async function () {
-        const testCallData1 = await mockCoreFacet
-          .connect(owner)
-          .configureBoostersBatch([1, 2], []);
-        const testCallData1String = testCallData1.data.toString();
-
-        //configureBoosterBatch
         await expect(
-          owner.sendTransaction({
-            to: stakerV3dsProxy.address,
-            data: testCallData1String,
-          })
+          diamondCoreFacet.connect(owner).configureBoostersBatch([1, 2], [])
         ).to.be.revertedWith("EmptyBoostInfoArray()");
 
-        const testCallData2 = await mockCoreFacet
-          .connect(owner)
-          .configureBoostersBatch(
+        await expect(
+          diamondCoreFacet.connect(owner).configureBoostersBatch(
             [1],
             [
               {
-                set: true,
                 multiplier: 0,
                 amountRequired: 0,
                 groupRequired: 0,
                 contractRequired: ethers.constants.AddressZero,
-                assetType: 2,
+                boostType: 2,
                 typeOfAsset: 0,
+                historyOfTokenMultipliers: [],
+                historyOfPointMultipliers: [],
               },
             ]
-          );
-        const testCallData2String = testCallData2.data.toString();
-
-        await expect(
-          owner.sendTransaction({
-            to: stakerV3dsProxy.address,
-            data: testCallData2String,
-          })
+          )
         ).to.be.revertedWith("InvalidConfBoostersInputs()");
       });
 
@@ -935,39 +605,32 @@ describe("===Stakerv3ds===", function () {
         let itemGroupId2 = ethers.BigNumber.from(2);
         let shiftedItemGroupId2 = itemGroupId2.shl(128);
 
-        const testCallData1 = await mockCoreFacet
-          .connect(owner)
-          .configureBoostersBatch(
+        await expect(
+          diamondCoreFacet.connect(owner).configureBoostersBatch(
             [1, 2, 3],
             [
               {
-                set: true,
                 multiplier: 2300,
                 amountRequired: 3,
                 groupRequired: itemGroupId2,
                 contractRequired: super721.address,
-                assetType: 2,
+                boostType: 2,
                 typeOfAsset: 1,
+                historyOfTokenMultipliers: [],
+                historyOfPointMultipliers: [],
               },
               {
-                set: true,
                 multiplier: 2000,
                 amountRequired: 2,
                 groupRequired: 0,
                 contractRequired: super1155.address,
-                assetType: 2,
+                boostType: 2,
                 typeOfAsset: 2,
+                historyOfTokenMultipliers: [],
+                historyOfPointMultipliers: [],
               },
             ]
-          );
-        const testCallData1String = testCallData1.data.toString();
-
-        //configureBoosterBatch
-        await expect(
-          owner.sendTransaction({
-            to: stakerV3dsProxy.address,
-            data: testCallData1String,
-          })
+          )
         ).to.be.revertedWith("InputLengthsMismatch()");
       });
 
@@ -977,39 +640,32 @@ describe("===Stakerv3ds===", function () {
         let itemGroupId2 = ethers.BigNumber.from(2);
         let shiftedItemGroupId2 = itemGroupId2.shl(128);
 
-        const testCallData1 = await mockCoreFacet
-          .connect(owner)
-          .configureBoostersBatch(
+        await expect(
+          diamondCoreFacet.connect(owner).configureBoostersBatch(
             [1, 0],
             [
               {
-                set: true,
                 multiplier: 2300,
                 amountRequired: 3,
                 groupRequired: itemGroupId2,
                 contractRequired: super721.address,
-                assetType: 2,
+                boostType: 2,
                 typeOfAsset: 1,
+                historyOfTokenMultipliers: [],
+                historyOfPointMultipliers: [],
               },
               {
-                set: true,
                 multiplier: 2000,
                 amountRequired: 2,
                 groupRequired: 0,
                 contractRequired: super1155.address,
-                assetType: 2,
+                boostType: 2,
                 typeOfAsset: 2,
+                historyOfTokenMultipliers: [],
+                historyOfPointMultipliers: [],
               },
             ]
-          );
-        const testCallData1String = testCallData1.data.toString();
-
-        //configureBoosterBatch
-        await expect(
-          owner.sendTransaction({
-            to: stakerV3dsProxy.address,
-            data: testCallData1String,
-          })
+          )
         ).to.be.revertedWith("BoosterIdZero()");
       });
 
@@ -1019,39 +675,32 @@ describe("===Stakerv3ds===", function () {
         let itemGroupId2 = ethers.BigNumber.from(2);
         let shiftedItemGroupId2 = itemGroupId2.shl(128);
 
-        const testCallData1 = await mockCoreFacet
-          .connect(owner)
-          .configureBoostersBatch(
+        await expect(
+          diamondCoreFacet.connect(owner).configureBoostersBatch(
             [1, 2],
             [
               {
-                set: true,
                 multiplier: 2300,
                 amountRequired: 3,
                 groupRequired: itemGroupId2,
                 contractRequired: super721.address,
-                assetType: 2,
+                boostType: 2,
                 typeOfAsset: 1,
+                historyOfTokenMultipliers: [],
+                historyOfPointMultipliers: [],
               },
               {
-                set: true,
                 multiplier: 2000,
                 amountRequired: 2,
                 groupRequired: 0,
                 contractRequired: depositToken.address,
-                assetType: 2,
+                boostType: 2,
                 typeOfAsset: 0,
+                historyOfTokenMultipliers: [],
+                historyOfPointMultipliers: [],
               },
             ]
-          );
-        const testCallData1String = testCallData1.data.toString();
-
-        //configureBoosterBatch
-        await expect(
-          owner.sendTransaction({
-            to: stakerV3dsProxy.address,
-            data: testCallData1String,
-          })
+          )
         ).to.be.revertedWith("InvalidConfBoostersAssetType()");
       });
 
@@ -1066,80 +715,53 @@ describe("===Stakerv3ds===", function () {
 
         const configOfBoosters = [
           {
-            set: true,
             multiplier: 2300,
             amountRequired: 3,
             groupRequired: itemGroupId2,
             contractRequired: super721.address,
-            assetType: 2,
+            boostType: 2,
             typeOfAsset: 1,
+            historyOfTokenMultipliers: [],
+            historyOfPointMultipliers: [],
           },
           {
-            set: true,
             multiplier: 2000,
             amountRequired: 2,
             groupRequired: 0,
             contractRequired: super1155.address,
-            assetType: 2,
+            boostType: 2,
             typeOfAsset: 2,
+            historyOfTokenMultipliers: [],
+            historyOfPointMultipliers: [],
           },
         ];
 
-        const testCallData1 = await mockCoreFacet
+        await diamondCoreFacet
           .connect(owner)
           .configureBoostersBatch([1, 2], configOfBoosters);
-        const testCallData1String = testCallData1.data.toString();
 
-        //configureBoosterBatch
-        await owner.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: testCallData1String,
-        });
-
-        const getBoosterCountData = await mockViewFacet
+        const getBoosterCountData = await diamondViewFacet
           .connect(owner)
           .getBoostersCount();
-        const getBoosterCountDataString = getBoosterCountData.toString();
 
-        const getBoosterInfo1Data = await mockViewFacet
+        let getBoosterInfo = [];
+        getBoosterInfo[0] = await diamondViewFacet
           .connect(owner)
           .getBoosterInfo(1);
-        const getBoosterInfo1DataString = getBoosterInfo1Data.toString();
 
-        const getBoosterInfo2Data = await mockViewFacet
+        getBoosterInfo[1] = await diamondViewFacet
           .connect(owner)
           .getBoosterInfo(2);
-        const getBoosterInfo2DataString = getBoosterInfo2Data.toString();
-
-        const boostCall1 = await ethers.provider.call({
-          to: stakerV3dsProxy.address,
-          data: getBoosterInfo1DataString,
-        });
-
-        const boostCall2 = await ethers.provider.call({
-          to: stakerV3dsProxy.address,
-          data: getBoosterInfo2DataString,
-        });
-
-        const boostCountCall = await ethers.provider.call({
-          to: stakerV3dsProxy.address,
-          data: getBoosterCountDataString,
-        });
-
-        const decodedData = utils.decodeResults(
-          [viewFacetABI, viewFacetABI, viewFacetABI],
-          ["getBoosterInfo", "getBoosterInfo", "getBoostersCount"],
-          [boostCall1, boostCall2, boostCountCall]
-        );
 
         expect(await configOfBoosters[0].multiplier).to.be.eq(
-          decodedData[0].multiplier
+          getBoosterInfo[0].multiplier
         );
         expect(await configOfBoosters[1].multiplier).to.be.eq(
-          decodedData[1].multiplier
+          getBoosterInfo[1].multiplier
         );
-        expect(await decodedData[2]).to.be.eq(2);
+        expect(await getBoosterCountData).to.be.eq(2);
       });
+
       it("should change existed boosters correctly", async function () {
         const viewFacetABI = await hre.artifacts.readArtifact(
           "StakerV3FacetViews"
@@ -1151,156 +773,109 @@ describe("===Stakerv3ds===", function () {
 
         const configOfBoosters = [
           {
-            set: true,
             multiplier: 2300,
             amountRequired: 3,
             groupRequired: itemGroupId2,
             contractRequired: super721.address,
-            assetType: 2,
+            boostType: 2,
             typeOfAsset: 1,
+            historyOfTokenMultipliers: [],
+            historyOfPointMultipliers: [],
           },
           {
-            set: true,
             multiplier: 2000,
             amountRequired: 2,
             groupRequired: 0,
             contractRequired: super1155.address,
-            assetType: 2,
+            boostType: 2,
             typeOfAsset: 2,
+            historyOfTokenMultipliers: [],
+            historyOfPointMultipliers: [],
           },
         ];
 
-        const testCallData1 = await mockCoreFacet
+        await diamondCoreFacet
           .connect(owner)
           .configureBoostersBatch([1, 2], configOfBoosters);
-        const testCallData1String = testCallData1.data.toString();
 
-        //configureBoosterBatch
-        await owner.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: testCallData1String,
-        });
-
-        const testCallData2 = await mockCoreFacet
-          .connect(owner)
-          .configureBoostersBatch(
-            [1],
-            [
-              {
-                set: true,
-                multiplier: 0,
-                amountRequired: 3,
-                groupRequired: itemGroupId2,
-                contractRequired: super721.address,
-                assetType: 2,
-                typeOfAsset: 1,
-              },
-            ]
-          );
-        const testCallData2String = testCallData2.data.toString();
-
-        const testCallData3 = await mockCoreFacet
-          .connect(owner)
-          .configureBoostersBatch(
-            [2],
-            [
-              {
-                set: true,
-                multiplier: 26000,
-                amountRequired: 2,
-                groupRequired: 0,
-                contractRequired: super1155.address,
-                assetType: 2,
-                typeOfAsset: 2,
-              },
-            ]
-          );
-        const testCallData3String = testCallData3.data.toString();
-
-        await owner.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: testCallData2String,
-        });
-
-        await owner.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: testCallData3String,
-        });
-
-        const getBoosterCountData = await mockViewFacet
-          .connect(owner)
-          .getBoostersCount();
-        const getBoosterCountDataString = getBoosterCountData.toString();
-
-        const getBoosterInfo1Data = await mockViewFacet
-          .connect(owner)
-          .getBoosterInfo(1);
-        const getBoosterInfo1DataString = getBoosterInfo1Data.toString();
-
-        const getBoosterInfo2Data = await mockViewFacet
-          .connect(owner)
-          .getBoosterInfo(2);
-        const getBoosterInfo2DataString = getBoosterInfo2Data.toString();
-
-        const boostCall1 = await ethers.provider.call({
-          to: stakerV3dsProxy.address,
-          data: getBoosterInfo1DataString,
-        });
-
-        const boostCall2 = await ethers.provider.call({
-          to: stakerV3dsProxy.address,
-          data: getBoosterInfo2DataString,
-        });
-
-        const boostCountCall = await ethers.provider.call({
-          to: stakerV3dsProxy.address,
-          data: getBoosterCountDataString,
-        });
-
-        const decodedData = utils.decodeResults(
-          [viewFacetABI, viewFacetABI, viewFacetABI],
-          ["getBoosterInfo", "getBoosterInfo", "getBoostersCount"],
-          [boostCall1, boostCall2, boostCountCall]
+        await diamondCoreFacet.connect(owner).configureBoostersBatch(
+          [1],
+          [
+            {
+              multiplier: 0,
+              amountRequired: 3,
+              groupRequired: itemGroupId2,
+              contractRequired: super721.address,
+              boostType: 2,
+              typeOfAsset: 1,
+              historyOfTokenMultipliers: [],
+              historyOfPointMultipliers: [],
+            },
+          ]
         );
 
-        expect(await decodedData[0].multiplier).to.be.eq(0);
-        expect(await decodedData[1].multiplier).to.be.eq(26000);
-        expect(await decodedData[2]).to.be.eq(1);
+        await diamondCoreFacet.connect(owner).configureBoostersBatch(
+          [2],
+          [
+            {
+              multiplier: 26000,
+              amountRequired: 2,
+              groupRequired: 0,
+              contractRequired: super1155.address,
+              boostType: 2,
+              typeOfAsset: 2,
+              historyOfTokenMultipliers: [],
+              historyOfPointMultipliers: [],
+            },
+          ]
+        );
+
+        const getBoosterCountData = await diamondViewFacet
+          .connect(owner)
+          .getBoostersCount();
+
+        let getBoosterInfo = [];
+        getBoosterInfo[0] = await diamondViewFacet
+          .connect(owner)
+          .getBoosterInfo(1);
+
+        getBoosterInfo[1] = await diamondViewFacet
+          .connect(owner)
+          .getBoosterInfo(2);
+
+        expect(await getBoosterInfo[0].multiplier).to.be.eq(0);
+        expect(await getBoosterInfo[1].multiplier).to.be.eq(26000);
+        expect(await getBoosterCountData).to.be.eq(1);
       });
     });
+
     describe("addPool, overwrtite pool, getPoolCount", function () {
       it("Reverts: emission schedule not defined", async function () {
-        const testCallData1 = await mockCoreFacet.connect(owner).addPool({
-          id: 0,
-          tokenStrength: 10000,
-          pointStrength: 10000,
-          groupId: 0,
-          tokensPerShare: 0,
-          pointsPerShare: 0,
-          compoundInterestThreshold: ethers.utils.parseEther("1000"),
-          compoundInterestMultiplier: 5000,
-          boostInfo: [1, 2],
-          assetAddress: super721.address,
-          typeOfAsset: 1,
-          lockPeriod: 0,
-          lockAmount: 0,
-          lockMultiplier: 0,
-          timeLockTypeOfBoost: 0,
-          compoundTypeOfBoost: 0,
-        });
-        const testCallData1String = testCallData1.data.toString();
-
-        //addPool
         await expect(
-          owner.sendTransaction({
-            to: stakerV3dsProxy.address,
-            data: testCallData1String,
+          diamondCoreFacet.connect(owner).addPool({
+            id: 0,
+            tokenStrength: 10000,
+            pointStrength: 10000,
+            groupId: 0,
+            tokensPerShare: 0,
+            pointsPerShare: 0,
+            compoundInterestThreshold: ethers.utils.parseEther("1000"),
+            compoundInterestMultiplier: 5000,
+            boostInfo: [1, 2],
+            assetAddress: super721.address,
+            typeOfAsset: 1,
+            lockPeriod: 0,
+            lockAmount: 0,
+            lockMultiplier: 0,
+            timeLockTypeOfBoost: 0,
+            compoundTypeOfBoost: 0,
+            typeOfPool: 0,
           })
         ).to.be.revertedWith("EmissionNotSet()");
       });
 
       it("Reverts: pool token is ERC20 token", async function () {
-        const testCallData1 = await mockCoreFacet.connect(owner).setEmissions(
+        await diamondCoreFacet.connect(owner).setEmissions(
           [
             {
               timeStamp: await utils.getCurrentTime(),
@@ -1314,45 +889,32 @@ describe("===Stakerv3ds===", function () {
             },
           ]
         );
-        const testCallData1String = testCallData1.data.toString();
 
-        //setEmissions
-        await owner.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: testCallData1String,
-        });
-
-        const testCallData2 = await mockCoreFacet.connect(owner).addPool({
-          id: 0,
-          tokenStrength: 10000,
-          pointStrength: 10000,
-          groupId: 0,
-          tokensPerShare: 0,
-          pointsPerShare: 0,
-          compoundInterestThreshold: ethers.utils.parseEther("1000"),
-          compoundInterestMultiplier: 5000,
-          boostInfo: [1, 2],
-          assetAddress: rewardToken.address,
-          typeOfAsset: 1,
-          lockPeriod: 0,
-          lockAmount: 0,
-          lockMultiplier: 0,
-          timeLockTypeOfBoost: 0,
-          compoundTypeOfBoost: 0,
-        });
-        const testCallData2String = testCallData2.data.toString();
-
-        //addPool
         await expect(
-          owner.sendTransaction({
-            to: stakerV3dsProxy.address,
-            data: testCallData2String,
+          diamondCoreFacet.connect(owner).addPool({
+            id: 0,
+            tokenStrength: 10000,
+            pointStrength: 10000,
+            groupId: 0,
+            tokensPerShare: 0,
+            pointsPerShare: 0,
+            compoundInterestThreshold: ethers.utils.parseEther("1000"),
+            compoundInterestMultiplier: 5000,
+            boostInfo: [1, 2],
+            assetAddress: rewardToken.address,
+            typeOfAsset: 1,
+            lockPeriod: 0,
+            lockAmount: 0,
+            lockMultiplier: 0,
+            timeLockTypeOfBoost: 0,
+            compoundTypeOfBoost: 0,
+            typeOfPool: 0,
           })
         ).to.be.reverted;
       });
 
       it("Reverts: mismatch typeOfAsset and real asset type", async function () {
-        const testCallData1 = await mockCoreFacet.connect(owner).setEmissions(
+        await diamondCoreFacet.connect(owner).setEmissions(
           [
             {
               timeStamp: await utils.getCurrentTime(),
@@ -1366,73 +928,54 @@ describe("===Stakerv3ds===", function () {
             },
           ]
         );
-        const testCallData1String = testCallData1.data.toString();
 
-        //setEmissions
-        await owner.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: testCallData1String,
-        });
-
-        const testCallData2 = await mockCoreFacet.connect(owner).addPool({
-          id: 0,
-          tokenStrength: 10000,
-          pointStrength: 10000,
-          groupId: 0,
-          tokensPerShare: 0,
-          pointsPerShare: 0,
-          compoundInterestThreshold: ethers.utils.parseEther("1000"),
-          compoundInterestMultiplier: 5000,
-          boostInfo: [1, 2],
-          assetAddress: super1155.address,
-          typeOfAsset: 1,
-          lockPeriod: 0,
-          lockAmount: 0,
-          lockMultiplier: 0,
-          timeLockTypeOfBoost: 0,
-          compoundTypeOfBoost: 0,
-        });
-        const testCallData2String = testCallData2.data.toString();
-
-        //addPool
         await expect(
-          owner.sendTransaction({
-            to: stakerV3dsProxy.address,
-            data: testCallData2String,
+          diamondCoreFacet.connect(owner).addPool({
+            id: 0,
+            tokenStrength: 10000,
+            pointStrength: 10000,
+            groupId: 0,
+            tokensPerShare: 0,
+            pointsPerShare: 0,
+            compoundInterestThreshold: ethers.utils.parseEther("1000"),
+            compoundInterestMultiplier: 5000,
+            boostInfo: [1, 2],
+            assetAddress: super1155.address,
+            typeOfAsset: 1,
+            lockPeriod: 0,
+            lockAmount: 0,
+            lockMultiplier: 0,
+            timeLockTypeOfBoost: 0,
+            compoundTypeOfBoost: 0,
+            typeOfPool: 0,
           })
         ).to.be.revertedWith("InvalidAsset()");
 
-        const testCallData3 = await mockCoreFacet.connect(owner).addPool({
-          id: 0,
-          tokenStrength: 10000,
-          pointStrength: 10000,
-          groupId: 0,
-          tokensPerShare: 0,
-          pointsPerShare: 0,
-          compoundInterestThreshold: ethers.utils.parseEther("1000"),
-          compoundInterestMultiplier: 5000,
-          boostInfo: [1, 2],
-          assetAddress: super721.address,
-          typeOfAsset: 2,
-          lockPeriod: 0,
-          lockAmount: 0,
-          lockMultiplier: 0,
-          timeLockTypeOfBoost: 0,
-          compoundTypeOfBoost: 0,
-        });
-        const testCallData3String = testCallData3.data.toString();
-
-        //addPool
         await expect(
-          owner.sendTransaction({
-            to: stakerV3dsProxy.address,
-            data: testCallData3String,
+          diamondCoreFacet.connect(owner).addPool({
+            id: 0,
+            tokenStrength: 10000,
+            pointStrength: 10000,
+            groupId: 0,
+            tokensPerShare: 0,
+            pointsPerShare: 0,
+            compoundInterestThreshold: ethers.utils.parseEther("1000"),
+            compoundInterestMultiplier: 5000,
+            boostInfo: [1, 2],
+            assetAddress: super721.address,
+            typeOfAsset: 2,
+            lockPeriod: 0,
+            lockAmount: 0,
+            lockMultiplier: 0,
+            timeLockTypeOfBoost: 0,
+            compoundTypeOfBoost: 0,
+            typeOfPool: 0,
           })
         ).to.be.revertedWith("InvalidAsset()");
       });
 
       it("Reverts: token or point strength of the pool is set to 0 or less", async function () {
-        const testCallData1 = await mockCoreFacet.connect(owner).setEmissions(
+        await diamondCoreFacet.connect(owner).setEmissions(
           [
             {
               timeStamp: await utils.getCurrentTime(),
@@ -1446,45 +989,32 @@ describe("===Stakerv3ds===", function () {
             },
           ]
         );
-        const testCallData1String = testCallData1.data.toString();
 
-        //setEmissions
-        await owner.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: testCallData1String,
-        });
-
-        const testCallData2 = await mockCoreFacet.connect(owner).addPool({
-          id: 0,
-          tokenStrength: 0,
-          pointStrength: 10000,
-          groupId: 0,
-          tokensPerShare: 0,
-          pointsPerShare: 0,
-          compoundInterestThreshold: ethers.utils.parseEther("1000"),
-          compoundInterestMultiplier: 5000,
-          boostInfo: [1, 2],
-          assetAddress: super721.address,
-          typeOfAsset: 1,
-          lockPeriod: 0,
-          lockAmount: 0,
-          lockMultiplier: 0,
-          timeLockTypeOfBoost: 0,
-          compoundTypeOfBoost: 0,
-        });
-        const testCallData2String = testCallData2.data.toString();
-
-        //addPool
         await expect(
-          owner.sendTransaction({
-            to: stakerV3dsProxy.address,
-            data: testCallData2String,
+          diamondCoreFacet.connect(owner).addPool({
+            id: 0,
+            tokenStrength: 0,
+            pointStrength: 10000,
+            groupId: 0,
+            tokensPerShare: 0,
+            pointsPerShare: 0,
+            compoundInterestThreshold: ethers.utils.parseEther("1000"),
+            compoundInterestMultiplier: 5000,
+            boostInfo: [1, 2],
+            assetAddress: super721.address,
+            typeOfAsset: 1,
+            lockPeriod: 0,
+            lockAmount: 0,
+            lockMultiplier: 0,
+            timeLockTypeOfBoost: 0,
+            compoundTypeOfBoost: 0,
+            typeOfPool: 0,
           })
         ).to.be.revertedWith("ZeroStrength()");
       });
 
       // it("Reverts: ERC20 can't be as asset at pool for stake", async function () {
-      //   const testCallData1 = await mockCoreFacet.connect(owner).setEmissions(
+      //   await diamondCoreFacet.connect(owner).setEmissions(
       //     [
       //       {
       //         timeStamp: await utils.getCurrentTime(),
@@ -1498,15 +1028,8 @@ describe("===Stakerv3ds===", function () {
       //       },
       //     ]
       //   );
-      //   const testCallData1String = testCallData1.data.toString();
 
-      //   //setEmissions
-      //   await owner.sendTransaction({
-      //     to: stakerV3dsProxy.address,
-      //     data: testCallData1String,
-      //   });
-
-      //   const testCallData2 = await mockCoreFacet.connect(owner).addPool({
+      //   await expect(diamondCoreFacet.connect(owner).addPool({
       //     id: 0,
       //     tokenStrength: 100,
       //     pointStrength: 10000,
@@ -1523,20 +1046,11 @@ describe("===Stakerv3ds===", function () {
       //     lockMultiplier: 0,
       //     timeLockTypeOfBoost: 0,
       //     compoundTypeOfBoost: 0,
-      //   });
-      //   const testCallData2String = testCallData2.data.toString();
-
-      //   //addPool
-      //   await expect(
-      //     owner.sendTransaction({
-      //       to: stakerV3dsProxy.address,
-      //       data: testCallData2String,
-      //     })
-      //   ).to.be.revertedWith("InvalidTypeOfAsset()");
+      //   })).to.be.revertedWith("InvalidTypeOfAsset()");
       // });
 
       it("Reverts: when group id is required but it is ERC20 asset", async function () {
-        const testCallData1 = await mockCoreFacet.connect(owner).setEmissions(
+        await diamondCoreFacet.connect(owner).setEmissions(
           [
             {
               timeStamp: await utils.getCurrentTime(),
@@ -1550,39 +1064,26 @@ describe("===Stakerv3ds===", function () {
             },
           ]
         );
-        const testCallData1String = testCallData1.data.toString();
 
-        //setEmissions
-        await owner.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: testCallData1String,
-        });
-
-        const testCallData2 = await mockCoreFacet.connect(owner).addPool({
-          id: 1,
-          tokenStrength: 10000,
-          pointStrength: 10000,
-          groupId: 1,
-          tokensPerShare: 0,
-          pointsPerShare: 0,
-          compoundInterestThreshold: ethers.utils.parseEther("1000000"),
-          compoundInterestMultiplier: 5000,
-          boostInfo: [1, 2],
-          assetAddress: depositToken.address,
-          typeOfAsset: 0,
-          lockPeriod: 0,
-          lockAmount: 0,
-          lockMultiplier: 0,
-          timeLockTypeOfBoost: 0,
-          compoundTypeOfBoost: 0,
-        });
-        const testCallData2String = testCallData2.data.toString();
-
-        //addPool
         await expect(
-          owner.sendTransaction({
-            to: stakerV3dsProxy.address,
-            data: testCallData2String,
+          diamondCoreFacet.connect(owner).addPool({
+            id: 1,
+            tokenStrength: 10000,
+            pointStrength: 10000,
+            groupId: 1,
+            tokensPerShare: 0,
+            pointsPerShare: 0,
+            compoundInterestThreshold: ethers.utils.parseEther("1000000"),
+            compoundInterestMultiplier: 5000,
+            boostInfo: [1, 2],
+            assetAddress: depositToken.address,
+            typeOfAsset: 0,
+            lockPeriod: 0,
+            lockAmount: 0,
+            lockMultiplier: 0,
+            timeLockTypeOfBoost: 0,
+            compoundTypeOfBoost: 0,
+            typeOfPool: 0,
           })
         ).to.be.revertedWith("InvalidGroupIdForERC20()");
       });
@@ -1592,7 +1093,7 @@ describe("===Stakerv3ds===", function () {
           "StakerV3FacetViews"
         );
 
-        const testCallData1 = await mockCoreFacet.connect(owner).setEmissions(
+        await diamondCoreFacet.connect(owner).setEmissions(
           [
             {
               timeStamp: await utils.getCurrentTime(),
@@ -1606,15 +1107,8 @@ describe("===Stakerv3ds===", function () {
             },
           ]
         );
-        const testCallData1String = testCallData1.data.toString();
 
-        //setEmissions
-        await owner.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: testCallData1String,
-        });
-
-        const testCallData2 = await mockCoreFacet.connect(owner).addPool({
+        await diamondCoreFacet.connect(owner).addPool({
           id: 0,
           tokenStrength: 10000,
           pointStrength: 10000,
@@ -1631,33 +1125,14 @@ describe("===Stakerv3ds===", function () {
           lockMultiplier: 0,
           timeLockTypeOfBoost: 0,
           compoundTypeOfBoost: 0,
-        });
-        const testCallData2String = testCallData2.data.toString();
-
-        //addPool
-        owner.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: testCallData2String,
+          typeOfPool: 0,
         });
 
-        const getPoolCount1Data = await mockViewFacet
-          .connect(owner)
-          .getPoolCount();
-        const getPoolCount1DataString = getPoolCount1Data.toString();
+        let getPoolCount = await diamondViewFacet.connect(owner).getPoolCount();
 
-        const getPoolCall1 = await ethers.provider.call({
-          to: stakerV3dsProxy.address,
-          data: getPoolCount1DataString,
-        });
+        expect(await getPoolCount).to.be.eq(1);
 
-        let decodedData = utils.decodeResults(
-          [viewFacetABI],
-          ["getPoolCount"],
-          [getPoolCall1]
-        );
-        expect(await decodedData[0]).to.be.eq(1);
-
-        const testCallData3 = await mockCoreFacet.connect(owner).addPool({
+        await diamondCoreFacet.connect(owner).addPool({
           id: 0,
           tokenStrength: 12000,
           pointStrength: 12000,
@@ -1674,36 +1149,17 @@ describe("===Stakerv3ds===", function () {
           lockMultiplier: 0,
           timeLockTypeOfBoost: 0,
           compoundTypeOfBoost: 0,
-        });
-        const testCallData3String = testCallData3.data.toString();
-
-        //addPool
-        owner.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: testCallData3String,
+          typeOfPool: 0,
         });
 
-        const getPoolCount2Data = await mockViewFacet
-          .connect(owner)
-          .getPoolCount();
-        const getPoolCount2DataString = getPoolCount2Data.toString();
-
-        const getPoolCall2 = await ethers.provider.call({
-          to: stakerV3dsProxy.address,
-          data: getPoolCount2DataString,
-        });
-
-        decodedData = utils.decodeResults(
-          [viewFacetABI],
-          ["getPoolCount"],
-          [getPoolCall2]
-        );
-        expect(await decodedData[0]).to.be.eq(1);
+        getPoolCount = await diamondViewFacet.connect(owner).getPoolCount();
+        expect(await getPoolCount).to.be.eq(1);
       });
     });
+
     describe("onERC721Received", function () {
       it("should work correctly", async function () {
-        await stakerV3FacetCore
+        await diamondCoreFacet
           .connect(owner)
           .onERC721Received(owner.address, signer1.address, 1, [0x01, 0x02]);
       });
@@ -1752,7 +1208,7 @@ describe("===Stakerv3ds===", function () {
 
         // Note 6.6666666666 per second is equivalent to 100 per 15 seconds(15 seconds = block time according to Blocks implementation)
         // Now the rewards must be set based on seconds
-        const testCallData1 = await mockCoreFacet.connect(owner).setEmissions(
+        await diamondCoreFacet.connect(owner).setEmissions(
           [
             {
               timeStamp: await utils.getCurrentTime(),
@@ -1766,48 +1222,34 @@ describe("===Stakerv3ds===", function () {
             },
           ]
         );
-        const testCallData1String = testCallData1.data.toString();
 
-        //setEmissions
-        await owner.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: testCallData1String,
-        });
+        await diamondCoreFacet.connect(owner).configureBoostersBatch(
+          [1, 2],
+          [
+            {
+              multiplier: 2300,
+              amountRequired: 3,
+              groupRequired: itemGroupId2,
+              contractRequired: super721.address,
+              boostType: 2,
+              typeOfAsset: 1,
+              historyOfTokenMultipliers: [],
+              historyOfPointMultipliers: [],
+            },
+            {
+              multiplier: 2000,
+              amountRequired: 2,
+              groupRequired: 0,
+              contractRequired: super1155.address,
+              boostType: 2,
+              typeOfAsset: 2,
+              historyOfTokenMultipliers: [],
+              historyOfPointMultipliers: [],
+            },
+          ]
+        );
 
-        const testCallData2 = await mockCoreFacet
-          .connect(owner)
-          .configureBoostersBatch(
-            [1, 2],
-            [
-              {
-                set: true,
-                multiplier: 2300,
-                amountRequired: 3,
-                groupRequired: itemGroupId2,
-                contractRequired: super721.address,
-                assetType: 2,
-                typeOfAsset: 1,
-              },
-              {
-                set: true,
-                multiplier: 2000,
-                amountRequired: 2,
-                groupRequired: 0,
-                contractRequired: super1155.address,
-                assetType: 2,
-                typeOfAsset: 2,
-              },
-            ]
-          );
-        const testCallData2String = testCallData2.data.toString();
-
-        //configureBoosterBatch
-        await owner.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: testCallData2String,
-        });
-
-        const testCallData3 = await mockCoreFacet.connect(owner).addPool({
+        await diamondCoreFacet.connect(owner).addPool({
           id: 0,
           tokenStrength: 10000,
           pointStrength: 10000,
@@ -1824,13 +1266,7 @@ describe("===Stakerv3ds===", function () {
           lockMultiplier: 0,
           timeLockTypeOfBoost: 0,
           compoundTypeOfBoost: 0,
-        });
-        const testCallData3String = testCallData3.data.toString();
-
-        //addPool
-        await owner.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: testCallData3String,
+          typeOfPool: 0,
         });
 
         // Mint ITEMS for Signer1
@@ -1916,7 +1352,7 @@ describe("===Stakerv3ds===", function () {
       });
 
       it("Reverts: deposit in pool with group requires, not an group item", async function () {
-        const testCallData1 = await mockCoreFacet.connect(owner).addPool({
+        await diamondCoreFacet.connect(owner).addPool({
           id: 1,
           tokenStrength: 10000,
           pointStrength: 10000,
@@ -1933,42 +1369,29 @@ describe("===Stakerv3ds===", function () {
           lockMultiplier: 0,
           timeLockTypeOfBoost: 0,
           compoundTypeOfBoost: 0,
-        });
-        const testCallData1String = testCallData1.data.toString();
-
-        //addPool
-        await owner.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: testCallData1String,
+          typeOfPool: 0,
         });
 
-        const testCallData2 = await mockStakingFacet.connect(signer1).deposit(
-          1,
-          {
-            assetAddress: super721.address,
-            id: [
-              shiftedItemGroupId2,
-              shiftedItemGroupId2.add(1),
-              shiftedItemGroupId2.add(2),
-            ],
-            amounts: [1, 2, 3],
-            IOUTokenId: [],
-          },
-          false
-        );
-        const testCallData2String = testCallData2.data.toString();
-
-        //deposit
         await expect(
-          signer1.sendTransaction({
-            to: stakerV3dsProxy.address,
-            data: testCallData2String,
-          })
+          diamondStakingFacet.connect(signer1).deposit(
+            1,
+            {
+              assetAddress: super721.address,
+              id: [
+                shiftedItemGroupId2,
+                shiftedItemGroupId2.add(1),
+                shiftedItemGroupId2.add(2),
+              ],
+              amounts: [1, 2, 3],
+              IOUTokenId: [],
+            },
+            false
+          )
         ).to.be.revertedWith("InvalidGroupIdForStake()");
       });
 
       it("Should deposit correctly with group id requires", async function () {
-        const testCallData1 = await mockCoreFacet.connect(owner).addPool({
+        await diamondCoreFacet.connect(owner).addPool({
           id: 1,
           tokenStrength: 10000,
           pointStrength: 10000,
@@ -1985,16 +1408,10 @@ describe("===Stakerv3ds===", function () {
           lockMultiplier: 0,
           timeLockTypeOfBoost: 0,
           compoundTypeOfBoost: 0,
-        });
-        const testCallData1String = testCallData1.data.toString();
-
-        //addPool
-        await owner.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: testCallData1String,
+          typeOfPool: 0,
         });
 
-        const testCallData2 = await mockStakingFacet.connect(signer1).deposit(
+        await diamondStakingFacet.connect(signer1).deposit(
           1,
           {
             assetAddress: super721.address,
@@ -2008,17 +1425,10 @@ describe("===Stakerv3ds===", function () {
           },
           false
         );
-        const testCallData2String = testCallData2.data.toString();
-
-        //deposit
-        await signer1.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: testCallData2String,
-        });
       });
 
       it("Reverts: when asset is ERC20 and amounts array length not equal 1", async function () {
-        const testCallData1 = await mockCoreFacet.connect(owner).addPool({
+        await diamondCoreFacet.connect(owner).addPool({
           id: 1,
           tokenStrength: 10000,
           pointStrength: 10000,
@@ -2035,38 +1445,25 @@ describe("===Stakerv3ds===", function () {
           lockMultiplier: 0,
           timeLockTypeOfBoost: 0,
           compoundTypeOfBoost: 0,
-        });
-        const testCallData1String = testCallData1.data.toString();
-
-        //addPool
-        await owner.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: testCallData1String,
+          typeOfPool: 0,
         });
 
-        const testCallData2 = await mockStakingFacet.connect(signer1).deposit(
-          1,
-          {
-            assetAddress: depositToken.address,
-            id: [1, 2],
-            amounts: [ethers.utils.parseEther("100"), 20],
-            IOUTokenId: [],
-          },
-          false
-        );
-        const testCallData2String = testCallData2.data.toString();
-
-        //setEmissions
         await expect(
-          signer1.sendTransaction({
-            to: stakerV3dsProxy.address,
-            data: testCallData2String,
-          })
+          diamondStakingFacet.connect(signer1).deposit(
+            1,
+            {
+              assetAddress: depositToken.address,
+              id: [1, 2],
+              amounts: [ethers.utils.parseEther("100"), 20],
+              IOUTokenId: [],
+            },
+            false
+          )
         ).to.be.revertedWith("InvalidERC20DepositInputs()");
       });
 
       it("ERC20 staking asset tests", async function () {
-        const testCallData1 = await mockCoreFacet.connect(owner).addPool({
+        await diamondCoreFacet.connect(owner).addPool({
           id: 1,
           tokenStrength: 10000,
           pointStrength: 10000,
@@ -2083,16 +1480,10 @@ describe("===Stakerv3ds===", function () {
           lockMultiplier: 0,
           timeLockTypeOfBoost: 0,
           compoundTypeOfBoost: 0,
-        });
-        const testCallData1String = testCallData1.data.toString();
-
-        //addPool
-        await owner.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: testCallData1String,
+          typeOfPool: 0,
         });
 
-        const testCallData2 = await mockStakingFacet.connect(signer1).deposit(
+        await diamondStakingFacet.connect(signer1).deposit(
           1,
           {
             assetAddress: depositToken.address,
@@ -2102,67 +1493,37 @@ describe("===Stakerv3ds===", function () {
           },
           false
         );
-        const testCallData2String = testCallData2.data.toString();
 
-        //setEmissions
-        await signer1.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: testCallData2String,
-        });
         startOfStaking = await utils.getCurrentTime();
 
         await network.provider.send("evm_setNextBlockTimestamp", [
-          startOfStaking + 29,
+          startOfStaking + 30,
         ]);
         await ethers.provider.send("evm_mine", []);
 
-        const testCallData10 = await mockStakingFacet
-          .connect(signer1)
-          .withdraw(1, [0]);
+        await diamondStakingFacet.connect(signer1).withdraw(1, [0]);
 
-        const testCallData10String = testCallData10.data.toString();
+        //User2-Claims
+        await diamondStakingFacet.connect(signer1).claim(1, []);
 
-        //withdraw
-        await signer1.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: testCallData10String,
-        });
-
-        //   //User2-Claims
-        const testCallData11 = await mockStakingFacet
-          .connect(signer1)
-          .claim(1, []);
-
-        const testCallData11String = testCallData11.data.toString();
-
-        await signer1.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: testCallData11String,
-        });
         expect(await rewardToken.balanceOf(signer1.address)).to.be.closeTo(
           ethers.utils.parseEther("103.3333"),
           ethers.utils.parseEther("0.01")
         );
       });
-      it("Reverts: Inactive pool", async function () {
-        const testCallData1 = await mockStakingFacet.connect(signer1).deposit(
-          5,
-          {
-            assetAddress: super721.address,
-            id: [1, 2, 3],
-            amounts: [1, 1, 1],
-            IOUTokenId: [],
-          },
-          false
-        );
-        const testCallData1String = testCallData1.data.toString();
 
-        //setEmissions
+      it("Reverts: Inactive pool", async function () {
         await expect(
-          signer1.sendTransaction({
-            to: stakerV3dsProxy.address,
-            data: testCallData1String,
-          })
+          diamondStakingFacet.connect(signer1).deposit(
+            5,
+            {
+              assetAddress: super721.address,
+              id: [1, 2, 3],
+              amounts: [1, 1, 1],
+              IOUTokenId: [],
+            },
+            false
+          )
         ).to.be.revertedWith("InactivePool()");
       });
 
@@ -2172,58 +1533,45 @@ describe("===Stakerv3ds===", function () {
         let itemGroupId2 = ethers.BigNumber.from(2);
         let shiftedItemGroupId2 = itemGroupId2.shl(128);
 
-        const testCallData1 = await mockStakingFacet.connect(signer1).deposit(
-          0,
-          {
-            assetAddress: some721.address,
-            id: [
-              shiftedItemGroupId2,
-              shiftedItemGroupId2.add(1),
-              shiftedItemGroupId2.add(2),
-            ],
-            amounts: [1, 2, 3],
-            IOUTokenId: [],
-          },
-          false
-        );
-        const testCallData1String = testCallData1.data.toString();
-
-        //deposit
         await expect(
-          signer1.sendTransaction({
-            to: stakerV3dsProxy.address,
-            data: testCallData1String,
-          })
+          diamondStakingFacet.connect(signer1).deposit(
+            0,
+            {
+              assetAddress: some721.address,
+              id: [
+                shiftedItemGroupId2,
+                shiftedItemGroupId2.add(1),
+                shiftedItemGroupId2.add(2),
+              ],
+              amounts: [1, 2, 3],
+              IOUTokenId: [],
+            },
+            false
+          )
         ).to.be.revertedWith("InvalidAssetToStake()");
       });
+
       it("Reverts: you can't deposit erc721 amounts other than 1", async function () {
         let itemGroupId = ethers.BigNumber.from(1);
         let shiftedItemGroupId = itemGroupId.shl(128);
         let itemGroupId2 = ethers.BigNumber.from(2);
         let shiftedItemGroupId2 = itemGroupId2.shl(128);
 
-        const testCallData1 = await mockStakingFacet.connect(signer1).deposit(
-          0,
-          {
-            assetAddress: super721.address,
-            id: [
-              shiftedItemGroupId2,
-              shiftedItemGroupId2.add(1),
-              shiftedItemGroupId2.add(2),
-            ],
-            amounts: [1, 2, 3],
-            IOUTokenId: [],
-          },
-          false
-        );
-        const testCallData1String = testCallData1.data.toString();
-
-        //deposit
         await expect(
-          signer1.sendTransaction({
-            to: stakerV3dsProxy.address,
-            data: testCallData1String,
-          })
+          diamondStakingFacet.connect(signer1).deposit(
+            0,
+            {
+              assetAddress: super721.address,
+              id: [
+                shiftedItemGroupId2,
+                shiftedItemGroupId2.add(1),
+                shiftedItemGroupId2.add(2),
+              ],
+              amounts: [1, 2, 3],
+              IOUTokenId: [],
+            },
+            false
+          )
         ).to.be.revertedWith("InvalidERC721Amount()");
       });
 
@@ -2233,7 +1581,7 @@ describe("===Stakerv3ds===", function () {
         let itemGroupId2 = ethers.BigNumber.from(2);
         let shiftedItemGroupId2 = itemGroupId2.shl(128);
 
-        const testCallData1 = await mockStakingFacet.connect(signer1).deposit(
+        await diamondStakingFacet.connect(signer1).deposit(
           0,
           {
             assetAddress: super721.address,
@@ -2247,13 +1595,6 @@ describe("===Stakerv3ds===", function () {
           },
           false
         );
-        const testCallData1String = testCallData1.data.toString();
-
-        //deposit
-        await signer1.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: testCallData1String,
-        });
 
         expect(await super721.balanceOf(signer1.address)).to.be.eq(7);
         expect(await super721.ownerOf(shiftedItemGroupId2)).to.be.eq(
@@ -2274,9 +1615,8 @@ describe("===Stakerv3ds===", function () {
         let itemGroupId2 = ethers.BigNumber.from(2);
         let shiftedItemGroupId2 = itemGroupId2.shl(128);
 
-        const testCallData1 = await mockBoostersFacet
-          .connect(signer1)
-          .stakeItemsBatch(0, 10, {
+        await expect(
+          diamondBoostersFacet.connect(signer1).stakeItemsBatch(0, 10, {
             assetAddress: super721.address,
             id: [
               shiftedItemGroupId2,
@@ -2285,14 +1625,6 @@ describe("===Stakerv3ds===", function () {
             ],
             amounts: [1, 1, 1],
             IOUTokenId: [],
-          });
-        const testCallData1String = testCallData1.data.toString();
-
-        //deposit
-        await expect(
-          signer1.sendTransaction({
-            to: stakerV3dsProxy.address,
-            data: testCallData1String,
           })
         ).to.be.revertedWith("InvalidInfoStakeForBoost()");
       });
@@ -2303,9 +1635,8 @@ describe("===Stakerv3ds===", function () {
         let itemGroupId2 = ethers.BigNumber.from(2);
         let shiftedItemGroupId2 = itemGroupId2.shl(128);
 
-        const testCallData1 = await mockBoostersFacet
-          .connect(signer1)
-          .stakeItemsBatch(0, 1, {
+        await expect(
+          diamondBoostersFacet.connect(signer1).stakeItemsBatch(0, 1, {
             assetAddress: some721.address,
             id: [
               shiftedItemGroupId2,
@@ -2314,39 +1645,24 @@ describe("===Stakerv3ds===", function () {
             ],
             amounts: [1, 1],
             IOUTokenId: [],
-          });
-        const testCallData1String = testCallData1.data.toString();
-
-        //stakeItemsBatch
-        await expect(
-          signer1.sendTransaction({
-            to: stakerV3dsProxy.address,
-            data: testCallData1String,
           })
         ).to.be.revertedWith("AssetArrayLengthsMismatch()");
 
-        const testCallData2 = await mockStakingFacet.connect(signer1).deposit(
-          0,
-          {
-            assetAddress: super721.address,
-            id: [
-              shiftedItemGroupId2,
-              shiftedItemGroupId2.add(1),
-              shiftedItemGroupId2.add(2),
-            ],
-            amounts: [1, 1],
-            IOUTokenId: [],
-          },
-          false
-        );
-        const testCallData2String = testCallData2.data.toString();
-
-        //deposit
         await expect(
-          signer1.sendTransaction({
-            to: stakerV3dsProxy.address,
-            data: testCallData2String,
-          })
+          diamondStakingFacet.connect(signer1).deposit(
+            0,
+            {
+              assetAddress: super721.address,
+              id: [
+                shiftedItemGroupId2,
+                shiftedItemGroupId2.add(1),
+                shiftedItemGroupId2.add(2),
+              ],
+              amounts: [1, 1],
+              IOUTokenId: [],
+            },
+            false
+          )
         ).to.be.revertedWith("AssetArrayLengthsMismatch()");
       });
 
@@ -2359,9 +1675,8 @@ describe("===Stakerv3ds===", function () {
         let shiftedItemGroupId3 = itemGroupId3.shl(128);
 
         // incorrect asset
-        const testCallData1 = await mockBoostersFacet
-          .connect(signer1)
-          .stakeItemsBatch(0, 1, {
+        await expect(
+          diamondBoostersFacet.connect(signer1).stakeItemsBatch(0, 1, {
             assetAddress: some721.address,
             id: [
               shiftedItemGroupId2,
@@ -2370,40 +1685,22 @@ describe("===Stakerv3ds===", function () {
             ],
             amounts: [1, 1, 1],
             IOUTokenId: [],
-          });
-        const testCallData1String = testCallData1.data.toString();
-
-        //deposit
-        await expect(
-          signer1.sendTransaction({
-            to: stakerV3dsProxy.address,
-            data: testCallData1String,
           })
         ).to.be.revertedWith("InvalidInfoStakeForBoost()");
 
         // incorrect amounts
-        const testCallData2 = await mockBoostersFacet
-          .connect(signer1)
-          .stakeItemsBatch(0, 1, {
+        await expect(
+          diamondBoostersFacet.connect(signer1).stakeItemsBatch(0, 1, {
             assetAddress: super721.address,
             id: [shiftedItemGroupId2, shiftedItemGroupId2.add(1)],
             amounts: [1, 1],
             IOUTokenId: [],
-          });
-        const testCallData2String = testCallData2.data.toString();
-
-        //deposit
-        await expect(
-          signer1.sendTransaction({
-            to: stakerV3dsProxy.address,
-            data: testCallData2String,
           })
         ).to.be.revertedWith("InvalidInfoStakeForBoost()");
 
         // incorrect group id
-        const testCallData3 = await mockBoostersFacet
-          .connect(signer1)
-          .stakeItemsBatch(0, 1, {
+        await expect(
+          diamondBoostersFacet.connect(signer1).stakeItemsBatch(0, 1, {
             assetAddress: super721.address,
             id: [
               shiftedItemGroupId3,
@@ -2412,46 +1709,29 @@ describe("===Stakerv3ds===", function () {
             ],
             amounts: [1, 1, 1],
             IOUTokenId: [],
-          });
-        const testCallData3String = testCallData3.data.toString();
-
-        //deposit
-        await expect(
-          signer1.sendTransaction({
-            to: stakerV3dsProxy.address,
-            data: testCallData3String,
           })
         ).to.be.revertedWith("InvalidInfoStakeForBoost()");
 
         // setting booster multiplier to 0
-        const testCallData4 = await mockCoreFacet
-          .connect(owner)
-          .configureBoostersBatch(
-            [1],
-            [
-              {
-                set: true,
-                multiplier: 0,
-                amountRequired: 3,
-                groupRequired: itemGroupId2,
-                contractRequired: super721.address,
-                assetType: 2,
-                typeOfAsset: 1,
-              },
-            ]
-          );
-        const testCallData4String = testCallData4.data.toString();
-
-        //deposit
-        await owner.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: testCallData4String,
-        });
+        await diamondCoreFacet.connect(owner).configureBoostersBatch(
+          [1],
+          [
+            {
+              multiplier: 0,
+              amountRequired: 3,
+              groupRequired: itemGroupId2,
+              contractRequired: super721.address,
+              boostType: 2,
+              typeOfAsset: 1,
+              historyOfTokenMultipliers: [],
+              historyOfPointMultipliers: [],
+            },
+          ]
+        );
 
         // cant stake for booster with multiplier 0
-        const testCallData5 = await mockBoostersFacet
-          .connect(signer1)
-          .stakeItemsBatch(0, 1, {
+        await expect(
+          diamondBoostersFacet.connect(signer1).stakeItemsBatch(0, 1, {
             assetAddress: super721.address,
             id: [
               shiftedItemGroupId2,
@@ -2460,14 +1740,6 @@ describe("===Stakerv3ds===", function () {
             ],
             amounts: [1, 1, 1],
             IOUTokenId: [],
-          });
-        const testCallData5String = testCallData5.data.toString();
-
-        //deposit
-        await expect(
-          signer1.sendTransaction({
-            to: stakerV3dsProxy.address,
-            data: testCallData5String,
           })
         ).to.be.revertedWith("InvalidInfoStakeForBoost()");
       });
@@ -2478,24 +1750,15 @@ describe("===Stakerv3ds===", function () {
         let itemGroupId2 = ethers.BigNumber.from(2);
         let shiftedItemGroupId2 = itemGroupId2.shl(128);
 
-        const testCallData1 = await mockBoostersFacet
-          .connect(signer1)
-          .stakeItemsBatch(0, 1, {
-            assetAddress: super721.address,
-            id: [
-              shiftedItemGroupId2,
-              shiftedItemGroupId2.add(1),
-              shiftedItemGroupId2.add(2),
-            ],
-            amounts: [1, 1, 1],
-            IOUTokenId: [],
-          });
-        const testCallData1String = testCallData1.data.toString();
-
-        //deposit
-        await signer1.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: testCallData1String,
+        await diamondBoostersFacet.connect(signer1).stakeItemsBatch(0, 1, {
+          assetAddress: super721.address,
+          id: [
+            shiftedItemGroupId2,
+            shiftedItemGroupId2.add(1),
+            shiftedItemGroupId2.add(2),
+          ],
+          amounts: [1, 1, 1],
+          IOUTokenId: [],
         });
 
         expect(await super721.balanceOf(signer1.address)).to.be.eq(7);
@@ -2508,31 +1771,22 @@ describe("===Stakerv3ds===", function () {
 
         expect(await IOUToken.balanceOf(signer1.address)).to.be.eq(0);
 
-        const getItemsUserInfoData = await mockViewFacet
+        let getItemsUserInfo = await diamondViewFacet
           .connect(owner)
           .getItemsUserInfo(signer1.address, 1);
-        const getItemsUserInfoDataString = getItemsUserInfoData.toString();
 
-        const getItemsUserInfo = await ethers.provider.call({
-          to: stakerV3dsProxy.address,
-          data: getItemsUserInfoDataString,
-        });
-
-        let decodedData = utils.decodeResults(
-          [viewFacetABI],
-          ["getItemsUserInfo"],
-          [getItemsUserInfo]
+        expect(await getItemsUserInfo.tokenIds[0]).to.be.eq(
+          shiftedItemGroupId2
         );
-
-        expect(await decodedData[0].tokenIds[0]).to.be.eq(shiftedItemGroupId2);
-        expect(await decodedData[0].tokenIds[1]).to.be.eq(
+        expect(await getItemsUserInfo.tokenIds[1]).to.be.eq(
           shiftedItemGroupId2.add(1)
         );
-        expect(await decodedData[0].tokenIds[2]).to.be.eq(
+        expect(await getItemsUserInfo.tokenIds[2]).to.be.eq(
           shiftedItemGroupId2.add(2)
         );
       });
     });
+
     describe("withdraw, claim", function () {
       beforeEach(async function () {
         viewFacetABI = await hre.artifacts.readArtifact("StakerV3FacetViews");
@@ -2560,7 +1814,7 @@ describe("===Stakerv3ds===", function () {
 
         // Note 6.6666666666 per second is equivalent to 100 per 15 seconds(15 seconds = block time according to Blocks implementation)
         // Now the rewards must be set based on seconds
-        const testCallData1 = await mockCoreFacet.connect(owner).setEmissions(
+        await diamondCoreFacet.connect(owner).setEmissions(
           [
             {
               timeStamp: await utils.getCurrentTime(),
@@ -2574,48 +1828,34 @@ describe("===Stakerv3ds===", function () {
             },
           ]
         );
-        const testCallData1String = testCallData1.data.toString();
 
-        //setEmissions
-        await owner.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: testCallData1String,
-        });
+        await diamondCoreFacet.connect(owner).configureBoostersBatch(
+          [1, 2],
+          [
+            {
+              multiplier: 2300,
+              amountRequired: 3,
+              groupRequired: itemGroupId2,
+              contractRequired: super721.address,
+              boostType: 2,
+              typeOfAsset: 1,
+              historyOfTokenMultipliers: [],
+              historyOfPointMultipliers: [],
+            },
+            {
+              multiplier: 2000,
+              amountRequired: 2,
+              groupRequired: 0,
+              contractRequired: super1155.address,
+              boostType: 2,
+              typeOfAsset: 2,
+              historyOfTokenMultipliers: [],
+              historyOfPointMultipliers: [],
+            },
+          ]
+        );
 
-        const testCallData2 = await mockCoreFacet
-          .connect(owner)
-          .configureBoostersBatch(
-            [1, 2],
-            [
-              {
-                set: true,
-                multiplier: 2300,
-                amountRequired: 3,
-                groupRequired: itemGroupId2,
-                contractRequired: super721.address,
-                assetType: 2,
-                typeOfAsset: 1,
-              },
-              {
-                set: true,
-                multiplier: 2000,
-                amountRequired: 2,
-                groupRequired: 0,
-                contractRequired: super1155.address,
-                assetType: 2,
-                typeOfAsset: 2,
-              },
-            ]
-          );
-        const testCallData2String = testCallData2.data.toString();
-
-        //configureBoosterBatch
-        await owner.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: testCallData2String,
-        });
-
-        const testCallData3 = await mockCoreFacet.connect(owner).addPool({
+        await diamondCoreFacet.connect(owner).addPool({
           id: 0,
           tokenStrength: 10000,
           pointStrength: 10000,
@@ -2632,16 +1872,10 @@ describe("===Stakerv3ds===", function () {
           lockMultiplier: 0,
           timeLockTypeOfBoost: 0,
           compoundTypeOfBoost: 0,
-        });
-        const testCallData3String = testCallData3.data.toString();
-
-        //addPool
-        await owner.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: testCallData3String,
+          typeOfPool: 0,
         });
 
-        const testCallData23 = await mockCoreFacet.connect(owner).addPool({
+        await diamondCoreFacet.connect(owner).addPool({
           id: 1,
           tokenStrength: 10000,
           pointStrength: 10000,
@@ -2658,13 +1892,7 @@ describe("===Stakerv3ds===", function () {
           lockMultiplier: 0,
           timeLockTypeOfBoost: 0,
           compoundTypeOfBoost: 0,
-        });
-        const testCallData23String = testCallData23.data.toString();
-
-        //addPool
-        await owner.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: testCallData23String,
+          typeOfPool: 0,
         });
 
         // Mint ITEMS for Signer1
@@ -2750,22 +1978,13 @@ describe("===Stakerv3ds===", function () {
       });
 
       it("Reverts: booster not available for this user", async function () {
-        const testCallData1 = await mockBoostersFacet
-          .connect(owner)
-          .unstakeItemsBatch(0, 1);
-        const testCallData1String = testCallData1.data.toString();
-
-        //withdraw
         await expect(
-          owner.sendTransaction({
-            to: stakerV3dsProxy.address,
-            data: testCallData1String,
-          })
+          diamondBoostersFacet.connect(owner).unstakeItemsBatch(0, 1)
         ).to.be.revertedWith("NotStaked()");
       });
 
       // it("Reverts: withdraw amount exceeds user's amount on staking", async function () {
-      //   const testCallData1 = await mockStakingFacet
+      //   await expect(diamondStakingFacet
       //     .connect(owner)
       //     .withdraw(0, {
       //       assetAddress: super721.address,
@@ -2776,20 +1995,11 @@ describe("===Stakerv3ds===", function () {
       //       ],
       //       amounts: [1, 1, 1],
       //       IOUTokenId: [],
-      //     });
-      //   const testCallData1String = testCallData1.data.toString();
-
-      //   //withdraw
-      //   await expect(
-      //     owner.sendTransaction({
-      //       to: stakerV3dsProxy.address,
-      //       data: testCallData1String,
-      //     })
-      //   ).to.be.revertedWith("InvalidAmount()");
+      //     })).to.be.revertedWith("InvalidAmount()");
       // });
 
       // it("Reverts: withdraw amount exceeds user's amount on staking", async function () {
-      //   const testCallData1 = await mockStakingFacet.connect(owner).withdraw(
+      //   await expect(diamondStakingFacet.connect(owner).withdraw(
       //     0,
       //     {
       //       assetAddress: super721.address,
@@ -2801,20 +2011,11 @@ describe("===Stakerv3ds===", function () {
       //       amounts: [1, 1, 1],
       //       IOUTokenId: [],
       //     }
-      //   );
-      //   const testCallData1String = testCallData1.data.toString();
-
-      //   //withdraw
-      //   await expect(
-      //     owner.sendTransaction({
-      //       to: stakerV3dsProxy.address,
-      //       data: testCallData1String,
-      //     })
-      //   ).to.be.revertedWith("InvalidAmount()");
+      //   )).to.be.revertedWith("InvalidAmount()");
       // });
 
       // it("Reverts: balance of IOU token is zero", async function () {
-      //   const testCallData1 = await mockStakingFacet.connect(owner).withdraw(
+      //   await expect(diamondStakingFacet.connect(owner).withdraw(
       //     0,
       //     {
       //       assetAddress: super721.address,
@@ -2826,20 +2027,11 @@ describe("===Stakerv3ds===", function () {
       //       amounts: [0, 0, 0],
       //       IOUTokenId: [],
       //     }
-      //   );
-      //   const testCallData1String = testCallData1.data.toString();
-
-      //   //withdraw
-      //   await expect(
-      //     owner.sendTransaction({
-      //       to: stakerV3dsProxy.address,
-      //       data: testCallData1String,
-      //     })
-      //   ).to.be.revertedWith("0x2E");
+      //   )).to.be.revertedWith("0x2E");
       // });
 
       it("Reverts: trying to withdraw with incorrect IOUToken id", async function () {
-        const testCallData1 = await mockStakingFacet.connect(signer1).deposit(
+        await diamondStakingFacet.connect(signer1).deposit(
           0,
           {
             assetAddress: super721.address,
@@ -2854,36 +2046,19 @@ describe("===Stakerv3ds===", function () {
           false
         );
 
-        const testCallData1String = testCallData1.data.toString();
-
-        //deposit
-        await signer1.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: testCallData1String,
-        });
-
-        const testCallData2 = await mockStakingFacet
-          .connect(owner)
-          .withdraw(0, [0]);
-        const testCallData2String = testCallData2.data.toString();
+        await expect(
+          diamondStakingFacet.connect(owner).withdraw(0, [0])
+        ).to.be.revertedWith("NotAnOwnerOfIOUToken()");
 
         await IOUToken.connect(signer1).transferFrom(
           signer1.address,
           signer2.address,
           0
         );
-
-        //withdraw
-        await expect(
-          signer1.sendTransaction({
-            to: stakerV3dsProxy.address,
-            data: testCallData2String,
-          })
-        ).to.be.revertedWith("NotAnOwnerOfIOUToken()");
       });
 
       it("Reverts: trying to withdraw with IOUToken related to other pool", async function () {
-        const addPoolCallData = await mockCoreFacet.connect(owner).addPool({
+        await diamondCoreFacet.connect(owner).addPool({
           id: 1,
           tokenStrength: 10000,
           pointStrength: 10000,
@@ -2900,16 +2075,10 @@ describe("===Stakerv3ds===", function () {
           lockMultiplier: 0,
           timeLockTypeOfBoost: 0,
           compoundTypeOfBoost: 0,
-        });
-        const addPoolCallDataString = addPoolCallData.data.toString();
-
-        //addPool
-        await owner.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: addPoolCallDataString,
+          typeOfPool: 0,
         });
 
-        const testCallData1 = await mockStakingFacet.connect(signer1).deposit(
+        await diamondStakingFacet.connect(signer1).deposit(
           0,
           {
             assetAddress: super721.address,
@@ -2924,15 +2093,7 @@ describe("===Stakerv3ds===", function () {
           false
         );
 
-        const testCallData1String = testCallData1.data.toString();
-
-        //deposit
-        await signer1.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: testCallData1String,
-        });
-
-        const testCallData2 = await mockStakingFacet.connect(signer2).deposit(
+        await diamondStakingFacet.connect(signer2).deposit(
           1,
           {
             assetAddress: super1155.address,
@@ -2943,36 +2104,19 @@ describe("===Stakerv3ds===", function () {
           false
         );
 
-        const testCallData2String = testCallData2.data.toString();
-
-        //deposit
-        await signer2.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: testCallData2String,
-        });
-
-        IOUToken.connect(signer1).transferFrom(
+        await IOUToken.connect(signer1).transferFrom(
           signer1.address,
           signer2.address,
           0
         );
 
-        const testCallData3 = await mockStakingFacet
-          .connect(signer2)
-          .withdraw(1, [0]);
-        const testCallData3String = testCallData3.data.toString();
-
-        //withdraw
         await expect(
-          signer2.sendTransaction({
-            to: stakerV3dsProxy.address,
-            data: testCallData3String,
-          })
+          diamondStakingFacet.connect(signer2).withdraw(1, [0])
         ).to.be.revertedWith("IOUTokenFromDifferentPool()");
       });
 
       it("should withdraw correctly", async function () {
-        const testCallData1 = await mockStakingFacet.connect(signer1).deposit(
+        await diamondStakingFacet.connect(signer1).deposit(
           0,
           {
             assetAddress: super721.address,
@@ -2987,15 +2131,7 @@ describe("===Stakerv3ds===", function () {
           false
         );
 
-        const testCallData1String = testCallData1.data.toString();
-
-        //deposit
-        await signer1.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: testCallData1String,
-        });
-
-        const testCallData23 = await mockStakingFacet.connect(signer2).deposit(
+        await diamondStakingFacet.connect(signer2).deposit(
           1,
           {
             assetAddress: super1155.address,
@@ -3006,33 +2142,15 @@ describe("===Stakerv3ds===", function () {
           false
         );
 
-        const testCallData23String = testCallData23.data.toString();
-
-        //deposit
-        await signer2.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: testCallData23String,
-        });
-
-        const testCallData2 = await mockBoostersFacet
-          .connect(signer1)
-          .stakeItemsBatch(0, 1, {
-            assetAddress: super721.address,
-            id: [
-              shiftedItemGroupId2.add(3),
-              shiftedItemGroupId2.add(4),
-              shiftedItemGroupId2.add(5),
-            ],
-            amounts: [1, 1, 1],
-            IOUTokenId: [],
-          });
-
-        const testCallData2String = testCallData2.data.toString();
-
-        //deposit
-        await signer1.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: testCallData2String,
+        await diamondBoostersFacet.connect(signer1).stakeItemsBatch(0, 1, {
+          assetAddress: super721.address,
+          id: [
+            shiftedItemGroupId2.add(3),
+            shiftedItemGroupId2.add(4),
+            shiftedItemGroupId2.add(5),
+          ],
+          amounts: [1, 1, 1],
+          IOUTokenId: [],
         });
 
         expect(await IOUToken.balanceOf(signer1.address)).to.be.eq(3);
@@ -3040,65 +2158,28 @@ describe("===Stakerv3ds===", function () {
         expect(await IOUToken.ownerOf(1)).to.be.eq(signer1.address);
         expect(await IOUToken.ownerOf(2)).to.be.eq(signer1.address);
 
-        const testCallData3 = await mockStakingFacet
-          .connect(owner)
-          .withdraw(0, [0, 1, 2]);
-        const testCallData3String = testCallData3.data.toString();
-
-        //withdraw
-        await signer1.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: testCallData3String,
-        });
+        await diamondStakingFacet.connect(signer1).withdraw(0, [0, 1, 2]);
 
         expect(await IOUToken.balanceOf(signer1.address)).to.be.eq(0);
 
-        const testCallData4 = await mockBoostersFacet
-          .connect(signer1)
-          .unstakeItemsBatch(0, 1);
-        const testCallData4String = testCallData4.data.toString();
+        await diamondBoostersFacet.connect(signer1).unstakeItemsBatch(0, 1);
 
-        //withdraw
-        await signer1.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: testCallData4String,
-        });
-
-        const testCallData25 = await mockStakingFacet
-          .connect(signer2)
-          .withdraw(1, [3, 4]);
-        const testCallData25String = testCallData25.data.toString();
-
-        //withdraw
-        await signer2.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: testCallData25String,
-        });
+        await diamondStakingFacet.connect(signer2).withdraw(1, [3, 4]);
       });
 
       it("should claim correctly", async function () {
-        const testCallData2 = await mockBoostersFacet
-          .connect(signer1)
-          .stakeItemsBatch(0, 1, {
-            assetAddress: super721.address,
-            id: [
-              shiftedItemGroupId2.add(3),
-              shiftedItemGroupId2.add(4),
-              shiftedItemGroupId2.add(5),
-            ],
-            amounts: [1, 1, 1],
-            IOUTokenId: [],
-          });
-
-        const testCallData2String = testCallData2.data.toString();
-
-        //deposit
-        await signer1.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: testCallData2String,
+        await diamondBoostersFacet.connect(signer1).stakeItemsBatch(0, 1, {
+          assetAddress: super721.address,
+          id: [
+            shiftedItemGroupId2.add(3),
+            shiftedItemGroupId2.add(4),
+            shiftedItemGroupId2.add(5),
+          ],
+          amounts: [1, 1, 1],
+          IOUTokenId: [],
         });
 
-        const testCallData1 = await mockStakingFacet.connect(signer1).deposit(
+        await diamondStakingFacet.connect(signer1).deposit(
           0,
           {
             assetAddress: super721.address,
@@ -3113,13 +2194,6 @@ describe("===Stakerv3ds===", function () {
           false
         );
 
-        const testCallData1String = testCallData1.data.toString();
-
-        //deposit
-        await signer1.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: testCallData1String,
-        });
         const startOfStaking = await (
           await ethers.provider.getBlock()
         ).timestamp;
@@ -3134,16 +2208,7 @@ describe("===Stakerv3ds===", function () {
         ]);
         await ethers.provider.send("evm_mine", []);
 
-        const testCallData3 = await mockStakingFacet
-          .connect(owner)
-          .claim(0, []);
-        const testCallData3String = testCallData3.data.toString();
-
-        //claim
-        await signer1.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: testCallData3String,
-        });
+        await diamondStakingFacet.connect(signer1).claim(0, []);
 
         // expect(
         //   await rewardToken.connect(signer1).balanceOf(signer1.address)
@@ -3153,43 +2218,16 @@ describe("===Stakerv3ds===", function () {
         //   ethers.utils.parseEther("0.01")
         // );
 
-        const testCallData4 = await mockBoostersFacet
-          .connect(owner)
-          .unstakeItemsBatch(0, 1);
-        const testCallData4String = testCallData4.data.toString();
+        await diamondBoostersFacet.connect(signer1).unstakeItemsBatch(0, 1);
 
-        //withdraw
-        await signer1.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: testCallData4String,
-        });
-
-        const testCallData5 = await mockStakingFacet
-          .connect(owner)
-          .withdraw(0, [0, 1, 2]);
-        const testCallData5String = testCallData5.data.toString();
-
-        //withdraw
-        await signer1.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: testCallData5String,
-        });
+        await diamondStakingFacet.connect(signer1).withdraw(0, [0, 1, 2]);
 
         //expect(await IOUToken.balanceOf(signer1.address)).to.be.eq(0);
 
         await network.provider.send("evm_increaseTime", [30]);
         await ethers.provider.send("evm_mine", []);
 
-        const testCallData6 = await mockStakingFacet
-          .connect(owner)
-          .claim(0, []);
-        const testCallData6String = testCallData6.data.toString();
-
-        //claim
-        await signer1.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: testCallData6String,
-        });
+        await diamondStakingFacet.connect(signer1).claim(0, []);
       });
 
       // it("Reverts: checkpoints start time and end time must be same lengths", async function () {
@@ -3268,7 +2306,7 @@ describe("===Stakerv3ds===", function () {
       //     balanceBytes2,
       //   ]);
 
-      //   const testCallData1 = await mockStakingFacet.connect(signer1).claim(
+      //   await expect(diamondStakingFacet.connect(signer1).claim(
       //     0,
       //     callDataBytes
       //     // signedDataHash,
@@ -3282,17 +2320,7 @@ describe("===Stakerv3ds===", function () {
       //     //   endTime: [blockTime + 1, blockTime + 1000],
       //     //   balance: [3000, 2000, 1],
       //     // }
-      //   );
-
-      //   const testCallData1String = testCallData1.data.toString();
-
-      //   //claim
-      //   await expect(
-      //     signer1.sendTransaction({
-      //       to: stakerV3dsProxy.address,
-      //       data: testCallData1String,
-      //     })
-      //   ).to.be.revertedWith(
+      //   )).to.be.revertedWith(
       //     "StakerV3FacetStaking::claim: mismatch of start time end time or balances arrays lengths."
       //   );
       // });
@@ -3373,30 +2401,22 @@ describe("===Stakerv3ds===", function () {
           balanceBytes2,
         ]);
 
-        const testCallData1 = await mockStakingFacet.connect(signer1).claim(
-          0,
-          callDataBytes
-          // signedDataHash,
-          // {
-          //   v: 0,
-          //   r: signature1.r,
-          //   s: signature1.s,
-          // },
-          // {
-          //   startTime: [blockTime - 1000, blockTime],
-          //   endTime: [blockTime + 1, blockTime + 1000],
-          //   balance: [3000, 2000],
-          // }
-        );
-
-        const testCallData1String = testCallData1.data.toString();
-
-        //claim
         await expect(
-          signer1.sendTransaction({
-            to: stakerV3dsProxy.address,
-            data: testCallData1String,
-          })
+          diamondStakingFacet.connect(signer1).claim(
+            0,
+            callDataBytes
+            // signedDataHash,
+            // {
+            //   v: 0,
+            //   r: signature1.r,
+            //   s: signature1.s,
+            // },
+            // {
+            //   startTime: [blockTime - 1000, blockTime],
+            //   endTime: [blockTime + 1, blockTime + 1000],
+            //   balance: [3000, 2000],
+            // }
+          )
         ).to.be.revertedWith("NotAnAdmin()");
       });
 
@@ -3476,30 +2496,22 @@ describe("===Stakerv3ds===", function () {
           balanceBytes2,
         ]);
 
-        const testCallData1 = await mockStakingFacet.connect(admin).claim(
-          0,
-          callDataBytes
-          // signedDataHash,
-          // {
-          //   v: signature1.v,
-          //   r: signature1.r,
-          //   s: signature1.s,
-          // },
-          // {
-          //   startTime: [blockTime - 100, blockTime],
-          //   endTime: [blockTime + 1, blockTime + 1000],
-          //   balance: [3000, 2000],
-          // }
-        );
-
-        const testCallData1String = testCallData1.data.toString();
-
-        //claim
         await expect(
-          admin.sendTransaction({
-            to: stakerV3dsProxy.address,
-            data: testCallData1String,
-          })
+          diamondStakingFacet.connect(admin).claim(
+            0,
+            callDataBytes
+            // signedDataHash,
+            // {
+            //   v: signature1.v,
+            //   r: signature1.r,
+            //   s: signature1.s,
+            // },
+            // {
+            //   startTime: [blockTime - 100, blockTime],
+            //   endTime: [blockTime + 1, blockTime + 1000],
+            //   balance: [3000, 2000],
+            // }
+          )
         ).to.be.revertedWith("MismatchArgumentsAndHash()");
       });
 
@@ -3507,7 +2519,7 @@ describe("===Stakerv3ds===", function () {
         const blockTime = await utils.getCurrentTime();
 
         const signedDataHash = ethers.utils.solidityKeccak256(
-          ["bytes", "bytes", "bytes"],
+          ["bytes32", "bytes32", "bytes32", "bytes32", "bytes32", "bytes32"],
           [
             ethers.utils.solidityKeccak256(
               ["uint256", "uint256"],
@@ -3520,6 +2532,24 @@ describe("===Stakerv3ds===", function () {
             ethers.utils.solidityKeccak256(
               ["uint256", "uint256"],
               [3000, 2000]
+            ),
+            ethers.utils.solidityKeccak256(
+              ["uint256", "uint256"],
+              [3000, 2000]
+            ),
+            ethers.utils.solidityKeccak256(
+              ["uint256", "uint256"],
+              [
+                ethers.utils.parseUnits("1.0", 12),
+                ethers.utils.parseUnits("1.2", 12),
+              ]
+            ),
+            ethers.utils.solidityKeccak256(
+              ["uint256", "uint256"],
+              [
+                ethers.utils.parseUnits("1.0", 30),
+                ethers.utils.parseUnits("1.2", 30),
+              ]
             ),
           ]
         );
@@ -3565,12 +2595,36 @@ describe("===Stakerv3ds===", function () {
           ethers.utils.hexlify(blockTime + 1000),
           32
         );
-        let balanceBytes1 = ethers.utils.hexZeroPad(
+        let tokensBalanceBytes1 = ethers.utils.hexZeroPad(
           ethers.utils.hexlify(3000),
           32
         );
-        let balanceBytes2 = ethers.utils.hexZeroPad(
+        let tokensBalanceBytes2 = ethers.utils.hexZeroPad(
           ethers.utils.hexlify(2000),
+          32
+        );
+        let pointsBalanceBytes1 = ethers.utils.hexZeroPad(
+          ethers.utils.hexlify(3000),
+          32
+        );
+        let pointsBalanceBytes2 = ethers.utils.hexZeroPad(
+          ethers.utils.hexlify(2000),
+          32
+        );
+        let tpsBytes1 = ethers.utils.hexZeroPad(
+          ethers.utils.hexlify(ethers.utils.parseUnits("1.0", 12)),
+          32
+        );
+        let tpsBytes2 = ethers.utils.hexZeroPad(
+          ethers.utils.hexlify(ethers.utils.parseUnits("1.2", 12)),
+          32
+        );
+        let ppsBytes1 = ethers.utils.hexZeroPad(
+          ethers.utils.hexlify(ethers.utils.parseUnits("1.0", 30)),
+          32
+        );
+        let ppsBytes2 = ethers.utils.hexZeroPad(
+          ethers.utils.hexlify(ethers.utils.parseUnits("1.2", 30)),
           32
         );
 
@@ -3584,11 +2638,17 @@ describe("===Stakerv3ds===", function () {
           startTimeBytes2,
           endTimeBytes1,
           endTimeBytes2,
-          balanceBytes1,
-          balanceBytes2,
+          tokensBalanceBytes1,
+          tokensBalanceBytes2,
+          pointsBalanceBytes1,
+          pointsBalanceBytes2,
+          tpsBytes1,
+          tpsBytes2,
+          ppsBytes1,
+          ppsBytes2,
         ]);
 
-        const testCallData1 = await mockStakingFacet.connect(admin).claim(
+        await diamondStakingFacet.connect(admin).claim(
           0,
           callDataBytes
           // signedDataHash,
@@ -3603,41 +2663,23 @@ describe("===Stakerv3ds===", function () {
           //   balance: [3000, 2000],
           // }
         );
-
-        const testCallData1String = testCallData1.data.toString();
-
-        //claim
-
-        admin.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: testCallData1String,
-        });
-
-        const testCallData2 = await mockStakingFacet.connect(admin).claim(
-          0,
-          callDataBytes
-          // signedDataHash,
-          // {
-          //   v: signature1.v,
-          //   r: signature1.r,
-          //   s: signature1.s,
-          // },
-          // {
-          //   startTime: [blockTime - 1000, blockTime],
-          //   endTime: [blockTime + 1, blockTime + 1000],
-          //   balance: [3000, 2000],
-          // }
-        );
-
-        const testCallData2String = testCallData2.data.toString();
-
-        //claim
 
         await expect(
-          admin.sendTransaction({
-            to: stakerV3dsProxy.address,
-            data: testCallData2String,
-          })
+          diamondStakingFacet.connect(admin).claim(
+            0,
+            callDataBytes
+            // signedDataHash,
+            // {
+            //   v: signature1.v,
+            //   r: signature1.r,
+            //   s: signature1.s,
+            // },
+            // {
+            //   startTime: [blockTime - 1000, blockTime],
+            //   endTime: [blockTime + 1, blockTime + 1000],
+            //   balance: [3000, 2000],
+            // }
+          )
         ).to.be.revertedWith("HashUsed()");
       });
 
@@ -3645,7 +2687,7 @@ describe("===Stakerv3ds===", function () {
         const blockTime = await utils.getCurrentTime();
 
         const signedDataHash = ethers.utils.solidityKeccak256(
-          ["bytes32", "bytes32", "bytes32"],
+          ["bytes32", "bytes32", "bytes32", "bytes32", "bytes32", "bytes32"],
           [
             ethers.utils.solidityKeccak256(
               ["uint256", "uint256"],
@@ -3659,46 +2701,26 @@ describe("===Stakerv3ds===", function () {
               ["uint256", "uint256"],
               [3000, 2000]
             ),
+            ethers.utils.solidityKeccak256(
+              ["uint256", "uint256"],
+              [3000, 2000]
+            ),
+            ethers.utils.solidityKeccak256(
+              ["uint256", "uint256"],
+              [
+                ethers.utils.parseUnits("1.0", 12),
+                ethers.utils.parseUnits("1.2", 12),
+              ]
+            ),
+            ethers.utils.solidityKeccak256(
+              ["uint256", "uint256"],
+              [
+                ethers.utils.parseUnits("1.0", 30),
+                ethers.utils.parseUnits("1.2", 30),
+              ]
+            ),
           ]
         );
-
-        const testCallData23 = await mockStakingFacet.connect(signer1).deposit(
-          0,
-          {
-            assetAddress: super721.address,
-            id: [shiftedItemGroupId2, shiftedItemGroupId2.add(1)],
-            amounts: [1, 1],
-            IOUTokenId: [],
-          },
-          false
-        );
-
-        const testCallData23String = testCallData23.data.toString();
-
-        //deposit
-        await signer1.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: testCallData23String,
-        });
-
-        const testCallData24 = await mockStakingFacet.connect(signer1).deposit(
-          0,
-          {
-            assetAddress: super721.address,
-            id: [shiftedItemGroupId2.add(2)],
-            amounts: [1],
-            IOUTokenId: [],
-          },
-          false
-        );
-
-        const testCallData24String = testCallData24.data.toString();
-
-        //deposit
-        await signer1.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: testCallData24String,
-        });
 
         const bytesArray = ethers.utils.arrayify(signedDataHash);
 
@@ -3741,12 +2763,36 @@ describe("===Stakerv3ds===", function () {
           ethers.utils.hexlify(blockTime + 1000),
           32
         );
-        let balanceBytes1 = ethers.utils.hexZeroPad(
+        let tokensBalanceBytes1 = ethers.utils.hexZeroPad(
           ethers.utils.hexlify(3000),
           32
         );
-        let balanceBytes2 = ethers.utils.hexZeroPad(
+        let tokensBalanceBytes2 = ethers.utils.hexZeroPad(
           ethers.utils.hexlify(2000),
+          32
+        );
+        let pointsBalanceBytes1 = ethers.utils.hexZeroPad(
+          ethers.utils.hexlify(3000),
+          32
+        );
+        let pointsBalanceBytes2 = ethers.utils.hexZeroPad(
+          ethers.utils.hexlify(2000),
+          32
+        );
+        let tpsBytes1 = ethers.utils.hexZeroPad(
+          ethers.utils.hexlify(ethers.utils.parseUnits("1.0", 12)),
+          32
+        );
+        let tpsBytes2 = ethers.utils.hexZeroPad(
+          ethers.utils.hexlify(ethers.utils.parseUnits("1.2", 12)),
+          32
+        );
+        let ppsBytes1 = ethers.utils.hexZeroPad(
+          ethers.utils.hexlify(ethers.utils.parseUnits("1.0", 30)),
+          32
+        );
+        let ppsBytes2 = ethers.utils.hexZeroPad(
+          ethers.utils.hexlify(ethers.utils.parseUnits("1.2", 30)),
           32
         );
 
@@ -3760,11 +2806,20 @@ describe("===Stakerv3ds===", function () {
           startTimeBytes2,
           endTimeBytes1,
           endTimeBytes2,
-          balanceBytes1,
-          balanceBytes2,
+          tokensBalanceBytes1,
+          tokensBalanceBytes2,
+          pointsBalanceBytes1,
+          pointsBalanceBytes2,
+          tpsBytes1,
+          tpsBytes2,
+          ppsBytes1,
+          ppsBytes2,
         ]);
 
-        const testCallData1 = await mockStakingFacet.connect(signer1).claim(
+        await network.provider.send("evm_increaseTime", [30]);
+        await ethers.provider.send("evm_mine", []);
+
+        await diamondStakingFacet.connect(signer1).claim(
           0,
           callDataBytes
           // signedDataHash,
@@ -3779,19 +2834,6 @@ describe("===Stakerv3ds===", function () {
           //   balance: [3000, 2000],
           // }
         );
-
-        const testCallData1String = testCallData1.data.toString();
-
-        await network.provider.send("evm_increaseTime", [30]);
-        await ethers.provider.send("evm_mine", []);
-
-        //claim
-
-        await signer1.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: testCallData1String,
-        });
-
         // expect(await rewardToken.balanceOf(signer1.address)).to.be.gt(0);
       });
     });
@@ -3805,65 +2847,29 @@ describe("===Stakerv3ds===", function () {
 
     describe("approvePointSpender spendPoints, getPendingPoints, getTotalPoints", function () {
       it("approve should work correctly", async function () {
-        const testCallData1 = await mockStakingFacet
+        await diamondPointsFacet
           .connect(owner)
           .approvePointSpender(signer2.address, true);
-
-        const testCallData1String = testCallData1.data.toString();
-
-        //approvePointSpender
-        await owner.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: testCallData1String,
-        });
       });
 
       it("Reverts: spender is not approved", async function () {
-        const testCallData1 = await mockStakingFacet
-          .connect(signer1)
-          .spendPoints(signer2.address, 10);
-
-        const testCallData1String = testCallData1.data.toString();
-
-        //approvePointSpender
         await expect(
-          signer1.sendTransaction({
-            to: stakerV3dsProxy.address,
-            data: testCallData1String,
-          })
+          diamondPointsFacet.connect(signer1).spendPoints(signer2.address, 10)
         ).to.be.revertedWith("NotApprovedPointSpender()");
       });
 
       it("Reverts: amount exceeds available points", async function () {
-        const testCallData1 = await mockStakingFacet
+        await diamondPointsFacet
           .connect(owner)
           .approvePointSpender(signer2.address, true);
 
-        const testCallData1String = testCallData1.data.toString();
-
-        //approvePointSpender
-        await owner.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: testCallData1String,
-        });
-
-        const testCallData2 = await mockStakingFacet
-          .connect(signer2)
-          .spendPoints(signer1.address, 10);
-
-        const testCallData2String = testCallData2.data.toString();
-
-        //approvePointSpender
         await expect(
-          signer2.sendTransaction({
-            to: stakerV3dsProxy.address,
-            data: testCallData2String,
-          })
+          diamondPointsFacet.connect(signer2).spendPoints(signer1.address, 10)
         ).to.be.revertedWith("InvalidAmount()");
       });
 
       it("spendPoints should work correctly ", async function () {
-        const testCallData1 = await mockCoreFacet.connect(owner).setEmissions(
+        await diamondCoreFacet.connect(owner).setEmissions(
           [
             {
               timeStamp: await utils.getCurrentTime(),
@@ -3877,48 +2883,34 @@ describe("===Stakerv3ds===", function () {
             },
           ]
         );
-        const testCallData1String = testCallData1.data.toString();
 
-        //setEmissions
-        await owner.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: testCallData1String,
-        });
+        await diamondCoreFacet.connect(owner).configureBoostersBatch(
+          [1, 2],
+          [
+            {
+              multiplier: 2300,
+              amountRequired: 3,
+              groupRequired: itemGroupId2,
+              contractRequired: super721.address,
+              boostType: 2,
+              typeOfAsset: 1,
+              historyOfTokenMultipliers: [],
+              historyOfPointMultipliers: [],
+            },
+            {
+              multiplier: 2000,
+              amountRequired: 2,
+              groupRequired: 0,
+              contractRequired: super1155.address,
+              boostType: 2,
+              typeOfAsset: 2,
+              historyOfTokenMultipliers: [],
+              historyOfPointMultipliers: [],
+            },
+          ]
+        );
 
-        const testCallData2 = await mockCoreFacet
-          .connect(owner)
-          .configureBoostersBatch(
-            [1, 2],
-            [
-              {
-                set: true,
-                multiplier: 2300,
-                amountRequired: 3,
-                groupRequired: itemGroupId2,
-                contractRequired: super721.address,
-                assetType: 2,
-                typeOfAsset: 1,
-              },
-              {
-                set: true,
-                multiplier: 2000,
-                amountRequired: 2,
-                groupRequired: 0,
-                contractRequired: super1155.address,
-                assetType: 2,
-                typeOfAsset: 2,
-              },
-            ]
-          );
-        const testCallData2String = testCallData2.data.toString();
-
-        //configureBoosterBatch
-        await owner.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: testCallData2String,
-        });
-
-        const testCallData3 = await mockCoreFacet.connect(owner).addPool({
+        await diamondCoreFacet.connect(owner).addPool({
           id: 0,
           tokenStrength: 10000,
           pointStrength: 10000,
@@ -3935,13 +2927,7 @@ describe("===Stakerv3ds===", function () {
           lockMultiplier: 0,
           timeLockTypeOfBoost: 0,
           compoundTypeOfBoost: 0,
-        });
-        const testCallData3String = testCallData3.data.toString();
-
-        //addPool
-        await owner.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: testCallData3String,
+          typeOfPool: 0,
         });
 
         await super721.connect(owner).configureGroup(itemGroupId2, {
@@ -3984,19 +2970,11 @@ describe("===Stakerv3ds===", function () {
           .connect(signer2)
           .setApprovalForAll(stakerV3dsProxy.address, true);
 
-        const testCallData4 = await mockStakingFacet
+        await diamondPointsFacet
           .connect(owner)
           .approvePointSpender(signer2.address, true);
 
-        const testCallData4String = testCallData4.data.toString();
-
-        //approvePointSpender
-        await owner.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: testCallData4String,
-        });
-
-        const testCallData5 = await mockStakingFacet.connect(signer1).deposit(
+        await diamondStakingFacet.connect(signer1).deposit(
           0,
           {
             assetAddress: super721.address,
@@ -4011,18 +2989,10 @@ describe("===Stakerv3ds===", function () {
           false
         );
 
-        const testCallData5String = testCallData5.data.toString();
-
-        //deposit
-        await signer1.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: testCallData5String,
-        });
-
         await network.provider.send("evm_increaseTime", [30]);
         await ethers.provider.send("evm_mine", []);
 
-        const testCallData6 = await mockStakingFacet.connect(signer1).deposit(
+        await diamondStakingFacet.connect(signer1).deposit(
           0,
           {
             assetAddress: super721.address,
@@ -4037,31 +3007,14 @@ describe("===Stakerv3ds===", function () {
           false
         );
 
-        const testCallData6String = testCallData6.data.toString();
-
-        //deposit
-        await signer1.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: testCallData6String,
-        });
-
-        const testCallData7 = await mockStakingFacet
+        await diamondPointsFacet
           .connect(signer2)
           .spendPoints(signer1.address, 10);
-
-        const testCallData7String = testCallData7.data.toString();
-
-        //spendPoints
-
-        signer2.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: testCallData7String,
-        });
       });
     });
     describe("apply boost", function () {
       beforeEach(async function () {
-        const testCallData1 = await mockCoreFacet.connect(owner).setEmissions(
+        await diamondCoreFacet.connect(owner).setEmissions(
           [
             {
               timeStamp: await utils.getCurrentTime(),
@@ -4075,48 +3028,34 @@ describe("===Stakerv3ds===", function () {
             },
           ]
         );
-        const testCallData1String = testCallData1.data.toString();
 
-        //setEmissions
-        await owner.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: testCallData1String,
-        });
+        await diamondCoreFacet.connect(owner).configureBoostersBatch(
+          [1, 2],
+          [
+            {
+              multiplier: 2300,
+              amountRequired: 3,
+              groupRequired: itemGroupId2,
+              contractRequired: super721.address,
+              boostType: 0,
+              typeOfAsset: 1,
+              historyOfTokenMultipliers: [],
+              historyOfPointMultipliers: [],
+            },
+            {
+              multiplier: 2000,
+              amountRequired: 2,
+              groupRequired: 0,
+              contractRequired: super721.address,
+              boostType: 1,
+              typeOfAsset: 1,
+              historyOfTokenMultipliers: [],
+              historyOfPointMultipliers: [],
+            },
+          ]
+        );
 
-        const testCallData2 = await mockCoreFacet
-          .connect(owner)
-          .configureBoostersBatch(
-            [1, 2],
-            [
-              {
-                set: true,
-                multiplier: 2300,
-                amountRequired: 3,
-                groupRequired: itemGroupId2,
-                contractRequired: super721.address,
-                assetType: 0,
-                typeOfAsset: 1,
-              },
-              {
-                set: true,
-                multiplier: 2000,
-                amountRequired: 2,
-                groupRequired: 0,
-                contractRequired: super721.address,
-                assetType: 1,
-                typeOfAsset: 1,
-              },
-            ]
-          );
-        const testCallData2String = testCallData2.data.toString();
-
-        //configureBoosterBatch
-        await owner.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: testCallData2String,
-        });
-
-        const testCallData3 = await mockCoreFacet.connect(owner).addPool({
+        await diamondCoreFacet.connect(owner).addPool({
           id: 0,
           tokenStrength: 10000,
           pointStrength: 10000,
@@ -4133,13 +3072,7 @@ describe("===Stakerv3ds===", function () {
           lockMultiplier: 0,
           timeLockTypeOfBoost: 0,
           compoundTypeOfBoost: 0,
-        });
-        const testCallData3String = testCallData3.data.toString();
-
-        //addPool
-        await owner.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: testCallData3String,
+          typeOfPool: 0,
         });
 
         await super721.connect(owner).configureGroup(itemGroupId2, {
@@ -4183,48 +3116,28 @@ describe("===Stakerv3ds===", function () {
           .setApprovalForAll(stakerV3dsProxy.address, true);
       });
       it("should work correctly with different/without boosts", async function () {
-        const testCallData1 = await mockBoostersFacet
-          .connect(signer1)
-          .stakeItemsBatch(0, 1, {
-            assetAddress: super721.address,
-            id: [
-              shiftedItemGroupId2,
-              shiftedItemGroupId2.add(1),
-              shiftedItemGroupId2.add(2),
-            ],
-            amounts: [1, 1, 1],
-            IOUTokenId: [],
-          });
-
-        const testCallData1String = testCallData1.data.toString();
-
-        //deposit
-        await signer1.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: testCallData1String,
+        await diamondBoostersFacet.connect(signer1).stakeItemsBatch(0, 1, {
+          assetAddress: super721.address,
+          id: [
+            shiftedItemGroupId2,
+            shiftedItemGroupId2.add(1),
+            shiftedItemGroupId2.add(2),
+          ],
+          amounts: [1, 1, 1],
+          IOUTokenId: [],
         });
 
         await network.provider.send("evm_increaseTime", [30]);
         await ethers.provider.send("evm_mine", []);
 
-        const testCallData2 = await mockBoostersFacet
-          .connect(signer1)
-          .stakeItemsBatch(0, 2, {
-            assetAddress: super721.address,
-            id: [shiftedItemGroupId2.add(3), shiftedItemGroupId2.add(4)],
-            amounts: [1, 1],
-            IOUTokenId: [],
-          });
-
-        const testCallData2String = testCallData2.data.toString();
-
-        //deposit
-        await signer1.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: testCallData2String,
+        await diamondBoostersFacet.connect(signer1).stakeItemsBatch(0, 2, {
+          assetAddress: super721.address,
+          id: [shiftedItemGroupId2.add(3), shiftedItemGroupId2.add(4)],
+          amounts: [1, 1],
+          IOUTokenId: [],
         });
 
-        const testCallData3 = await mockStakingFacet.connect(signer1).deposit(
+        await diamondStakingFacet.connect(signer1).deposit(
           0,
           {
             assetAddress: super721.address,
@@ -4235,15 +3148,7 @@ describe("===Stakerv3ds===", function () {
           false
         );
 
-        const testCallData3String = testCallData3.data.toString();
-
-        //deposit
-        await signer1.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: testCallData3String,
-        });
-
-        const testCallData4 = await mockCoreFacet.connect(owner).addPool({
+        await diamondCoreFacet.connect(owner).addPool({
           id: 1,
           tokenStrength: 15000,
           pointStrength: 15000,
@@ -4260,16 +3165,10 @@ describe("===Stakerv3ds===", function () {
           lockMultiplier: 0,
           timeLockTypeOfBoost: 0,
           compoundTypeOfBoost: 0,
-        });
-        const testCallData4String = testCallData4.data.toString();
-
-        //deposit
-        await owner.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: testCallData4String,
+          typeOfPool: 0,
         });
 
-        const testCallData5 = await mockStakingFacet.connect(signer2).deposit(
+        await diamondStakingFacet.connect(signer2).deposit(
           1,
           {
             assetAddress: super721.address,
@@ -4279,59 +3178,31 @@ describe("===Stakerv3ds===", function () {
           },
           false
         );
-
-        const testCallData5String = testCallData5.data.toString();
-
-        //deposit
-        await signer2.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: testCallData5String,
-        });
       });
 
       it("should get total points correctly", async function () {
-        const testCallData1 = await mockBoostersFacet
-          .connect(signer1)
-          .stakeItemsBatch(0, 1, {
-            assetAddress: super721.address,
-            id: [
-              shiftedItemGroupId2,
-              shiftedItemGroupId2.add(1),
-              shiftedItemGroupId2.add(2),
-            ],
-            amounts: [1, 1, 1],
-            IOUTokenId: [],
-          });
-
-        const testCallData1String = testCallData1.data.toString();
-
-        //deposit
-        await signer1.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: testCallData1String,
+        await diamondBoostersFacet.connect(signer1).stakeItemsBatch(0, 1, {
+          assetAddress: super721.address,
+          id: [
+            shiftedItemGroupId2,
+            shiftedItemGroupId2.add(1),
+            shiftedItemGroupId2.add(2),
+          ],
+          amounts: [1, 1, 1],
+          IOUTokenId: [],
         });
 
         await network.provider.send("evm_increaseTime", [30]);
         await ethers.provider.send("evm_mine", []);
 
-        const testCallData2 = await mockBoostersFacet
-          .connect(signer1)
-          .stakeItemsBatch(0, 2, {
-            assetAddress: super721.address,
-            id: [shiftedItemGroupId2.add(3), shiftedItemGroupId2.add(4)],
-            amounts: [1, 1],
-            IOUTokenId: [],
-          });
-
-        const testCallData2String = testCallData2.data.toString();
-
-        //deposit
-        await signer1.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: testCallData2String,
+        await diamondBoostersFacet.connect(signer1).stakeItemsBatch(0, 2, {
+          assetAddress: super721.address,
+          id: [shiftedItemGroupId2.add(3), shiftedItemGroupId2.add(4)],
+          amounts: [1, 1],
+          IOUTokenId: [],
         });
 
-        const testCallData3 = await mockStakingFacet.connect(signer1).deposit(
+        await diamondStakingFacet.connect(signer1).deposit(
           0,
           {
             assetAddress: super721.address,
@@ -4342,15 +3213,7 @@ describe("===Stakerv3ds===", function () {
           false
         );
 
-        const testCallData3String = testCallData3.data.toString();
-
-        //deposit
-        await signer1.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: testCallData3String,
-        });
-
-        const testCallData4 = await mockCoreFacet.connect(owner).addPool({
+        await diamondCoreFacet.connect(owner).addPool({
           id: 1,
           tokenStrength: 15000,
           pointStrength: 15000,
@@ -4367,16 +3230,10 @@ describe("===Stakerv3ds===", function () {
           lockMultiplier: 0,
           timeLockTypeOfBoost: 0,
           compoundTypeOfBoost: 0,
-        });
-        const testCallData4String = testCallData4.data.toString();
-
-        //deposit
-        await owner.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: testCallData4String,
+          typeOfPool: 0,
         });
 
-        const testCallData5 = await mockStakingFacet.connect(signer2).deposit(
+        await diamondStakingFacet.connect(signer2).deposit(
           1,
           {
             assetAddress: super721.address,
@@ -4386,19 +3243,11 @@ describe("===Stakerv3ds===", function () {
           },
           false
         );
-
-        const testCallData5String = testCallData5.data.toString();
-
-        //deposit
-        await signer2.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: testCallData5String,
-        });
       });
     });
     describe("getPendingTokens", function () {
       beforeEach(async function () {
-        const testCallData1 = await mockCoreFacet.connect(owner).setEmissions(
+        await diamondCoreFacet.connect(owner).setEmissions(
           [
             {
               timeStamp: await utils.getCurrentTime(),
@@ -4412,48 +3261,34 @@ describe("===Stakerv3ds===", function () {
             },
           ]
         );
-        const testCallData1String = testCallData1.data.toString();
 
-        //setEmissions
-        await owner.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: testCallData1String,
-        });
+        await diamondCoreFacet.connect(owner).configureBoostersBatch(
+          [1, 2],
+          [
+            {
+              multiplier: 2300,
+              amountRequired: 3,
+              groupRequired: itemGroupId2,
+              contractRequired: super721.address,
+              boostType: 0,
+              typeOfAsset: 1,
+              historyOfTokenMultipliers: [],
+              historyOfPointMultipliers: [],
+            },
+            {
+              multiplier: 2000,
+              amountRequired: 2,
+              groupRequired: 0,
+              contractRequired: super721.address,
+              boostType: 1,
+              typeOfAsset: 1,
+              historyOfTokenMultipliers: [],
+              historyOfPointMultipliers: [],
+            },
+          ]
+        );
 
-        const testCallData2 = await mockCoreFacet
-          .connect(owner)
-          .configureBoostersBatch(
-            [1, 2],
-            [
-              {
-                set: true,
-                multiplier: 2300,
-                amountRequired: 3,
-                groupRequired: itemGroupId2,
-                contractRequired: super721.address,
-                assetType: 0,
-                typeOfAsset: 1,
-              },
-              {
-                set: true,
-                multiplier: 2000,
-                amountRequired: 2,
-                groupRequired: 0,
-                contractRequired: super721.address,
-                assetType: 1,
-                typeOfAsset: 1,
-              },
-            ]
-          );
-        const testCallData2String = testCallData2.data.toString();
-
-        //configureBoosterBatch
-        await owner.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: testCallData2String,
-        });
-
-        const testCallData3 = await mockCoreFacet.connect(owner).addPool({
+        await diamondCoreFacet.connect(owner).addPool({
           id: 0,
           tokenStrength: 10000,
           pointStrength: 10000,
@@ -4470,13 +3305,7 @@ describe("===Stakerv3ds===", function () {
           lockMultiplier: 0,
           timeLockTypeOfBoost: 0,
           compoundTypeOfBoost: 0,
-        });
-        const testCallData3String = testCallData3.data.toString();
-
-        //addPool
-        await owner.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: testCallData3String,
+          typeOfPool: 0,
         });
 
         await super721.connect(owner).configureGroup(itemGroupId2, {
@@ -4519,45 +3348,25 @@ describe("===Stakerv3ds===", function () {
           .connect(signer2)
           .setApprovalForAll(stakerV3dsProxy.address, true);
 
-        const testCallData4 = await mockBoostersFacet
-          .connect(signer1)
-          .stakeItemsBatch(0, 1, {
-            assetAddress: super721.address,
-            id: [
-              shiftedItemGroupId2,
-              shiftedItemGroupId2.add(1),
-              shiftedItemGroupId2.add(2),
-            ],
-            amounts: [1, 1, 1],
-            IOUTokenId: [],
-          });
-
-        const testCallData4String = testCallData4.data.toString();
-
-        //deposit
-        await signer1.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: testCallData4String,
+        await diamondBoostersFacet.connect(signer1).stakeItemsBatch(0, 1, {
+          assetAddress: super721.address,
+          id: [
+            shiftedItemGroupId2,
+            shiftedItemGroupId2.add(1),
+            shiftedItemGroupId2.add(2),
+          ],
+          amounts: [1, 1, 1],
+          IOUTokenId: [],
         });
 
-        const testCallData5 = await mockBoostersFacet
-          .connect(signer1)
-          .stakeItemsBatch(0, 2, {
-            assetAddress: super721.address,
-            id: [shiftedItemGroupId2.add(3), shiftedItemGroupId2.add(4)],
-            amounts: [1, 1],
-            IOUTokenId: [],
-          });
-
-        const testCallData5String = testCallData5.data.toString();
-
-        //deposit
-        await signer1.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: testCallData5String,
+        await diamondBoostersFacet.connect(signer1).stakeItemsBatch(0, 2, {
+          assetAddress: super721.address,
+          id: [shiftedItemGroupId2.add(3), shiftedItemGroupId2.add(4)],
+          amounts: [1, 1],
+          IOUTokenId: [],
         });
 
-        const testCallData6 = await mockStakingFacet.connect(signer1).deposit(
+        await diamondStakingFacet.connect(signer1).deposit(
           0,
           {
             assetAddress: super721.address,
@@ -4567,40 +3376,21 @@ describe("===Stakerv3ds===", function () {
           },
           false
         );
-
-        const testCallData6String = testCallData6.data.toString();
-
-        //deposit
-        await signer1.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: testCallData6String,
-        });
       });
+
       it("getPendingTokens should work correctly", async function () {
         const stakingFacetABI = await hre.artifacts.readArtifact(
           "StakerV3FacetStaking"
         );
 
-        const getPendingTokens = await mockStakingFacet
-          .connect(owner)
-          .getPendingTokens(0, signer1.address);
-        const getPendingTokensString = getPendingTokens.toString();
-
         await network.provider.send("evm_increaseTime", [30]);
         await ethers.provider.send("evm_mine", []);
 
-        const getPendingTokensCall = await ethers.provider.call({
-          to: stakerV3dsProxy.address,
-          data: getPendingTokens,
-        });
+        let getPendingTokens = await diamondStakingFacet
+          .connect(owner)
+          .getPendingTokens(0, signer1.address);
 
-        const decodedData = utils.decodeResults(
-          [stakingFacetABI],
-          ["getPendingTokens"],
-          [getPendingTokensCall]
-        );
-
-        expect(await decodedData[0]).be.closeTo(
+        expect(await getPendingTokens).be.closeTo(
           ethers.utils.parseEther("200"),
           10 ** 15
         );
@@ -4611,26 +3401,14 @@ describe("===Stakerv3ds===", function () {
           "StakerV3FacetStaking"
         );
 
-        const getPendingPoints = await mockStakingFacet
-          .connect(owner)
-          .getPendingPoints(0, signer1.address);
-        const getPendingPointsString = getPendingPoints.toString();
-
         await network.provider.send("evm_increaseTime", [30]);
         await ethers.provider.send("evm_mine", []);
 
-        const getPendingPointsCall = await ethers.provider.call({
-          to: stakerV3dsProxy.address,
-          data: getPendingPoints,
-        });
+        let getPendingPoints = await diamondStakingFacet
+          .connect(owner)
+          .getPendingPoints(0, signer1.address);
 
-        const decodedData = utils.decodeResults(
-          [stakingFacetABI],
-          ["getPendingPoints"],
-          [getPendingPointsCall]
-        );
-
-        expect(await decodedData[0]).be.closeTo(
+        expect(await getPendingPoints).be.closeTo(
           ethers.utils.parseEther("200"),
           10 ** 15
         );
@@ -4644,73 +3422,33 @@ describe("===Stakerv3ds===", function () {
         const pointsFacetABI = await hre.artifacts.readArtifact(
           "StakerV3FacetPoints"
         );
-        const testCallData1 = await mockStakingFacet
+        await diamondPointsFacet
           .connect(owner)
           .approvePointSpender(signer2.address, true);
-
-        const testCallData1String = testCallData1.data.toString();
-
-        //approvePointSpender
-        await owner.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: testCallData1String,
-        });
-
-        const testCallData2 = await mockStakingFacet
-          .connect(signer2)
-          .spendPoints(signer1.address, ethers.utils.parseEther("50"));
-
-        const testCallData2String = testCallData2.data.toString();
-
-        //spendPoints
-        signer2.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: testCallData2String,
-        });
 
         await network.provider.send("evm_setNextBlockTimestamp", [
           startOfStaking + 29,
         ]);
         await ethers.provider.send("evm_mine", []);
 
-        const getAvailablePoints = await mockStakingFacet
+        await diamondPointsFacet
+          .connect(signer2)
+          .spendPoints(signer1.address, ethers.utils.parseEther("50"));
+
+        let getAvailablePoints = await diamondPointsFacet
           .connect(owner)
           .getAvailablePoints(signer1.address);
-        const getAvailablePointsString = getAvailablePoints.toString();
 
-        const getAvailablePointsCall = await ethers.provider.call({
-          to: stakerV3dsProxy.address,
-          data: getAvailablePoints,
-        });
-
-        let decodedData = utils.decodeResults(
-          [pointsFacetABI],
-          ["getAvailablePoints"],
-          [getAvailablePointsCall]
-        );
-
-        expect(await decodedData[0]).be.closeTo(
+        expect(getAvailablePoints).be.closeTo(
           ethers.utils.parseEther("150"),
           10 ** 15
         );
 
-        const getTotalPoints = await mockStakingFacet
+        let getTotalPoints = await diamondPointsFacet
           .connect(owner)
           .getTotalPoints(signer1.address);
-        const getTotalPointsString = getTotalPoints.toString();
 
-        const getTotalPointsCall = await ethers.provider.call({
-          to: stakerV3dsProxy.address,
-          data: getTotalPoints,
-        });
-
-        decodedData = utils.decodeResults(
-          [stakingFacetABI],
-          ["getTotalPoints"],
-          [getTotalPointsCall]
-        );
-
-        expect(await decodedData[0]).be.closeTo(
+        expect(await getTotalPoints).be.closeTo(
           ethers.utils.parseEther("200"),
           10 ** 15
         );
@@ -4752,7 +3490,7 @@ describe("===Stakerv3ds===", function () {
           .connect(signer2)
           .setApprovalForAll(stakerV3dsProxy.address, true);
 
-        const testCallData1 = await mockCoreFacet.connect(owner).setEmissions(
+        await diamondCoreFacet.connect(owner).setEmissions(
           [
             {
               timeStamp: (await utils.getCurrentTime()) + 10000,
@@ -4767,14 +3505,7 @@ describe("===Stakerv3ds===", function () {
           ]
         );
 
-        // setEmissions
-        const testCallData1String = testCallData1.data.toString();
-        await owner.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: testCallData1String,
-        });
-
-        const testCallData2 = await mockCoreFacet.connect(owner).addPool({
+        await diamondCoreFacet.connect(owner).addPool({
           id: 1,
           tokenStrength: 10000,
           pointStrength: 10000,
@@ -4791,13 +3522,7 @@ describe("===Stakerv3ds===", function () {
           lockMultiplier: 0,
           timeLockTypeOfBoost: 0,
           compoundTypeOfBoost: 0,
-        });
-        const testCallData2String = testCallData2.data.toString();
-
-        //addPool
-        await owner.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: testCallData2String,
+          typeOfPool: 0,
         });
 
         //console.log(await utils.getCurrentTime());
@@ -4806,48 +3531,25 @@ describe("===Stakerv3ds===", function () {
         // await ethers.provider.send("evm_mine", []);
         //console.log(await utils.getCurrentTime());
 
-        const getPendingTokens = await mockStakingFacet
+        let getPendingTokens = await diamondStakingFacet
           .connect(owner)
           .getPendingTokens(1, signer1.address);
-        const getPendingTokensString = getPendingTokens.toString();
 
-        const getPendingTokensCall = await ethers.provider.call({
-          to: stakerV3dsProxy.address,
-          data: getPendingTokens,
-        });
-
-        let decodedData = utils.decodeResults(
-          [stakingFacetABI],
-          ["getPendingPoints"],
-          [getPendingTokensCall]
-        );
-
-        expect(await decodedData[0]).be.closeTo(
+        expect(await getPendingTokens).be.closeTo(
           ethers.utils.parseEther("0"),
           10 ** 15
         );
 
-        const getPendingPoints = await mockStakingFacet
+        let getPendingPoints = await diamondStakingFacet
           .connect(owner)
           .getPendingPoints(1, signer1.address);
-        const getPendingPointsString = getPendingPoints.toString();
 
-        const getPendingPointsCall = await ethers.provider.call({
-          to: stakerV3dsProxy.address,
-          data: getPendingPoints,
-        });
-
-        decodedData = utils.decodeResults(
-          [stakingFacetABI],
-          ["getPendingPoints"],
-          [getPendingPointsCall]
-        );
-
-        expect(await decodedData[0]).be.closeTo(
+        expect(await getPendingPoints).be.closeTo(
           ethers.utils.parseEther("0"),
           10 ** 15
         );
       });
+
       it("getTotalEmittedTokens and getTotalEmittedPoints should work correctly with different emissions", async function () {
         await rewardToken.transfer(
           stakerV3dsProxy.address,
@@ -4883,7 +3585,7 @@ describe("===Stakerv3ds===", function () {
           .connect(signer2)
           .setApprovalForAll(stakerV3dsProxy.address, true);
 
-        const testCallData1 = await mockCoreFacet.connect(owner).setEmissions(
+        await diamondCoreFacet.connect(owner).setEmissions(
           [
             {
               timeStamp: await utils.getCurrentTime(),
@@ -4906,14 +3608,7 @@ describe("===Stakerv3ds===", function () {
           ]
         );
 
-        // setEmissions
-        const testCallData1String = testCallData1.data.toString();
-        await owner.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: testCallData1String,
-        });
-
-        const testCallData2 = await mockCoreFacet.connect(owner).addPool({
+        await diamondCoreFacet.connect(owner).addPool({
           id: 1,
           tokenStrength: 10000,
           pointStrength: 10000,
@@ -4930,16 +3625,10 @@ describe("===Stakerv3ds===", function () {
           lockMultiplier: 0,
           timeLockTypeOfBoost: 0,
           compoundTypeOfBoost: 0,
-        });
-        const testCallData2String = testCallData2.data.toString();
-
-        //addPool
-        await owner.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: testCallData2String,
+          typeOfPool: 0,
         });
 
-        const testCallData3 = await mockStakingFacet.connect(signer1).deposit(
+        await diamondStakingFacet.connect(signer1).deposit(
           1,
           {
             id: [shiftedItemGroupId2, shiftedItemGroupId2.add(1)],
@@ -4949,30 +3638,14 @@ describe("===Stakerv3ds===", function () {
           },
           false
         );
-        const testCallData3String = testCallData3.data.toString();
 
-        //deposit
-        await signer1.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: testCallData3String,
-        });
-
-        const testCallData4 = await mockStakingFacet
-          .connect(signer1)
-          .claim(1, []);
-        const testCallData4String = testCallData4.data.toString();
-
-        //claim
-        await signer1.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: testCallData4String,
-        });
+        await diamondStakingFacet.connect(signer1).claim(1, []);
         //console.log(await utils.getCurrentTime());
 
         await network.provider.send("evm_increaseTime", [30]);
         await ethers.provider.send("evm_mine", []);
 
-        const testCallData5 = await mockStakingFacet.connect(signer1).deposit(
+        await diamondStakingFacet.connect(signer1).deposit(
           1,
           {
             id: [shiftedItemGroupId2.add(2), shiftedItemGroupId2.add(3)],
@@ -4982,15 +3655,8 @@ describe("===Stakerv3ds===", function () {
           },
           false
         );
-        const testCallData5String = testCallData5.data.toString();
 
-        //deposit
-        await signer1.sendTransaction({
-          to: stakerV3dsProxy.address,
-          data: testCallData5String,
-        });
-
-        // const testCallData3 = await mockStakingFacet
+        // await diamondStakingFacet
         //   .connect(signer1)
         //   .deposit(1, 0, {
         //     id: [shiftedItemGroupId2, shiftedItemGroupId2.add(1)],
@@ -4999,19 +3665,12 @@ describe("===Stakerv3ds===", function () {
         //     IOUTokenId: [],
         //   },
         // false);
-        // const testCallData3String = testCallData3.data.toString();
-
-        // //deposit
-        // await signer1.sendTransaction({
-        //   to: stakerV3dsProxy.address,
-        //   data: testCallData3String,
-        // });
       });
     });
   });
   //   describe("time lock deposits testing", function () {
   //     beforeEach(async function () {
-  //       const testCallData1 = await mockCoreFacet.connect(owner).setEmissions(
+  //       await diamondCoreFacet.connect(owner).setEmissions(
   //         [
   //           {
   //             timeStamp: await utils.getCurrentTime(),
@@ -5025,48 +3684,36 @@ describe("===Stakerv3ds===", function () {
   //           },
   //         ]
   //       );
-  //       const testCallData1String = testCallData1.data.toString();
+  //
 
-  //       //setEmissions
-  //       await owner.sendTransaction({
-  //         to: stakerV3dsProxy.address,
-  //         data: testCallData1String,
-  //       });
-
-  //       const testCallData2 = await mockCoreFacet
+  //       await diamondCoreFacet
   //         .connect(owner)
   //         .configureBoostersBatch(
   //           [1, 2],
   //           [
   //             {
-  //               set: true,
+  //
   //               multiplier: 2300,
   //               amountRequired: 3,
   //               groupRequired: itemGroupId2,
   //               contractRequired: super721.address,
-  //               assetType: 0,
+  //               boostType: 0,
   //               typeOfAsset: 1,
   //             },
   //             {
-  //               set: true,
+  //
   //               multiplier: 2000,
   //               amountRequired: 2,
   //               groupRequired: 0,
   //               contractRequired: super721.address,
-  //               assetType: 1,
+  //               boostType: 1,
   //               typeOfAsset: 1,
   //             },
   //           ]
   //         );
-  //       const testCallData2String = testCallData2.data.toString();
+  //
 
-  //       //configureBoosterBatch
-  //       await owner.sendTransaction({
-  //         to: stakerV3dsProxy.address,
-  //         data: testCallData2String,
-  //       });
-
-  //       const testCallData3 = await mockCoreFacet.connect(owner).addPool({
+  //       await diamondCoreFacet.connect(owner).addPool({
   //         id: 0,
   //         tokenStrength: 10000,
   //         pointStrength: 10000,
@@ -5083,14 +3730,9 @@ describe("===Stakerv3ds===", function () {
   //         lockMultiplier: 10000,
   //         timeLockTypeOfBoost: 2,
   //         compoundTypeOfBoost: 2,
+  //         typeOfPool: 0,
   //       });
-  //       const testCallData3String = testCallData3.data.toString();
-
-  //       //addPool
-  //       await owner.sendTransaction({
-  //         to: stakerV3dsProxy.address,
-  //         data: testCallData3String,
-  //       });
+  //
 
   //       await super721.connect(owner).configureGroup(itemGroupId2, {
   //         name: "PEPSI",
@@ -5143,7 +3785,7 @@ describe("===Stakerv3ds===", function () {
   //         .connect(signer3)
   //         .setApprovalForAll(stakerV3dsProxy.address, true);
 
-  //       // const testCallData5 = await mockStakingFacet.connect(signer1).deposit(
+  //       // await diamondStakingFacet.connect(signer1).deposit(
   //       //   0,
   //       //   2,
   //       //   {
@@ -5155,21 +3797,14 @@ describe("===Stakerv3ds===", function () {
   //       //   false
   //       // );
 
-  //       // const testCallData5String = testCallData5.data.toString();
-
-  //       // //deposit
-  //       // await signer1.sendTransaction({
-  //       //   to: stakerV3dsProxy.address,
-  //       //   data: testCallData5String,
-  //       // });
-
   //       await rewardToken.transfer(
   //         stakerV3dsProxy.address,
   //         ethers.utils.parseEther("500000")
   //       );
   //     });
+
   //     it("Reverts: invalid amount to lock", async function () {
-  //       const testCallData1 = await mockStakingFacet.connect(signer2).deposit(
+  //       await expect(diamondStakingFacet.connect(signer2).deposit(
   //         0,
   //         {
   //           assetAddress: super721.address,
@@ -5178,17 +3813,11 @@ describe("===Stakerv3ds===", function () {
   //           IOUTokenId: [],
   //         },
   //         true
-  //       );
-  //       const testCallData1String = testCallData1.data.toString();
-  //       await expect(
-  //         signer2.sendTransaction({
-  //           to: stakerV3dsProxy.address,
-  //           data: testCallData1String,
-  //         })
-  //       ).to.be.revertedWith("InvalidAmountToLock()");
+  //       )).to.be.revertedWith("InvalidAmountToLock()");
   //     });
+
   //     it("Reverts: tokens already locked", async function () {
-  //       const testCallData1 = await mockStakingFacet.connect(signer1).deposit(
+  //       await diamondStakingFacet.connect(signer1).deposit(
   //         0,
   //         {
   //           assetAddress: super721.address,
@@ -5198,13 +3827,8 @@ describe("===Stakerv3ds===", function () {
   //         },
   //         true
   //       );
-  //       const testCallData1String = testCallData1.data.toString();
-  //       await signer1.sendTransaction({
-  //         to: stakerV3dsProxy.address,
-  //         data: testCallData1String,
-  //       });
 
-  //       const testCallData2 = await mockStakingFacet.connect(signer1).deposit(
+  //       await expect(diamondStakingFacet.connect(signer1).deposit(
   //         0,
   //         {
   //           assetAddress: super721.address,
@@ -5213,17 +3837,11 @@ describe("===Stakerv3ds===", function () {
   //           IOUTokenId: [],
   //         },
   //         true
-  //       );
-  //       const testCallData2String = testCallData2.data.toString();
-  //       await expect(
-  //         signer1.sendTransaction({
-  //           to: stakerV3dsProxy.address,
-  //           data: testCallData2String,
-  //         })
-  //       ).to.be.revertedWith("TokensAlreadyLocked()");
+  //       )).to.be.revertedWith("TokensAlreadyLocked()");
   //     });
+
   //     it("Reverts: can't withdraw tokens are locked", async function () {
-  //       const testCallData1 = await mockStakingFacet.connect(signer1).deposit(
+  //       await diamondStakingFacet.connect(signer1).deposit(
   //         0,
   //         {
   //           assetAddress: super721.address,
@@ -5233,14 +3851,10 @@ describe("===Stakerv3ds===", function () {
   //         },
   //         true
   //       );
-  //       const testCallData1String = testCallData1.data.toString();
-  //       await signer1.sendTransaction({
-  //         to: stakerV3dsProxy.address,
-  //         data: testCallData1String,
-  //       });
+
   //       let startOfStaking = await utils.getCurrentTime();
 
-  //       const testCallData2 = await mockStakingFacet.connect(signer1).withdraw(
+  //       await expect(diamondStakingFacet.connect(signer1).withdraw(
   //         0,
   //         {
   //           assetAddress: super721.address,
@@ -5248,16 +3862,9 @@ describe("===Stakerv3ds===", function () {
   //           amounts: [1, 1],
   //           IOUTokenId: [0, 1],
   //         }
-  //       );
-  //       const testCallData2String = testCallData2.data.toString();
-  //       await expect(
-  //         signer1.sendTransaction({
-  //           to: stakerV3dsProxy.address,
-  //           data: testCallData2String,
-  //         })
-  //       ).to.be.revertedWith("TokenLocked()");
+  //       )).to.be.revertedWith("TokenLocked()");
 
-  //       const testCallData3 = await mockStakingFacet.connect(signer1).deposit(
+  //       await diamondStakingFacet.connect(signer1).deposit(
   //         0,
   //         {
   //           assetAddress: super721.address,
@@ -5267,13 +3874,8 @@ describe("===Stakerv3ds===", function () {
   //         },
   //         false
   //       );
-  //       const testCallData3String = testCallData3.data.toString();
-  //       signer1.sendTransaction({
-  //         to: stakerV3dsProxy.address,
-  //         data: testCallData3String,
-  //       });
 
-  //       const testCallData4 = await mockStakingFacet.connect(signer1).withdraw(
+  //       await diamondStakingFacet.connect(signer1).withdraw(
   //         0,
   //         {
   //           assetAddress: super721.address,
@@ -5282,12 +3884,7 @@ describe("===Stakerv3ds===", function () {
   //           IOUTokenId: [2, 3],
   //         }
   //       );
-  //       const testCallData4String = testCallData4.data.toString();
 
-  //       await signer1.sendTransaction({
-  //         to: stakerV3dsProxy.address,
-  //         data: testCallData4String,
-  //       });
   //       expect(await super721.ownerOf(shiftedItemGroupId2.add(3))).to.be.eq(
   //         signer1.address
   //       );
@@ -5297,16 +3894,23 @@ describe("===Stakerv3ds===", function () {
   //       ]);
   //       await ethers.provider.send("evm_mine", []);
 
-  //       await signer1.sendTransaction({
-  //         to: stakerV3dsProxy.address,
-  //         data: testCallData2String,
-  //       });
+  //       await diamondStakingFacet.connect(signer1).withdraw(
+  //         0,
+  //         {
+  //           assetAddress: super721.address,
+  //           id: [shiftedItemGroupId2.add(3), shiftedItemGroupId2.add(4)],
+  //           amounts: [1, 1],
+  //           IOUTokenId: [0, 1],
+  //         }
+  //       );
+
   //       expect(await super721.ownerOf(shiftedItemGroupId2.add(1))).to.be.eq(
   //         signer1.address
   //       );
   //     });
+
   //     it("should work with different types of time lock boosts correctly", async function () {
-  //       const testCallData1 = await mockCoreFacet.connect(owner).addPool({
+  //       await diamondCoreFacet.connect(owner).addPool({
   //         id: 1,
   //         tokenStrength: 10000,
   //         pointStrength: 10000,
@@ -5323,8 +3927,10 @@ describe("===Stakerv3ds===", function () {
   //         lockMultiplier: 10000,
   //         timeLockTypeOfBoost: 1,
   //         compoundTypeOfBoost: 1,
+  //         typeOfPool: 0,
   //       });
-  //       const testCallData2 = await mockCoreFacet.connect(owner).addPool({
+
+  //       await diamondCoreFacet.connect(owner).addPool({
   //         id: 2,
   //         tokenStrength: 10000,
   //         pointStrength: 10000,
@@ -5341,21 +3947,11 @@ describe("===Stakerv3ds===", function () {
   //         lockMultiplier: 10000,
   //         timeLockTypeOfBoost: 0,
   //         compoundTypeOfBoost: 0,
-  //       });
-  //       const testCallData1String = testCallData1.data.toString();
-  //       const testCallData2String = testCallData2.data.toString();
-
-  //       await owner.sendTransaction({
-  //         to: stakerV3dsProxy.address,
-  //         data: testCallData1String,
-  //       });
-  //       await owner.sendTransaction({
-  //         to: stakerV3dsProxy.address,
-  //         data: testCallData2String,
+  //         typeOfPool: 0,
   //       });
 
   //       let startOfStaking = await utils.getCurrentTime();
-  //       const testCallData3 = await mockStakingFacet.connect(signer1).deposit(
+  //       await diamondStakingFacet.connect(signer1).deposit(
   //         1,
   //         {
   //           assetAddress: super721.address,
@@ -5366,7 +3962,7 @@ describe("===Stakerv3ds===", function () {
   //         true
   //       );
 
-  //       const testCallData4 = await mockStakingFacet.connect(signer1).deposit(
+  //       await diamondStakingFacet.connect(signer1).deposit(
   //         2,
   //         {
   //           assetAddress: super721.address,
@@ -5376,35 +3972,17 @@ describe("===Stakerv3ds===", function () {
   //         },
   //         true
   //       );
-  //       const testCallData3String = testCallData3.data.toString();
-  //       const testCallData4String = testCallData4.data.toString();
-  //       await signer1.sendTransaction({
-  //         to: stakerV3dsProxy.address,
-  //         data: testCallData3String,
-  //       });
-
-  //       await signer1.sendTransaction({
-  //         to: stakerV3dsProxy.address,
-  //         data: testCallData4String,
-  //       });
-
-  //       const testCallData5 = await mockStakingFacet
-  //         .connect(signer1)
-  //         .claim(1, []);
-
-  //       const testCallData5String = testCallData5.data.toString();
 
   //       await network.provider.send("evm_setNextBlockTimestamp", [
   //         startOfStaking + 30,
   //       ]);
   //       await ethers.provider.send("evm_mine", []);
 
-  //       //claim
-  //       await signer1.sendTransaction({
-  //         to: stakerV3dsProxy.address,
-  //         data: testCallData5String,
-  //       });
+  //       await diamondStakingFacet
+  //         .connect(signer1)
+  //         .claim(1, []);
   //     });
+
   //     it("complex math tests of time locks with 3 users", async function () {
   //       let shares = {
   //         sig1: 0,
@@ -5415,7 +3993,7 @@ describe("===Stakerv3ds===", function () {
   //       let rewardsPerSecond = BigNumber.from(ethers.utils.parseEther("10")),
   //         lockMultiplier = 2;
 
-  //       const testCallData6 = await mockStakingFacet.connect(signer2).deposit(
+  //       await diamondStakingFacet.connect(signer2).deposit(
   //         0,
   //         {
   //           assetAddress: super721.address,
@@ -5426,36 +4004,20 @@ describe("===Stakerv3ds===", function () {
   //         false
   //       );
 
-  //       const testCallData6String = testCallData6.data.toString();
-
-  //       const testCallData4 = await mockStakingFacet.connect(signer1).deposit(
-  //         0,
-  //         {
-  //           assetAddress: super721.address,
-  //           id: [shiftedItemGroupId2, shiftedItemGroupId2.add(1)],
-  //           amounts: [1, 1],
-  //           IOUTokenId: [],
-  //         },
-  //         true
-  //       );
-
-  //       const testCallData4String = testCallData4.data.toString();
-
-  //       //deposit
-  //       await signer2.sendTransaction({
-  //         to: stakerV3dsProxy.address,
-  //         data: testCallData6String,
-  //       });
   //       shares.sig2 = 2000;
   //       shares.sum = shares.sig1 + shares.sig2 + shares.sig3;
   //       let signer2DepTime = await utils.getCurrentTime();
 
-  //       //deposit
-  //       let startOfStaking = await utils.getCurrentTime();
-  //       await signer1.sendTransaction({
-  //         to: stakerV3dsProxy.address,
-  //         data: testCallData4String,
-  //       });
+  //       await diamondStakingFacet.connect(signer1).deposit(
+  //        0,
+  //        {
+  //          assetAddress: super721.address,
+  //          id: [shiftedItemGroupId2, shiftedItemGroupId2.add(1)],
+  //          amounts: [1, 1],
+  //          IOUTokenId: [],
+  //        },
+  //        true
+  //       );
   //       // 2000 with time lock bonus multiplier x2
   //       shares.sig1 = 2000 * lockMultiplier;
   //       shares.sum = shares.sig1 + shares.sig2 + shares.sig3;
@@ -5464,28 +4026,14 @@ describe("===Stakerv3ds===", function () {
   //         rewardsPerSecond.mul(signer1DepTime - signer2DepTime)
   //       );
 
-  //       const testCallData1 = await mockStakingFacet
-  //         .connect(signer1)
-  //         .claim(0, []);
-
-  //       const testCallData1String = testCallData1.data.toString();
-
-  //       const testCallData2 = await mockStakingFacet
-  //         .connect(signer2)
-  //         .claim(0, []);
-
-  //       const testCallData2String = testCallData2.data.toString();
-
   //       await network.provider.send("evm_setNextBlockTimestamp", [
   //         startOfStaking + 30,
   //       ]);
   //       await ethers.provider.send("evm_mine", []);
 
-  //       //claim
-  //       await signer1.sendTransaction({
-  //         to: stakerV3dsProxy.address,
-  //         data: testCallData1String,
-  //       });
+  //       await diamondStakingFacet
+  //         .connect(signer1)
+  //         .claim(0, []);
 
   //       // helper var
   //       let someBig = ethers.utils.parseEther("1");
@@ -5506,10 +4054,10 @@ describe("===Stakerv3ds===", function () {
   //         await ethers.provider.getBlock()
   //       ).timestamp;
 
-  //       await signer2.sendTransaction({
-  //         to: stakerV3dsProxy.address,
-  //         data: testCallData2String,
-  //       });
+  //       await diamondStakingFacet
+  //         .connect(signer2)
+  //         .claim(0, []);
+
   //       signer2Rewards = signer2Rewards.add(
   //         rewardsPerSecond
   //           .mul(someBig.mul(shares.sig2).div(shares.sum))
@@ -5526,7 +4074,8 @@ describe("===Stakerv3ds===", function () {
   //       //   10 ** 15
   //       // );
 
-  //       const testCallData3 = await mockStakingFacet.connect(signer3).deposit(
+  //       // 3 seconds have passed since the last claim
+  //       await diamondStakingFacet.connect(signer3).deposit(
   //         0,
   //         {
   //           assetAddress: super721.address,
@@ -5536,28 +4085,6 @@ describe("===Stakerv3ds===", function () {
   //         },
   //         false
   //       );
-
-  //       const testCallData3String = testCallData3.data.toString();
-
-  //       const testCallData7 = await mockStakingFacet.connect(signer3).deposit(
-  //         0,
-  //         {
-  //           assetAddress: super721.address,
-  //           id: [shiftedItemGroupId2.add(5), shiftedItemGroupId2.add(6)],
-  //           amounts: [1, 1],
-  //           IOUTokenId: [],
-  //         },
-  //         true
-  //       );
-
-  //       const testCallData7String = testCallData7.data.toString();
-
-  //       // 3 seconds have passed since the last claim
-  //       //deposit
-  //       await signer3.sendTransaction({
-  //         to: stakerV3dsProxy.address,
-  //         data: testCallData3String,
-  //       });
   //       let signer3DepTime = await utils.getCurrentTime();
   //       signer1Rewards = signer1Rewards.add(
   //         rewardsPerSecond
@@ -5575,11 +4102,17 @@ describe("===Stakerv3ds===", function () {
   //       shares.sum = shares.sig1 + shares.sig2 + shares.sig3;
 
   //       // +1 second (4 overall)
-  //       //deposit
-  //       await signer3.sendTransaction({
-  //         to: stakerV3dsProxy.address,
-  //         data: testCallData7String,
-  //       });
+  //       await diamondStakingFacet.connect(signer3).deposit(
+  //         0,
+  //         {
+  //           assetAddress: super721.address,
+  //           id: [shiftedItemGroupId2.add(5), shiftedItemGroupId2.add(6)],
+  //           amounts: [1, 1],
+  //           IOUTokenId: [],
+  //         },
+  //         true
+  //       );
+
   //       let signer3TimeLockAt = await utils.getCurrentTime();
   //       signer1Rewards = signer1Rewards.add(
   //         rewardsPerSecond
@@ -5603,18 +4136,19 @@ describe("===Stakerv3ds===", function () {
   //       shares.sig3 = 3000 * lockMultiplier;
   //       shares.sum = shares.sig1 + shares.sig2 + shares.sig3;
 
-  //       // claim
-  //       await signer1.sendTransaction({
-  //         to: stakerV3dsProxy.address,
-  //         data: testCallData1String,
-  //       });
+  //       await diamondStakingFacet
+  //         .connect(signer1)
+  //         .claim(0, []);
+
   //       let signer1SecondClaimTime = await utils.getCurrentTime();
+
   //       signer1Rewards = signer1Rewards.add(
   //         rewardsPerSecond
   //           .mul(someBig.mul(shares.sig1).div(shares.sum))
   //           .mul(signer1SecondClaimTime - signer3TimeLockAt)
   //           .div(someBig)
   //       );
+
   //       // 200 + 10 * 2/3 * 4(time between 1st signer1 claim and 1st signer3 deposit) + 10 *
   //       // * 4/7(share of signer1 at signer3 1st deposit) * 1 + 1/3(share of signer1 at signer3 2nd deposit) *
   //       // * 1(second past until 2nd signer1 claim) ~= 235,714285714
@@ -5623,10 +4157,10 @@ describe("===Stakerv3ds===", function () {
   //       //   10 ** 15
   //       // );
 
-  //       await signer2.sendTransaction({
-  //         to: stakerV3dsProxy.address,
-  //         data: testCallData1String,
-  //       });
+  //       await diamondStakingFacet
+  //         .connect(signer2)
+  //         .claim(0, []);
+
   //       let signer2SecondClaimTime = await utils.getCurrentTime();
   //       signer2Rewards = signer2Rewards.add(
   //         rewardsPerSecond
@@ -5634,6 +4168,7 @@ describe("===Stakerv3ds===", function () {
   //           .mul(signer2SecondClaimTime - signer3TimeLockAt)
   //           .div(someBig)
   //       );
+
   //       // 113.333333 + 10 * 1/3 * 3(one less second) + 10 * 2/7 * 1 + 1/6 *
   //       // * 2(+1 second from last tx) ~= 129.52380949
   //       // expect(await rewardToken.balanceOf(signer2.address)).to.be.closeTo(
@@ -5647,11 +4182,10 @@ describe("===Stakerv3ds===", function () {
   //       ]);
   //       await ethers.provider.send("evm_mine", []);
 
-  //       //claim
-  //       await signer1.sendTransaction({
-  //         to: stakerV3dsProxy.address,
-  //         data: testCallData1String,
-  //       });
+  //       await diamondStakingFacet
+  //         .connect(signer1)
+  //         .claim(0, []);
+
   //       let signer1ThirdClaimTime = await utils.getCurrentTime();
   //       signer1Rewards = signer1Rewards.add(
   //         rewardsPerSecond
@@ -5659,6 +4193,7 @@ describe("===Stakerv3ds===", function () {
   //           .mul(signer1ThirdClaimTime - signer1SecondClaimTime)
   //           .div(someBig)
   //       );
+
   //       // 235.714285 + 10 * 1/3 * 24(time from last signer1 claim) ~= 315.714285
   //       // expect(await rewardToken.balanceOf(signer1.address)).to.be.closeTo(
   //       //   signer1Rewards,
@@ -5681,11 +4216,10 @@ describe("===Stakerv3ds===", function () {
   //       shares.sig1 = 2000;
   //       shares.sum = shares.sig1 + shares.sig2 + shares.sig3;
 
-  //       //claim
-  //       await signer2.sendTransaction({
-  //         to: stakerV3dsProxy.address,
-  //         data: testCallData2String,
-  //       });
+  //       await diamondStakingFacet
+  //         .connect(signer2)
+  //         .claim(0, []);
+
   //       let signer2ThirdClaimTime = await utils.getCurrentTime();
   //       signer2Rewards = signer2Rewards.add(
   //         rewardsPerSecond
@@ -5701,11 +4235,10 @@ describe("===Stakerv3ds===", function () {
   //       //   10 ** 15
   //       // );
 
-  //       //claim
-  //       await signer3.sendTransaction({
-  //         to: stakerV3dsProxy.address,
-  //         data: testCallData1String,
-  //       });
+  //       await diamondStakingFacet
+  //         .connect(signer3)
+  //         .claim(0, []);
+
   //       let signer3FirstClaimTime = await utils.getCurrentTime();
   //       signer3Rewards = signer3Rewards.add(
   //         rewardsPerSecond
@@ -5722,10 +4255,10 @@ describe("===Stakerv3ds===", function () {
   //       //   10 ** 15
   //       // );
 
-  //       await signer1.sendTransaction({
-  //         to: stakerV3dsProxy.address,
-  //         data: testCallData1String,
-  //       });
+  //       await diamondStakingFacet
+  //         .connect(signer1)
+  //         .claim(0, []);
+
   //       let signer1FourthClaimTime = await utils.getCurrentTime();
   //       signer1Rewards = signer1Rewards.add(
   //         rewardsPerSecond
@@ -5733,16 +4266,17 @@ describe("===Stakerv3ds===", function () {
   //           .mul(signer1FourthClaimTime - signer1ThirdClaimTime)
   //           .div(someBig)
   //       );
+
   //       // 315.714285 + 10 * 2/10 * 3 ~= 321.714285714285
   //       // expect(await rewardToken.balanceOf(signer1.address)).to.be.closeTo(
   //       //   signer1Rewards,
   //       //   10 ** 15
   //       // );
 
-  //       await signer2.sendTransaction({
-  //         to: stakerV3dsProxy.address,
-  //         data: testCallData1String,
-  //       });
+  //       await diamondStakingFacet
+  //         .connect(signer2)
+  //         .claim(0, []);
+
   //       let signer2FourthClaimTime = await utils.getCurrentTime();
   //       signer2Rewards = signer2Rewards.add(
   //         rewardsPerSecond
@@ -5750,16 +4284,17 @@ describe("===Stakerv3ds===", function () {
   //           .mul(signer2FourthClaimTime - signer2ThirdClaimTime)
   //           .div(someBig)
   //       );
+
   //       // 169.857142823 + 10 * 2/10 * 3 ~= 175.85714285714
   //       // expect(await rewardToken.balanceOf(signer2.address)).to.be.closeTo(
   //       //   signer2Rewards,
   //       //   10 ** 15
   //       // );
 
-  //       await signer3.sendTransaction({
-  //         to: stakerV3dsProxy.address,
-  //         data: testCallData1String,
-  //       });
+  //       await diamondStakingFacet
+  //         .connect(signer3)
+  //         .claim(0, []);
+
   //       let signer3SecondClaimTime = await utils.getCurrentTime();
   //       signer3Rewards = signer3Rewards.add(
   //         rewardsPerSecond
@@ -5767,6 +4302,7 @@ describe("===Stakerv3ds===", function () {
   //           .mul(signer3SecondClaimTime - signer3FirstClaimTime)
   //           .div(someBig)
   //       );
+
   //       // 138.428571428571 + 10 * 6/10 * 3 ~= 156.428571429
   //       // expect(await rewardToken.balanceOf(signer3.address)).to.be.closeTo(
   //       //   signer3Rewards,
@@ -5806,10 +4342,10 @@ describe("===Stakerv3ds===", function () {
   //       ]);
   //       await ethers.provider.send("evm_mine", []);
 
-  //       await signer1.sendTransaction({
-  //         to: stakerV3dsProxy.address,
-  //         data: testCallData1String,
-  //       });
+  //       await diamondStakingFacet
+  //         .connect(signer1)
+  //         .claim(0, []);
+
   //       let signer1FifthClaimTime = await utils.getCurrentTime();
   //       signer1Rewards = signer1Rewards.add(
   //         rewardsPerSecond
@@ -5822,10 +4358,10 @@ describe("===Stakerv3ds===", function () {
   //       //   10 ** 15
   //       // );
 
-  //       await signer2.sendTransaction({
-  //         to: stakerV3dsProxy.address,
-  //         data: testCallData1String,
-  //       });
+  //       await diamondStakingFacet
+  //         .connect(signer2)
+  //         .claim(0, []);
+
   //       let signer2FifthClaimTime = await utils.getCurrentTime();
   //       signer2Rewards = signer2Rewards.add(
   //         rewardsPerSecond
@@ -5838,10 +4374,10 @@ describe("===Stakerv3ds===", function () {
   //       //   10 ** 15
   //       // );
 
-  //       await signer3.sendTransaction({
-  //         to: stakerV3dsProxy.address,
-  //         data: testCallData1String,
-  //       });
+  //       await diamondStakingFacet
+  //         .connect(signer3)
+  //         .claim(0, []);
+
   //       let signer3ThirdClaimTime = await utils.getCurrentTime();
   //       signer3Rewards = signer3Rewards.add(
   //         rewardsPerSecond
@@ -5854,6 +4390,7 @@ describe("===Stakerv3ds===", function () {
   //       //   10 ** 15
   //       // );
   //     });
+
   //     it("multiple unlocks should work correctly", async function () {
   //       let shares = {
   //         sig1: 0,
@@ -5864,7 +4401,7 @@ describe("===Stakerv3ds===", function () {
   //       let rewardsPerSecond = BigNumber.from(ethers.utils.parseEther("10")),
   //         lockMultiplier = 2;
 
-  //       const testCallData6 = await mockStakingFacet.connect(signer2).deposit(
+  //       await diamondStakingFacet.connect(signer2).deposit(
   //         0,
   //         {
   //           assetAddress: super721.address,
@@ -5875,9 +4412,13 @@ describe("===Stakerv3ds===", function () {
   //         false
   //       );
 
-  //       const testCallData6String = testCallData6.data.toString();
+  //       shares.sig2 = 2000;
+  //       shares.sum = shares.sig1 + shares.sig2 + shares.sig3;
+  //       let signer2DepTime = await utils.getCurrentTime();
 
-  //       const testCallData4 = await mockStakingFacet.connect(signer1).deposit(
+  //       //deposit
+  //       let startOfStaking = await utils.getCurrentTime();
+  //       await diamondStakingFacet.connect(signer1).deposit(
   //         0,
   //         {
   //           assetAddress: super721.address,
@@ -5888,23 +4429,6 @@ describe("===Stakerv3ds===", function () {
   //         true
   //       );
 
-  //       const testCallData4String = testCallData4.data.toString();
-
-  //       //deposit
-  //       await signer2.sendTransaction({
-  //         to: stakerV3dsProxy.address,
-  //         data: testCallData6String,
-  //       });
-  //       shares.sig2 = 2000;
-  //       shares.sum = shares.sig1 + shares.sig2 + shares.sig3;
-  //       let signer2DepTime = await utils.getCurrentTime();
-
-  //       //deposit
-  //       let startOfStaking = await utils.getCurrentTime();
-  //       await signer1.sendTransaction({
-  //         to: stakerV3dsProxy.address,
-  //         data: testCallData4String,
-  //       });
   //       // 2000 with time lock bonus multiplier x2
   //       shares.sig1 = 2000 * lockMultiplier;
   //       shares.sum = shares.sig1 + shares.sig2 + shares.sig3;
@@ -5913,22 +4437,14 @@ describe("===Stakerv3ds===", function () {
   //         rewardsPerSecond.mul(signer1DepTime - signer2DepTime)
   //       );
 
-  //       const claimCallData = await mockStakingFacet
-  //         .connect(signer1)
-  //         .claim(0, []);
-
-  //       const claimCallDataString = claimCallData.data.toString();
-
   //       await network.provider.send("evm_setNextBlockTimestamp", [
   //         startOfStaking + 30,
   //       ]);
   //       await ethers.provider.send("evm_mine", []);
 
-  //       //claim
-  //       await signer1.sendTransaction({
-  //         to: stakerV3dsProxy.address,
-  //         data: claimCallDataString,
-  //       });
+  //       await diamondStakingFacet
+  //         .connect(signer1)
+  //         .claim(0, []);
 
   //       // helper var
   //       let someBig = ethers.utils.parseEther("1");
@@ -5949,9 +4465,9 @@ describe("===Stakerv3ds===", function () {
   //         await ethers.provider.getBlock()
   //       ).timestamp;
 
-  //       await signer2.sendTransaction({
-  //         to: stakerV3dsProxy.address,
-  //         data: claimCallDataString,
+  //       await diamondStakingFacet
+  //         .connect(signer2)
+  //         .claim(0, []);
   //       });
   //       signer2Rewards = signer2Rewards.add(
   //         rewardsPerSecond
@@ -5969,7 +4485,9 @@ describe("===Stakerv3ds===", function () {
   //         10 ** 15
   //       );
 
-  //       const testCallData3 = await mockStakingFacet.connect(signer3).deposit(
+  //       // 3 seconds have passed since the last claim
+  //       //deposit
+  //       await diamondStakingFacet.connect(signer3).deposit(
   //         0,
   //         {
   //           assetAddress: super721.address,
@@ -5980,27 +4498,6 @@ describe("===Stakerv3ds===", function () {
   //         false
   //       );
 
-  //       const testCallData3String = testCallData3.data.toString();
-
-  //       const testCallData7 = await mockStakingFacet.connect(signer3).deposit(
-  //         0,
-  //         {
-  //           assetAddress: super721.address,
-  //           id: [shiftedItemGroupId2.add(5), shiftedItemGroupId2.add(6)],
-  //           amounts: [1, 1],
-  //           IOUTokenId: [],
-  //         },
-  //         true
-  //       );
-
-  //       const testCallData7String = testCallData7.data.toString();
-
-  //       // 3 seconds have passed since the last claim
-  //       //deposit
-  //       await signer3.sendTransaction({
-  //         to: stakerV3dsProxy.address,
-  //         data: testCallData3String,
-  //       });
   //       let signer3DepTime = await utils.getCurrentTime();
   //       signer1Rewards = signer1Rewards.add(
   //         rewardsPerSecond
@@ -6018,11 +4515,17 @@ describe("===Stakerv3ds===", function () {
   //       shares.sum = shares.sig1 + shares.sig2 + shares.sig3;
 
   //       // +1 second (4 overall)
-  //       //deposit
-  //       await signer3.sendTransaction({
-  //         to: stakerV3dsProxy.address,
-  //         data: testCallData7String,
-  //       });
+  //       await diamondStakingFacet.connect(signer3).deposit(
+  //         0,
+  //         {
+  //           assetAddress: super721.address,
+  //           id: [shiftedItemGroupId2.add(5), shiftedItemGroupId2.add(6)],
+  //           amounts: [1, 1],
+  //           IOUTokenId: [],
+  //         },
+  //         true
+  //       );
+
   //       let signer3TimeLockAt = await utils.getCurrentTime();
   //       signer1Rewards = signer1Rewards.add(
   //         rewardsPerSecond
@@ -6100,11 +4603,12 @@ describe("===Stakerv3ds===", function () {
   //       await expect(IOUToken.ownerOf(2)).to.be.reverted;
   //       expect(await IOUToken.ownerOf(4)).to.be.eq(signer3.address);
   //       await expect(IOUToken.ownerOf(5)).to.be.reverted;
-  //       //claim
-  //       await signer1.sendTransaction({
-  //         to: stakerV3dsProxy.address,
-  //         data: claimCallDataString,
+
+  //       await diamondStakingFacet
+  //         .connect(signer1)
+  //         .claim(0, []);
   //       });
+
   //       let signer1LastClaim = await utils.getCurrentTime();
   //       signer1Rewards = signer1Rewards.add(
   //         rewardsPerSecond
@@ -6112,6 +4616,7 @@ describe("===Stakerv3ds===", function () {
   //           .mul(signer1LastClaim - (signer3TimeLockAt + 60))
   //           .div(someBig)
   //       );
+
   //       expect(await IOUToken.ownerOf(2)).to.be.eq(signer1.address);
   //       expect(await IOUToken.ownerOf(4)).to.be.eq(signer3.address);
   //       expect(await IOUToken.ownerOf(5)).to.be.eq(signer3.address);
@@ -6120,10 +4625,11 @@ describe("===Stakerv3ds===", function () {
   //         10 ** 15
   //       );
 
-  //       await signer2.sendTransaction({
-  //         to: stakerV3dsProxy.address,
-  //         data: claimCallDataString,
+  //       await diamondStakingFacet
+  //         .connect(signer2)
+  //         .claim(0, []);
   //       });
+
   //       let signer2LastClaim = await utils.getCurrentTime();
   //       signer2Rewards = signer2Rewards.add(
   //         rewardsPerSecond
@@ -6136,10 +4642,11 @@ describe("===Stakerv3ds===", function () {
   //         10 ** 15
   //       );
 
-  //       await signer3.sendTransaction({
-  //         to: stakerV3dsProxy.address,
-  //         data: claimCallDataString,
+  //       await diamondStakingFacet
+  //         .connect(signer3)
+  //         .claim(0, []);
   //       });
+
   //       let signer3LastClaim = await utils.getCurrentTime();
   //       signer3Rewards = signer3Rewards.add(
   //         rewardsPerSecond
@@ -6162,7 +4669,7 @@ describe("===Stakerv3ds===", function () {
   //       ethers.utils.parseEther("500000")
   //     );
 
-  //     const testCallData1 = await mockCoreFacet.connect(owner).setEmissions(
+  //     await diamondCoreFacet.connect(owner).setEmissions(
   //       [
   //         {
   //           timeStamp: await utils.getCurrentTime(),
@@ -6176,33 +4683,6 @@ describe("===Stakerv3ds===", function () {
   //         },
   //       ]
   //     );
-  //     const testCallData1String = testCallData1.data.toString();
-
-  //     //setEmissions
-  //     await owner.sendTransaction({
-  //       to: stakerV3dsProxy.address,
-  //       data: testCallData1String,
-  //     });
-
-  //     const testCallData2 = await mockCoreFacet.connect(owner).addPool({
-  //       id: 0,
-  //       tokenStrength: 10000,
-  //       pointStrength: 10000,
-  //       groupId: 0,
-  //       tokensPerShare: 0,
-  //       pointsPerShare: 0,
-  //       compoundInterestThreshold: ethers.utils.parseEther("500"),
-  //       compoundInterestMultiplier: 5000,
-  //       boostInfo: [1, 2],
-  //       assetAddress: super721.address,
-  //       typeOfAsset: 1,
-  //       lockPeriod: 0,
-  //       lockAmount: 0,
-  //       lockMultiplier: 0,
-  //       timeLockTypeOfBoost: 0,
-  //       compoundTypeOfBoost: 0,
-  //     });
-  //     const testCallData2String = testCallData2.data.toString();
 
   //     await super721.connect(owner).configureGroup(itemGroupId2, {
   //       name: "PEPSI",
@@ -6227,13 +4707,29 @@ describe("===Stakerv3ds===", function () {
   //       .connect(signer1)
   //       .setApprovalForAll(stakerV3dsProxy.address, true);
 
-  //     //addPool
-  //     await owner.sendTransaction({
-  //       to: stakerV3dsProxy.address,
-  //       data: testCallData2String,
+  //     await diamondCoreFacet.connect(owner).addPool({
+  //       id: 0,
+  //       tokenStrength: 10000,
+  //       pointStrength: 10000,
+  //       groupId: 0,
+  //       tokensPerShare: 0,
+  //       pointsPerShare: 0,
+  //       compoundInterestThreshold: ethers.utils.parseEther("500"),
+  //       compoundInterestMultiplier: 5000,
+  //       boostInfo: [1, 2],
+  //       assetAddress: super721.address,
+  //       typeOfAsset: 1,
+  //       lockPeriod: 0,
+  //       lockAmount: 0,
+  //       lockMultiplier: 0,
+  //       timeLockTypeOfBoost: 0,
+  //       compoundTypeOfBoost: 0,
+  //       typeOfPool: 0,
   //     });
 
-  //     const testCallData3 = await mockStakingFacet.connect(signer1).deposit(
+  //     let signer1DepTime = await utils.getCurrentTime();
+
+  //     await diamondStakingFacet.connect(signer1).deposit(
   //       0,
   //       {
   //         assetAddress: super721.address,
@@ -6248,31 +4744,16 @@ describe("===Stakerv3ds===", function () {
   //       false
   //     );
 
-  //     const testCallData3String = testCallData3.data.toString();
-
-  //     const testCallData4 = await mockStakingFacet
-  //       .connect(signer1)
-  //       .claim(0, []);
-
-  //     const testCallData4String = testCallData4.data.toString();
-
-  //     let signer1DepTime = await utils.getCurrentTime();
-  //     //deposit
-  //     await signer1.sendTransaction({
-  //       to: stakerV3dsProxy.address,
-  //       data: testCallData3String,
-  //     });
-
   //     await network.provider.send("evm_setNextBlockTimestamp", [
   //       signer1DepTime + 30,
   //     ]);
   //     await ethers.provider.send("evm_mine", []);
 
   //     //claim
-  //     await signer1.sendTransaction({
-  //       to: stakerV3dsProxy.address,
-  //       data: testCallData4String,
-  //     });
+  //     await diamondStakingFacet
+  //       .connect(signer1)
+  //       .claim(0, []);
+
   //     // expect(await rewardToken.balanceOf(signer1.address)).to.be.closeTo(
   //     //   ethers.utils.parseEther("300"),
   //     //   10 ** 15
@@ -6283,11 +4764,10 @@ describe("===Stakerv3ds===", function () {
   //     ]);
   //     await ethers.provider.send("evm_mine", []);
 
-  //     //claim
-  //     await signer1.sendTransaction({
-  //       to: stakerV3dsProxy.address,
-  //       data: testCallData4String,
-  //     });
+  //     await diamondStakingFacet
+  //       .connect(signer1)
+  //       .claim(0, []);
+
   //     // 300 + 10 * 50 + 10 * 20 * 1.5 = 1100
   //     // expect(await rewardToken.balanceOf(signer1.address)).to.be.closeTo(
   //     //   ethers.utils.parseEther("1100"),
@@ -6317,23 +4797,16 @@ describe("===Stakerv3ds===", function () {
       );
 
       // addDeveloper()
-      const addDevCallData = await mockCoreFacet
+      await diamondCoreFacet
         .connect(owner)
         .addDeveloper(developer.address, 1000);
-      const addDevCallDataString = addDevCallData.data.toString();
 
-      // execute addDeveloper
-      await owner.sendTransaction({
-        to: stakerV3dsProxy.address,
-        data: addDevCallDataString,
-      });
-
-      await stakerV3FacetCore.connect(owner).initialize(owner.address);
+      //await diamondCoreFacet.connect(owner).initialize(owner.address);
 
       // Note 10 per second is equivalent to 150 per 15 seconds(15 seconds = block time according to Blocks implementation)
       // Now the rewards must be set based on seconds
 
-      const testCallData1 = await mockCoreFacet.connect(owner).setEmissions(
+      await diamondCoreFacet.connect(owner).setEmissions(
         [
           {
             timeStamp: await utils.getCurrentTime(),
@@ -6347,48 +4820,34 @@ describe("===Stakerv3ds===", function () {
           },
         ]
       );
-      const testCallData1String = testCallData1.data.toString();
 
-      //setEmissions
-      await owner.sendTransaction({
-        to: stakerV3dsProxy.address,
-        data: testCallData1String,
-      });
+      await diamondCoreFacet.connect(owner).configureBoostersBatch(
+        [1, 2],
+        [
+          {
+            multiplier: 2300,
+            amountRequired: 3,
+            groupRequired: itemGroupId2,
+            contractRequired: super721.address,
+            boostType: 2,
+            typeOfAsset: 1,
+            historyOfTokenMultipliers: [],
+            historyOfPointMultipliers: [],
+          },
+          {
+            multiplier: 2000,
+            amountRequired: 2,
+            groupRequired: 0,
+            contractRequired: super1155.address,
+            boostType: 2,
+            typeOfAsset: 2,
+            historyOfTokenMultipliers: [],
+            historyOfPointMultipliers: [],
+          },
+        ]
+      );
 
-      const testCallData2 = await mockCoreFacet
-        .connect(owner)
-        .configureBoostersBatch(
-          [1, 2],
-          [
-            {
-              set: true,
-              multiplier: 2300,
-              amountRequired: 3,
-              groupRequired: itemGroupId2,
-              contractRequired: super721.address,
-              assetType: 2,
-              typeOfAsset: 1,
-            },
-            {
-              set: true,
-              multiplier: 2000,
-              amountRequired: 2,
-              groupRequired: 0,
-              contractRequired: super1155.address,
-              assetType: 2,
-              typeOfAsset: 2,
-            },
-          ]
-        );
-      const testCallData2String = testCallData2.data.toString();
-
-      //configureBoosterBatch
-      await owner.sendTransaction({
-        to: stakerV3dsProxy.address,
-        data: testCallData2String,
-      });
-
-      const testCallData3 = await mockCoreFacet.connect(owner).addPool({
+      await diamondCoreFacet.connect(owner).addPool({
         id: 0,
         tokenStrength: 10000,
         pointStrength: 10000,
@@ -6405,13 +4864,7 @@ describe("===Stakerv3ds===", function () {
         lockMultiplier: 0,
         timeLockTypeOfBoost: 0,
         compoundTypeOfBoost: 0,
-      });
-      const testCallData3String = testCallData3.data.toString();
-
-      //addPool
-      await owner.sendTransaction({
-        to: stakerV3dsProxy.address,
-        data: testCallData3String,
+        typeOfPool: 0,
       });
 
       // Mint ITEMS for Signer1
@@ -6478,8 +4931,10 @@ describe("===Stakerv3ds===", function () {
         .setApprovalForAll(stakerV3dsProxy.address, true);
 
       //
+      let startOfStaking = await utils.getCurrentTime();
+
       //User1-Deposit
-      const testCallData4 = await mockStakingFacet.connect(signer1).deposit(
+      await diamondStakingFacet.connect(signer1).deposit(
         0,
         {
           assetAddress: super721.address,
@@ -6494,31 +4949,13 @@ describe("===Stakerv3ds===", function () {
         false
       );
 
-      const testCallData4String = testCallData4.data.toString();
-
-      let startOfStaking = await utils.getCurrentTime();
-      //deposit
-      await signer1.sendTransaction({
-        to: stakerV3dsProxy.address,
-        data: testCallData4String,
-      });
-
-      //User1-Claims
-      const testCallData20 = await mockStakingFacet
-        .connect(signer1)
-        .claim(0, []);
-
-      const testCallData20String = testCallData20.data.toString();
-
       await network.provider.send("evm_setNextBlockTimestamp", [
         startOfStaking + 30,
       ]);
       await ethers.provider.send("evm_mine", []);
-      //claim
-      await signer1.sendTransaction({
-        to: stakerV3dsProxy.address,
-        data: testCallData20String,
-      });
+
+      //User1-Claims
+      await diamondStakingFacet.connect(signer1).claim(0, []);
       // expect(await rewardToken.balanceOf(signer1.address)).to.be.closeTo(
       //   ethers.utils.parseEther("297"),
       //   ethers.utils.parseEther("0.01")
@@ -6528,21 +4965,6 @@ describe("===Stakerv3ds===", function () {
       expect(await IOUToken.ownerOf(0)).to.be.eq(signer1.address);
       expect(await IOUToken.ownerOf(1)).to.be.eq(signer1.address);
 
-      //User1-StakeITEMS
-      const testCallData5 = await mockBoostersFacet
-        .connect(signer1)
-        .stakeItemsBatch(0, 1, {
-          assetAddress: super721.address,
-          id: [
-            shiftedItemGroupId2.add(3),
-            shiftedItemGroupId2.add(4),
-            shiftedItemGroupId2.add(5),
-          ],
-          amounts: [1, 1, 1],
-          IOUTokenId: [],
-        });
-
-      const testCallData5String = testCallData5.data.toString();
       expect(await super721.ownerOf(shiftedItemGroupId2.add(3))).to.be.eq(
         signer1.address
       );
@@ -6552,10 +4974,17 @@ describe("===Stakerv3ds===", function () {
         startOfStaking + 60,
       ]);
       await ethers.provider.send("evm_mine", []);
-      //deposit
-      await signer1.sendTransaction({
-        to: stakerV3dsProxy.address,
-        data: testCallData5String,
+
+      //User1-StakeITEMS
+      await diamondBoostersFacet.connect(signer1).stakeItemsBatch(0, 1, {
+        assetAddress: super721.address,
+        id: [
+          shiftedItemGroupId2.add(3),
+          shiftedItemGroupId2.add(4),
+          shiftedItemGroupId2.add(5),
+        ],
+        amounts: [1, 1, 1],
+        IOUTokenId: [],
       });
 
       expect(await super721.ownerOf(shiftedItemGroupId2.add(3))).to.be.eq(
@@ -6566,29 +4995,25 @@ describe("===Stakerv3ds===", function () {
       );
 
       //user2 stake items
-      const testCallData6 = await mockBoostersFacet
-        .connect(signer2)
-        .stakeItemsBatch(0, 2, {
-          assetAddress: super1155.address,
-          id: [shiftedItemGroupId, shiftedItemGroupId.add(1)],
-          amounts: [1, 1],
-          IOUTokenId: [],
-        });
-
-      const testCallData6String = testCallData6.data.toString();
-
-      //deposit
-      await signer2.sendTransaction({
-        to: stakerV3dsProxy.address,
-        data: testCallData6String,
+      await diamondBoostersFacet.connect(signer2).stakeItemsBatch(0, 2, {
+        assetAddress: super1155.address,
+        id: [shiftedItemGroupId, shiftedItemGroupId.add(1)],
+        amounts: [1, 1],
+        IOUTokenId: [],
       });
 
       expect(
         await super1155.balanceOf(signer2.address, shiftedItemGroupId)
       ).to.be.eq(19);
 
+      // +300 rewards for signer1 (900 summary) and signer 2 is starting staking
+      await network.provider.send("evm_setNextBlockTimestamp", [
+        startOfStaking + 90,
+      ]);
+      await ethers.provider.send("evm_mine", []);
+
       //User2-Deposit
-      const testCallData7 = await mockStakingFacet.connect(signer2).deposit(
+      await diamondStakingFacet.connect(signer2).deposit(
         0,
         {
           assetAddress: super721.address,
@@ -6603,36 +5028,14 @@ describe("===Stakerv3ds===", function () {
         false
       );
 
-      const testCallData7String = testCallData7.data.toString();
-
-      // +300 rewards for signer1 (900 summary) and signer 2 is starting staking
-      await network.provider.send("evm_setNextBlockTimestamp", [
-        startOfStaking + 90,
-      ]);
-      await ethers.provider.send("evm_mine", []);
-      //deposit
-      await signer2.sendTransaction({
-        to: stakerV3dsProxy.address,
-        data: testCallData7String,
-      });
-
-      //User1-Claims
-      const testCallData8 = await mockStakingFacet
-        .connect(signer1)
-        .claim(0, []);
-
-      const testCallData8String = testCallData8.data.toString();
-
       // 900 + about 76 rewards for signer 1 - 1% for developer ~= 966.166
       await network.provider.send("evm_setNextBlockTimestamp", [
         startOfStaking + 105,
       ]);
       await ethers.provider.send("evm_mine", []);
-      //claim
-      await signer1.sendTransaction({
-        to: stakerV3dsProxy.address,
-        data: testCallData8String,
-      });
+
+      //User1-Claims
+      await diamondStakingFacet.connect(signer1).claim(0, []);
 
       // expect(await rewardToken.balanceOf(signer1.address)).to.be.closeTo(
       //   ethers.utils.parseEther("966.166"),
@@ -6643,59 +5046,31 @@ describe("===Stakerv3ds===", function () {
         stakerV3dsProxy.address
       );
       //User1-UnstakeITEMS
-      const testCallData9 = await mockBoostersFacet
-        .connect(signer1)
-        .unstakeItemsBatch(0, 1);
-
-      const testCallData9String = testCallData9.data.toString();
-
-      //withdraw
-      await signer1.sendTransaction({
-        to: stakerV3dsProxy.address,
-        data: testCallData9String,
-      });
+      await diamondBoostersFacet.connect(signer1).unstakeItemsBatch(0, 1);
 
       expect(await super721.ownerOf(shiftedItemGroupId2.add(5))).to.be.eq(
         signer1.address
       );
-
-      //User2-Withdraw
-      const testCallData10 = await mockStakingFacet
-        .connect(signer2)
-        .withdraw(0, [3, 4, 5]);
-
-      const testCallData10String = testCallData10.data.toString();
 
       await network.provider.send("evm_setNextBlockTimestamp", [
         startOfStaking + 120,
       ]);
       await ethers.provider.send("evm_mine", []);
-      //withdraw
-      await signer2.sendTransaction({
-        to: stakerV3dsProxy.address,
-        data: testCallData10String,
-      });
+
+      //User2-Withdraw
+      await diamondStakingFacet.connect(signer2).withdraw(0, [3, 4, 5]);
 
       expect(await super721.ownerOf(shiftedItemGroupId2.add(5))).to.be.eq(
         signer1.address
       );
 
-      //   //User2-Claims
-      const testCallData11 = await mockStakingFacet
-        .connect(signer2)
-        .claim(0, []);
-
-      const testCallData11String = testCallData11.data.toString();
-
       await network.provider.send("evm_setNextBlockTimestamp", [
         startOfStaking + 135,
       ]);
       await ethers.provider.send("evm_mine", []);
-      //claim
-      await signer2.sendTransaction({
-        to: stakerV3dsProxy.address,
-        data: testCallData11String,
-      });
+
+      //User2-Claims
+      await diamondStakingFacet.connect(signer2).claim(0, []);
 
       // its about 2 seconds until tx with user1 unstake booster will be mine,
       // so rewards of signer2 = ~74(150 * 3600 / 7290 at moment of first claim of signer1)
@@ -6711,20 +5086,10 @@ describe("===Stakerv3ds===", function () {
       // );
 
       //User2-UnstakeITEMS
-      const testCallData12 = await mockBoostersFacet
-        .connect(signer2)
-        .unstakeItemsBatch(0, 2);
-
-      const testCallData12String = testCallData12.data.toString();
-
-      //withdraw
-      await signer2.sendTransaction({
-        to: stakerV3dsProxy.address,
-        data: testCallData12String,
-      });
+      await diamondBoostersFacet.connect(signer2).unstakeItemsBatch(0, 2);
 
       // //User1-Deposit
-      // const testCallData12 = await mockStakingFacet
+      // await diamondStakingFacet
       //   .connect(signer1)
       //   .deposit(0, {
       //     assetAddress: super721.address,
@@ -6737,14 +5102,6 @@ describe("===Stakerv3ds===", function () {
       //     IOUTokenId: [],
       //   },
       // false);
-
-      // const testCallData12String = testCallData12.data.toString();
-
-      // //deposit
-      // await signer1.sendTransaction({
-      //   to: stakerV3dsProxy.address,
-      //   data: testCallData12String,
-      // });
     });
   });
 });

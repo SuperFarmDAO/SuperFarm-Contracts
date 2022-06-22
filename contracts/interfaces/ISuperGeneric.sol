@@ -68,9 +68,17 @@ interface ISuperGeneric is IERC165 {
         bytes memory _data
     ) external;
 
+    function mintBatch(
+        address _recipient,
+        uint256 _amount,
+        uint256 _poolId
+    ) external;
+
     function burnBatch(address _burner, uint256[] memory _ids) external;
 
     function ownerOf(uint256 tokenId) external view returns (address);
+
+    function totalSupply() external view returns (uint256);
 
     /**
      * @dev safeBatchTransferFrom is not included in Original Openzeppelin IERC721.

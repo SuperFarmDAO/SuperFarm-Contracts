@@ -2,8 +2,6 @@
 pragma solidity ^0.8.7;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
 import "../../../base/Sweepableds.sol";
 import "../../../interfaces/ISuperGeneric.sol";
@@ -23,15 +21,11 @@ import "../StakerBlueprint.sol";
  * https://github.com/sushiswap/sushiswap/blob/master/contracts/MasterChef.sol
  */
 contract StakerV3FacetPoints is Sweepableds {
-    using SafeERC20 for IERC20;
-    using EnumerableSet for EnumerableSet.UintSet;
-    using EnumerableSet for EnumerableSet.AddressSet;
-
     /**
      * Uses the emission schedule to calculate the total amount of points
      * emitted between two specified timestamps.
-     * @param _fromTime the time to begin calculating emissions from.
-     * @param _toTime the time to calculate total emissions up to.
+     * @param _fromTime The time to begin calculating emissions from.
+     * @param _toTime The time to calculate total emissions up to.
      */
     function getTotalEmittedPoints(uint256 _fromTime, uint256 _toTime)
         internal
@@ -44,7 +38,7 @@ contract StakerV3FacetPoints is Sweepableds {
         uint256 totalEmittedPoints;
         uint256 workingRate;
         uint256 workingTime = _fromTime;
-        for (uint256 i; i < b.pointEmissionEventsCount; i++) {
+        for (uint256 i; i < b.pointEmissionEventsCount; ) {
             uint256 emissionTime = b.pointEmissionEvents[i].timeStamp;
             uint256 emissionRate = b.pointEmissionEvents[i].rate;
             if (_toTime < emissionTime) {
@@ -56,6 +50,9 @@ contract StakerV3FacetPoints is Sweepableds {
                 workingTime = emissionTime;
             }
             workingRate = emissionRate;
+            unchecked {
+                ++i;
+            }
         }
         totalEmittedPoints += ((_toTime - workingTime) * workingRate);
         return totalEmittedPoints;
@@ -67,7 +64,7 @@ contract StakerV3FacetPoints is Sweepableds {
      * @param _poolId The address of a particular staking pool asset to check for a
      *   pending reward.
      * @param _user The user address to check for a pending reward.
-     * @return the pending reward token amount.
+     * @return The pending reward token amount.
      */
     function getPendingPoints(uint256 _poolId, address _user)
         public
@@ -77,8 +74,8 @@ contract StakerV3FacetPoints is Sweepableds {
         StakerBlueprint.StakerStateVariables storage b = StakerBlueprint
             .stakerStateVariables();
 
-        StakerBlueprint.PoolInfo memory pool = b.poolInfoV3[_poolId];
-        StakerBlueprint.UserInfo memory user = b.userInfoV3[_poolId][_user];
+        StakerBlueprint.PoolInfo storage pool = b.poolInfoV3[_poolId];
+        StakerBlueprint.UserInfo storage user = b.userInfoV3[_poolId][_user];
         uint256 pointsPerShare = pool.pointsPerShare;
         uint256 pointBoostedDeposit = pool.pointBoostedDeposit;
 
@@ -99,19 +96,42 @@ contract StakerV3FacetPoints is Sweepableds {
 
     /**
      * Return the number of points that the user has available to spend.
-     * @param _user the user whose available points we want to get.
-     * @return the number of points that the user has available to spend.
+     * @param _user The user whose available points we want to get.
+     * @return The number of points that the user has available to spend.
      */
     function getAvailablePoints(address _user) public view returns (uint256) {
         StakerBlueprint.StakerStateVariables storage b = StakerBlueprint
             .stakerStateVariables();
 
         uint256 pendingTotal;
-        for (uint256 i; i < b.poolAssets.length; i++) {
+        for (uint256 i; i < b.poolAssets.length; ) {
             uint256 _pendingPoints = getPendingPoints(i, _user);
             pendingTotal += _pendingPoints;
+            unchecked {
+                ++i;
+            }
         }
         return (b.userPoints[_user] + pendingTotal) - b.userSpentPoints[_user];
+    }
+
+    /**
+     * Return the total number of points that the user has ever accrued.
+     * @param _user The user whose total points we want to get.
+     * @return The total number of points that the user has ever accrued.
+     */
+    function getTotalPoints(address _user) external view returns (uint256) {
+        StakerBlueprint.StakerStateVariables storage b = StakerBlueprint
+            .stakerStateVariables();
+
+        uint256 pendingTotal;
+        for (uint256 i; i < b.poolAssets.length; ) {
+            uint256 _pendingPoints = getPendingPoints(i, _user);
+            pendingTotal += _pendingPoints;
+            unchecked {
+                ++i;
+            }
+        }
+        return b.userPoints[_user] + pendingTotal;
     }
 
     /**
