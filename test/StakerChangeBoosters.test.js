@@ -260,7 +260,7 @@ describe("===Stakerv3ds===", function () {
     );
   });
 
-  describe("change booster with 1000 partcipants", function () {
+  describe("Multiplie changes of booster", function () {
     it("stakerv3", async function () {
       await diamondCoreFacet.connect(owner).setEmissions(
         [
