@@ -116,27 +116,6 @@ async function withProxies() {
   return [registry, transferProxy];
 }
 
-<<<<<<< HEAD
-export const withContracts = async function(platformFeeAddress, minimumPlatformFee, protocolFeeAddress, minimumProtocolFee){
-    const [erc1155, erc721, weth] = await withTestTokens();
-    const[registry, transferProxy] = await withProxies();
-
-    const Marketplace = await ethers.getContractFactory("SuperMarketplace");
-
-    const marketplace = await Marketplace.deploy(
-        registry.address,
-        ethers.utils.defaultAbiCoder.encode(["string"],["\x19Ethereum Signed Message:\n"]),
-        transferProxy.address,
-        platformFeeAddress,
-        minimumPlatformFee,
-        protocolFeeAddress,
-        minimumProtocolFee
-    );
-    await marketplace.deployed()
-
-    return [marketplace, registry, transferProxy, erc1155, erc721, weth]
-}
-=======
 export const withContracts = async function (
   platformFeeAddress,
   minimumPlatformFee
@@ -160,7 +139,6 @@ export const withContracts = async function (
 
   return [marketplace, registry, transferProxy, erc1155, erc721, weth];
 };
->>>>>>> partly refactored and fully covered with tests StakerV3ds
 
 export const OrderType = {
   Order: [
@@ -363,47 +341,50 @@ export const getIndex = function (balances, address) {
 
 /*=======================MERKLE UTILS (with allowances)===========================*/
 
-/*=======================MULTICALL=================================*/ 
-export const decodeResult = function(contractABI, func, result) {
-    var functionABI =  contractABI.abi.find((abiItem) => {return abiItem.name == func;});
-    var abiCoder = ethers.utils.defaultAbiCoder;
-    var decoded = abiCoder.decode(functionABI.outputs, String(result)); 
-    return decoded;   
-}
+/*=======================MULTICALL=================================*/
+export const decodeResult = function (contractABI, func, result) {
+  var functionABI = contractABI.abi.find((abiItem) => {
+    return abiItem.name == func;
+  });
+  var abiCoder = ethers.utils.defaultAbiCoder;
+  var decoded = abiCoder.decode(functionABI.outputs, String(result));
+  return decoded;
+};
 
-export const encodeCall = function(address, contractABI, func, param) {
-    var functionABI =  contractABI.abi.find((abiItem) => {return abiItem.name == func;});
-    var iface = new ethers.utils.Interface([functionABI]);
-    var encodedData = iface.encodeFunctionData(func, param);
-    var call = {
-        target: address,
-        callData: encodedData
-    };
-    return [call];
-}
+export const encodeCall = function (address, contractABI, func, param) {
+  var functionABI = contractABI.abi.find((abiItem) => {
+    return abiItem.name == func;
+  });
+  var iface = new ethers.utils.Interface([functionABI]);
+  var encodedData = iface.encodeFunctionData(func, param);
+  var call = {
+    target: address,
+    callData: encodedData,
+  };
+  return [call];
+};
 
-// decodeResults and encodeCalls fucntions  
-export const decodeResults = function(contractABIs, funcs, results) {
-    // iterate over ABIs and funcs to extract result for each call from common
-    var decoded = [];
-    for(var i = 0; i < funcs.length; i++) {
-        var result = decodeResult(contractABIs[i], funcs[i], results[i])
-        decoded = decoded.concat(result); 
-    }
-    return decoded;
-}
+// decodeResults and encodeCalls fucntions
+export const decodeResults = function (contractABIs, funcs, results) {
+  // iterate over ABIs and funcs to extract result for each call from common
+  var decoded = [];
+  for (var i = 0; i < funcs.length; i++) {
+    var result = decodeResult(contractABIs[i], funcs[i], results[i]);
+    decoded = decoded.concat(result);
+  }
+  return decoded;
+};
 
-export const encodeCalls = function(addresses, contractABIs, funcs, params) {
-    var encoded = [];
-    for(var i = 0; i < addresses.length; i++) {
-        var call = encodeCall(addresses[i], contractABIs[i], funcs[i], params[i])
-        encoded = encoded.concat(call);
-    }
-    return encoded;
-}
+export const encodeCalls = function (addresses, contractABIs, funcs, params) {
+  var encoded = [];
+  for (var i = 0; i < addresses.length; i++) {
+    var call = encodeCall(addresses[i], contractABIs[i], funcs[i], params[i]);
+    encoded = encoded.concat(call);
+  }
+  return encoded;
+};
 
-/*=======================MULTICALL=================================*/ 
-
+/*=======================MULTICALL=================================*/
 
 /*===============================DIAMOND UTILS=================================== */
 
