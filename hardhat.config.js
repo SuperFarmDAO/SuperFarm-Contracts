@@ -174,10 +174,7 @@ module.exports = {
   gasReporter: {
     enabled: process.env.REPORT_GAS ? true : false,
     currency: "USD",
-    coinmarketcap: "f00f5626-6a6c-4729-8f82-1fce01420257",
-    // outputFile: "gasPrice.txt",
-    // noColors: true,
-    // onlyCalledMethods: false,
+    coinmarketcap: process.env.COINMARKETCAP_API_KEY,
     showTimeSpent: true,
   },
 };
