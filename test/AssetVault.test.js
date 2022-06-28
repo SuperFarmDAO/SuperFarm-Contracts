@@ -25,7 +25,7 @@ describe('AssetVault', function () {
 		carol = { provider: signers[2].provider, signer: signers[2], address: addresses[2] };
 		dev = { provider: signers[3].provider, signer: signers[3], address: addresses[3] };
 
-		// Create factories for deploying all required contracts using specified signers.
+		// Create factories for deploying all required contracts using signers.
 		MultiSigWallet = await ethers.getContractFactory('MultiSigWallet');
 		Timelock = await ethers.getContractFactory('Timelock');
 		AssetVault = await ethers.getContractFactory('AssetVault');
@@ -58,7 +58,8 @@ describe('AssetVault', function () {
       'Vault One',
       dev.address, // panic owner
       dev.address, // panic destination
-      3,
+      3, // panic limit
+      ethers.constants.AddressZero, // evacuation destination
       '0x000000000000000000000000000000000000DEAD' // backup burn
     );
 		await assetVault.deployed();
@@ -93,7 +94,7 @@ describe('AssetVault', function () {
         let vaultBalance = await dev.provider.getBalance(assetVault.address);
 
         // Send Ether from the vault.
-        await assetVault.connect(dev.signer).sendTokens(
+        await assetVault.connect(dev.signer).send(
           [ dev.address ],
           [ ethers.constants.AddressZero ],
           [
@@ -119,7 +120,7 @@ describe('AssetVault', function () {
         devBalance.should.be.equal(0);
 
         // Send tokens from the vault.
-        await assetVault.connect(dev.signer).sendTokens(
+        await assetVault.connect(dev.signer).send(
           [ dev.address ],
           [ token.address ],
           [
@@ -154,7 +155,7 @@ describe('AssetVault', function () {
         devBalance.should.be.equal(0);
 
         // Send tokens from the vault.
-        await assetVault.connect(dev.signer).sendTokens(
+        await assetVault.connect(dev.signer).send(
           [ alice.address ],
           [ test721.address ],
           [
@@ -198,7 +199,7 @@ describe('AssetVault', function () {
         devBalance.should.be.equal(0);
 
         // Send tokens from the vault.
-        await assetVault.connect(dev.signer).sendTokens(
+        await assetVault.connect(dev.signer).send(
           [ alice.address, bob.address ],
           [ test721.address, test721.address ],
           [
@@ -262,7 +263,7 @@ describe('AssetVault', function () {
         devBalance.should.be.equal(0);
 
         // Send tokens from the vault.
-        await assetVault.connect(dev.signer).sendTokens(
+        await assetVault.connect(dev.signer).send(
           [ alice.address, bob.address, alice.address, carol.address ],
           [
             test721.address,
@@ -346,7 +347,7 @@ describe('AssetVault', function () {
         vaultBalance.should.be.equal(1);
 
         // Send tokens from the vault.
-        await assetVault.connect(dev.signer).sendTokens(
+        await assetVault.connect(dev.signer).send(
           [ alice.address ],
           [ test1155.address ],
           [
@@ -380,7 +381,7 @@ describe('AssetVault', function () {
         vaultBalance.should.be.equal(1);
 
         // Send tokens from the vault.
-        await assetVault.connect(dev.signer).sendTokens(
+        await assetVault.connect(dev.signer).send(
           [ alice.address, bob.address ],
           [ test1155.address, test1155.address ],
           [
@@ -428,7 +429,7 @@ describe('AssetVault', function () {
         vaultBalance.should.be.equal(1);
 
         // Send tokens from the vault.
-        await assetVault.connect(dev.signer).sendTokens(
+        await assetVault.connect(dev.signer).send(
           [ alice.address, bob.address, alice.address, carol.address ],
           [
             test1155.address,
@@ -534,7 +535,7 @@ describe('AssetVault', function () {
 
       // Test sending some assets before panic withdrawal.
       it('panic after send works as expected', async () => {
-        await assetVault.connect(dev.signer).sendTokens(
+        await assetVault.connect(dev.signer).send(
           [
             alice.address,
             alice.address,
@@ -681,34 +682,32 @@ describe('AssetVault', function () {
         // Configure the assets that had been directly received.
         await assetVault.connect(dev.signer).configure(
           [
-            token.address,
-            test721.address,
-            secondTest721.address,
-            test1155.address,
-            secondTest1155.address
-          ],
-          [
             {
+              assetAddress: token.address,
               assetType: AssetType.ERC20,
               amounts: [ ethers.utils.parseEther('1000000000') ],
               ids: [ 0 ]
             },
             {
+              assetAddress: test721.address,
               assetType: AssetType.ERC721,
               amounts: [ 1, 1, 1 ],
               ids: [ 1, 2, 3 ]
             },
             {
+              assetAddress: secondTest721.address,
               assetType: AssetType.ERC721,
               amounts: [ 1, 1, 1 ],
               ids: [ 1, 2, 3 ]
             },
             {
+              assetAddress: test1155.address,
               assetType: AssetType.ERC1155,
               amounts: [ 1, 2, 3 ],
               ids: [ 1, 2, 3 ]
             },
             {
+              assetAddress: secondTest1155.address,
               assetType: AssetType.ERC1155,
               amounts: [ 1, 2, 3 ],
               ids: [ 1, 2, 3 ]
@@ -767,39 +766,57 @@ describe('AssetVault', function () {
           []
         );
 
-        // Alice must set the vault as an approved spender.
+        // Alice must set the vault as an approved spender on all assets.
+        await token.connect(alice.signer).approve(
+          assetVault.address,
+          ethers.constants.MaxUint256
+        );
+        await test721.connect(alice.signer).setApprovalForAll(
+          assetVault.address,
+          true
+        );
+        await secondTest721.connect(alice.signer).setApprovalForAll(
+          assetVault.address,
+          true
+        );
+        await test1155.connect(alice.signer).setApprovalForAll(
+          assetVault.address,
+          true
+        );
+        await secondTest1155.connect(alice.signer).setApprovalForAll(
+          assetVault.address,
+          true
+        );
 
         // Have Alice deposit all assets in the vault.
         await assetVault.connect(alice.signer).deposit(
           [
-            token.address,
-            test721.address,
-            secondTest721.address,
-            test1155.address,
-            secondTest1155.address
-          ],
-          [
             {
+              assetAddress: token.address,
               assetType: AssetType.ERC20,
               amounts: [ ethers.utils.parseEther('1000000000') ],
               ids: [ 0 ]
             },
             {
+              assetAddress: test721.address,
               assetType: AssetType.ERC721,
               amounts: [ 1, 1, 1 ],
               ids: [ 1, 2, 3 ]
             },
             {
+              assetAddress: secondTest721.address,
               assetType: AssetType.ERC721,
               amounts: [ 1, 1, 1 ],
               ids: [ 1, 2, 3 ]
             },
             {
+              assetAddress: test1155.address,
               assetType: AssetType.ERC1155,
               amounts: [ 1, 2, 3 ],
               ids: [ 1, 2, 3 ]
             },
             {
+              assetAddress: secondTest1155.address,
               assetType: AssetType.ERC1155,
               amounts: [ 1, 2, 3 ],
               ids: [ 1, 2, 3 ]
@@ -835,7 +852,7 @@ describe('AssetVault', function () {
       //
       //   // Generate the raw transaction for releasing tokens from the vault.
       //   let releaseTokenTransaction = await assetVault.populateTransaction
-      //     .sendTokens(
+      //     .send(
       //       [ dev.address ],
       //       [ token.address ],
       //       [

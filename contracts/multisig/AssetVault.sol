@@ -8,8 +8,8 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Burnable.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Burnable.sol";
+import "@openzeppelin/contracts/token/ERC721/utils/ERC721Holder.sol";
 import "@openzeppelin/contracts/token/ERC1155/extensions/ERC1155Burnable.sol";
 import "@openzeppelin/contracts/token/ERC1155/utils/ERC1155Holder.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
@@ -20,21 +20,17 @@ import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
   conditions later in this contract.
 */
 error CallerIsNotPanicOwner(); // TODO: check reverts
-error CannotChangePanicDetailsOnLockedVault();
+error KeyedArraysMismatch();
 error ERC20AlreadyConfigured();
 error ERC721AlreadyConfigured();
 error ERC1155AlreadyConfigured();
-error KeyedArraysMismatch();
-error AddressOfTokenIsNotPermited();
-error TypeOfAssetIsNotERC721OrERC1155();
+error CannotChangePanicDetailsOnLockedVault();
 error MustSendTokensToAtLeastOneRecipient();
 error RecipientLengthCannotBeMismathedWithAssetsLength();
 error Unsupported721Interface();
 error Unsupported1155Interface();
-error EtherBurnWasUnsuccesful();
 error EtherTransferWasUnsuccessful();
 
-// TODO: 80 characters
 /**
   @title A vault for securely holding assets. This vault can hold Ether, ERC-20
     tokens, ERC-721 tokens, or ERC-1155 tokens.
@@ -47,15 +43,18 @@ error EtherTransferWasUnsuccessful();
   this vault empowers signatories to mitigate potential damage from an attacker
   via the `panic` function.
 
-  It is recommended that assets be sent to this vault using the `deposit` function, which will correctly configure contract storage such that the `panic` function covers all assets. In the event that using `deposit` is not possible, assets may be manually configured via the `configure` function.
+  It is recommended that assets be sent to this vault using the `deposit`
+  function, which will correctly configure contract storage such that the
+  `panic` function covers all assets. In the event that using `deposit` is not
+  possible, assets may be manually configured via the `configure` function.
 
   June 24th, 2022.
 */
 contract AssetVault is
+  ERC721Holder,
+  ERC1155Holder,
   Ownable,
-  ReentrancyGuard,
-  IERC721Receiver,
-  ERC1155Holder // TODO: interface vs concrete inherit
+  ReentrancyGuard
 {
   using EnumerableSet for EnumerableSet.AddressSet;
   using SafeERC20 for IERC20;
@@ -89,18 +88,31 @@ contract AssetVault is
   */
   address public panicOwner;
 
-  /// An optional address where tokens may be immediately sent by `panicOwner`.
+  /**
+    An address where tokens may be immediately sent by `panicOwner`. If this
+    address is the zero address, then the vault will attempt to burn assets
+    immediately upon panic.
+  */
   address public panicDestination;
 
   /**
-    A counter to limit the number of times a vault can panic before burning the
-    underlying supply of tokens. This limit is in place to protect against a
-    situation where multiple vaults linked in a circle are all compromised. In
-    the event of such an attack, this still gives the original multisignature
-    holders the chance to burn the tokens by repeatedly calling `panic` before
-    the attacker can use `sendTokens`.
+    A counter to limit the number of times a vault can panic before taking a
+    final emergency action on the underlying supply of tokens. This limit is in
+    place to protect against a situation where multiple vaults linked in a
+    cycle are all compromised. In the event of such an attack, this still gives
+    the original multisignature holders the chance to either evacuate or burn
+    the tokens by repeatedly calling `panic` before the attacker can use `send`.
+
+    When the panic limit is reached, assets will be sent to
+    `evacuationDestination`. If they fail to transfer, they will be burnt.
   */
   uint256 public immutable panicLimit;
+
+  /**
+    An address where tokens are attempted to be evacuated to in the event the
+    `panicLimit` is tripped.
+  */
+  address public immutable evacuationDestination;
 
   /**
     A backup burn destination to use in the event that an asset is not
@@ -188,6 +200,31 @@ contract AssetVault is
   mapping ( address => Asset ) public assets;
 
   /**
+    This struct defines one or more operation of a single specific type of asset
+    in this vault. It is used to prepare this vault's configuration to accept
+    ERC-20, ERC-721, and ERC-1155 tokens. It is used when sending tokens to
+    specify the amount of the specific asset to send. In the case of ERC-721
+    items, it specifies the particular IDs under a contract address to send. In
+    the case of ERC-1155 items, it specifies the particular IDs and their
+    corresponding amounts to send. It includes the address of the smart contract
+    which the `Asset` struct otherwise lacks.
+
+    @param assetType An `AssetType` type to classify this asset.
+    @param assetAddress The address of the asset's smart contract.
+    @param amounts An array of token amounts, keyed against the elements in
+      `ids`. In the case that `assetType` is Ether or ERC20, this should be a
+      singleton array containing just the amount that should be transfered.
+    @param ids An array of IDs which should be transfered in the event that
+      `assetType` is ERC721 or ERC1155.
+  */
+  struct AssetSpecification {
+    AssetType assetType;
+    address assetAddress;
+    uint256[] amounts;
+    uint256[] ids;
+  }
+
+  /**
     An event for tracking a deposit of assets into this vault.
 
     @param etherAmount The amount of Ether that was deposited.
@@ -219,12 +256,12 @@ contract AssetVault is
     @param erc1155Count The number of different instances of transfers from
       different ERC-1155 addresses.
   */
-  event TokenSend (
+  event Send (
     uint256 etherAmount,
     uint256 erc20Count,
     uint256 erc721Count,
     uint256 erc1155Count
-  ); // TODO: linguistic adjsutment of 'token' vs 'asset'
+  );
 
   /**
     An event for tracking a change in panic details.
@@ -319,59 +356,95 @@ contract AssetVault is
     @param _panicDestination The destination to withdraw to in emergency.
     @param _panicLimit A limit for the number of times `panic` can be called
       before assets are self-destructed.
+    @param _evacuationDestination An address where tokens are attempted to be
+      evacuated to in the event the `panicLimit` is tripped.
+    @param _backupBurnDestination A backup burn destination to use in the event
+      that an asset is not conventionally-burnable.
   */
   constructor (
     string memory _name,
     address _panicOwner,
     address _panicDestination,
     uint256 _panicLimit,
+    address _evacuationDestination,
     address _backupBurnDestination
   ) {
     name = _name;
     panicOwner = _panicOwner;
     panicDestination = _panicDestination;
     panicLimit = _panicLimit;
+    evacuationDestination = _evacuationDestination;
     backupBurnDestination = _backupBurnDestination;
   }
 
   /**
-    This contract must respond as being able to safely receive ERC-721 items by
-    returning the standard's ERC-721 receiving selector.
+    A private helper function to configure this vault to add assets to the
+    contract that may have been directly transferred without using `deposit`.
+    Assets must first be configured in order to be transferrable via `panic`.
 
-    @return The magic value indicating that this contract may safely receive
-      ERC-721 items.
+    @param _assets An array of `AssetSpecification` structs containing
+      configuration details about each asset being configured.
   */
-  function onERC721Received (
-    address,
-    address,
-    uint256,
-    bytes memory
-  ) public virtual override returns (bytes4) {
-    return this.onERC721Received.selector;
+  function _configure (
+    AssetSpecification[] calldata _assets
+  ) private {
+
+    /*
+      If it isn't already present, add each asset being configured to its
+      appropriate set. Then, update the asset details mapping.
+    */
+    for (uint256 i = 0; i < _assets.length;) {
+
+      // Add any new ERC-20 token addresses.
+      if (_assets[i].assetType == AssetType.ERC20 &&
+        !erc20Assets.contains(_assets[i].assetAddress)) {
+        erc20Assets.add(_assets[i].assetAddress);
+      }
+
+      // Add any new ERC-721 token addresses.
+      if (_assets[i].assetType == AssetType.ERC721 &&
+        !erc721Assets.contains(_assets[i].assetAddress)) {
+        erc721Assets.add(_assets[i].assetAddress);
+      }
+
+      // Add any new ERC-1155 token addresses.
+      if (_assets[i].assetType == AssetType.ERC1155 &&
+        !erc1155Assets.contains(_assets[i].assetAddress)) {
+        erc1155Assets.add(_assets[i].assetAddress);
+      }
+
+      // Update the asset details mapping.
+      assets[_assets[i].assetAddress] = Asset({
+        assetType: _assets[i].assetType,
+        ids: _assets[i].ids,
+        amounts: _assets[i].amounts
+      });
+      unchecked { ++i; }
+    }
+
+    // Emit an event indicating that reconfiguration occurred.
+    emit Reconfigured();
   }
 
   /**
-    Deposit assets directly into this vault such that panic details are automatically configured. Calling this deposit function requires first approving any involved assets for transfer.
+    Deposit assets directly into this vault such that panic details are
+    automatically configured. Calling this deposit function requires first
+    approving any involved assets for transfer.
 
-    @param _assetAddresses An array of contract addresses for assets to deposit.
     @param _assets An array of `Asset` structs containing configuration details
-      about each asset corresponding to an address in `_assetAddresses`.
+      about each asset being deposited.
   */
   function deposit (
-    address[] calldata _assetAddresses, // TODO: compare gas usage to a new combined struct
-    Asset[] calldata _assets
+    AssetSpecification[] calldata _assets
   ) external payable nonReentrant {
-    if (_assetAddresses.length != _assets.length) {
-      revert KeyedArraysMismatch();
-    }
 
     // Transfer each asset to the vault. This requires approving the vault.
     uint256 erc20Count = 0;
     uint256 erc721Count = 0;
     uint256 erc1155Count = 0;
-    for (uint256 i = 0; i < _assetAddresses.length;) {
-      address assetAddress = _assetAddresses[i];
-      Asset memory asset = _assets[i];
+    for (uint256 i = 0; i < _assets.length;) {
+      address assetAddress = _assets[i].assetAddress;
+      AssetSpecification memory asset = _assets[i];
 
       // Send ERC-20 tokens to the vault.
       if (asset.assetType == AssetType.ERC20) {
@@ -436,7 +509,7 @@ contract AssetVault is
     }
 
     // Configure all assets which were just deposited.
-    configure(_assetAddresses, _assets);
+    _configure(_assets);
 
     // Emit a deposit event.
     emit Deposit(msg.value, erc20Count, erc721Count, erc1155Count);
@@ -447,50 +520,13 @@ contract AssetVault is
     directly transferred without using `deposit`. Assets must first be
     configured in order to be transferrable via `panic`.
 
-    @param _assetAddresses An array of contract addresses for assets that must
-      be configured.
     @param _assets An array of `Asset` structs containing configuration details
-      about each asset corresponding to an address in `_assetAddresses`.
+      about each asset being configured.
   */
   function configure (
-    address[] calldata _assetAddresses, // TODO: compare gas usage to a new combined struct
-    Asset[] calldata _assets
-  ) public nonReentrant onlyOwner {
-    if (_assetAddresses.length != _assets.length) {
-      revert KeyedArraysMismatch();
-    }
-
-    /*
-      If it isn't already present, add each asset being configured to its
-      appropriate set. Then, update the asset details mapping.
-    */
-    for (uint256 i = 0; i < _assetAddresses.length;) {
-
-      // Add any new ERC-20 token addresses.
-      if (_assets[i].assetType == AssetType.ERC20 &&
-        !erc20Assets.contains(_assetAddresses[i])) {
-        erc20Assets.add(_assetAddresses[i]);
-      }
-
-      // Add any new ERC-721 token addresses.
-      if (_assets[i].assetType == AssetType.ERC721 &&
-        !erc721Assets.contains(_assetAddresses[i])) {
-        erc721Assets.add(_assetAddresses[i]);
-      }
-
-      // Add any new ERC-1155 token addresses.
-      if (_assets[i].assetType == AssetType.ERC1155 &&
-        !erc1155Assets.contains(_assetAddresses[i])) {
-        erc1155Assets.add(_assetAddresses[i]);
-      }
-
-      // Update the asset details mapping.
-      assets[_assetAddresses[i]] = _assets[i];
-      unchecked { ++i; }
-    }
-
-    // Emit an event indicating that reconfiguration occurred.
-    emit Reconfigured();
+    AssetSpecification[] calldata _assets
+  ) external nonReentrant onlyOwner {
+    _configure(_assets);
   }
 
   /**
@@ -603,7 +639,7 @@ contract AssetVault is
     @param _tokens An array of
     @param _assets An array of `Asset` structs that
   */
-  function sendTokens (
+  function send (
     address[] calldata _recipients,
     address[] calldata _tokens,
     Asset[] calldata _assets
@@ -699,7 +735,7 @@ contract AssetVault is
     }
 
     // Emit an event tracking details about this asset transfer.
-    emit TokenSend(totalEth, erc20Count, erc721Count, erc1155Count);
+    emit Send(totalEth, erc20Count, erc721Count, erc1155Count);
   }
 
   /**
@@ -748,21 +784,33 @@ contract AssetVault is
       address, attempt to burn all assets in the vault.
     */
     if (panicCounter == panicLimit || panicDestination == address(0)) {
+      address targetedAddress = evacuationDestination;
+      if (panicDestination == address(0)) {
+        targetedAddress = address(0);
+      }
 
       // Attempt to burn all Ether; we proceed whether this succeeds or not.
-      (bool success, ) = address(0).call{ value: totalBalanceEth }(""); // TODO: remove success flag
+      address(targetedAddress).call{ value: totalBalanceEth }("");
 
       /*
-        Attempt to burn all ERC-20 tokens. If they supply a burn function, we will try to use it. In the event that a "proper" burn fails, we will transfer the tokens to `0x...DEAD`.
+        Attempt to burn all ERC-20 tokens. If they supply a burn function, we
+        will try to use it. In the event that a "proper" burn fails, we will
+        transfer the tokens to a configurable backup burn address.
       */
       for (uint256 i = 0; i < totalAmountERC20;) {
         IERC20 token = IERC20(erc20Assets.at(i));
         uint256 tokenBalance = token.balanceOf(address(this));
-        // TODO: support configurable pre-burn panic-limit-transfer
-        ERC20Burnable burnable = ERC20Burnable(erc20Assets.at(i));
-        try burnable.burn(tokenBalance) {
-        } catch {
-          token.safeTransfer(backupBurnDestination, tokenBalance);
+        if (targetedAddress == address(0)) {
+          ERC20Burnable burnable = ERC20Burnable(erc20Assets.at(i));
+          try burnable.burn(tokenBalance) {
+          } catch {
+            token.safeTransfer(backupBurnDestination, tokenBalance);
+          }
+        } else {
+          try token.transfer(targetedAddress, tokenBalance) {
+          } catch {
+            token.safeTransfer(backupBurnDestination, tokenBalance);
+          }
         }
         unchecked { ++i; }
       }
@@ -781,14 +829,29 @@ contract AssetVault is
         */
         if (item.supportsInterface(ERC721_INTERFACE_ID)) {
           for (uint256 j = 0; j < assets[erc721Assets.at(i)].ids.length;) {
-            ERC721Burnable burnable = ERC721Burnable(erc721Assets.at(i));
-            try burnable.burn(assets[erc721Assets.at(i)].ids[j]) { // TODO: unroll for readability, check gas?
-            } catch {
-              item.safeTransferFrom(
+            if (targetedAddress == address(0)) {
+              ERC721Burnable burnable = ERC721Burnable(erc721Assets.at(i));
+              try burnable.burn(assets[erc721Assets.at(i)].ids[j]) { // TODO: unroll for readability, check gas?
+              } catch {
+                item.safeTransferFrom(
+                  address(this),
+                  backupBurnDestination,
+                  assets[erc721Assets.at(i)].ids[j]
+                );
+              }
+            } else {
+              try item.safeTransferFrom(
                 address(this),
-                backupBurnDestination,
+                targetedAddress,
                 assets[erc721Assets.at(i)].ids[j]
-              );
+              ) {
+              } catch {
+                item.safeTransferFrom(
+                  address(this),
+                  backupBurnDestination,
+                  assets[erc721Assets.at(i)].ids[j]
+                );
+              }
             }
             unchecked { ++j; }
           }
@@ -797,30 +860,52 @@ contract AssetVault is
       }
 
       /*
-        Attempt to transfer all ERC-1155 items held by this vault. Invalid items will be left behind.
+        Attempt to transfer all ERC-1155 items held by this vault. Invalid items
+        will be left behind.
       */
       for (uint256 i = 0; i < totalAmountERC1155;) {
         IERC1155 item = IERC1155(erc1155Assets.at(i));
 
         /*
-          Panic burning is an emergency self-destruct and therefore we will not fail upon encountering potentially-invalid items. It is more important to ensure that whatever items may be burnt are burnt.
+          Panic burning is an emergency self-destruct and therefore we will not
+          fail upon encountering potentially-invalid items. It is more important
+          to ensure that whatever items may be burnt are burnt.
         */
         if (item.supportsInterface(ERC1155_INTERFACE_ID)) {
           for (uint256 j = 0; j < assets[erc1155Assets.at(i)].ids.length;) {
-            ERC1155Burnable burnable = ERC1155Burnable(erc1155Assets.at(i));
-            try burnable.burn(
-              address(this),
-              assets[erc1155Assets.at(i)].ids[j],
-              assets[erc1155Assets.at(i)].amounts[j]
-            ) { // TODO: unroll for readability, check gas?
-            } catch {
-              item.safeTransferFrom(
+            if (targetedAddress == address(0)) {
+              ERC1155Burnable burnable = ERC1155Burnable(erc1155Assets.at(i));
+              try burnable.burn(
                 address(this),
-                backupBurnDestination,
+                assets[erc1155Assets.at(i)].ids[j],
+                assets[erc1155Assets.at(i)].amounts[j]
+              ) { // TODO: unroll for readability, check gas?
+              } catch {
+                item.safeTransferFrom(
+                  address(this),
+                  backupBurnDestination,
+                  assets[erc1155Assets.at(i)].ids[j],
+                  assets[erc1155Assets.at(i)].amounts[j],
+                  ""
+                );
+              }
+            } else {
+              try item.safeTransferFrom(
+                address(this),
+                targetedAddress,
                 assets[erc1155Assets.at(i)].ids[j],
                 assets[erc1155Assets.at(i)].amounts[j],
                 ""
-              );
+              ) {
+              } catch {
+                item.safeTransferFrom(
+                  address(this),
+                  backupBurnDestination,
+                  assets[erc1155Assets.at(i)].ids[j],
+                  assets[erc1155Assets.at(i)].amounts[j],
+                  ""
+                );
+              }
             }
             unchecked { ++j; }
           }
@@ -862,13 +947,17 @@ contract AssetVault is
       }
 
       /*
-        Attempt to transfer all ERC-721 items held by this vault. Invalid items will be left behind.
+        Attempt to transfer all ERC-721 items held by this vault. Invalid items
+        will be left behind.
       */
       for (uint256 i = 0; i < totalAmountERC721;) {
         IERC721 item = IERC721(erc721Assets.at(i));
 
         /*
-          Panic is an emergency withdrawal function and therefore we will not fail upon encountering potentially-invalid items. It is more important to ensure that whatever items may be properly transferred are properly transferred.
+          Panic is an emergency withdrawal function and therefore we will not
+          fail upon encountering potentially-invalid items. It is more important
+          to ensure that whatever items may be properly transferred are properly
+          transferred.
         */
         if (item.supportsInterface(ERC721_INTERFACE_ID)) {
           for (uint256 j = 0; j < assets[erc721Assets.at(i)].ids.length;) {
@@ -884,13 +973,17 @@ contract AssetVault is
       }
 
       /*
-        Attempt to transfer all ERC-1155 items held by this vault. Invalid items will be left behind.
+        Attempt to transfer all ERC-1155 items held by this vault. Invalid items
+        will be left behind.
       */
       for (uint256 i = 0; i < totalAmountERC1155;) {
         IERC1155 item = IERC1155(erc1155Assets.at(i));
 
         /*
-          Panic is an emergency withdrawal function and therefore we will not fail upon encountering potentially-invalid items. It is more important to ensure that whatever items may be properly transferred are properly transferred.
+          Panic is an emergency withdrawal function and therefore we will not
+          fail upon encountering potentially-invalid items. It is more important
+          to ensure that whatever items may be properly transferred are properly
+          transferred.
         */
         if (item.supportsInterface(ERC1155_INTERFACE_ID)) {
           for (uint256 j = 0; j < assets[erc1155Assets.at(i)].ids.length;) {
