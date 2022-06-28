@@ -19,11 +19,7 @@ import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
   statements. We are just declaring these errors for reverting with upon various
   conditions later in this contract.
 */
-error CallerIsNotPanicOwner(); // TODO: check reverts
-error KeyedArraysMismatch();
-error ERC20AlreadyConfigured();
-error ERC721AlreadyConfigured();
-error ERC1155AlreadyConfigured();
+error CallerIsNotPanicOwner();
 error CannotChangePanicDetailsOnLockedVault();
 error MustSendTokensToAtLeastOneRecipient();
 error RecipientLengthCannotBeMismathedWithAssetsLength();
@@ -386,7 +382,7 @@ contract AssetVault is
       configuration details about each asset being configured.
   */
   function _configure (
-    AssetSpecification[] calldata _assets
+    AssetSpecification[] memory _assets
   ) private {
 
     /*
@@ -435,7 +431,7 @@ contract AssetVault is
       about each asset being deposited.
   */
   function deposit (
-    AssetSpecification[] calldata _assets
+    AssetSpecification[] memory _assets
   ) external payable nonReentrant {
 
     // Transfer each asset to the vault. This requires approving the vault.
@@ -492,19 +488,15 @@ contract AssetVault is
         }
 
         // Perform a transfer of each asset.
-        for (uint256 j = 0; j < asset.ids.length;) {
-          item.safeTransferFrom(
-            _msgSender(),
-            address(this),
-            asset.ids[j],
-            asset.amounts[j],
-            ""
-          );
-          unchecked { ++j; }
-        }
+        item.safeBatchTransferFrom(
+          _msgSender(),
+          address(this),
+          asset.ids,
+          asset.amounts,
+          ""
+        );
         erc1155Count += 1;
       }
-
       unchecked { ++i; }
     }
 
@@ -524,7 +516,7 @@ contract AssetVault is
       about each asset being configured.
   */
   function configure (
-    AssetSpecification[] calldata _assets
+    AssetSpecification[] memory _assets
   ) external nonReentrant onlyOwner {
     _configure(_assets);
   }
@@ -640,15 +632,15 @@ contract AssetVault is
     @param _assets An array of `Asset` structs that
   */
   function send (
-    address[] calldata _recipients,
-    address[] calldata _tokens,
-    Asset[] calldata _assets
+    address[] memory _recipients,
+    address[] memory _tokens,
+    Asset[] memory _assets
   ) external nonReentrant onlyOwner {
     if (_recipients.length == 0) {
       revert MustSendTokensToAtLeastOneRecipient();
     }
     if (_recipients.length != _assets.length) {
-      revert RecipientLengthCannotBeMismathedWithAssetsLength(); // TODO: trim
+      revert RecipientLengthCannotBeMismathedWithAssetsLength();
     }
 
     /*
@@ -716,16 +708,13 @@ contract AssetVault is
         }
 
         // Perform a transfer of each asset.
-        for (uint256 j = 0; j < asset.ids.length;) {
-          item.safeTransferFrom(
-            address(this),
-            recipient,
-            asset.ids[j],
-            asset.amounts[j],
-            ""
-          );
-          unchecked { ++j; }
-        }
+        item.safeBatchTransferFrom(
+          address(this),
+          recipient,
+          asset.ids,
+          asset.amounts,
+          ""
+        );
         erc1155Count += 1;
       }
 
@@ -798,10 +787,11 @@ contract AssetVault is
         transfer the tokens to a configurable backup burn address.
       */
       for (uint256 i = 0; i < totalAmountERC20;) {
-        IERC20 token = IERC20(erc20Assets.at(i));
+        address assetAddress = erc20Assets.at(i);
+        IERC20 token = IERC20(assetAddress);
         uint256 tokenBalance = token.balanceOf(address(this));
         if (targetedAddress == address(0)) {
-          ERC20Burnable burnable = ERC20Burnable(erc20Assets.at(i));
+          ERC20Burnable burnable = ERC20Burnable(assetAddress);
           try burnable.burn(tokenBalance) {
           } catch {
             token.safeTransfer(backupBurnDestination, tokenBalance);
@@ -820,7 +810,9 @@ contract AssetVault is
         be left behind.
       */
       for (uint256 i = 0; i < totalAmountERC721;) {
-        IERC721 item = IERC721(erc721Assets.at(i));
+        address assetAddress = erc721Assets.at(i);
+        IERC721 item = IERC721(assetAddress);
+        Asset memory asset = assets[assetAddress];
 
         /*
           Panic burning is an emergency self-destruct and therefore we will not
@@ -828,28 +820,28 @@ contract AssetVault is
           to ensure that whatever items may be burnt are burnt.
         */
         if (item.supportsInterface(ERC721_INTERFACE_ID)) {
-          for (uint256 j = 0; j < assets[erc721Assets.at(i)].ids.length;) {
+          for (uint256 j = 0; j < asset.ids.length;) {
             if (targetedAddress == address(0)) {
-              ERC721Burnable burnable = ERC721Burnable(erc721Assets.at(i));
-              try burnable.burn(assets[erc721Assets.at(i)].ids[j]) { // TODO: unroll for readability, check gas?
+              ERC721Burnable burnable = ERC721Burnable(assetAddress);
+              try burnable.burn(asset.ids[j]) {
               } catch {
                 item.safeTransferFrom(
                   address(this),
                   backupBurnDestination,
-                  assets[erc721Assets.at(i)].ids[j]
+                  asset.ids[j]
                 );
               }
             } else {
               try item.safeTransferFrom(
                 address(this),
                 targetedAddress,
-                assets[erc721Assets.at(i)].ids[j]
+                asset.ids[j]
               ) {
               } catch {
                 item.safeTransferFrom(
                   address(this),
                   backupBurnDestination,
-                  assets[erc721Assets.at(i)].ids[j]
+                  asset.ids[j]
                 );
               }
             }
@@ -864,7 +856,9 @@ contract AssetVault is
         will be left behind.
       */
       for (uint256 i = 0; i < totalAmountERC1155;) {
-        IERC1155 item = IERC1155(erc1155Assets.at(i));
+        address assetAddress = erc1155Assets.at(i);
+        IERC1155 item = IERC1155(assetAddress);
+        Asset memory asset = assets[assetAddress];
 
         /*
           Panic burning is an emergency self-destruct and therefore we will not
@@ -872,42 +866,39 @@ contract AssetVault is
           to ensure that whatever items may be burnt are burnt.
         */
         if (item.supportsInterface(ERC1155_INTERFACE_ID)) {
-          for (uint256 j = 0; j < assets[erc1155Assets.at(i)].ids.length;) {
-            if (targetedAddress == address(0)) {
-              ERC1155Burnable burnable = ERC1155Burnable(erc1155Assets.at(i));
-              try burnable.burn(
+          if (targetedAddress == address(0)) {
+            ERC1155Burnable burnable = ERC1155Burnable(assetAddress);
+            try burnable.burnBatch(
+              address(this),
+              asset.ids,
+              asset.amounts
+            ) {
+            } catch {
+              item.safeBatchTransferFrom(
                 address(this),
-                assets[erc1155Assets.at(i)].ids[j],
-                assets[erc1155Assets.at(i)].amounts[j]
-              ) { // TODO: unroll for readability, check gas?
-              } catch {
-                item.safeTransferFrom(
-                  address(this),
-                  backupBurnDestination,
-                  assets[erc1155Assets.at(i)].ids[j],
-                  assets[erc1155Assets.at(i)].amounts[j],
-                  ""
-                );
-              }
-            } else {
-              try item.safeTransferFrom(
-                address(this),
-                targetedAddress,
-                assets[erc1155Assets.at(i)].ids[j],
-                assets[erc1155Assets.at(i)].amounts[j],
+                backupBurnDestination,
+                asset.ids,
+                asset.amounts,
                 ""
-              ) {
-              } catch {
-                item.safeTransferFrom(
-                  address(this),
-                  backupBurnDestination,
-                  assets[erc1155Assets.at(i)].ids[j],
-                  assets[erc1155Assets.at(i)].amounts[j],
-                  ""
-                );
-              }
+              );
             }
-            unchecked { ++j; }
+          } else {
+            try item.safeBatchTransferFrom(
+              address(this),
+              targetedAddress,
+              asset.ids,
+              asset.amounts,
+              ""
+            ) {
+            } catch {
+              item.safeBatchTransferFrom(
+                address(this),
+                backupBurnDestination,
+                asset.ids,
+                asset.amounts,
+                ""
+              );
+            }
           }
         }
         unchecked { ++i; }
@@ -951,7 +942,9 @@ contract AssetVault is
         will be left behind.
       */
       for (uint256 i = 0; i < totalAmountERC721;) {
-        IERC721 item = IERC721(erc721Assets.at(i));
+        address assetAddress = erc721Assets.at(i);
+        IERC721 item = IERC721(assetAddress);
+        Asset memory asset = assets[assetAddress];
 
         /*
           Panic is an emergency withdrawal function and therefore we will not
@@ -960,11 +953,11 @@ contract AssetVault is
           transferred.
         */
         if (item.supportsInterface(ERC721_INTERFACE_ID)) {
-          for (uint256 j = 0; j < assets[erc721Assets.at(i)].ids.length;) {
+          for (uint256 j = 0; j < asset.ids.length;) {
             item.safeTransferFrom(
               address(this),
               panicDestination,
-              assets[erc721Assets.at(i)].ids[j]
+              asset.ids[j]
             );
             unchecked { ++j; }
           }
@@ -977,7 +970,9 @@ contract AssetVault is
         will be left behind.
       */
       for (uint256 i = 0; i < totalAmountERC1155;) {
-        IERC1155 item = IERC1155(erc1155Assets.at(i));
+        address assetAddress = erc1155Assets.at(i);
+        IERC1155 item = IERC1155(assetAddress);
+        Asset memory asset = assets[assetAddress];
 
         /*
           Panic is an emergency withdrawal function and therefore we will not
@@ -986,16 +981,13 @@ contract AssetVault is
           transferred.
         */
         if (item.supportsInterface(ERC1155_INTERFACE_ID)) {
-          for (uint256 j = 0; j < assets[erc1155Assets.at(i)].ids.length;) {
-            item.safeTransferFrom(
-              address(this),
-              panicDestination,
-              assets[erc1155Assets.at(i)].ids[j],
-              assets[erc1155Assets.at(i)].amounts[j],
-              ""
-            );
-            unchecked { ++j; }
-          }
+          item.safeBatchTransferFrom(
+            address(this),
+            panicDestination,
+            asset.ids,
+            asset.amounts,
+            ""
+          );
         }
         unchecked { ++i; }
       }
