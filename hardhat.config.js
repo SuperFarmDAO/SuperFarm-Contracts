@@ -83,12 +83,6 @@ module.exports = {
 		]
 	},
 	networks: {
-		hardhat: {
-			forking: {
-				url: `https://eth-mainnet.alchemyapi.io/v2/${process.env.ALCHEMY_KEY}`,
-				blockNumber: 12883802
-			}
-		},
 		mainnet: {
 			url: `https://mainnet.infura.io/v3/${INFURA_PROJECT_ID}`,
 			accounts: [ `0x${DEPLOYER_PRIVATE_KEY}` ]

@@ -95,10 +95,10 @@ describe('AssetVault', function () {
 
         // Send Ether from the vault.
         await assetVault.connect(dev.signer).send(
-          [ dev.address ],
-          [ ethers.constants.AddressZero ],
           [
             {
+              recipientAddress: dev.address,
+              assetAddress: ethers.constants.AddressZero,
               assetType: AssetType.Ether,
               amounts: [ ethers.utils.parseEther('10') ],
               ids: [ 0 ]
@@ -121,10 +121,10 @@ describe('AssetVault', function () {
 
         // Send tokens from the vault.
         await assetVault.connect(dev.signer).send(
-          [ dev.address ],
-          [ token.address ],
           [
             {
+              recipientAddress: dev.address,
+              assetAddress: token.address,
               assetType: AssetType.ERC20,
               amounts: [ ethers.utils.parseEther('100') ],
               ids: [ 0 ]
@@ -156,10 +156,10 @@ describe('AssetVault', function () {
 
         // Send tokens from the vault.
         await assetVault.connect(dev.signer).send(
-          [ alice.address ],
-          [ test721.address ],
           [
             {
+              recipientAddress: alice.address,
+              assetAddress: test721.address,
               assetType: AssetType.ERC721,
               amounts: [ 1 ],
               ids: [ 2 ]
@@ -200,15 +200,17 @@ describe('AssetVault', function () {
 
         // Send tokens from the vault.
         await assetVault.connect(dev.signer).send(
-          [ alice.address, bob.address ],
-          [ test721.address, test721.address ],
           [
             {
+              recipientAddress: alice.address,
+              assetAddress: test721.address,
               assetType: AssetType.ERC721,
               amounts: [ 1 ],
               ids: [ 2 ]
             },
             {
+              recipientAddress: bob.address,
+              assetAddress: test721.address,
               assetType: AssetType.ERC721,
               amounts: [ 1, 1 ],
               ids: [ 1, 3 ]
@@ -264,30 +266,31 @@ describe('AssetVault', function () {
 
         // Send tokens from the vault.
         await assetVault.connect(dev.signer).send(
-          [ alice.address, bob.address, alice.address, carol.address ],
-          [
-            test721.address,
-            test721.address,
-            secondTest721.address,
-            secondTest721.address
-          ],
           [
             {
+              recipientAddress: alice.address,
+              assetAddress: test721.address,
               assetType: AssetType.ERC721,
               amounts: [ 1 ],
               ids: [ 2 ]
             },
             {
+              recipientAddress: bob.address,
+              assetAddress: test721.address,
               assetType: AssetType.ERC721,
               amounts: [ 1, 1 ],
               ids: [ 1, 3 ]
             },
             {
+              recipientAddress: alice.address,
+              assetAddress: secondTest721.address,
               assetType: AssetType.ERC721,
               amounts: [ 1 ],
               ids: [ 2 ]
             },
             {
+              recipientAddress: carol.address,
+              assetAddress: secondTest721.address,
               assetType: AssetType.ERC721,
               amounts: [ 1, 1 ],
               ids: [ 1, 3 ]
@@ -348,10 +351,10 @@ describe('AssetVault', function () {
 
         // Send tokens from the vault.
         await assetVault.connect(dev.signer).send(
-          [ alice.address ],
-          [ test1155.address ],
           [
             {
+              recipientAddress: alice.address,
+              assetAddress: test1155.address,
               assetType: AssetType.ERC1155,
               amounts: [ 1 ],
               ids: [ 1 ]
@@ -382,15 +385,17 @@ describe('AssetVault', function () {
 
         // Send tokens from the vault.
         await assetVault.connect(dev.signer).send(
-          [ alice.address, bob.address ],
-          [ test1155.address, test1155.address ],
           [
             {
+              recipientAddress: alice.address,
+              assetAddress: test1155.address,
               assetType: AssetType.ERC1155,
               amounts: [ 1 ],
               ids: [ 1 ]
             },
             {
+              recipientAddress: bob.address,
+              assetAddress: test1155.address,
               assetType: AssetType.ERC1155,
               amounts: [ 2 ],
               ids: [ 3 ]
@@ -430,30 +435,31 @@ describe('AssetVault', function () {
 
         // Send tokens from the vault.
         await assetVault.connect(dev.signer).send(
-          [ alice.address, bob.address, alice.address, carol.address ],
-          [
-            test1155.address,
-            test1155.address,
-            secondTest1155.address,
-            secondTest1155.address
-          ],
           [
             {
+              recipientAddress: alice.address,
+              assetAddress: test1155.address,
               assetType: AssetType.ERC1155,
               amounts: [ 1 ],
               ids: [ 2 ]
             },
             {
+              recipientAddress: bob.address,
+              assetAddress: test1155.address,
               assetType: AssetType.ERC1155,
               amounts: [ 1, 1 ],
               ids: [ 1, 3 ]
             },
             {
+              recipientAddress: alice.address,
+              assetAddress: secondTest1155.address,
               assetType: AssetType.ERC1155,
               amounts: [ 1 ],
               ids: [ 2 ]
             },
             {
+              recipientAddress: carol.address,
+              assetAddress: secondTest1155.address,
               assetType: AssetType.ERC1155,
               amounts: [ 1, 1 ],
               ids: [ 1, 3 ]
@@ -537,41 +543,37 @@ describe('AssetVault', function () {
       it('panic after send works as expected', async () => {
         await assetVault.connect(dev.signer).send(
           [
-            alice.address,
-            alice.address,
-            alice.address,
-            alice.address,
-            alice.address
-          ],
-          [
-            token.address,
-            test721.address,
-            secondTest721.address,
-            test1155.address,
-            secondTest1155.address
-          ],
-          [
             {
+              recipientAddress: alice.address,
+              assetAddress: token.address,
               assetType: AssetType.ERC20,
               amounts: [ ethers.utils.parseEther('1') ],
               ids: [ 0 ]
             },
             {
+              recipientAddress: alice.address,
+              assetAddress: test721.address,
               assetType: AssetType.ERC721,
               amounts: [ 1 ],
               ids: [ 1 ]
             },
             {
+              recipientAddress: alice.address,
+              assetAddress: secondTest721.address,
               assetType: AssetType.ERC721,
               amounts: [ 1 ],
               ids: [ 1 ]
             },
             {
+              recipientAddress: alice.address,
+              assetAddress: test1155.address,
               assetType: AssetType.ERC1155,
               amounts: [ 1 ],
               ids: [ 3 ]
             },
             {
+              recipientAddress: alice.address,
+              assetAddress: secondTest1155.address,
               assetType: AssetType.ERC1155,
               amounts: [ 1, 1 ],
               ids: [ 2, 3 ]
@@ -833,116 +835,116 @@ describe('AssetVault', function () {
 
       // Test vault panic.
       testPanic();
-    });
 
-    // Test the vault in a multisig configuration.
-    describe('with multisig', function () {
+      // Test the vault in a multisig configuration.
+      describe('with multisig', function () {
 
-      // Transfer control of the multi-asset vault to the multisig timelock.
-      beforeEach(async () => {
-        await assetVault.connect(alice.signer).transferOwnership(
-          timelock.address
-        );
+        // Transfer control of the multi-asset vault to the multisig timelock.
+        beforeEach(async () => {
+          await assetVault.connect(dev.signer).transferOwnership(
+            timelock.address
+          );
+        });
+
+        // Verify that the multisignature wallet can send assets from the vault.
+        it('allow the multisig to send assets via timelock', async () => {
+          let devBalance = await token.balanceOf(dev.address);
+          devBalance.should.be.equal(0);
+
+          // Generate the raw transaction for releasing assets from the vault.
+          let releaseTokenTransaction = await assetVault.populateTransaction
+            .send(
+              [
+                {
+                  recipientAddress: dev.address,
+                  assetAddress: token.address,
+                  assetType: AssetType.ERC20,
+                  amounts: [ ethers.utils.parseEther('100') ],
+                  ids: [ 0 ]
+                }
+              ]
+            );
+
+          // Prepare the raw transaction for enqueuing release in the timelock.
+          let enqueueTransaction = await timelock.populateTransaction.queueTransaction(assetVault.address, ethers.utils.parseEther('0'), '', releaseTokenTransaction.data, Math.floor(Date.now() / 1000) + 100000);
+
+          // Generate the raw transaction for executing token release with the time lock.
+          let executeTransaction = await timelock.populateTransaction.executeTransaction(assetVault.address, ethers.utils.parseEther('0'), '', releaseTokenTransaction.data, Math.floor(Date.now() / 1000) + 100000);
+
+          // Submit the token release transaction with the first multisigner.
+          await multiSig.connect(alice.signer).submitTransaction(timelock.address, ethers.utils.parseEther('0'), enqueueTransaction.data);
+          let transactionData = await multiSig.transactions(0);
+          transactionData.destination.should.be.equal(timelock.address);
+          transactionData.value.should.be.equal(ethers.utils.parseEther('0'));
+          transactionData.data.should.be.equal(enqueueTransaction.data);
+          transactionData.executed.should.be.equal(false);
+          let aliceConfirmation = await multiSig.confirmations(0, alice.address);
+          aliceConfirmation.should.be.equal(true);
+
+          // Confirm the token release transaction with the second multisigner.
+          let confirmationTransaction = await multiSig.connect(bob.signer).confirmTransaction(0);
+          let confirmationReceipt = await confirmationTransaction.wait();
+          let executionEvent = confirmationReceipt.events[confirmationReceipt.events.length - 1];
+          executionEvent.event.should.be.equal('Execution');
+          transactionData = await multiSig.transactions(0);
+          transactionData.destination.should.be.equal(timelock.address);
+          transactionData.value.should.be.equal(ethers.utils.parseEther('0'));
+          transactionData.data.should.be.equal(enqueueTransaction.data);
+          transactionData.executed.should.be.equal(true);
+          let bobConfirmation = await multiSig.confirmations(0, bob.address);
+          bobConfirmation.should.be.equal(true);
+
+          // Confirm that the tokens have not been sent yet.
+          devBalance = await token.balanceOf(dev.address);
+          devBalance.should.be.equal(0);
+
+          // Submit the token release execution transaction with the first multisigner.
+          await multiSig.connect(alice.signer).submitTransaction(timelock.address, ethers.utils.parseEther('0'), executeTransaction.data);
+          transactionData = await multiSig.transactions(1);
+          transactionData.destination.should.be.equal(timelock.address);
+          transactionData.value.should.be.equal(ethers.utils.parseEther('0'));
+          transactionData.data.should.be.equal(executeTransaction.data);
+          transactionData.executed.should.be.equal(false);
+          aliceConfirmation = await multiSig.confirmations(1, alice.address);
+          aliceConfirmation.should.be.equal(true);
+
+          // Confirm that the time lock may not be executed prematurely.
+          confirmationTransaction = await multiSig.connect(bob.signer).confirmTransaction(1);
+          confirmationReceipt = await confirmationTransaction.wait();
+          executionEvent = confirmationReceipt.events[confirmationReceipt.events.length - 1];
+          executionEvent.event.should.be.equal('ExecutionFailure');
+          transactionData = await multiSig.transactions(1);
+          transactionData.destination.should.be.equal(timelock.address);
+          transactionData.value.should.be.equal(ethers.utils.parseEther('0'));
+          transactionData.data.should.be.equal(executeTransaction.data);
+          transactionData.executed.should.be.equal(false);
+          bobConfirmation = await multiSig.confirmations(1, bob.address);
+          bobConfirmation.should.be.equal(true);
+
+          // Wait for the time lock to mature.
+          ethers.provider.send('evm_increaseTime', [ 200000 ]);
+
+          // Reset the second multisig holder's confirmation.
+          await multiSig.connect(bob.signer).revokeConfirmation(1);
+
+          // Confirm that the time lock may now be executed.
+          confirmationTransaction = await multiSig.connect(bob.signer).confirmTransaction(1);
+          confirmationReceipt = await confirmationTransaction.wait();
+          executionEvent = confirmationReceipt.events[confirmationReceipt.events.length - 1];
+          executionEvent.event.should.be.equal('Execution');
+          transactionData = await multiSig.transactions(1);
+          transactionData.destination.should.be.equal(timelock.address);
+          transactionData.value.should.be.equal(ethers.utils.parseEther('0'));
+          transactionData.data.should.be.equal(executeTransaction.data);
+          transactionData.executed.should.be.equal(true);
+          bobConfirmation = await multiSig.confirmations(1, bob.address);
+          bobConfirmation.should.be.equal(true);
+
+          // Confirm that the tokens have been sent.
+          devBalance = await token.balanceOf(dev.address);
+          devBalance.should.be.equal(ethers.utils.parseEther('100'));
+        });
       });
-
-      // Verify that the multisignature wallet can send tokens from the vault.
-      // it('should allow the multisig to send tokens via timelock', async () => {
-      //   let devBalance = await token.balanceOf(dev.address);
-      //   devBalance.should.be.equal(0);
-      //
-      //   // Generate the raw transaction for releasing tokens from the vault.
-      //   let releaseTokenTransaction = await assetVault.populateTransaction
-      //     .send(
-      //       [ dev.address ],
-      //       [ token.address ],
-      //       [
-      //         {
-      //           assetType: AssetType.ERC20,
-      //           amounts: [ ethers.utils.parseEther('100') ],
-      //           ids: [ 0 ]
-      //         }
-      //       ]
-      //     );
-      //
-      //   // Generate the raw transaction for enqueuing token release with the time lock.
-      //   let enqueueTransaction = await timelock.populateTransaction.queueTransaction(assetVault.address, ethers.utils.parseEther('0'), '', releaseTokenTransaction.data, Math.floor(Date.now() / 1000) + 180000);
-      //
-      //   // Generate the raw transaction for executing token release with the time lock.
-      //   let executeTransaction = await timelock.populateTransaction.executeTransaction(assetVault.address, ethers.utils.parseEther('0'), '', releaseTokenTransaction.data, Math.floor(Date.now() / 1000) + 180000);
-      //
-      //   // Submit the token release transaction with the first multisigner.
-      //   await multiSig.connect(alice.signer).submitTransaction(timelock.address, ethers.utils.parseEther('0'), enqueueTransaction.data);
-      //   let transactionData = await multiSig.transactions(0);
-      //   transactionData.destination.should.be.equal(timelock.address);
-      //   transactionData.value.should.be.equal(ethers.utils.parseEther('0'));
-      //   transactionData.data.should.be.equal(enqueueTransaction.data);
-      //   transactionData.executed.should.be.equal(false);
-      //   let aliceConfirmation = await multiSig.confirmations(0, alice.address);
-      //   aliceConfirmation.should.be.equal(true);
-      //
-      //   // Confirm the token release transaction with the second multisigner.
-      //   let confirmationTransaction = await multiSig.connect(bob.signer).confirmTransaction(0);
-      //   let confirmationReceipt = await confirmationTransaction.wait();
-      //   let executionEvent = confirmationReceipt.events[confirmationReceipt.events.length - 1];
-      //   executionEvent.event.should.be.equal('Execution');
-      //   transactionData = await multiSig.transactions(0);
-      //   transactionData.destination.should.be.equal(timelock.address);
-      //   transactionData.value.should.be.equal(ethers.utils.parseEther('0'));
-      //   transactionData.data.should.be.equal(enqueueTransaction.data);
-      //   transactionData.executed.should.be.equal(true);
-      //   let bobConfirmation = await multiSig.confirmations(0, bob.address);
-      //   bobConfirmation.should.be.equal(true);
-      //
-      //   // Confirm that the tokens have not been sent yet.
-      //   devBalance = await token.balanceOf(dev.address);
-      //   devBalance.should.be.equal(0);
-      //
-      //   // Submit the token release execution transaction with the first multisigner.
-      //   await multiSig.connect(alice.signer).submitTransaction(timelock.address, ethers.utils.parseEther('0'), executeTransaction.data);
-      //   transactionData = await multiSig.transactions(1);
-      //   transactionData.destination.should.be.equal(timelock.address);
-      //   transactionData.value.should.be.equal(ethers.utils.parseEther('0'));
-      //   transactionData.data.should.be.equal(executeTransaction.data);
-      //   transactionData.executed.should.be.equal(false);
-      //   aliceConfirmation = await multiSig.confirmations(1, alice.address);
-      //   aliceConfirmation.should.be.equal(true);
-      //
-      //   // Confirm that the time lock may not be executed prematurely.
-      //   confirmationTransaction = await multiSig.connect(bob.signer).confirmTransaction(1);
-      //   confirmationReceipt = await confirmationTransaction.wait();
-      //   executionEvent = confirmationReceipt.events[confirmationReceipt.events.length - 1];
-      //   executionEvent.event.should.be.equal('ExecutionFailure');
-      //   transactionData = await multiSig.transactions(1);
-      //   transactionData.destination.should.be.equal(timelock.address);
-      //   transactionData.value.should.be.equal(ethers.utils.parseEther('0'));
-      //   transactionData.data.should.be.equal(executeTransaction.data);
-      //   transactionData.executed.should.be.equal(false);
-      //   bobConfirmation = await multiSig.confirmations(1, bob.address);
-      //   bobConfirmation.should.be.equal(true);
-      //
-      //   // Wait for the time lock to mature.
-      //   ethers.provider.send('evm_increaseTime', [ 190000 ]);
-      //
-      //   // Reset the second multisig holder's confirmation.
-      //   await multiSig.connect(bob.signer).revokeConfirmation(1);
-      //
-      //   // Confirm that the time lock may now be executed.
-      //   confirmationTransaction = await multiSig.connect(bob.signer).confirmTransaction(1);
-      //   confirmationReceipt = await confirmationTransaction.wait();
-      //   executionEvent = confirmationReceipt.events[confirmationReceipt.events.length - 1];
-      //   executionEvent.event.should.be.equal('Execution');
-      //   transactionData = await multiSig.transactions(1);
-      //   transactionData.destination.should.be.equal(timelock.address);
-      //   transactionData.value.should.be.equal(ethers.utils.parseEther('0'));
-      //   transactionData.data.should.be.equal(executeTransaction.data);
-      //   transactionData.executed.should.be.equal(true);
-      //   bobConfirmation = await multiSig.confirmations(1, bob.address);
-      //   bobConfirmation.should.be.equal(true);
-      //
-      //   // Confirm that the tokens have been sent.
-      //   devBalance = await token.balanceOf(dev.address);
-      //   devBalance.should.be.equal(ethers.utils.parseEther('100'));
-      // });
     });
   });
 });

@@ -21,8 +21,7 @@ import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 */
 error CallerIsNotPanicOwner();
 error CannotChangePanicDetailsOnLockedVault();
-error MustSendTokensToAtLeastOneRecipient();
-error RecipientLengthCannotBeMismathedWithAssetsLength();
+error MustSendAssetsToAtLeastOneRecipient();
 error Unsupported721Interface();
 error Unsupported1155Interface();
 error EtherTransferWasUnsuccessful();
@@ -196,7 +195,7 @@ contract AssetVault is
   mapping ( address => Asset ) public assets;
 
   /**
-    This struct defines one or more operation of a single specific type of asset
+    This struct defines a single operation on some single specific type of asset
     in this vault. It is used to prepare this vault's configuration to accept
     ERC-20, ERC-721, and ERC-1155 tokens. It is used when sending tokens to
     specify the amount of the specific asset to send. In the case of ERC-721
@@ -215,6 +214,32 @@ contract AssetVault is
   */
   struct AssetSpecification {
     AssetType assetType;
+    address assetAddress;
+    uint256[] amounts;
+    uint256[] ids;
+  }
+
+  /**
+    This struct defines the information required to send some single specific
+    type of asset in this vault to a recipient. It is used when sending tokens
+    to specify the amount of the specific asset to send. In the case of ERC-721
+    items, it specifies the particular IDs under a contract address to send. In
+    the case of ERC-1155 items, it specifies the particular IDs and their
+    corresponding amounts to send. It includes the address of the smart contract
+    which the `Asset` struct otherwise lacks.
+
+    @param assetType An `AssetType` type to classify this asset.
+    @param recipientAddress The address of the recipient to send the asset to.
+    @param assetAddress The address of the asset's smart contract.
+    @param amounts An array of token amounts, keyed against the elements in
+      `ids`. In the case that `assetType` is Ether or ERC20, this should be a
+      singleton array containing just the amount that should be transfered.
+    @param ids An array of IDs which should be transfered in the event that
+      `assetType` is ERC721 or ERC1155.
+  */
+  struct SendSpecification {
+    AssetType assetType;
+    address recipientAddress;
     address assetAddress;
     uint256[] amounts;
     uint256[] ids;
@@ -427,8 +452,8 @@ contract AssetVault is
     automatically configured. Calling this deposit function requires first
     approving any involved assets for transfer.
 
-    @param _assets An array of `Asset` structs containing configuration details
-      about each asset being deposited.
+    @param _assets An array of `AssetSpecification` structs containing
+      configuration details about each asset being deposited.
   */
   function deposit (
     AssetSpecification[] memory _assets
@@ -512,8 +537,8 @@ contract AssetVault is
     directly transferred without using `deposit`. Assets must first be
     configured in order to be transferrable via `panic`.
 
-    @param _assets An array of `Asset` structs containing configuration details
-      about each asset being configured.
+    @param _assets An array of `AssetSpecification` structs containing
+      configuration details about each asset being configured.
   */
   function configure (
     AssetSpecification[] memory _assets
@@ -523,40 +548,37 @@ contract AssetVault is
 
   /**
     This private helper function removes from panic storage the particular
-    `_asset` details from the contract address `_token` because said assets were
-    transferred out of the vault and should no longer be tracked.
+    `_asset` details from their corresponding contract addresses because said
+    assets were transferred out of the vault and should no longer be tracked.
 
-    @param _token The contract address to which belong the `_asset` assets which
-      were transferred away.
-    @param _asset An `Asset` struct tracking the assets which were transferred
-      and ought to be removed from panic storage.
+    @param _asset An `AssetSpecification` struct tracking the assets which were
+      transferred and ought to be removed from panic storage.
   */
   function _removeToken (
-    address _token,
-    Asset memory _asset
+    AssetSpecification memory _asset
   ) private {
 
     // Remove a tracked ERC-20 asset if the vault no longer has a balance.
     if (_asset.assetType == AssetType.ERC20) {
-      IERC20 token = IERC20(_token);
+      IERC20 token = IERC20(_asset.assetAddress);
       uint256 balance = token.balanceOf(address(this));
       if (balance == 0) {
-        erc20Assets.remove(_token);
+        erc20Assets.remove(_asset.assetAddress);
       }
     }
 
     // Remove an ERC-721 asset entirely if the vault no longer has a balance.
     if (_asset.assetType == AssetType.ERC721) {
-      IERC721 token = IERC721(_token);
+      IERC721 token = IERC721(_asset.assetAddress);
       uint256 balance = token.balanceOf(address(this));
       if (balance == 0) {
-        erc721Assets.remove(_token);
+        erc721Assets.remove(_asset.assetAddress);
 
       // The vault still carries a balance; remove particular ERC-721 token IDs.
       } else {
 
         // Remove specific elements in `_asset` from the storage asset.
-        uint256[] storage oldIds = assets[_token].ids;
+        uint256[] storage oldIds = assets[_asset.assetAddress].ids;
         for (uint256 i; i < oldIds.length;) {
           for (uint256 j = 0; j < _asset.ids.length;) {
             uint256 candidateId = _asset.ids[j];
@@ -584,8 +606,8 @@ contract AssetVault is
     if (_asset.assetType == AssetType.ERC1155) {
 
       // Reduce the amount held of specific IDs in `_asset`.
-      uint256[] storage oldIds = assets[_token].ids;
-      uint256[] storage oldAmounts = assets[_token].amounts;
+      uint256[] storage oldIds = assets[_asset.assetAddress].ids;
+      uint256[] storage oldAmounts = assets[_asset.assetAddress].amounts;
       for (uint256 i; i < oldIds.length;) {
         for (uint256 j = 0; j < _asset.ids.length;) {
           uint256 candidateId = _asset.ids[j];
@@ -617,9 +639,9 @@ contract AssetVault is
         unchecked { ++i; }
       }
 
-      // If we removed every ID, remove the asset entirely.
+      // If we removed every component ID, remove the ERC-1155 asset entirely.
       if (oldIds.length == 0) {
-        erc1155Assets.remove(_token);
+        erc1155Assets.remove(_asset.assetAddress);
       }
     }
   }
@@ -627,20 +649,14 @@ contract AssetVault is
   /**
     Allows this vault's owner to send assets out of the vault.
 
-    @param _recipients An array of addresses to receive assets.
-    @param _tokens An array of
-    @param _assets An array of `Asset` structs that
+    @param _sends An array of `SendSpecification` structs that each request
+      sending some specific assets from this vault to a recipient.
   */
   function send (
-    address[] memory _recipients,
-    address[] memory _tokens,
-    Asset[] memory _assets
+    SendSpecification[] memory _sends
   ) external nonReentrant onlyOwner {
-    if (_recipients.length == 0) {
-      revert MustSendTokensToAtLeastOneRecipient();
-    }
-    if (_recipients.length != _assets.length) {
-      revert RecipientLengthCannotBeMismathedWithAssetsLength();
+    if (_sends.length == 0) {
+      revert MustSendAssetsToAtLeastOneRecipient();
     }
 
     /*
@@ -651,15 +667,13 @@ contract AssetVault is
     uint256 erc20Count = 0;
     uint256 erc721Count = 0;
     uint256 erc1155Count = 0;
-    for (uint256 i = 0; i < _recipients.length;) {
-      address recipient = _recipients[i];
-      address assetAddress = _tokens[i];
-      Asset memory asset = _assets[i];
+    for (uint256 i = 0; i < _sends.length;) {
+      SendSpecification memory send = _sends[i];
 
       // Send Ether to the recipient.
-      if (asset.assetType == AssetType.Ether) {
-        uint256 amount = asset.amounts[0];
-        (bool success, ) = recipient.call{ value: amount }("");
+      if (send.assetType == AssetType.Ether) {
+        uint256 amount = send.amounts[0];
+        (bool success, ) = send.recipientAddress.call{ value: amount }("");
         if (!success) {
           revert EtherTransferWasUnsuccessful();
         }
@@ -667,15 +681,15 @@ contract AssetVault is
       }
 
       // Send ERC-20 tokens to the recipient.
-      if (asset.assetType == AssetType.ERC20) {
-        uint256 amount = asset.amounts[0];
-        IERC20(assetAddress).safeTransfer(recipient, amount);
+      if (send.assetType == AssetType.ERC20) {
+        uint256 amount = send.amounts[0];
+        IERC20(send.assetAddress).safeTransfer(send.recipientAddress, amount);
         erc20Count += 1;
       }
 
       // Send ERC-721 tokens to the recipient.
-      if (asset.assetType == AssetType.ERC721) {
-        IERC721 item = IERC721(assetAddress);
+      if (send.assetType == AssetType.ERC721) {
+        IERC721 item = IERC721(send.assetAddress);
 
         // Only attempt to send valid ERC-721 items.
         if (!item.supportsInterface(
@@ -685,11 +699,11 @@ contract AssetVault is
         }
 
         // Perform a transfer of each asset.
-        for (uint256 j = 0; j < asset.ids.length;) {
+        for (uint256 j = 0; j < send.ids.length;) {
           item.safeTransferFrom(
             address(this),
-            recipient,
-            asset.ids[j]
+            send.recipientAddress,
+            send.ids[j]
           );
           unchecked { ++j; }
         }
@@ -697,8 +711,8 @@ contract AssetVault is
       }
 
       // Send ERC-1155 tokens to the recipient.
-      if (asset.assetType == AssetType.ERC1155) {
-        IERC1155 item = IERC1155(assetAddress);
+      if (send.assetType == AssetType.ERC1155) {
+        IERC1155 item = IERC1155(send.assetAddress);
 
         // Only attempt to send valid ERC-1155 items.
         if (!item.supportsInterface(
@@ -710,16 +724,21 @@ contract AssetVault is
         // Perform a transfer of each asset.
         item.safeBatchTransferFrom(
           address(this),
-          recipient,
-          asset.ids,
-          asset.amounts,
+          send.recipientAddress,
+          send.ids,
+          send.amounts,
           ""
         );
         erc1155Count += 1;
       }
 
       // Remove the transferred asset from vault storage.
-      _removeToken(assetAddress, asset);
+      _removeToken(AssetSpecification({
+        assetAddress: send.assetAddress,
+        assetType: send.assetType,
+        ids: send.ids,
+        amounts: send.amounts
+      }));
       unchecked { ++i; }
     }
 
