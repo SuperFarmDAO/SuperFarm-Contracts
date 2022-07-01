@@ -681,6 +681,11 @@ contract Super721 is PermitControl, ERC165Storage, IERC721 {
       totalBalances[_from] = totalBalances[_from] - 1;
       totalBalances[_to] = totalBalances[_to] + 1;
 
+      _holderTokens[_from].remove(_ids[i]);
+      _holderTokens[_to].add(_ids[i]);
+
+      _tokenOwners.set(_ids[i], _to);
+
       // Emit the transfer event and perform the safety check.
       emit Transfer(_from, _to, _ids[i]);
       _doSafeTransferAcceptanceCheck(_msgSender(), _from, _to, _ids[i], _data);
