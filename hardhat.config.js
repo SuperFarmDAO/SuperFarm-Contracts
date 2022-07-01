@@ -36,8 +36,7 @@ module.exports = {
 				version: '0.6.6',
 				settings: {
 					optimizer: {
-						enabled: true,
-						runs: 0
+						enabled: true
 					}
 				}
 			},
@@ -53,8 +52,7 @@ module.exports = {
 				version: '0.7.6',
 				settings: {
 					optimizer: {
-						enabled: true,
-						runs: 0
+						enabled: true
 					}
 				}
 			},
@@ -62,8 +60,7 @@ module.exports = {
 				version: '0.8.7',
 				settings: {
 					optimizer: {
-						enabled: true,
-						runs: 0
+						enabled: true
 					}
 				}
 			},
@@ -71,20 +68,21 @@ module.exports = {
 				version: '0.8.8',
 				settings: {
 					optimizer: {
-						enabled: true,
-						runs: 0
+						enabled: true
 					}
 				}
 			},
+			{
+				version: '0.8.15',
+				settings: {
+					optimizer: {
+						enabled: true
+					}
+				}
+			}
 		]
 	},
 	networks: {
-		hardhat: {
-			forking: {
-				url: `https://eth-mainnet.alchemyapi.io/v2/${process.env.ALCHEMY_KEY}`,
-				blockNumber: 12883802
-			}
-		},
 		mainnet: {
 			url: `https://mainnet.infura.io/v3/${INFURA_PROJECT_ID}`,
 			accounts: [ `0x${DEPLOYER_PRIVATE_KEY}` ]
@@ -122,31 +120,31 @@ module.exports = {
 			chainId: 137,
 			gasPrice: "auto",
 			accounts: [ `0x${DEPLOYER_PRIVATE_KEY}` ]
-		}, 
+		},
 		mumbai: {
 			url: "https://rpc-mumbai.maticvigil.com",
 			chainId: 80001,
 			gasPrice: "auto",
 			accounts: [ `0x${DEPLOYER_PRIVATE_KEY}` ]
-		}, 
+		},
 		avalanche: {
 			url: "https://api.avax.network/ext/bc/C/rpc",
 			chainId: 43114,
 			gasPrice: "auto",
 			accounts: [ `0x${DEPLOYER_PRIVATE_KEY}` ]
-		}, 
+		},
 		avalanche_fuji: {
 			url: "https://api.avax-test.network/ext/bc/C/rpc",
 			chainId: 43113,
 			gasPrice: "auto",
 			accounts: [ `0x${DEPLOYER_PRIVATE_KEY}` ]
-		}, 
+		},
 		fantom_testnet:{
 			url: "https://rpc.testnet.fantom.network/",
 			chainId: 4002,
 			gasPrice: "auto",
 			accounts: [ `0x${DEPLOYER_PRIVATE_KEY}` ]
-		}, 
+		},
 		fantom:{
 			url: "https://rpc.ftm.tools/",
 			chainId: 250,
@@ -160,9 +158,13 @@ module.exports = {
 	mocha: {
 		grep: '^(?!.*; using Ganache).*'
 	},
-    contractSizer: {
-        alphaSort: true,
-        runOnCompile: true,
-        disambiguatePaths: false,
-    }
+	gasReporter: {
+    currency: 'USD',
+    coinmarketcap: process.env.COINMARKETCAP_API_KEY
+  },
+  contractSizer: {
+    alphaSort: true,
+    runOnCompile: true,
+    disambiguatePaths: false
+  }
 };
