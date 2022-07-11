@@ -7,9 +7,7 @@
 // 3. Neither the name of the copyright holder nor the names of its contributors may be used to endorse or promote products derived from this software without specific prior written permission.
 // THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 pragma solidity ^0.8.8;
-
 contract Timelock {
-
     event NewAdmin(address indexed newAdmin);
     event NewPendingAdmin(address indexed newPendingAdmin);
     event NewDelay(uint256 indexed newDelay);
@@ -39,7 +37,7 @@ contract Timelock {
     );
 
     uint256 public constant GRACE_PERIOD = 14 days;
-    uint256 public constant MINIMUM_DELAY = 2 days;
+    uint256 public constant MINIMUM_DELAY = 0 days;
     uint256 public constant MAXIMUM_DELAY = 30 days;
 
     address public admin;
@@ -175,7 +173,6 @@ contract Timelock {
             "Timelock::executeTransaction: Call must come from admin."
         );
 
-
         bytes32 txHash = keccak256(
             abi.encode(target, value, signature, data, eta)
         );
@@ -187,7 +184,6 @@ contract Timelock {
             getBlockTimestamp() >= eta,
             "Timelock::executeTransaction: Transaction hasn't surpassed time lock."
         );
-        
         require(
             getBlockTimestamp() <= eta + GRACE_PERIOD,
             "Timelock::executeTransaction: Transaction is stale."

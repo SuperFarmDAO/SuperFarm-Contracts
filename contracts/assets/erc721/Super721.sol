@@ -774,57 +774,38 @@ contract Super721 is PermitControl, ERC165Storage, IERC721 {
     @param _data Additional call data to send with this transfer.
   */
 
-    function safeBatchTransferFrom(
-        address _from,
-        address _to,
-        uint256[] memory _ids,
-        bytes memory _data
-    ) external virtual {
-        require(
-            _to != address(0),
-            "Super721::safeBatchTransferFrom: transfer to the zero address"
-        );
-        require(
-            _from == _msgSender() || isApprovedForAll(_from, _msgSender()),
-            "Super721::safeBatchTransferFrom: caller is not owner nor approved"
-        );
+  function safeBatchTransferFrom(address _from, address _to,
+    uint256[] memory _ids, bytes memory _data)
+    external virtual {
+    require(_to != address(0),
+      "Super721::safeBatchTransferFrom: transfer to the zero address");
+    require(_from == _msgSender() || isApprovedForAll(_from, _msgSender()),
+      "Super721::safeBatchTransferFrom: caller is not owner nor approved");
 
-        // Validate transfer and perform all batch token sends.
-        _beforeTokenTransfer(
-            _msgSender(),
-            _from,
-            _to,
-            _ids,
-            _asSingletonArray(1),
-            _data
-        );
-        for (uint256 i = 0; i < _ids.length; ++i) {
-            // Retrieve the item's group ID.
-            uint256 groupId = (_ids[i] & GROUP_MASK) >> 128;
+    // Validate transfer and perform all batch token sends.
+    _beforeTokenTransfer(_msgSender(), _from, _to, _ids, _asSingletonArray(1), _data);
+    for (uint256 i = 0; i < _ids.length; ++i) {
 
-            // Update all specially-tracked group-specific balances.
-            require(
-                balances[_ids[i]][_from] >= 1,
-                "Super721::safeBatchTransferFrom: insufficient balance for transfer"
-            );
-            balances[_ids[i]][_from] = balances[_ids[i]][_from] - 1;
-            balances[_ids[i]][_to] = balances[_ids[i]][_to] + 1;
-            groupBalances[groupId][_from] = groupBalances[groupId][_from] - 1;
-            groupBalances[groupId][_to] = groupBalances[groupId][_to] + 1;
-            totalBalances[_from] = totalBalances[_from] - 1;
-            totalBalances[_to] = totalBalances[_to] + 1;
-            _tokenOwners.set(_ids[i], _to);
+      // Retrieve the item's group ID.
+      uint256 groupId = (_ids[i] & GROUP_MASK) >> 128;
 
-            // Emit the transfer event and perform the safety check.
-            emit Transfer(_from, _to, _ids[i]);
-            _doSafeTransferAcceptanceCheck(
-                _msgSender(),
-                _from,
-                _to,
-                _ids[i],
-                _data
-            );
-        }
+      // Update all specially-tracked group-specific balances.
+      require(balances[_ids[i]][_from] >= 1, "Super721::safeBatchTransferFrom: insufficient balance for transfer");
+      balances[_ids[i]][_from] = balances[_ids[i]][_from] - 1;
+      balances[_ids[i]][_to] = balances[_ids[i]][_to] + 1;
+      groupBalances[groupId][_from] = groupBalances[groupId][_from] - 1;
+      groupBalances[groupId][_to] = groupBalances[groupId][_to] + 1;
+      totalBalances[_from] = totalBalances[_from] - 1;
+      totalBalances[_to] = totalBalances[_to] + 1;
+
+      _holderTokens[_from].remove(_ids[i]);
+      _holderTokens[_to].add(_ids[i]);
+
+      _tokenOwners.set(_ids[i], _to);
+
+      // Emit the transfer event and perform the safety check.
+      emit Transfer(_from, _to, _ids[i]);
+      _doSafeTransferAcceptanceCheck(_msgSender(), _from, _to, _ids[i], _data);
     }
 
     /**

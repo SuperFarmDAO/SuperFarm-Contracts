@@ -8,14 +8,11 @@ import "@openzeppelin/contracts/utils/Address.sol";
 /**
   @title An advanced permission-management contract.
   @author Tim Clancy
-
   This contract allows for a contract owner to delegate specific rights to
   external addresses. Additionally, these rights can be gated behind certain
   sets of circumstances and granted expiration times. This is useful for some
   more finely-grained access control in contracts.
-  
   The owner of this contract is always a fully-permissioned super-administrator.
-
   August 23rd, 2021.
 */
 abstract contract PermitControlds is OwnableUpgradeable {

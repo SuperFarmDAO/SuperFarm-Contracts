@@ -25,9 +25,9 @@ interface ISuper721 {
         view
         returns (uint256[] memory);
 
-    function mintBatch(address _recipient, uint256[] calldata _ids,
-        bytes memory _data)
-        external;
+    function mintBatch(address _recipient, uint256[] calldata _ids, bytes memory _data) external; 
 
-    function burnBatch(address _burner, uint256[] memory _ids) external;
+    function safeBatchTransferFrom(address _from, address _to, uint256[] memory _ids, bytes memory _data) external;
+
+    function transferOwnership(address newOwner) external;
 }

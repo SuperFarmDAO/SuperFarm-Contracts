@@ -5,6 +5,7 @@ import { network, ethers, waffle } from 'hardhat';
 import { expect } from 'chai';
 
 import 'chai/register-should';
+let currentTime, snapshotId;
 
 const DATA = "0x02";
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
@@ -212,6 +213,17 @@ describe('===TokenVault w/o Timelock and MultiSig===', function () {
 
     });
 
+    // accelerate tests by taking snapshot of block 
+    beforeEach(async function() {
+		currentTime = await (await ethers.provider.getBlock()).timestamp;
+		snapshotId = await network.provider.send("evm_snapshot");
+	});
+
+
+	afterEach(async function() {
+		await network.provider.send("evm_revert", [snapshotId]);
+	});
+
     // Verify that the multisignature wallet can send tokens from the vault.
     it('should update panic data', async () => {    
         await tokenVault.connect(dev).changePanicDetails(carol.address, bob.address);
@@ -221,7 +233,7 @@ describe('===TokenVault w/o Timelock and MultiSig===', function () {
         await expect(
             tokenVault.changePanicDetails(carol.address, bob.address)
         ).to.be.revertedWith(
-            "You cannot change panic details on a vault which is locked."
+            "CannotChangePanicDetailsOnLockedVault()"
         );
     });
 
@@ -231,11 +243,11 @@ describe('===TokenVault w/o Timelock and MultiSig===', function () {
 
         await expect( 
          tokenVault.connect(dev).addSuper721Addr([super721.address])
-        ).to.be.revertedWith("address of super721 already presented in set");
+        ).to.be.revertedWith("AddressOfSuper721AlreadyInSet()");
         
         await expect( 
             tokenVault.connect(dev).addSuper1155Addr([super1155.address])
-        ).to.be.revertedWith("address of super1155 already presented in set");
+        ).to.be.revertedWith("AddressOfSuper1155AlreadyInSet");
     })
 
     let asset721,
@@ -283,21 +295,21 @@ describe('===TokenVault w/o Timelock and MultiSig===', function () {
                     [super721.address],
                     [asset721, asset1155]
                 )
-            ).to.be.revertedWith("Number of contracts and assets should be the same");
+            ).to.be.revertedWith("NumberOfContractsAndAssetsShouldBeTheSame()");
             
             await expect(
                 tokenVault.connect(dev).addTokens(
                     [token.address, super1155.address],
                     [asset721, asset1155]
                 )
-            ).to.be.revertedWith("Address of token is not permited");
+            ).to.be.revertedWith("AddressOfTokenIsNotPermited()");
             
             await expect(
                 tokenVault.connect(dev).addTokens(
                     [super721.address, super1155.address],
                     [assetERC20, assetEth]
                 )
-            ).to.be.revertedWith("Type of asset isn't ERC721 or ERC1155");
+            ).to.be.revertedWith("TypeOfAssetIsNotERC721OrERC1155()");
         });
 
         describe('Test sending of tokens on contract ->', function () {
@@ -366,19 +378,19 @@ describe('===TokenVault w/o Timelock and MultiSig===', function () {
             it('sendTokens() REVERTs:', async () => {
                 await expect(
                  tokenVault.sendTokens([], [token.address], [assetERC20])
-                ).to.be.revertedWith("You must send tokens to at least one recipient.");
+                ).to.be.revertedWith("MustSendTokensToAtLeastOneRecipient");
 
                 await expect(
                  tokenVault.sendTokens([alice.address], [token.address], [assetERC20, asset721])
-                ).to.be.revertedWith("Recipients length cannot be mismatched with assets length.");
+                ).to.be.revertedWith("RecipientLengthCannotBeMismathedWithAssetsLength()");
             
                 await expect(
                  tokenVault.sendTokens([alice.address], [super721Additional.address], [asset721])
-                ).to.be.revertedWith("Super721 address is not availible");
+                ).to.be.revertedWith("Super721IsNotAvailible");
                 
                 await expect(
                     tokenVault.sendTokens([alice.address], [super1155Additional.address], [asset1155])
-                ).to.be.revertedWith("Super1155 address is not availible");
+                ).to.be.revertedWith("Super1155IsNotAvailible");
                 
                 await expect(
                     tokenVault.sendTokens([alice.address], [ZERO_ADDRESS], 
@@ -388,7 +400,7 @@ describe('===TokenVault w/o Timelock and MultiSig===', function () {
                             ids: []
                         }]
                     )
-                ).to.be.revertedWith("send Eth failed");
+                ).to.be.revertedWith("SendEthFailed");
             });
 
 
