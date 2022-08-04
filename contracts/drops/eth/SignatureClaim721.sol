@@ -40,7 +40,7 @@ contract SignatureClaim721 is
     @dev _expiry The expiry time after which this signature cannot execute.
   */
   bytes32 constant public CLAIM_TYPEHASH = keccak256(
-    "mint(address _claimant,uint256 _expiry)"
+    "claim(address _claimant,uint256 _expiry)"
   );
 
   /// The name of this contract.
@@ -138,7 +138,7 @@ contract SignatureClaim721 is
     @param _r Half of the ECDSA signature pair.
     @param _s Half of the ECDSA signature pair.
   */
-  function mint (
+  function claim (
     uint256 _expiry,
     uint8 _v,
     bytes32 _r,
