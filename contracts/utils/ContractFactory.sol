@@ -35,7 +35,7 @@ contract ContractFactory is
   */
   event Deployed (
     address indexed destination,
-    bytes indexed bytecode,
+    bytes bytecode,
     bytes32 indexed salt
   );
 
