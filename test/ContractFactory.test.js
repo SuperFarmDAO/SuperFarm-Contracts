@@ -59,14 +59,19 @@ describe('ContractFactory', function () {
 			).to.be.revertedWith('InvalidSaltSender()');
 
 			// Perform a deployment and verify that the address continues to match.
+			const callValue = ethers.utils.parseEther('0.1');
 			const deployTx = await contractFactory.connect(alice.signer).deploy(
 				bytecode,
 				salt,
-				{ value: ethers.utils.parseEther('0.1') }
+				{ value: callValue }
 			);
 			const deployReceipt = await deployTx.wait();
 			const deployedAddress = deployReceipt.events[0].args.destination;
 			deployedAddress.should.be.equal(expectedAddress);
+
+			// Confirm that the Ether balance was received by the new contract.
+			const deployedBalance = await dev.provider.getBalance(deployedAddress);
+			deployedBalance.should.be.equal(callValue);
 		});
 
 		// Verify that deployment of a non-payable constructor with value fails.
