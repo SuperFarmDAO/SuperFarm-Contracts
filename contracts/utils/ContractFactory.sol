@@ -9,6 +9,7 @@ import "@openzeppelin/contracts/utils/Context.sol";
   conditions later in this contract.
 */
 error InvalidSaltSender();
+error CreationFailedCheckConstructor();
 error FailedToDeployContract();
 
 /**
@@ -69,6 +70,7 @@ contract ContractFactory is
     }
 
     // Create the new contract at `destination`, passing along any value.
+    uint256 destinationSize;
     assembly {
       destination := create2(
         callvalue(),
@@ -76,12 +78,18 @@ contract ContractFactory is
         mload(_bytecode),
         _salt
       )
-      if iszero(extcodesize(destination)) {
-        revert(0, 0)
-      }
+      destinationSize := extcodesize(destination)
     }
 
-    // Revert if the destination is the invalid zero address.
+    /*
+      Revert if the destination size is zero; a likely candidate for this
+      problem is sending value to a non-payable constructor.
+    */
+    if (destinationSize == 0) {
+      revert CreationFailedCheckConstructor();
+    }
+
+    // Revert if the destination is the known-invalid zero address.
     if (destination == address(0)) {
       revert FailedToDeployContract();
     }
