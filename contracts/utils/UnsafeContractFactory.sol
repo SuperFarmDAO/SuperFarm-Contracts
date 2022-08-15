@@ -1,31 +1,33 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 pragma solidity 0.8.16;
 
-import "@openzeppelin/contracts/utils/Context.sol";
-
 /*
   It saves bytecode to revert on custom errors instead of using require
   statements. We are just declaring these errors for reverting with upon various
   conditions later in this contract.
 */
-error InvalidSaltSender();
 error CreationFailedCheckConstructor();
 error FailedToDeployContract();
 
 /**
-  @title A factory for deploying contracts to predetermined addresses.
+  @title An unsafe variant of a factory for deploying contracts to predetermined
+    addresses.
   @author Tim Clancy
 
-  This is a modified take on a contract deployment factory inspired by 0age's
-  Pr000xy `Create2Factory` and miguelm's `Factory`.
+  This is a variant of the `ContractFactory` (which was inspired by 0age's
+  Pr000xy `Create2Factory` and miguelm's `Factory`) that does not feature
+  protections against submitted salts being front-ran.
   https://github.com/0age/Pr000xy/
   https://github.com/miguelmota/solidity-create2-example/
 
-  August 13th, 2022.
+  The intent of dropping salt safety is to allow callers to use salts that were
+  generated from external contexts unaware of the salt protection scheme for use
+  in non-critical applications where loss of funds is not possible (such as
+  deploying vanity addresses).
+
+  August 14th, 2022.
 */
-contract ContractFactory is
-  Context
-{
+contract UnsafeContractFactory {
 
   /**
     An event emitted when a contract is deployed using this factory.
@@ -42,32 +44,21 @@ contract ContractFactory is
 
   /**
     Deploy a new contract with bytecode `_bytecode` to a predetermined address
-    using the salt `_salt`.
+    using the salt `_salt`. There is no front-running protection on the salt.
+    Use with caution.
 
     @param _bytecode The bytecode of a new contract to deploy.
     @param _salt The salt which determines the address where the new contract is
-      deployed to. To mitigate front-runners being able to intercept this salt
-      and potentially snipe the deployment of predetermined contracts, the first
-      20 bytes of this `_salt` must be equal to the message sender.
+      deployed to. There is no front-running protection on the salt.
 
     @return The destination address of newly-deployed contract.
-    @custom:reverts Reverts if the salt encodes an address that is not the
-      caller. Reverts if the contract fails to deploy to the destination.
+    @custom:reverts Reverts if the contract fails to deploy to the destination.
   */
-  function deploy (
+  function unsafeDeploy (
     bytes memory _bytecode,
     bytes32 _salt
   ) external payable returns (address) {
     address destination;
-
-    /*
-      Protect against front-runners intercepting the `_salt` by requiring that
-      the first 20 bytes of the `_salt` be the address of the message sender.
-      Revert if this is not the case.
-    */
-    if (bytes20(_salt) != bytes20(_msgSender())) {
-      revert InvalidSaltSender();
-    }
 
     // Create the new contract at `destination`, passing along any value.
     uint256 destinationSize;
