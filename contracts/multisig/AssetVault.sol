@@ -20,11 +20,12 @@ import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
   conditions later in this contract.
 */
 error CallerIsNotPanicOwner();
+error CallerIsNotWhitelistedDepositor();
 error CannotChangePanicDetailsOnLockedVault();
-error MustSendAssetsToAtLeastOneRecipient();
-error Unsupported721Interface();
-error Unsupported1155Interface();
 error EtherTransferWasUnsuccessful();
+error MustSendAssetsToAtLeastOneRecipient();
+error Unsupported1155Interface();
+error Unsupported721Interface();
 
 /**
   @title A vault for securely holding assets. This vault can hold Ether, ERC-20
@@ -43,7 +44,7 @@ error EtherTransferWasUnsuccessful();
   `panic` function covers all assets. In the event that using `deposit` is not
   possible, assets may be manually configured via the `configure` function.
 
-  June 24th, 2022.
+  August 30th, 2022.
 */
 contract AssetVault is
   ERC721Holder,
@@ -115,6 +116,12 @@ contract AssetVault is
     recommended to use a recognized blackhole address such as `0x...DEAD`.
   */
   address public immutable backupBurnDestination;
+
+  /**
+    A mapping for certifying whether or not a particular caller is a whitelisted
+    depositor. Only the owner of this contract may add or remove depositors.
+  */
+  mapping ( address => bool ) public depositors;
 
   /**
     A flag to determine whether or not alteration of this vault's `panicOwner`
@@ -246,6 +253,19 @@ contract AssetVault is
   }
 
   /**
+    This struct defines the information required to update the whitelist status
+    of a specific potential depositor address. This allows the owner of this
+    vault to control which callers may or may not deposit assets.
+
+    @param depositor The address of the depositor to update.
+    @param status Whether or not the `depositor` should be whitelisted.
+  */
+  struct UpdateDepositor {
+    address depositor;
+    bool status;
+  }
+
+  /**
     An event for tracking a deposit of assets into this vault.
 
     @param etherAmount The amount of Ether that was deposited.
@@ -345,6 +365,17 @@ contract AssetVault is
   );
 
   /**
+    An event for tracking when the whitelist status of a depositor changes.
+
+    @param depositor The depositor whose whitelist status has changed.
+    @param isWhitelisted Whether or not the depositor is allowed to deposit.
+  */
+  event WhitelistedDepositor (
+    address indexed depositor,
+    bool isWhitelisted
+  );
+
+  /**
     An event indicating that the vault contract has received Ether.
 
     @param caller The address of the caller which sent Ether to this vault.
@@ -354,6 +385,14 @@ contract AssetVault is
     address caller,
     uint256 amount
   );
+
+  /// A modifier to see if a caller is a member of the whitelisted `depositors`.
+  modifier onlyDepositors () {
+    if (!depositors[_msgSender()]) {
+      revert CallerIsNotWhitelistedDepositor();
+    }
+    _;
+  }
 
   /// A modifier to see if a caller is the `panicOwner`.
   modifier onlyPanicOwner () {
@@ -457,7 +496,7 @@ contract AssetVault is
   */
   function deposit (
     AssetSpecification[] memory _assets
-  ) external payable nonReentrant {
+  ) external payable nonReentrant onlyDepositors {
 
     // Transfer each asset to the vault. This requires approving the vault.
     uint256 erc20Count = 0;
@@ -1021,6 +1060,24 @@ contract AssetVault is
         totalAmountERC1155,
         panicDestination
       );
+    }
+  }
+
+  /**
+    Configure this vault by updating the whitelisted depositing status of
+    various potential depositors.
+
+    @param _depositors An array of `UpdateDepositor` structs containing
+      configuration details about each depositor being updated.
+  */
+  function updateDepositors (
+    UpdateDepositor[] memory _depositors
+  ) external nonReentrant onlyOwner {
+    for (uint256 i = 0; i < _depositors.length;) {
+      UpdateDepositor memory update = _depositors[i];
+      depositors[update.depositor] = update.status;
+      emit WhitelistedDepositor(update.depositor, update.status);
+      unchecked { ++i; }
     }
   }
 
