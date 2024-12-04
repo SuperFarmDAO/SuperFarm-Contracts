@@ -29,6 +29,3 @@ coverage.json
 
 # Ignore script output.
 output/
-
-# Ignore deployment scripts.
-scripts/
