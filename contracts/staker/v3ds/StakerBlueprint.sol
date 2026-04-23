@@ -1,0 +1,485 @@
+// SPDX-License-Identifier: GPL-3.0
+pragma solidity ^0.8.8;
+
+import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+
+/**
+ * @title Blueprint library for Staker.
+ * @author Qazawat Zirak
+ * This library acts as a blueprint for storage mechanim in the proxy contract.
+ * The library defines state variables in form of structs. It also defines the
+ * storage location of the variables using KECCAK256 to avoid memory collision.
+ * The state is stored in Proxy contract, which does a delegate call.
+ * 9th Feb, 2022.
+ */
+library StakerBlueprint {
+    using EnumerableSet for EnumerableSet.UintSet;
+    using EnumerableSet for EnumerableSet.AddressSet;
+
+    error AssetArrayLengthsMismatch();
+    error InvalidInfoStakeForBoost();
+    error InactivePool();
+    error InvalidAssetToStake();
+    error NotStaked();
+    error InvalidAmount();
+    error IOUTokenFromDifferentPool();
+    error NotAnOwnerOfIOUToken();
+    error NotAnAdmin();
+    error MismatchArgumentsAndHash();
+    error HashUsed();
+    error NotApprovedPointSpender();
+    error InvalidAmountToLock();
+    error TokensAlreadyLocked();
+    error TokenLocked();
+    error InvalidERC721Amount();
+    error CantAlterDevs();
+    error ZeroDevShare();
+    error CantIncreaseDevShare();
+    error InvalidNewAddress();
+    error CantAlterTokenEmissionSchedule();
+    error CantAlterPointEmissionSchedule();
+    error ZeroTokenEmissionEvents();
+    error ZeroPointEmissionEvents();
+    error EmptyBoostInfoArray();
+    error InputLengthsMismatch();
+    error BoosterIdZero();
+    error InvalidConfBoostersInputs();
+    error InvalidConfBoostersAssetType();
+    error EmissionNotSet();
+    error ZeroStrength();
+    error InvalidAsset();
+    error InvalidTypeOfAsset();
+    error InvalidERC20DepositInputs();
+    error InvalidGroupIdForERC20();
+    error InvalidGroupIdForStake();
+    error InvalidTypeOfPool();
+    error WrongTypeOfPoolForTypeOfAsset();
+    error CantGetSameBoosterTwice();
+
+    /// Event for staking non fungible items for boosters.
+    event StakeItemBatch(
+        address indexed user,
+        uint256 indexed _poolId,
+        uint256 boosterId
+    );
+
+    /// Event for unstaking non fungible items from boosters.
+    event UnstakeItemBatch(
+        address indexed user,
+        uint256 indexed _poolId,
+        uint256 boosterId
+    );
+
+    /// An event for tracking when a user has spent points.
+    event SpentPoints(
+        address indexed source,
+        address indexed user,
+        uint256 amount
+    );
+
+    /// The public identifier for the right to add developer.
+    bytes32 public constant ADD_DEVELOPER = keccak256("ADD_DEVELOPER");
+
+    /// The public identifier for the right to lock developers.
+    bytes32 public constant LOCK_DEVELOPERS = keccak256("LOCK_DEVELOPERS");
+
+    /// The public identifier for the right to set emissions.
+    bytes32 public constant SET_EMISSIONS = keccak256("SET_EMISSIONS");
+
+    /// The public identifier for the right to lock token emissions.
+    bytes32 public constant LOCK_TOKEN_EMISSIONS =
+        keccak256("LOCK_TOKEN_EMISSIONS");
+
+    /// The public identifier for the right to lock point emissions.
+    bytes32 public constant LOCK_POINT_EMISSIONS =
+        keccak256("LOCK_POINT_EMISSIONS");
+
+    /// The public identifier for the right to configure boosters.
+    bytes32 public constant CONFIGURE_BOOSTERS =
+        keccak256("CONFIGURE_BOOSTERS");
+
+    /// The public identifier for the right to add pools.
+    bytes32 public constant ADD_POOL = keccak256("ADD_POOL");
+
+    /// The public identifier for the right to approve point spender.
+    bytes32 public constant APPROVE_POINT_SPENDER =
+        keccak256("APPROVE_POINT_SPENDER");
+
+    /// ERC721 interface ID to detect external contracts for Items staking.
+    bytes4 public constant INTERFACE_ERC721 = 0x80ac58cd;
+
+    /// ERC1155 interface ID to detect external contracts for Items staking.
+    bytes4 public constant INTERFACE_ERC1155 = 0xd9b67a26;
+
+    /// @dev A max uint256 value that represents earliest timestamp for quick reference.
+    uint256 public constant MAX_INT = 2**256 - 1;
+
+    /**
+     * This struct defines the state variables for StakerProxy.
+     *
+     * @param admin Address of admin user for verify purposes.
+     * @param implementation Address of the logic contract corresponding to selector.
+     * @param IOUTokenAddress IOU token address.
+     * @param nextIOUTokenId The next available ID to be assumed by the next IOUToken minted.
+     * @param token Token to disburse to stakers.
+     * @param canAlterDevelopers Flag for allowing contract owner to add or set developers.
+     * @param developerAddresses Developer addresses for finding shares in the 'developerShares'.
+     * @param developerShares A mapping of developer addresses to their percent share of emissions.
+     *   Share percentages are represented as 1/1000th of a percent. That is, a 1%
+     *   share of emissions should map an address to 1000.
+     * @param canAlterTokenEmissionSchedule Flag for allowing contract owner to alter token emissions.
+     * @param canAlterPointEmissionSchedule Flag for allowing contract owner to alter point emissions.
+     * @param lastPoolId actual pool id.
+     * @param tokenEmissionEventsCount The total number of 'EmissionPoint' as token emission events in the schedule.
+     * @param pointEmissionEventsCount The total number of 'EmissionPoint' as point emission events in the schedule.
+     * @param tokenEmissionEvents Schedule of token 'EmissionPoint' for finding emission rate changes.
+     * @param pointEmissionEvents Schedule of point 'EmissionPoint' for finding emission rate changes.
+     * @param earliestTokenEmissionEvent Earliest possible token emission timestamp.
+     * @param earliestPointEmissionEvent Earliest possible point emission timestamp.
+     * @param poolAssets Array for enumeration of the pools.
+     * @param poolInfo Mapping of pools to 'PoolInfo' based on their id.
+     * @param userInfo Stored information for each user staking in each pool.
+     * @param totalTokenStrength The total sum of the token strength of all pools.
+     * @param totalPointStrength The total sum of the point strength of all pools.
+     * @param totalTokenDisbursed The total amount of the disbursed token ever emitted by this Staker.
+     * @param userPoints Users additionally accrue non-token points for participating via staking.
+     * @param userSpentPoints The amount of points belonging to a user already spent.
+     * @param approvedPointSpenders A map of all external addresses that are permitted to spend user points.
+     * @param boostInfo Mapping of Booster ID to its 'BoostInfo'.
+     * @param activeBoosters Number of boosters that are active.
+     * @param hashes Signature hashes created for claim function.
+     * @param itemUserInfo Collection of Item stakers.
+     * @param totalItemStakes Items staked in this contract.
+     * @param IOUIdToStakedAsset Mapping that matches pool id => IOU token id => staked assets.
+     * @param poolTokens Array for enumeration of the pools.
+     * @param name Name of the staker.
+     * @param poolLocks Mapping that contains user's address that locked his deposit and time when
+     *  he locked for each pool.
+     * @param lockIndex Mapping that contains indexex from which start to bypass array of time locked deposits
+     *  for each pool.
+     */
+    struct StakerStateVariables {
+        address admin;
+        mapping(bytes4 => address) implementations;
+        address IOUTokenAddress;
+        uint256 nextIOUTokenId;
+        address token;
+        bool canAlterDevelopers;
+        bool canAlterTokenEmissionSchedule;
+        bool canAlterPointEmissionSchedule;
+        EnumerableSet.AddressSet developerAddresses;
+        mapping(address => uint256) developerShares;
+        //mapping(address => uint256) developerRewards;
+        mapping(uint256 => EnumerableSet.UintSet) boosterPools;
+        uint256 lastPoolId;
+        uint256 tokenEmissionEventsCount;
+        uint256 pointEmissionEventsCount;
+        mapping(uint256 => EmissionPoint) tokenEmissionEvents;
+        mapping(uint256 => EmissionPoint) pointEmissionEvents;
+        uint256 earliestTokenEmissionEvent;
+        uint256 earliestPointEmissionEvent;
+        address[] poolAssets;
+        mapping(IERC20 => PoolInfo) poolInfo;
+        mapping(IERC20 => mapping(address => UserInfo)) userInfo;
+        mapping(uint256 => PoolInfo) poolInfoV3;
+        mapping(uint256 => mapping(address => UserInfo)) userInfoV3;
+        mapping(uint256 => mapping(uint256 => RewardsTiedToNFT)) NFTRewards;
+        uint256 totalTokenStrength;
+        uint256 totalPointStrength;
+        uint256 totalTokenDisbursed;
+        mapping(address => uint256) userPoints;
+        mapping(address => uint256) userSpentPoints;
+        mapping(address => bool) approvedPointSpenders;
+        mapping(uint256 => BoostInfo) boostInfo;
+        uint256 activeBoosters;
+        mapping(bytes32 => bool) hashes;
+        mapping(address => ItemUserInfo) itemUserInfo;
+        uint256 totalItemStakes;
+        mapping(uint256 => mapping(uint256 => StakedAsset)) IOUIdToStakedAsset;
+        IERC20[] poolTokens;
+        string name;
+        mapping(uint256 => PoolLocks[]) poolLocks;
+        mapping(uint256 => uint256) lockIndex;
+        mapping(uint256 => mapping(uint256 => uint256)) boosterAmount;
+        mapping(uint256 => mapping(uint256 => uint256[])) tpsOnBoostUpdate;
+        mapping(uint256 => mapping(uint256 => uint256[])) ppsOnBoostUpdate;
+    }
+
+    struct RewardsTiedToNFT {
+        uint256 shareOfTokenBoostedDeposited;
+        uint256 shareOfPointBoostedDeposited;
+        uint256 accamulatedTokenRewards;
+        uint256 accamulatedPointRewards;
+        uint256 tokenPaid;
+        uint256 pointPaid;
+    }
+
+    struct PoolLocks {
+        uint256 lockedAt;
+        address lockedUser;
+    }
+    /**
+     * This emission schedule maps a timestamp to the amount of tokens or points
+     * that should be disbursed starting at that timestamp per-second onwards.
+     * @param timeStamp if current time reaches timestamp, the rate is applied.
+     * @param rate measure of points or tokens emitted per-second.
+     */
+    struct EmissionPoint {
+        uint256 timeStamp;
+        uint256 rate;
+    }
+
+    /**
+     * A struct containing the pool info.
+     * @param typeOfAsset type of asset that is represented in pool.
+     * @param tokenStrength the relative token emission strength of this pool.
+     * @param tokenBoostedDeposit amount of tokens after boosts are applied.
+     * @param tokensPerShare accumulated tokens per share times 1e12.
+     * @param pointStrength the relative point emission strength of this pool.
+     * @param pointBoostedDeposit amount of points after boosts are applied.
+     * @param pointsPerShare accumulated points per share times 1e30.
+     * @param lastRewardEvent record of the time of the last disbursement.
+     * @param boostInfo boosters applied to the pool rewards when eligible. !Must start with 1!
+     * @param lockPeriod the time for which the token will be locked with time locked deposit.
+     * @param lockAmount required amount of tokens for time lock deposit.
+     * @param lockMultiplier multiplier that applies for user's share if time lock deposit is active.
+     * @param compoundInterestThreshold minimum amount of rewards for compound interest multiplier to be applied.
+     * @param compoundInterestMultiplier multiplier that applies for user's rewards if treshold is reached.
+     * @param assetAddress address of asset that should be staked into the pool.
+     * @param typeOfAsset enum that shows which standard the token used in the pool belongs to.
+     * @param timeLockTypeOfBoost enum that specifies Tokens/Points to boost or both by time lock deposit.
+     * @param compoundTypeOfBoost enum that specifies Tokens/Points to boost or both by compound interest.
+     *
+     * 'tokenBoostedDeposit' and 'pointBoostedDeposit' do not change emission
+     * rate, but used to calculate perShare amount when there are boosters.
+     */
+    struct PoolInfo {
+        uint256 tokenStrength;
+        uint256 tokenBoostedDeposit;
+        uint256 tokensPerShare;
+        uint256 pointStrength;
+        uint256 pointBoostedDeposit;
+        uint256 pointsPerShare;
+        uint256 groupId;
+        uint256 lastRewardEvent;
+        uint256[] boostInfo;
+        uint256 lockPeriod;
+        uint256 lockAmount;
+        uint256 lockMultiplier;
+        uint256 compoundInterestThreshold;
+        uint256 compoundInterestMultiplier;
+        address assetAddress;
+        PoolType typeOfPool;
+        AssetType typeOfAsset;
+        BoosterAssetType timeLockTypeOfBoost;
+        BoosterAssetType compoundTypeOfBoost;
+    }
+
+    /**
+     * An auxiliary structure that is used to create or configure an existing pool
+     * @param id id of the generated boost.
+     * @param tokenStrength the relative token emission strength of this pool.
+     * @param pointStrength the relative point emission strength of this pool.
+     * @param groupId id of the group of tokens that should be staked in this pool.
+     * @param tokensPerShare accumulated tokens per share times 1e12.
+     * @param pointsPerShare accumulated points per share times 1e30.
+     * @param boostInfo boosters applied to the pool rewards when eligible. !Must start with 1!
+     * @param lockPeriod the time for which the token will be locked with time locked deposit.
+     * @param lockAmount required amount of tokens for time lock deposit.
+     * @param lockMultiplier multiplier that applies for user's share if time lock deposit is active.
+     * @param compoundInterestThreshold minimum amount of rewards for compound interest multiplier to be applied.
+     * @param compoundInterestMultiplier multiplier that applies for user's rewards if treshold is reached.
+     * @param assetAddress address of asset that should be staked into the pool.
+     * @param typeOfAsset enum that shows which standard the token used in the pool belongs to.
+     * @param timeLockTypeOfBoost enum that specifies Tokens/Points to boost or both by time lock deposit.
+     * @param compoundTypeOfBoost enum that specifies Tokens/Points to boost or both by compound interest.
+     */
+    struct AddPoolStruct {
+        uint256 id;
+        uint256 tokenStrength;
+        uint256 pointStrength;
+        uint256 groupId;
+        uint256 tokensPerShare;
+        uint256 pointsPerShare;
+        uint256[] boostInfo;
+        uint256 lockPeriod;
+        uint256 lockAmount;
+        uint256 lockMultiplier;
+        uint256 compoundInterestThreshold;
+        uint256 compoundInterestMultiplier;
+        address assetAddress;
+        PoolType typeOfPool;
+        AssetType typeOfAsset;
+        BoosterAssetType timeLockTypeOfBoost;
+        BoosterAssetType compoundTypeOfBoost;
+    }
+
+    /**
+     * A struct which represents the V, R, S variables of a signature.
+     * @param v v part of signature.
+     * @param r r part of signature.
+     * @param s s part of signature.
+     */
+    struct Sig {
+        uint8 v;
+        bytes32 r;
+        bytes32 s;
+    }
+
+    /**
+     * The structure stores the checkpoints when the user held the NFT
+     *
+     * @param startTime Beginning of holding
+     * @param endTime Ending of holding
+     * @param balance Holding balance. 1000 = 1
+     */
+    struct Checkpoint {
+        uint256[] startTime;
+        uint256[] endTime;
+        uint256[] tokensBalance;
+        uint256[] pointsBalance;
+        uint256[] tokensPerShare;
+        uint256[] pointsPerShare;
+    }
+
+    /**
+     * A struct containing the Fungible Token Staker information.
+     * @param amount amount of the pool asset being provided by the user.
+     * @param tokenBoostedAmount tokens amount after boosts are applied.
+     * @param pointBoostedAmount points amount after boosts are applied.
+     * @param tokenRewards amount of token rewards accumulated to be claimed.
+     * @param pointRewards amount of point rewards accumulated to be claimed.
+     * @param tokenPaid value of user's total token earnings paid out.
+     *   pending reward = (user.amount * pool.tokensPerShare) - user.rewardDebt.
+     * @param pointPaid value of user's total point earnings paid out.
+     * @param asset The structure stores information about what assets the user has staked
+     */
+    struct UserInfo {
+        uint256 amount;
+        uint256 tokenBoostedAmount;
+        uint256 pointBoostedAmount;
+        uint256 tokenRewards;
+        uint256 pointRewards;
+        uint256 tokenPaid;
+        uint256 pointPaid;
+        StakedAsset asset;
+    }
+
+    enum PoolType {
+        StakingTiedToHolder,
+        StakingTiedToNFT,
+        NoStakingTiedToHolder,
+        NoStakingTiedToNFT
+    }
+
+    /**
+     * The type of asset on which the boost is applied.
+     * @param Tokens boost is applied on the disburse token.
+     * @param Points boost is applied on the points.
+     * @param Both boost is applied on both.
+     */
+    enum BoosterAssetType {
+        Tokens,
+        Points,
+        Both
+    }
+
+    /**
+     * The type of asset that available to stake in.
+     * @param ERC20 represents ERC20 token.
+     * @param ERC721 represents ERC721 token.
+     * @param ERC1155 represents ERC1155 token.
+     */
+    enum AssetType {
+        ERC20,
+        ERC721,
+        ERC1155
+    }
+
+    /**
+     * A booster struct, which stores information on the boost requirements.
+     * @param multiplier the rate which will act as a boost on basis points.
+     *   A multiplier of Zero means, the booster is not set.
+     * @param amountRequired number of Items required from the contract.
+     * @param groupRequired (optional) specifies a group from Items contract
+     *   as requirement for the boost. If 0, then any group or item.
+     * @param contractRequired contract that the required assets belong to.
+     * @param boostType enum that specifies Tokens/Points to boost or both.
+     * @param typeOfAsset type of asset that is represented in booster for lock.
+     */
+    struct BoostInfo {
+        uint32 multiplier;
+        uint24 amountRequired;
+        uint32 groupRequired;
+        address contractRequired;
+        BoosterAssetType boostType;
+        AssetType typeOfAsset;
+        uint256[] historyOfTokenMultipliers;
+        uint256[] historyOfPointMultipliers;
+    }
+
+    /**
+     * The structure stores information about what assets the user has staked
+     * @param assetAddress Address of asset
+     * @param id Array of id's
+     * @param amounts Array of amounts
+     * @param IOUTokenId Arrays of id's of IOUtoken
+     */
+    struct StakedAsset {
+        address assetAddress;
+        uint256[] id;
+        uint256[] amounts;
+        uint256[] IOUTokenId;
+    }
+
+    /**
+     * A struct containing the Items staker information.
+     * @param totalItems total Items staked in this contract by Items staker.
+     * @param tokenIds actual ids of tokens mapped to booster Id.
+     * @param amounts amount of Items per tokenId.
+     * @param boosterIds enumerable booster Ids the user has staked Items in.
+     *
+     * Contract address at the time of unstaking is retreived from boostInfo.
+     */
+    struct ItemUserInfo {
+        uint256 totalItems;
+        mapping(uint256 => EnumerableSet.UintSet) tokenIds;
+        mapping(uint256 => uint256) amounts;
+        EnumerableSet.UintSet boosterIds;
+        mapping(uint256 => LockedItems) lockedItems;
+        mapping(uint256 => uint256) lastNumberOfBoosterUpdate;
+    }
+
+    struct LockedItems {
+        uint256 lockedAt;
+        uint256[] lockedIOUIds;
+    }
+
+    /**
+     * A struct as return parameter to get token Ids against a booster Id of
+     * a staker. Needed since EnumerableSets cannot have getters by default.
+     * @param boostersIds the booster Id to check the Items for.
+     * @param tokenIds the token Ids that are staked in that booster.
+     * @param amounts amount per token Id staked in a booster.
+     * @param totalItems total Items staked in this contract by Items staker.
+     */
+    struct GetItemUserInfo {
+        uint256 boosterId;
+        uint256[] tokenIds;
+        uint256[] amounts;
+        uint256 totalItems;
+    }
+
+    // Storage Locations
+    function stakerStateVariables()
+        internal
+        pure
+        returns (StakerStateVariables storage _stakerStateVariables)
+    {
+        bytes32 storagePosition = keccak256("diamond.storage.StateVariables");
+        assembly {
+            _stakerStateVariables.slot := storagePosition
+        }
+    }
+}

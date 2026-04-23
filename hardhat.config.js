@@ -1,25 +1,25 @@
-'use strict';
+"use strict";
 
 // Configure environment variables.
-require('dotenv').config();
+require("dotenv").config();
 
 // Include Babel so that we may use some newer JavaScript syntax.
-require('@babel/register');
+require("@babel/register");
 
 // Include Waffle with Ethers as our preferred engine for testing.
-require('@nomiclabs/hardhat-waffle');
+require("@nomiclabs/hardhat-waffle");
 
 // Include the detailed gas usage reporter for tests.
-require('hardhat-gas-reporter');
+require("hardhat-gas-reporter");
 
 // Include the contract size output display.
-require('hardhat-contract-sizer');
+require("hardhat-contract-sizer");
 
 // Include coverage checking for unit tests.
-require('solidity-coverage');
+require("solidity-coverage");
 
 // Include the Etherscan contract verifier.
-require('@nomiclabs/hardhat-etherscan');
+require("@nomiclabs/hardhat-etherscan");
 
 // Retrieve sensitive node and private key details from environment variables.
 const INFURA_PROJECT_ID = process.env.INFURA_PROJECT_ID;
